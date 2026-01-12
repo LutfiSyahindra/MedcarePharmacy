@@ -20,6 +20,8 @@ use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
 use App\Http\Controllers\ProfileController;
+use App\Notifications\TestNotification;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -241,6 +243,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/pembelian/{id}/update', [PembelianController::class, 'update'])->name('pembelian.update');
         Route::delete('/pembelian/{id}/destroy', [PembelianController::class, 'destroy'])->name('pembelian.destroy');
         Route::get('/pembelian/{id}/show', [PembelianController::class, 'show'])->name('pembelian.show');
+        Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');
 
 
     });
