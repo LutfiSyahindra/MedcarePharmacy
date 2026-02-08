@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Menu\PembelianPenerimaan;
 
+use App\Models\KonversiSatuanModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel as PembelianModel;
 
@@ -26,7 +27,7 @@ class PembelianRepository
 
     public function findByIdPembelian($id)
     {
-        $Pembelian = PembelianModel::with('details')->find($id);
+        $Pembelian = PembelianModel::with('details', 'details.satuanKonversi.satuan')->find($id);
         return $Pembelian;
     }
 
@@ -41,7 +42,8 @@ class PembelianRepository
         // Ambil header + distributor + semua detail + relasi obat
         $pembelian = PembelianModel::with([
             'distributor',
-            'details.obat'
+            'details.obat',
+            'details.satuanKonversi.satuan'
         ])->findOrFail($id);
 
         // Format data agar mudah dipakai di frontend
@@ -54,6 +56,12 @@ class PembelianRepository
         });
 
         return response()->json($pembelian);
+    }
+
+    public function getKonversiSatuan($obatId)
+    {
+        $KonversiSatuan = KonversiSatuanModel::with('satuan')->where('obat_id', $obatId)->get();
+        return $KonversiSatuan;
     }
 
 }

@@ -56,6 +56,13 @@
                         </select>
                     </div>
 
+                    <div class="col-md-3">
+                        <label class="form-label">Satuan</label>
+                        <select class="form-select satuan-select" name="satuan_id[]" disabled required>
+                            <option value="">-- Pilih Satuan --</option>
+                        </select>
+                    </div>
+
                     <div class="col-md-2">
                         <label class="form-label">Qty</label>
                         <input type="number" class="form-control" name="qty[]" min="1" value="1" required>
@@ -108,6 +115,13 @@
                     <div class="col-md-4">
                         <label class="form-label">Obat</label>
                         <select class="js-example-basic-single form-select" data-width="100%" name="obat_id[]" required>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Satuan</label>
+                        <select class="form-select satuan-select" name="satuan_id[]" disabled required>
+                            <option value="">-- Pilih Satuan --</option>
                         </select>
                     </div>
 
@@ -293,22 +307,85 @@
         $(document).on('change', 'select[name="obat_id[]"]', function() {
 
             let row = $(this).closest('.detail-item');
+            let obatId = $(this).val();
             let selectedOption = $(this).find('option:selected');
 
-            // Ambil harga dari data-harga
-            let harga = parseFloat(selectedOption.data('harga')) || 0;
+            let $satuanSelect = row.find('.satuan-select');
 
-            // Set ke input harga_estimasi
-            row.find('.harga_estimasi').val(harga);
+            // reset
+            $satuanSelect
+                .html('<option value="">-- Pilih Satuan --</option>')
+                .prop('disabled', true);
 
-            // Ambil qty
-            let qty = parseFloat(row.find('[name="qty[]"]').val()) || 0;
+            row.find('.harga_estimasi').val(0);
+            row.find('.subtotal').val(0);
 
-            // Hitung subtotal
-            row.find('.subtotal').val((qty * harga).toFixed(2));
+            if (!obatId) {
+                hitungTotal();
+                return;
+            }
 
-            // Hitung total keseluruhan
-            hitungTotal();
+            $.ajax({
+                url: "{{ route("pembelian.getKonversiSatuan") }}",
+                type: 'GET',
+                dataType: 'json',
+                data: {
+                    obat_id: obatId
+                },
+                success: function(data) {
+                    // ===== NORMALISASI (OBJECT / ARRAY) =====
+                    let list = Array.isArray(data) ? data : [data];
+
+                    if (!list.length || !list[0]?.satuan) {
+                        fallbackHargaDefault();
+                        return;
+                    }
+
+                    // urutkan konversi terkecil
+                    list.sort((a, b) => a.konversi - b.konversi);
+
+                    let options = '<option value="">-- Pilih Satuan --</option>';
+
+                    list.forEach(item => {
+                        options += `
+                    <option value="${item.id}"
+                            data-konversi="${item.konversi}">
+                        ${item.satuan.nama}
+                    </option>
+                `;
+                    });
+
+                    $satuanSelect
+                        .html(options)
+                        .prop('disabled', false);
+
+                    // ================= EDIT MODE =================
+                    if (editMode) {
+                        let satuanLama = row.data('satuan-terpilih');
+                        if (satuanLama) {
+                            $satuanSelect.val(satuanLama).trigger('change');
+                        }
+                    }
+                    // ================= TAMBAH MODE =================
+                    else {
+                        $satuanSelect.prop('selectedIndex', 1).trigger('change');
+                    }
+                },
+                error: function() {
+                    fallbackHargaDefault();
+                }
+            });
+
+            // ===== FALLBACK JIKA TIDAK ADA KONVERSI =====
+            function fallbackHargaDefault() {
+                let harga = parseFloat(selectedOption.data('harga')) || 0;
+                let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
+
+                row.find('.harga_estimasi').val(harga);
+                row.find('.subtotal').val((harga * qty).toFixed(2));
+
+                hitungTotal();
+            }
         });
 
         // --- Format Rupiah 
@@ -319,6 +396,28 @@
                 minimumFractionDigits: 0
             }).format(angka);
         }
+
+        // --- Konversi Satuan
+        $(document).on('change', '.satuan-select', function() {
+
+            let row = $(this).closest('.detail-item');
+            let selected = $(this).find(':selected');
+
+            let hargaDasar = parseFloat(
+                row.find('select[name="obat_id[]"] option:selected').data('harga')
+            ) || 0;
+
+            let konversi = parseFloat(selected.data('konversi')) || 1;
+            let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
+
+            let harga = hargaDasar * konversi;
+
+            row.find('.harga_estimasi').val(harga);
+            row.find('.subtotal').val((harga * qty).toFixed(2));
+
+            hitungTotal();
+        });
+
         // =================== End Inisiasi Event Handler ===============
 
         // =================== Inisiasi DataTable ======================
@@ -492,86 +591,95 @@
 
         // --- Edit Pembelian
         window.editPembelian = function(id) {
+
             editMode = true;
+
             $.ajax({
                 url: "{{ route("pembelian.edit", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
-                    editMode = true;
 
-                    // response langsung header
                     let header = response;
-                    // detail ada di "details"
                     let detail = response.details ?? [];
 
-                    // buka modal
                     $('#pembelianModal').modal('show');
                     $('#pembelianModalLabel').text('Edit Purchase Order');
                     $('#submitForm').text('Update');
 
-                    // ID untuk update
                     $('#pembelian_id').val(header.id);
-
-                    // isi header
                     $('input[name="no_po"]').val(header.no_po);
                     $('#distributor_id').val(header.distributor_id).trigger('change');
 
-                    let tanggalFormatted = moment(response.tanggal_po).format('DD-MM-YYYY');
-                    $('input[name="tanggal"]').val(tanggalFormatted);
+                    $('input[name="tanggal"]').val(
+                        moment(header.tanggal_po).format('DD-MM-YYYY')
+                    );
 
                     $('textarea[name="catatan"]').val(header.catatan ?? '');
 
-                    // ===================== DETAIL OBAT =====================
                     $('#detail-wrapper').empty();
 
-                    detail.forEach(function(item) {
-                        let newRow = `
-                    <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Obat</label>
-                            <select class="js-example-basic-single form-select obatSelect" name="obat_id[]" required>
-                                <option value="${item.obat_id}">Loading...</option>
-                            </select>
-                        </div>
+                    detail.forEach(item => {
 
-                        <div class="col-md-2">
-                            <label class="form-label">Qty</label>
-                            <input type="number" class="form-control qtyInput" name="qty[]" value="${item.qty}" required>
-                        </div>
+                        let row = `
+                            <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3"
+                                data-satuan-terpilih="${item.satuan_konversi.id}">
 
-                        <div class="col-md-3">
-                            <label class="form-label">Harga Estimasi</label>
-                            <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]" value="${item.harga_estimasi}">
-                        </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Obat</label>
+                                    <select class="js-example-basic-single form-select obatSelect"
+                                            name="obat_id[]" required>
+                                        <option value="${item.obat_id}">Loading...</option>
+                                    </select>
+                                </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label">Subtotal</label>
-                            <input type="number" class="form-control subtotal" name="subtotal[]" value="${item.subtotal}" readonly>
-                        </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Satuan</label>
+                                    <select class="form-select satuan-select"
+                                            name="satuan_id[]" disabled required>
+                                        <option value="">-- Pilih Satuan --</option>
+                                    </select>
+                                </div>
 
-                        <div class="col-md-12 mt-2 d-flex justify-content-end">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
-                                <i class="bi bi-trash"></i> Hapus
-                            </button>
-                        </div>
-                    </div>
-                `;
+                                <div class="col-md-2">
+                                    <label class="form-label">Qty</label>
+                                    <input type="number" class="form-control"
+                                        name="qty[]" value="${item.qty}" required>
+                                </div>
 
-                        $('#detail-wrapper').append(newRow);
+                                <div class="col-md-3">
+                                    <label class="form-label">Harga Estimasi</label>
+                                    <input type="number" class="form-control harga_estimasi"
+                                        name="harga_estimasi[]" value="${item.harga_estimasi}">
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">Subtotal</label>
+                                    <input type="number" class="form-control subtotal"
+                                        name="subtotal[]" value="${item.subtotal}" readonly>
+                                </div>
+
+                                <div class="col-md-12 mt-2 d-flex justify-content-end">
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-sm remove-detail">
+                                        <i class="bi bi-trash"></i> Hapus
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        $('#detail-wrapper').append(row);
                     });
 
-                    // load select2 + data obat ke semua select obat
+
+                    // load obat + trigger change otomatis
                     $('.obatSelect').each(function(i) {
-                        loadObatInto($(this), detail[i]
-                            .obat_id); // <--- pilih obat sesuai database
+                        loadObatInto($(this), detail[i].obat_id);
                     });
 
-
-                    // hitung total
                     hitungTotal();
                 }
             });
-        }
+        };
 
         // --- Detail
         window.lihatPembelian = function(id) {
@@ -579,6 +687,7 @@
                 url: "{{ route("pembelian.show", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(res) {
+                    console.log(res);
 
                     let po = res.original; // <--- KUNCI PENTING
                     let detail = po.details;
@@ -600,6 +709,7 @@
                         $('#detailObatTable tbody').append(`
                     <tr>
                         <td>${item.nama_obat}</td>
+                        <td>${item.satuan_konversi.satuan.nama}</td>
                         <td>${item.qty}</td>
                         <td>Rp ${Number(item.harga_estimasi).toLocaleString('id-ID')}</td>
                         <td>Rp ${Number(item.subtotal).toLocaleString('id-ID')}</td>

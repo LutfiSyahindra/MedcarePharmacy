@@ -68,6 +68,7 @@
                                 <thead class="table-light border rounded-3">
                                     <tr>
                                         <th>Nama Obat</th>
+                                        <th>Satuan</th>
                                         <th>Qty</th>
                                         <th>Harga Estimasi</th>
                                         <th>Subtotal</th>

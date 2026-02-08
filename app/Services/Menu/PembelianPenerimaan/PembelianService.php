@@ -109,5 +109,11 @@ class PembelianService
         return PembelianDetailModel::where('purchase_order_id', $poId)->delete();
     }
 
+    public function getKonversiSatuan($obatId)
+    {
+        $KonversiSatuan = $this->PembelianRepository->getKonversiSatuan($obatId);
+        return $KonversiSatuan;
+    }
+
 
 }

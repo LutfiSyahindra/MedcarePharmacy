@@ -2,7 +2,9 @@
 
 namespace App\Models\Menu\PembelianPenerimaan;
 
+use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\SatuansModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,4 +25,13 @@ class PembelianDetailModel extends Model
     {
         return $this->belongsTo(MasterObatModel::class);
     }
+
+    public function satuanKonversi()
+    {
+        return $this->belongsTo(
+            KonversiSatuanModel::class,
+            'satuan_konversi'
+        );
+    }
+
 }

@@ -62,36 +62,51 @@
 
                     <div id="detail-wrapper">
                         <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3">
+
+                            <!-- OBAT -->
                             <div class="col-md-4">
                                 <label class="form-label">Obat</label>
-                                <select class="js-example-basic-single form-select" data-width="100%" name="obat_id[]"
-                                    required>
-                                    <!-- Data obat di-load via AJAX -->
+                                <select class="js-example-basic-single form-select obat-select" data-width="100%"
+                                    name="obat_id[]" required>
+                                    <!-- via AJAX -->
                                 </select>
                             </div>
 
-                            <div class="col-md-2">
-                                <label class="form-label">Qty</label>
-                                <input type="number" class="form-control" name="qty[]" min="1" value="1"
-                                    required>
+                            <!-- SATUAN -->
+                            <div class="col-md-3">
+                                <label class="form-label">Satuan</label>
+                                <select class="form-select satuan-select" name="satuan_id[]" required>
+                                    <option value="">-- Pilih Satuan --</option>
+                                </select>
                             </div>
 
+                            <!-- QTY -->
+                            <div class="col-md-2">
+                                <label class="form-label">Qty</label>
+                                <input type="number" class="form-control qty" name="qty[]" min="1"
+                                    value="1" required>
+                            </div>
+
+                            <!-- HARGA -->
                             <div class="col-md-3">
                                 <label class="form-label">Harga Estimasi</label>
                                 <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]"
                                     min="0" step="0.01" value="0">
                             </div>
 
+                            <!-- SUBTOTAL -->
                             <div class="col-md-3">
                                 <label class="form-label">Subtotal</label>
                                 <input type="number" class="form-control subtotal" name="subtotal[]" readonly>
                             </div>
 
+                            <!-- HAPUS -->
                             <div class="col-md-12 mt-2 d-flex justify-content-end">
                                 <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                                     <i class="bi bi-trash"></i> Hapus
                                 </button>
                             </div>
+
                         </div>
                     </div>
 

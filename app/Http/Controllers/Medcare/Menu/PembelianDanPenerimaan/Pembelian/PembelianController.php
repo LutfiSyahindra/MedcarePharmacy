@@ -73,6 +73,12 @@ class PembelianController extends Controller
         return response()->json($obat);
     }
 
+    public function getKonversiSatuan(Request $request){
+        $KonversiSatuan = $this->PembelianService->getKonversiSatuan($request->obat_id);
+        // Log::info($KonversiSatuan);    
+        return response()->json($KonversiSatuan);
+    }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -97,6 +103,7 @@ class PembelianController extends Controller
             'qty.*'            => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
             'subtotal.*'       => 'required|numeric|min:0',
+            'satuan_id.*'       => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
@@ -123,6 +130,7 @@ class PembelianController extends Controller
                     'qty'               => $request->qty[$i],
                     'harga_estimasi'    => $request->harga_estimasi[$i],
                     'subtotal'          => $request->subtotal[$i],
+                    'satuan_konversi'         => $request->satuan_id[$i],
                 ]);
             }
 
@@ -158,6 +166,7 @@ class PembelianController extends Controller
     public function show(string $id)
     {
         $Pembelian = $this->PembelianService->DetailPembelian($id);
+        Log::info($Pembelian);
         return response()->json($Pembelian);
     }
 
@@ -167,7 +176,6 @@ class PembelianController extends Controller
     public function edit(string $id)
     {
         $Pembelian = $this->PembelianService->findByIdPembelian($id);
-        Log::info($Pembelian);
         return response()->json($Pembelian);
     }
 
@@ -187,6 +195,7 @@ class PembelianController extends Controller
             'qty.*'            => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
             'subtotal.*'       => 'required|numeric|min:0',
+            'satuan_id.*'       => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
@@ -218,6 +227,7 @@ class PembelianController extends Controller
                     'qty'               => $request->qty[$i],
                     'harga_estimasi'    => $request->harga_estimasi[$i],
                     'subtotal'          => $request->subtotal[$i],
+                    'satuan_konversi'   => $request->satuan_id[$i],
                 ]);
             }
 
