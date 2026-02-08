@@ -237,6 +237,37 @@
             {{-- Menu --}}
             <li class="nav-item nav-category">Menu</li>
             <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="collapse" href="#notifikasi" role="button"
+                    aria-expanded="false" aria-controls="notifikasi">
+                    <i class="link-icon" data-feather="bell"></i>
+
+                    <span class="link-title">
+                        Notifikasi
+                        {{-- 🔔 CONTAINER KHUSUS BADGE --}}
+                        <span id="notif-badge-container">
+                            @if (auth()->user()->unreadNotifications->count())
+                                <span class="badge bg-danger ms-1" id="notif-count">
+                                    {{ auth()->user()->unreadNotifications->count() }}
+                                </span>
+                            @endif
+                        </span>
+                    </span>
+
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+
+                <div class="collapse" id="notifikasi">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item">
+                            <a href="{{ route("notifikasi.SemuaNotifikasi") }}" class="nav-link">
+                                📩 Semua Notifikasi
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#pembelian" role="button"
                     aria-expanded="false" aria-controls="pembelian">
                     <i class="link-icon" data-feather="shopping-bag"></i>

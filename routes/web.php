@@ -13,6 +13,8 @@ use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
+use App\Http\Controllers\Medcare\Notifikasi\MainController;
+use App\Http\Controllers\Medcare\Notifikasi\PembelianNotifikasiController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
 use App\Http\Controllers\Medcare\Settings\Auth\RoleController;
 use App\Http\Controllers\Medcare\Settings\Auth\UsersController;
@@ -36,6 +38,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::prefix('medcare/menu/notifikasi')->group(function () {
+        Route::get('/notifikasi/latest', [MainController::class, 'latest'])->name('notifikasi.latest');
+        Route::get('/notifikasi', [MainController::class, 'index'])->name('notifikasi.SemuaNotifikasi');
+        Route::post('/notifikasi/mark-all-read', [MainController::class, 'markAllRead'])->name('notifikasi.markAllRead');
+        Route::get('/notifikasi/table', [MainController::class, 'table'])->name('notifikasi.table');
+        Route::post('/notifikasi/readNotifikasi', [MainController::class, 'readNotifikasi'])->name('notifikasi.readNotifikasi');
+    });
 
     Route::prefix('medcare/settings')->group(function () {
         // Users

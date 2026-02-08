@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
 use App\Services\Settings\Master\DistributorService;
 use App\Services\Settings\Master\MasterObatService;
@@ -12,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
+use App\Notifications\PoCreatedNotification;
+use Illuminate\Support\Facades\Notification;
+
 
 class PembelianController extends Controller
 {
@@ -123,6 +127,18 @@ class PembelianController extends Controller
             }
 
             DB::commit();
+
+            // ======================
+            // 🔔 KIRIM NOTIFIKASI
+            // ======================
+            $approvers = User::role(['admin'])->get();
+
+            if ($approvers->count()) {
+                Notification::send(
+                    $approvers,
+                    new PoCreatedNotification($po)
+                );
+            }
 
             return response()->json([
                 'status' => 'success',
