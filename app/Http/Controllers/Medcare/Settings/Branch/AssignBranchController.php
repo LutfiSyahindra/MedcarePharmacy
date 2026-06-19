@@ -33,9 +33,11 @@ class AssignBranchController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataBranch) {
             return '
-                <button class="btn btn-sm btn-success" onclick="assignBranch(' . $dataBranch['id'] . ')"> 
-                    <i class="mdi mdi-account-plus"></i>
-                </button> 
+                <div class="branch-action-group">
+                    <button type="button" class="btn branch-action-btn branch-action-assign" title="Assign user" onclick="assignBranch(' . $dataBranch['id'] . ')"> 
+                        <i class="mdi mdi-account-plus-outline"></i>
+                    </button>
+                </div>
             ';
         })
 

@@ -37,12 +37,16 @@ class KonversiSatuanObatController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataKonversiSatuanObat) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="obat-action-group">
+                    <button type="button" class="btn obat-action-btn obat-action-edit" title="Edit"
+                        onclick="editKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn obat-action-btn obat-action-delete" title="Hapus"
+                        onclick="deleteKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')">
+                        <i class="mdi mdi-trash-can-outline"></i>
+                    </button>
+                </div>
             ';
         })
 

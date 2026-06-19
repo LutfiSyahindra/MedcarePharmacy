@@ -30,12 +30,14 @@ class SatuanController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataSatuan) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editSatuan(' . $dataSatuan['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteSatuan(' . $dataSatuan['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="satuan-action-group">
+                    <button type="button" class="btn satuan-action-btn satuan-action-edit" title="Edit satuan" onclick="editSatuan(' . $dataSatuan['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn satuan-action-btn satuan-action-delete" title="Hapus satuan" onclick="deleteSatuan(' . $dataSatuan['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -102,12 +104,13 @@ class SatuanController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Satuan updated successfully',
+            'message' => 'Satuan berhasil diperbarui',
             'data'    => $dataSatuan
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->SatuanService->updateStatus($request->id, $request->status);
     }
 

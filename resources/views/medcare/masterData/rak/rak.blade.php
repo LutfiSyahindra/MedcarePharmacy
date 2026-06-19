@@ -6,84 +6,78 @@
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
     @include("template.AddOn.dropify")
+    @include("medcare.masterData.rak.partials.style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.rak.modalMain")
-    @include("medcare.masterData.rak.modalExcell")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">RAK PENYIMPANAN</a></li>
-            <li class="breadcrumb-item active" aria-current="page">RAK PENYIMPANAN rak</li>
-        </ol>
-    </nav>
+    <div class="rak-page">
+        @include("medcare.masterData.rak.modalMain")
+        @include("medcare.masterData.rak.modalExcell")
+        @include("medcare.masterData.rak.partials.header")
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-archive mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Rak</h5>
-                                <small class="text-muted">Kelola dan cari data Rak dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchRak" class="form-control border-start-0"
-                                    placeholder="Cari Rak...">
-                            </div>
-
-                            <!-- Tombol Import Excel -->
-                            <button type="button" class="btn btn-success btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#rakModalExcell">
-                                <i class="mdi mdi-file-excel me-1"></i>
-                                <span>Import</span>
-                            </button>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#rakModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table id="tableRak" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Rak Penyimpanan</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="rak-stats-grid">
+            <div class="rak-stat">
+                <span class="rak-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="rakTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh rak penyimpanan obat yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="rak-stat">
+                <span class="rak-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="rakFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="rak-stat">
+                <span class="rak-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="rakSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai rak.</small>
                 </div>
             </div>
         </div>
+
+        <section class="rak-table-section">
+            <div class="rak-table-toolbar">
+                <div class="rak-table-title">
+                    <span class="rak-table-title-icon"><i class="mdi mdi-archive-marker-outline"></i></span>
+                    <div>
+                        <h5>Daftar Rak Penyimpanan</h5>
+                        <p>Kelola kode, nama rak, lokasi, dan status aktif penyimpanan obat.</p>
+                    </div>
+                </div>
+                <div class="rak-table-tools">
+                    <label class="rak-search" for="rakSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="rakSearch" placeholder="Cari kode, rak, atau lokasi...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tableRak" class="table rak-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Rak Penyimpanan</th>
+                            <th>Lokasi</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.rak.partials.scripts")
     @include("medcare.masterData.rak.jsMain")
 @endpush

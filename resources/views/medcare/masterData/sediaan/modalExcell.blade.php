@@ -1,57 +1,55 @@
-<!-- Modal Upload Golongan Excel -->
-<div class="modal fade" id="sediaanModalExcell" tabindex="-1" aria-labelledby="sediaanModalExcellLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade sediaan-modal" id="sediaanModalExcell" tabindex="-1" aria-labelledby="sediaanModalExcellLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="sediaanModalExcellLabel">Upload Data Sediaan (Excel)</h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-file-excel-outline"></i></span>
+                    <div>
+                        <h5 class="modal-title" id="sediaanModalExcellLabel">Import Sediaan</h5>
+                        <p class="modal-subtitle">Upload file Excel dari template resmi agar data sediaan tetap konsisten.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
-                <form id="sediaanExcellForm" enctype="multipart/form-data">
+                <form id="sediaanExcelForm" enctype="multipart/form-data">
                     @csrf
-                    <div class="row g-3">
-                        <div class="col-md-12 mb-3">
-                            <div class="alert alert-info border-start border-3 border-info shadow-sm" role="alert">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong class="fs-6 mb-0">Note:</strong>
-                                    <button type="button" id="downloadTemplateBtn"
-                                        class="btn btn-primary btn-sm d-flex align-items-center">
-                                        <i data-feather="download" class="me-1"></i>
-                                        Download Template
-                                    </button>
-                                </div>
-                                <ol class="mb-0 ps-3">
-                                    <li>Unduh template dengan tombol di atas.</li>
-                                    <li>Isi data pada template sesuai kolom yang tersedia.</li>
-                                    <li>Upload kembali template yang telah diisi.</li>
-                                </ol>
-                            </div>
-                        </div>
 
-                        <div class="col-md-12">
-                            <label class="form-label fw-bold mb-2">Pilih File Excel</label>
-                            <input type="file" id="myDropify" name="file" class="dropify"
-                                data-allowed-file-extensions="xls xlsx" data-max-file-size="5M" />
-                            <small class="text-muted">Format file yang diperbolehkan: .xls, .xlsx (maks. 5MB)</small>
+                    <div class="sediaan-import-panel">
+                        <div>
+                            <strong>Langkah import data</strong>
+                            <ol class="sediaan-import-steps">
+                                <li>Download template Excel.</li>
+                                <li>Isi kode dan nama sediaan sesuai kolom template.</li>
+                                <li>Upload kembali file yang sudah lengkap.</li>
+                            </ol>
                         </div>
+                        <button type="button" id="sediaanDownloadTemplateBtn" class="btn btn-primary btn-sm">
+                            <i class="mdi mdi-download"></i>
+                            Download Template
+                        </button>
                     </div>
 
-                    <!-- Modal Footer -->
-                    <div class="modal-footer mt-4">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i data-feather="x"></i> Tutup
+                    <div class="sediaan-field">
+                        <label class="form-label fw-bold mb-2">File Excel</label>
+                        <input type="file" id="sediaanExcelInput" name="file" class="dropify"
+                            data-allowed-file-extensions="xls xlsx" data-max-file-size="5M">
+                        <small class="sediaan-form-hint">Format yang diperbolehkan: .xls atau .xlsx, maksimal 5MB.</small>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close"></i>
+                            Tutup
                         </button>
-                        <button type="button" id="submitFormExcell" class="btn btn-primary">
-                            <i data-feather="upload"></i> Upload
+                        <button type="button" id="sediaanSubmitExcel" class="btn btn-primary">
+                            <i class="mdi mdi-upload"></i>
+                            Upload
                         </button>
                     </div>
                 </form>
             </div>
-
         </div>
     </div>
 </div>

@@ -38,12 +38,14 @@ class BranchController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataBranch) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editBranch(' . $dataBranch['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger" onclick="deleteBranch(' . $dataBranch['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="branch-action-group">
+                    <button type="button" class="btn branch-action-btn branch-action-edit" title="Edit branch" onclick="editBranch(' . $dataBranch['id'] . ')"> 
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button> 
+                    <button type="button" class="btn branch-action-btn branch-action-delete" title="Hapus branch" onclick="deleteBranch(' . $dataBranch['id'] . ')">  
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -79,7 +81,7 @@ class BranchController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'User berhasil dibuat',
+            'message' => 'Branch berhasil dibuat',
             'data' => $branchCreate
         ]);
     }
@@ -106,21 +108,19 @@ class BranchController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        // ✅ validasi sesuai field dari FORM
         $validated = $request->validate([
-            'nama'   => 'required|string|max:255',
-            'kode'   => 'required|string|max:50|unique:branches,code,' . $id,
-            'alamat' => 'nullable|string',
-            'noHp'   => 'nullable|string|max:20',
-            'email'  => 'nullable|email',
+            'code'    => 'required|string|max:50|unique:branches,code,' . $id,
+            'name'    => 'required|string|max:100',
+            'address' => 'nullable|string|max:255',
+            'phone'   => 'nullable|string|max:20',
+            'email'   => 'nullable|email|max:100',
         ]);
 
-        // ✅ mapping ke field model
         $data = [
-            'name'    => $validated['nama'],
-            'code'    => $validated['kode'],
-            'address' => $validated['alamat'],
-            'phone'   => $validated['noHp'],
+            'name'    => $validated['name'],
+            'code'    => $validated['code'],
+            'address' => $validated['address'] ?? null,
+            'phone'   => $validated['phone'] ?? null,
             'email'   => $validated['email'] ?? null,
         ];
 
@@ -129,7 +129,7 @@ class BranchController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Branch updated successfully',
+            'message' => 'Branch berhasil diperbarui',
             'data'    => $branch
         ], 200);
     }

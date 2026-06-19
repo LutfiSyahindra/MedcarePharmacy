@@ -26,6 +26,8 @@ License: For each use you must have a valid license purchased only from above li
                 @include("template.partials.navbar")
                 <!-- partial -->
 
+                @include("template.partials.page-tabs")
+
                 <div class="page-content">
 
                     @yield("content")

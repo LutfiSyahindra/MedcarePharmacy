@@ -1,27 +1,23 @@
 <script>
     $(document).ready(function() {
+        const userSubmitDefault = '<i class="mdi mdi-content-save-outline"></i>Simpan User';
+        const userSubmitUpdate = '<i class="mdi mdi-content-save-edit-outline"></i>Update User';
+        const assignRolesDefault = '<i class="mdi mdi-account-check-outline"></i>Simpan Role';
+
+        AuthUI.wirePasswordToggles();
 
         $('#usersModal').on('show.bs.modal', function() {
-            let form = $('#signupForm');
-            $('#usersModalLabel').text('ADD USERS');
-            // reset form
+            const form = $('#signupForm');
+            $('#usersModalLabel').text('Tambah User');
             form.trigger('reset');
-
-            // reset error message kalau ada
-            form.find('.invalid-feedback').text('');
-            form.find('.form-control').removeClass('is-invalid');
-
-            // reset hidden userId
+            AuthUI.clearValidation('#signupForm');
             $('#userId').val('');
+            $('#submitForm').html(userSubmitDefault).prop('disabled', false);
         });
 
-        let userTable = $('#tableUsers').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            autoWidth: false,
+        let userTable = $('#tableUsers').DataTable(AuthUI.dataTableOptions({
             ajax: {
-                url: "{{ route("users.table") }}", // pastikan route ini ada
+                url: "{{ route("users.table") }}",
                 type: "GET"
             },
             columns: [{
@@ -32,24 +28,57 @@
                 },
                 {
                     data: 'name',
-                    name: 'name'
+                    name: 'name',
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+
+                        const safeName = AuthUI.escapeHtml(data);
+                        const initials = AuthUI.getInitials(data);
+                        return `
+                            <div class="auth-identity">
+                                <span class="auth-avatar">${initials}</span>
+                                <div>
+                                    <strong title="${safeName}">${safeName}</strong>
+                                    <small>ID #${AuthUI.escapeHtml(row.id)}</small>
+                                </div>
+                            </div>
+                        `;
+                    }
                 },
                 {
                     data: 'email',
-                    name: 'email'
+                    name: 'email',
+                    render: function(data, type) {
+                        if (type !== 'display') return data;
+
+                        const safeEmail = AuthUI.escapeHtml(data);
+                        return `
+                            <a href="mailto:${safeEmail}" class="auth-email-link">
+                                <i class="mdi mdi-email-outline"></i>
+                                ${safeEmail}
+                            </a>
+                        `;
+                    }
                 },
                 {
                     data: 'status',
                     name: 'status',
-                    render: function(data, type, row, meta) {
-                        // jika status aktif = 1, checkbox dicentang
-                        let checked = data == 1 ? 'checked' : '';
+                    render: function(data, type, row) {
+                        const isActive = Number(data) === 1;
+                        const checked = isActive ? 'checked' : '';
+                        const label = isActive ? 'Aktif' : 'Nonaktif';
+                        const statusClass = isActive ? 'is-active' : 'is-inactive';
+
                         return `
-                        <div class="form-check form-switch mb-0">
-                            <input type="checkbox" class="form-check-input toggle-status" data-id="${row.id}" ${checked} id="switch${row.id}">
-                            <label class="form-check-label" for="switch${row.id}"></label>
-                        </div>
-                    `;
+                            <div class="auth-status-wrap">
+                                <div class="form-check form-switch mb-0">
+                                    <input type="checkbox" class="form-check-input toggle-status"
+                                        data-id="${row.id}" ${checked} id="switch${row.id}">
+                                    <label class="form-check-label" for="switch${row.id}"></label>
+                                </div>
+                                <span class="auth-status-text ${statusClass}">${label}</span>
+                            </div>
+                        `;
                     },
                     orderable: false,
                     searchable: false
@@ -61,137 +90,160 @@
                     searchable: false
                 }
             ]
+        }));
+
+        AuthUI.initTableTools({
+            table: userTable,
+            tableSelector: '#tableUsers',
+            searchSelector: '#usersSearch',
+            totalTarget: '#usersTotalCount',
+            filteredTarget: '#usersFilteredCount',
+            selectedTarget: '#usersSelectedCount'
         });
 
         $('#tableUsers').on('change', '.toggle-status', function() {
-            let userId = $(this).data('id');
-            let status = $(this).is(':checked') ? 1 : 0;
-            console.log('User ID: ' + userId + ', Status: ' + status);
+            const $toggle = $(this);
+            const userId = $toggle.data('id');
+            const status = $toggle.is(':checked') ? 1 : 0;
+            const previousStatus = status ? 0 : 1;
+            const $statusText = $toggle.closest('.auth-status-wrap').find('.auth-status-text');
+
+            $toggle.prop('disabled', true);
 
             $.ajax({
-                url: "{{ route("users.updateStatus") }}", // pastikan route ini ada
+                url: "{{ route("users.updateStatus") }}",
                 method: 'PUT',
                 data: {
                     _token: '{{ csrf_token() }}',
                     status: status,
                     id: userId
                 },
-                success: function(response) {
-                    console.log('Status updated!');
-                    // SweetAlert
+                success: function() {
+                    $statusText
+                        .toggleClass('is-active', status === 1)
+                        .toggleClass('is-inactive', status !== 1)
+                        .text(status === 1 ? 'Aktif' : 'Nonaktif');
+
                     Swal.fire({
                         icon: 'success',
-                        title: 'Berhasil!',
+                        title: 'Berhasil',
                         text: 'Status user berhasil diperbarui.',
                         timer: 1500,
                         showConfirmButton: false
                     });
                 },
-                error: function(err) {
-                    console.log(err);
+                error: function() {
+                    $toggle.prop('checked', previousStatus === 1);
+                    $statusText
+                        .toggleClass('is-active', previousStatus === 1)
+                        .toggleClass('is-inactive', previousStatus !== 1)
+                        .text(previousStatus === 1 ? 'Aktif' : 'Nonaktif');
+
                     Swal.fire({
                         icon: 'error',
-                        title: 'Gagal!',
+                        title: 'Gagal',
                         text: 'Terjadi kesalahan saat mengubah status.',
                         timer: 1500,
                         showConfirmButton: false
                     });
+                },
+                complete: function() {
+                    $toggle.prop('disabled', false);
                 }
             });
         });
 
         $('#signupForm').on('submit', function(e) {
             e.preventDefault();
+            AuthUI.clearValidation('#signupForm');
 
-            let formData = $(this).serialize();
-            let userId = $('#userId').val(); // Ambil ID user jika ada
-            let url = userId ? `/medcare/settings/users/${userId}/update` :
-                "{{ route("users.store") }}"; // Tentukan URL
-            let method = userId ? 'PUT' : 'POST'; // Tentukan metode
+            const formData = $(this).serialize();
+            const userId = $('#userId').val();
+            const url = userId ? "{{ route("users.update", ":id") }}".replace(':id', userId) :
+                "{{ route("users.store") }}";
+            const method = userId ? 'PUT' : 'POST';
+            const normalLabel = userId ? userSubmitUpdate : userSubmitDefault;
 
             Swal.fire({
-                title: userId ? 'Apakah Anda yakin ingin memperbarui data ini?' :
-                    'Apakah Anda yakin ingin menambahkan data ini?',
+                title: userId ? 'Perbarui data user ini?' : 'Tambahkan user baru?',
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: 'Ya, simpan!',
+                confirmButtonText: 'Ya, simpan',
                 cancelButtonText: 'Batal',
                 reverseButtons: true
             }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: url,
-                        method: method,
-                        data: formData,
-                        success: function(response) {
-                            if (response.status === 'success') {
-                                $('#usersModal').modal('hide');
+                if (!result.isConfirmed) return;
 
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: response.message,
-                                    toast: true,
-                                    position: 'top-end',
-                                    timer: 3000,
-                                    timerProgressBar: true,
-                                    showConfirmButton: false,
-                                });
+                AuthUI.setButtonLoading('#submitForm', true, 'Menyimpan...', normalLabel);
 
-                                $('#signupForm')[0].reset();
-                                $('#userId').val(''); // Reset ID
-                                userTable.ajax.reload();
-                            }
-                        },
-                        error: function(xhr) {
-                            if (xhr.status === 422) {
-                                let errors = xhr.responseJSON.errors;
-                                for (let key in errors) {
-                                    $(`#error-${key}`).text(errors[key][0]);
-                                    $(`#${key}`).addClass('is-invalid');
-                                }
-                            }
+                $.ajax({
+                    url: url,
+                    method: method,
+                    data: formData,
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            $('#usersModal').modal('hide');
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: response.message,
+                                toast: true,
+                                position: 'top-end',
+                                timer: 3000,
+                                timerProgressBar: true,
+                                showConfirmButton: false,
+                            });
+
+                            $('#signupForm')[0].reset();
+                            $('#userId').val('');
+                            userTable.ajax.reload(null, false);
                         }
-                    });
-                }
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 422) {
+                            const errors = xhr.responseJSON.errors;
+                            for (let key in errors) {
+                                $(`#error-${key}`).text(errors[key][0]);
+                                $(`#${key}`).addClass('is-invalid').closest('.auth-field').addClass('has-error');
+                            }
+                            return;
+                        }
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: 'Terjadi kesalahan saat menyimpan user.'
+                        });
+                    },
+                    complete: function() {
+                        AuthUI.setButtonLoading('#submitForm', false, 'Menyimpan...', normalLabel);
+                    }
+                });
             });
         });
-
 
         window.editUsers = function(userId) {
             const modal = $('#usersModal');
             modal.modal('show');
 
-            // reset form & error state
             $('#signupForm')[0].reset();
-            $('#signupForm .invalid-feedback').text('');
-            $('#signupForm .form-control').removeClass('is-invalid');
-
-            // set hidden ID user
+            AuthUI.clearValidation('#signupForm');
             $('#userId').val(userId);
+            $('#submitForm').html(userSubmitUpdate).prop('disabled', false);
 
             $.ajax({
                 url: "{{ route("users.edit", ":id") }}".replace(':id', userId),
                 method: 'GET',
                 success: function(response) {
-                    console.log(response);
-
-                    // ubah judul dan tombol
-                    $('#usersModalLabel').text('EDIT USERS');
-                    $('#submitForm').text('Update');
-
-                    // isi field form
+                    $('#usersModalLabel').text('Edit User');
                     $('#name').val(response.name);
                     $('#email').val(response.email);
-
-                    // kalau memang ada address & phone di response,
-                    // pastikan form HTML juga punya fieldnya
                 },
-                error: function(xhr) {
-                    console.error('Gagal mengambil data user', xhr);
+                error: function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'Failed to fetch user data. Please try again.',
+                        text: 'Gagal mengambil data user. Silakan coba lagi.',
                     });
                     modal.modal('hide');
                 }
@@ -199,155 +251,168 @@
         }
 
         window.deleteUsers = function(id) {
-            // Tampilkan konfirmasi hapus
             Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: 'Users ini akan dihapus secara permanen!',
+                title: 'Hapus user ini?',
+                text: 'Data user akan dihapus secara permanen.',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Ya, hapus!',
-                cancelButtonText: 'Batal'
+                confirmButtonText: 'Ya, hapus',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
             }).then((result) => {
-                if (result.isConfirmed) {
-                    // Kirim request DELETE menggunakan AJAX
-                    $.ajax({
-                        url: "{{ route("users.delete", ":id") }}".replace(':id',
-                            id),
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire(
-                                    'Dihapus!',
-                                    response.message,
-                                    'success'
-                                );
-                                userTable.ajax.reload(); // Reload DataTables
-                            } else {
-                                Swal.fire(
-                                    'Gagal!',
-                                    response.message,
-                                    'error'
-                                );
-                            }
-                        },
-                        error: function(xhr) {
-                            Swal.fire(
-                                'Gagal!',
-                                'Terjadi kesalahan saat menghapus users.',
-                                'error'
-                            );
+                if (!result.isConfirmed) return;
+
+                $.ajax({
+                    url: "{{ route("users.delete", ":id") }}".replace(':id', id),
+                    type: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Dihapus',
+                                text: response.message,
+                                timer: 1800,
+                                showConfirmButton: false
+                            });
+                            userTable.ajax.reload(null, false);
+                            return;
                         }
-                    });
-                }
+
+                        Swal.fire('Gagal', response.message, 'error');
+                    },
+                    error: function() {
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus user.', 'error');
+                    }
+                });
             });
         }
 
         function loadRolesOptions(selectedIds = []) {
+            const normalizedSelected = selectedIds.map(String);
+
             return $.ajax({
                 url: '{{ route("users.dataRoles") }}',
-                type: 'GET',
-                success: function(response) {
-                    const rolesSelect = $('#rolesSelect');
-                    rolesSelect.empty();
+                type: 'GET'
+            }).done(function(response) {
+                const rolesSelect = $('#rolesSelect');
 
-                    // Tambah opsi satu per satu
-                    response.forEach(function(roles) {
-                        const isSelected = selectedIds.includes(roles.id.toString()) ?
-                            'selected' : '';
-                        rolesSelect.append(
-                            `<option value="${roles.id}" ${isSelected}>${roles.name}</option>`
-                        );
-                    });
-
-                    // Re-init select2
-                    rolesSelect.select2({
-                        dropdownParent: $('#assignRolesModal'),
-                        placeholder: "Pilih roles",
-                        allowClear: true,
-                        width: '100%'
-                    });
-                },
-                error: function() {
-                    alert('Gagal memuat data roles!');
+                if (rolesSelect.hasClass('select2-hidden-accessible')) {
+                    rolesSelect.select2('destroy');
                 }
+
+                rolesSelect.empty();
+                response.forEach(function(roles) {
+                    const isSelected = normalizedSelected.includes(String(roles.id)) ? 'selected' : '';
+                    rolesSelect.append(
+                        `<option value="${roles.id}" ${isSelected}>${AuthUI.escapeHtml(roles.name)}</option>`
+                    );
+                });
+
+                rolesSelect.select2({
+                    dropdownParent: $('#assignRolesModal'),
+                    placeholder: "Pilih roles",
+                    allowClear: true,
+                    width: '100%'
+                });
+
+                rolesSelect.off('change.authRoles').on('change.authRoles', function() {
+                    AuthUI.updateSelectCount('#rolesSelect', '#rolesSelectionCount');
+                });
+
+                AuthUI.updateSelectCount('#rolesSelect', '#rolesSelectionCount');
+            }).fail(function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Gagal memuat data roles.'
+                });
             });
         }
 
         window.assignRoles = function(UsersId) {
             const modal = $('#assignRolesModal');
             modal.modal('show');
-            $('#assignRolesModalLabel').text('ASSIGN ROLES');
+            $('#assignRolesModalLabel').text('Assign Roles');
             $('#userssId').val(UsersId);
-            console.log('assignRoles ID: ' + UsersId);
+            $('#assignRoles').html(assignRolesDefault).prop('disabled', false);
+            $('#rolesSelectionCount').text('0');
 
-            // Reset select dulu
-            $('#rolesSelect').val(null).trigger('change');
+            const optionsRequest = loadRolesOptions([]);
 
-            // Load semua opsi permission (jika pakai AJAX untuk pilihan permission)
-            loadRolesOptions([]);
-
-            // Ambil permissions yang sudah dimiliki role
             $.ajax({
                 url: "{{ route("users.getUserRoles", ":id") }}".replace(':id', UsersId),
                 type: "GET",
                 success: function(res) {
                     if (res.status) {
-                        // Set selected permissions di select2
-                        $('#rolesSelect').val(res.data).trigger('change');
+                        optionsRequest.done(function() {
+                            $('#rolesSelect').val((res.data || []).map(String)).trigger('change');
+                        });
                     }
                 },
                 error: function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Gagal mengambil data Roles!'
+                        text: 'Gagal mengambil data roles.'
                     });
                 }
             });
         }
 
+        $('#selectAllRoles').on('click', function() {
+            $('#rolesSelect option').prop('selected', true);
+            $('#rolesSelect').trigger('change');
+        });
+
+        $('#clearRolesSelection').on('click', function() {
+            $('#rolesSelect').val(null).trigger('change');
+        });
+
         $('#assignRolesForm').on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
+            const formData = $(this).serialize();
+            AuthUI.setButtonLoading('#assignRoles', true, 'Menyimpan...', assignRolesDefault);
 
             $.ajax({
                 url: "{{ route("users.assignRoles") }}",
                 type: "POST",
                 data: formData,
                 success: function(response) {
-                    if (response.status) { // pakai 'status' sesuai controller
-                        $('#assignRolesModal').modal('hide'); // perbaikan typo
-                        $('#assignRolesForm')[0].reset(); // perbaikan typo
+                    if (response.status) {
+                        $('#assignRolesModal').modal('hide');
+                        $('#assignRolesForm')[0].reset();
                         $('#rolesSelect').val(null).trigger('change');
-                        $('#tableUsers').DataTable().ajax.reload();
+                        userTable.ajax.reload(null, false);
 
                         Swal.fire({
                             icon: 'success',
                             title: 'Berhasil',
                             text: response.message
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message
-                        });
+                        return;
                     }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: response.message
+                    });
                 },
                 error: function(xhr) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Terjadi kesalahan server!'
+                        text: xhr.status === 422 ? 'Pilih minimal satu role.' : 'Terjadi kesalahan server.'
                     });
+                },
+                complete: function() {
+                    AuthUI.setButtonLoading('#assignRoles', false, 'Menyimpan...', assignRolesDefault);
                 }
             });
         });
-
-
     });
 </script>

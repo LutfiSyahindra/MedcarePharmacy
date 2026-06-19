@@ -6,85 +6,78 @@
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
     @include("template.AddOn.dropify")
+    @include("medcare.masterData.sediaan.partials.style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.sediaan.modalMain")
-    @include("medcare.masterData.sediaan.modalExcell")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Sediaan</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Sediaan Obat</li>
-        </ol>
-    </nav>
+    <div class="sediaan-page">
+        @include("medcare.masterData.sediaan.modalMain")
+        @include("medcare.masterData.sediaan.modalExcell")
+        @include("medcare.masterData.sediaan.partials.header")
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-bottle-tonic-outline mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Sediaan</h5>
-                                <small class="text-muted">Kelola dan cari data Sediaan Obat dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchSediaan" class="form-control border-start-0"
-                                    placeholder="Cari Sediaan...">
-                            </div>
-
-                            <!-- Tombol Import Excel -->
-                            <button type="button" class="btn btn-success btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#sediaanModalExcell">
-                                <i class="mdi mdi-file-excel me-1"></i>
-                                <span>Import</span>
-                            </button>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#sediaanModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <h6 class="card-title"></h6>
-                    <div class="table-responsive">
-                        <table id="tableSediaan" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Sediaan</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="sediaan-stats-grid">
+            <div class="sediaan-stat">
+                <span class="sediaan-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="sediaanTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh sediaan obat yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="sediaan-stat">
+                <span class="sediaan-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="sediaanFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="sediaan-stat">
+                <span class="sediaan-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="sediaanSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai data.</small>
                 </div>
             </div>
         </div>
+
+        <section class="sediaan-table-section">
+            <div class="sediaan-table-toolbar">
+                <div class="sediaan-table-title">
+                    <span class="sediaan-table-title-icon"><i class="mdi mdi-bottle-tonic-outline"></i></span>
+                    <div>
+                        <h5>Daftar Sediaan Obat</h5>
+                        <p>Kelola kode, nama, keterangan, dan status aktif sediaan.</p>
+                    </div>
+                </div>
+                <div class="sediaan-table-tools">
+                    <label class="sediaan-search" for="sediaanSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="sediaanSearch" placeholder="Cari kode, nama, atau keterangan...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tableSediaan" class="table sediaan-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Sediaan</th>
+                            <th>Keterangan</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.sediaan.partials.scripts")
     @include("medcare.masterData.sediaan.jsMain")
 @endpush

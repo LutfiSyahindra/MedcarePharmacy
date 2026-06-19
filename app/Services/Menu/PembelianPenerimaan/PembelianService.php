@@ -57,7 +57,7 @@ class PembelianService
                 'status'        => $r->status ?? '-',
                 'catatan'       => $r->catatan ?? '-',
                 'created_by'    => $r->createdBy->name ?? '-',
-                'approved_by'   => $r->approved_by,
+                'approved_by'   => $r->approvedBy->name ?? null,
             ];
         }
 
@@ -94,9 +94,9 @@ class PembelianService
         return $Pembelian;
     }
 
-    public function updateStatus($id, $status)
+    public function updateStatus($id, $status, $approvedBy = null)
     {
-        return $this->PembelianRepository->updateStatus($id, $status);
+        return $this->PembelianRepository->updateStatus($id, $status, $approvedBy);
     }
 
     public function deletePembelian($id)

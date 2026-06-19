@@ -1,99 +1,100 @@
 <script>
     $(document).ready(function() {
-
-        // --- Setup CSRF untuk semua AJAX request
         $.ajaxSetup({
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
         });
 
-        // --- Reset modal ketika dibuka
-        $('#golonganModal').on('show.bs.modal', function() {
-            let form = $('#golonganForm');
-            $('#golonganModalLabel').text('ADD GOLONGAN OBAT');
-            form.trigger('reset');
-            $('#submitForm').text('Add');
-            $('#addInput').show();
+        const modalSelector = '#golonganModal';
+        const formSelector = '#golonganForm';
+        const wrapperSelector = '#golonganInputWrapper';
+        const submitSelector = '#submitGolonganForm';
+        const addButtonSelector = '#addGolonganInput';
 
-            // reset error message
-            form.find('.invalid-feedback').text('');
-            form.find('.form-control').removeClass('is-invalid');
-            $('#golonganId').val('');
+        if ($.fn.dropify) {
+            $('#golonganExcelInput').dropify();
+        }
 
-            // reset input-wrapper jadi hanya 1 row
-            $('#input-wrapper').html(`
-                <div class="row g-3 mb-2 input-group-item">
-                            <div class="col-md-3">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="kode[]" type="text" placeholder="Contoh: ANT">
-                                <div class="invalid-feedback"></div>
-                            </div>
+        function golonganRow(mode = 'create', data = {}) {
+            const isEdit = mode === 'edit';
+            const kodeName = isEdit ? 'kode' : 'kode[]';
+            const namaName = isEdit ? 'nama' : 'nama[]';
+            const keteranganName = isEdit ? 'keterangan' : 'keterangan[]';
+            const kodeValue = GolonganUI.escapeHtml(data.kode || '');
+            const namaValue = GolonganUI.escapeHtml(data.nama || '');
+            const keteranganValue = GolonganUI.escapeHtml(data.keterangan || '');
 
-                            <div class="col-md-4">
-                                <label class="form-label">Golongan</label>
-                                <input class="form-control" name="nama[]" type="text"
-                                    placeholder="Contoh: Antibiotik">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label">Keterangan</label>
-                                <input class="form-control" name="keterangan[]" type="text"
-                                    placeholder="Deskripsi tambahan (opsional)">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-1 d-flex align-items-end">
-                                <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                            </div>
+            return `
+                <div class="golongan-batch-row">
+                    <div class="golongan-field is-code">
+                        <label class="form-label">Kode</label>
+                        <div class="golongan-input-shell">
+                            <span class="golongan-input-icon"><i class="mdi mdi-pound"></i></span>
+                            <input class="form-control" name="${kodeName}" type="text" value="${kodeValue}" placeholder="ANT">
                         </div>
-            `);
-        });
-
-        // --- Tambah input baru
-        $(document).on('click', '#addInput', function() {
-            let newInput = `
-                <div class="row g-3 mb-2 input-group-item">
-                            <div class="col-md-3">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="kode[]" type="text" placeholder="Contoh: ANT">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label">Golongan</label>
-                                <input class="form-control" name="nama[]" type="text"
-                                    placeholder="Contoh: Antibiotik">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label">Keterangan</label>
-                                <input class="form-control" name="keterangan[]" type="text"
-                                    placeholder="Deskripsi tambahan (opsional)">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-1 d-flex align-items-end">
-                                <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                            </div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    <div class="golongan-field is-name">
+                        <label class="form-label">Golongan</label>
+                        <div class="golongan-input-shell">
+                            <span class="golongan-input-icon"><i class="mdi mdi-shape-outline"></i></span>
+                            <input class="form-control" name="${namaName}" type="text" value="${namaValue}" placeholder="Contoh: Antibiotik">
                         </div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    <div class="golongan-field is-description">
+                        <label class="form-label">Keterangan</label>
+                        <div class="golongan-input-shell">
+                            <span class="golongan-input-icon"><i class="mdi mdi-text-box-outline"></i></span>
+                            <input class="form-control" name="${keteranganName}" type="text" value="${keteranganValue}" placeholder="Deskripsi tambahan opsional">
+                        </div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    ${isEdit ? '' : `
+                        <div class="golongan-field is-action">
+                            <button type="button" class="btn btn-outline-danger golongan-row-remove remove-golongan-input" title="Hapus baris">
+                                <i class="mdi mdi-delete-outline"></i>
+                            </button>
+                        </div>
+                    `}
+                </div>
             `;
-            $('#input-wrapper').append(newInput);
+        }
+
+        function resetAddMode() {
+            const $form = $(formSelector);
+
+            $('#golonganModalLabel').text('Tambah Golongan');
+            $('#golonganModalSubtitle').text('Buat satu atau beberapa golongan obat.');
+            $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
+            $('#golonganId').val('');
+            $('#golonganBatchToolbar').show();
+            $form.trigger('reset');
+            GolonganUI.clearValidation(formSelector);
+            $(wrapperSelector).html(golonganRow());
+            GolonganUI.updateBatchCount(wrapperSelector, '#golonganRowCount');
+        }
+
+        $(modalSelector).on('show.bs.modal', resetAddMode);
+
+        $(document).on('click', addButtonSelector, function() {
+            $(wrapperSelector).append(golonganRow());
+            GolonganUI.updateBatchCount(wrapperSelector, '#golonganRowCount');
         });
 
-        // --- Hapus input tertentu
-        $(document).on('click', '.remove-input', function() {
-            $(this).closest('.input-group-item').remove();
+        $(document).on('click', '.remove-golongan-input', function() {
+            if ($(wrapperSelector).find('.golongan-batch-row').length <= 1) {
+                $(this).closest('.golongan-batch-row').find('input').val('');
+                GolonganUI.toast('info', 'Baris dibersihkan', 'Minimal satu baris input tetap tersedia.');
+                return;
+            }
+
+            $(this).closest('.golongan-batch-row').remove();
+            GolonganUI.updateBatchCount(wrapperSelector, '#golonganRowCount');
         });
 
-        // --- DataTable
-        let golonganTable = $('#tableGolongan').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            autoWidth: false,
+        const golonganTable = $('#tableGolongan').DataTable(GolonganUI.dataTableOptions({
             ajax: {
                 url: "{{ route("golongan.table") }}",
                 type: "GET"
@@ -106,24 +107,42 @@
                 },
                 {
                     data: 'kode',
-                    name: 'kode'
+                    name: 'kode',
+                    render: function(data) {
+                        return GolonganUI.codeBadge(data);
+                    }
                 },
                 {
                     data: 'nama',
-                    name: 'nama'
+                    name: 'nama',
+                    render: function(data) {
+                        return GolonganUI.identity(data, 'Golongan obat');
+                    }
+                },
+                {
+                    data: 'keterangan',
+                    name: 'keterangan',
+                    render: function(data) {
+                        return GolonganUI.descriptionBadge(data);
+                    }
                 },
                 {
                     data: 'is_active',
                     name: 'is_active',
-                    render: function(data, type, row, meta) {
-                        // jika status aktif = 1, checkbox dicentang1
-                        let checked = data == 1 ? 'checked' : '';
+                    render: function(data, type, row) {
+                        const checked = data == 1 ? 'checked' : '';
+                        const textClass = data == 1 ? 'is-active' : 'is-inactive';
+                        const text = data == 1 ? 'Aktif' : 'Nonaktif';
+
                         return `
-                        <div class="form-check form-switch mb-0">
-                            <input type="checkbox" class="form-check-input toggle-status" data-id="${row.id}" ${checked} id="switch${row.id}">
-                            <label class="form-check-label" for="switch${row.id}"></label>
-                        </div>
-                    `;
+                            <div class="golongan-status-wrap">
+                                <div class="form-check form-switch mb-0">
+                                    <input type="checkbox" class="form-check-input toggle-golongan-status" data-id="${row.id}" ${checked} id="golonganSwitch${row.id}">
+                                    <label class="form-check-label" for="golonganSwitch${row.id}"></label>
+                                </div>
+                                <span class="golongan-status-text ${textClass}">${text}</span>
+                            </div>
+                        `;
                     },
                     orderable: false,
                     searchable: false
@@ -135,285 +154,211 @@
                     searchable: false
                 }
             ]
+        }));
+
+        GolonganUI.initTableTools({
+            table: golonganTable,
+            tableSelector: '#tableGolongan',
+            searchSelector: '#golonganSearch',
+            totalTarget: '#golonganTotal',
+            filteredTarget: '#golonganFiltered',
+            selectedTarget: '#golonganSelected'
         });
 
-        // --- Hilangkan search default bawaan DataTables
-        $('.dataTables_filter').hide();
+        $('#tableGolongan').on('change', '.toggle-golongan-status', function() {
+            const $toggle = $(this);
+            const $statusText = $toggle.closest('.golongan-status-wrap').find('.golongan-status-text');
+            const golonganId = $toggle.data('id');
+            const status = $toggle.is(':checked') ? 1 : 0;
+            const previousStatus = status ? 0 : 1;
 
-        // --- Hubungkan search custom dengan DataTables
-        $('#searchGolongan').on('keyup', function() {
-            golonganTable.search(this.value).draw();
-        });
-
-        // --- Mengaktifkan dan Menonaktifkan Margin
-        $('#tableGolongan').on('change', '.toggle-status', function() {
-            let golonganId = $(this).data('id');
-            let status = $(this).is(':checked') ? 1 : 0;
-            console.log('golongan ID: ' + golonganId + ', Status: ' + status);
+            $toggle.prop('disabled', true);
 
             $.ajax({
-                url: "{{ route("golongan.updateStatus") }}", // pastikan route ini ada
+                url: "{{ route("golongan.updateStatus") }}",
                 method: 'PUT',
                 data: {
-                    _token: '{{ csrf_token() }}',
                     status: status,
                     id: golonganId
                 },
-                success: function(response) {
-                    console.log('Status updated!');
-                    // SweetAlert
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil!',
-                        text: 'Status Golongan berhasil diperbarui.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                success: function() {
+                    $statusText
+                        .toggleClass('is-active', status === 1)
+                        .toggleClass('is-inactive', status === 0)
+                        .text(status === 1 ? 'Aktif' : 'Nonaktif');
+
+                    GolonganUI.toast('success', 'Status Diperbarui', status === 1 ? 'Golongan sekarang aktif.' : 'Golongan sekarang nonaktif.');
                 },
-                error: function(err) {
-                    console.log(err);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal!',
-                        text: 'Terjadi kesalahan saat mengubah golongan.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                error: function() {
+                    $toggle.prop('checked', previousStatus === 1);
+                    $statusText
+                        .toggleClass('is-active', previousStatus === 1)
+                        .toggleClass('is-inactive', previousStatus === 0)
+                        .text(previousStatus === 1 ? 'Aktif' : 'Nonaktif');
+
+                    GolonganUI.toast('error', 'Gagal Mengubah Status', 'Terjadi kesalahan saat mengubah status golongan.');
+                },
+                complete: function() {
+                    $toggle.prop('disabled', false);
                 }
             });
         });
 
-        // --- Submit form
-        $('#golonganForm').on('submit', function(e) {
+        $(formSelector).on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
-            let golonganId = $('#golonganId').val();
-
-            let url = golonganId ?
+            const golonganId = $('#golonganId').val();
+            const url = golonganId ?
                 "{{ route("golongan.update", ":id") }}".replace(':id', golonganId) :
                 "{{ route("golongan.store") }}";
+            const method = golonganId ? 'PUT' : 'POST';
+            const normalHtml = golonganId ?
+                '<i class="mdi mdi-content-save-edit-outline"></i>Update' :
+                '<i class="mdi mdi-content-save-outline"></i>Simpan';
 
-            let method = golonganId ? 'PUT' : 'POST';
+            GolonganUI.clearValidation(formSelector);
+            GolonganUI.setButtonLoading(submitSelector, true, golonganId ? 'Mengupdate...' : 'Menyimpan...', normalHtml);
 
             $.ajax({
                 url: url,
                 method: method,
-                data: formData,
+                data: $(this).serialize(),
                 success: function(response) {
                     if (response.status === 'success') {
-                        $('#golonganModal').modal('hide');
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: response.message,
-                            toast: true,
-                            position: 'top-end',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-
-                        $('#golonganForm')[0].reset();
-                        $('#golonganId').val('');
-                        golonganTable.ajax.reload();
+                        $(modalSelector).modal('hide');
+                        GolonganUI.toast('success', response.message);
+                        golonganTable.ajax.reload(null, false);
                     }
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
-                        let errors = xhr.responseJSON.errors;
-                        let errorMessages = [];
-
-                        // reset semua error dulu
-                        $('#golonganForm').find('.invalid-feedback').text('');
-                        $('#golonganForm').find('.form-control').removeClass(
-                            'is-invalid');
-
-                        for (let key in errors) {
-                            // contoh key: "code.0", "name.1"
-                            let messages = errors[key];
-                            errorMessages.push(messages[0]);
-
-                            // cari input sesuai index
-                            let parts = key.split('.');
-                            let field = parts[0]; // code / name
-                            let index = parts[1]; // index array
-
-                            // ambil row ke-index lalu kasih error
-                            let row = $('#input-wrapper .input-group-item').eq(index);
-                            row.find(`input[name="${field}[]"]`).addClass('is-invalid');
-                            row.find('.invalid-feedback').first().text(messages[0]);
-                        }
-
-                        // tampilkan semua error di toast juga
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validasi Gagal',
-                            html: errorMessages.join('<br>'),
-                            toast: true,
-                            position: 'top-end',
-                            timer: 4000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
+                        const messages = GolonganUI.markBatchErrors(formSelector, wrapperSelector, xhr.responseJSON.errors);
+                        GolonganUI.toast('error', 'Validasi Gagal', messages.join('<br>'));
+                        return;
                     }
+
+                    GolonganUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan golongan.');
+                },
+                complete: function() {
+                    GolonganUI.setButtonLoading(submitSelector, false, '', normalHtml);
                 }
             });
         });
 
-        // --- Edit
         window.editGolongan = function(id) {
             $.ajax({
                 url: "{{ route("golongan.edit", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
-                    // isi modal
-                    $('#golonganModal').modal('show');
-                    $('#golonganModalLabel').text('EDIT GOLONGAN');
-                    $('#submitForm').text('Update');
-
-                    // sembunyikan tombol tambah input (supaya tidak bisa multiple)
-                    $('#addInput').hide();
-
-                    // set hidden ID
+                    $(modalSelector).modal('show');
+                    $('#golonganModalLabel').text('Edit Golongan');
+                    $('#golonganModalSubtitle').text('Perbarui kode, nama, dan keterangan golongan yang dipilih.');
+                    $(submitSelector).html('<i class="mdi mdi-content-save-edit-outline"></i>Update');
+                    $('#golonganBatchToolbar').hide();
                     $('#golonganId').val(response.id);
-
-                    // render hanya 1 row input
-                    $('#input-wrapper').html(`
-                        <div class="row g-3 mb-2 input-group-item">
-                            <div class="col-md-3">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="kode" type="text" value="${response.kode}">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Golongan</label>
-                                <input class="form-control" name="nama" type="text" value="${response.nama}">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Keterangan</label>
-                                <input class="form-control" name="keterangan" type="text"
-                                    placeholder="Deskripsi tambahan (opsional)">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                        </div>
-                    `);
+                    $(wrapperSelector).html(golonganRow('edit', response));
+                    GolonganUI.clearValidation(formSelector);
+                    GolonganUI.updateBatchCount(wrapperSelector, '#golonganRowCount');
+                },
+                error: function() {
+                    GolonganUI.toast('error', 'Gagal Memuat', 'Data golongan tidak bisa dimuat.');
                 }
             });
-        }
+        };
 
-        // --- Hapus
         window.deleteGolongan = function(id) {
-            // Tampilkan konfirmasi hapus
             Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: 'Golongan ini akan dihapus secara permanen!',
+                title: 'Hapus golongan?',
+                text: 'Data yang sudah dihapus tidak bisa dikembalikan.',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Ya, hapus!',
+                confirmButtonText: 'Ya, hapus',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    // Kirim request DELETE menggunakan AJAX
-                    $.ajax({
-                        url: "{{ route("golongan.destroy", ":id") }}".replace(
-                            ':id',
-                            id),
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire(
-                                    'Dihapus!',
-                                    response.message,
-                                    'success'
-                                );
-                                golonganTable.ajax.reload(); // Reload DataTables
-                            } else {
-                                Swal.fire(
-                                    'Gagal!',
-                                    response.message,
-                                    'error'
-                                );
-                            }
-                        },
-                        error: function(xhr) {
-                            Swal.fire(
-                                'Gagal!',
-                                'Terjadi kesalahan saat menghapus Golongan.',
-                                'error'
-                            );
+                if (!result.isConfirmed) return;
+
+                $.ajax({
+                    url: "{{ route("golongan.destroy", ":id") }}".replace(':id', id),
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            GolonganUI.toast('success', 'Berhasil Dihapus', response.message);
+                            golonganTable.ajax.reload(null, false);
+                            return;
                         }
-                    });
-                }
+
+                        Swal.fire('Gagal', response.message, 'error');
+                    },
+                    error: function() {
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus golongan.', 'error');
+                    }
+                });
             });
+        };
+
+        function resetGolonganExcelForm() {
+            $('#golonganExcelForm')[0].reset();
+            const dropify = $('#golonganExcelInput').data('dropify');
+
+            if (dropify) {
+                dropify.resetPreview();
+                dropify.clearElement();
+            }
         }
 
-        // --- Download Template
-        $('#downloadTemplateBtn').on('click', function() {
+        $('#golonganModalExcell').on('hidden.bs.modal', resetGolonganExcelForm);
+
+        $('#golonganDownloadTemplateBtn').on('click', function() {
             window.location.href = "{{ route("golongan.exportTemplate") }}";
-        })
+        });
 
-        // --- submitFormExcell
-        $('#submitFormExcell').on('click', function() {
-            let fileInput = $('#myDropify')[0];
-            let file = fileInput.files[0];
+        $('#golonganSubmitExcel').on('click', function() {
+            const fileInput = $('#golonganExcelInput')[0];
+            const file = fileInput.files[0];
+            const normalHtml = '<i class="mdi mdi-upload"></i>Upload';
 
-            // Jika file belum dipilih
             if (!file) {
-                // Tambahkan efek getar (shake)
-                $('#myDropify').addClass('shake border-danger');
-
-                // Hilangkan efek setelah 600ms
-                setTimeout(() => {
-                    $('#myDropify').removeClass('shake border-danger');
+                $('#golonganExcelInput').closest('.dropify-wrapper').addClass('shake border-danger');
+                setTimeout(function() {
+                    $('#golonganExcelInput').closest('.dropify-wrapper').removeClass('shake border-danger');
                 }, 600);
 
-                // Tampilkan alert
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Peringatan',
-                    text: 'Silakan pilih file Excel terlebih dahulu!',
+                    title: 'File belum dipilih',
+                    text: 'Silakan pilih file Excel terlebih dahulu.'
                 });
-
-                return; // hentikan eksekusi selanjutnya
+                return;
             }
 
-            let formData = new FormData();
+            const formData = new FormData();
             formData.append('file', file);
+            GolonganUI.setButtonLoading('#golonganSubmitExcel', true, 'Mengupload...', normalHtml);
 
-            // Alert progress
             Swal.fire({
                 title: 'Mengupload File...',
                 html: `
                     <div class="progress" style="height: 20px;">
-                        <div id="uploadProgressBar" 
-                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                        <div id="uploadProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                             role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <p class="mt-2 mb-0 text-muted">Mohon tunggu, proses import sedang berlangsung.</p>
                 `,
                 allowOutsideClick: false,
                 showConfirmButton: false,
-                didOpen: () => {
+                didOpen: function() {
                     Swal.showLoading();
                 }
             });
 
-            // Kirim AJAX
             $.ajax({
                 xhr: function() {
-                    let xhr = new window.XMLHttpRequest();
-                    xhr.upload.addEventListener("progress", function(evt) {
+                    const xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', function(evt) {
                         if (evt.lengthComputable) {
-                            let percentComplete = Math.round((evt.loaded / evt
-                                .total) * 100);
-                            $('#uploadProgressBar')
-                                .css('width', percentComplete + '%')
-                                .text(percentComplete + '%');
+                            const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                            $('#uploadProgressBar').css('width', percentComplete + '%').text(percentComplete + '%');
                         }
                     }, false);
                     return xhr;
@@ -428,45 +373,32 @@
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Berhasil',
+                            title: 'Import Berhasil',
                             html: `
                                 <p>${response.added} data berhasil ditambahkan.</p>
-                                <p>${response.skipped} data dilewati (sudah ada).</p>
+                                <p>${response.skipped} data dilewati.</p>
                             `,
-                            timer: 2500,
+                            timer: 2600,
                             showConfirmButton: false,
-                            willClose: () => {
-                                // Tutup modal
+                            willClose: function() {
                                 $('#golonganModalExcell').modal('hide');
-
-                                // Reload DataTable jika sudah diinisialisasi
-                                if (typeof golonganTable !== 'undefined') {
-                                    golonganTable.ajax.reload(null,
-                                        false
-                                    ); // false = tetap di halaman sekarang
-                                }
+                                golonganTable.ajax.reload(null, false);
                             }
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message ||
-                                'Terjadi kesalahan saat import data.',
-                        });
+                        return;
                     }
+
+                    Swal.fire('Gagal', response.message || 'Terjadi kesalahan saat import data.', 'error');
                 },
                 error: function(xhr) {
                     Swal.close();
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Gagal mengupload file: ' + xhr.responseText,
-                    });
+                    const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal mengupload file.';
+                    Swal.fire('Gagal Import', message, 'error');
+                },
+                complete: function() {
+                    GolonganUI.setButtonLoading('#golonganSubmitExcel', false, '', normalHtml);
                 }
             });
         });
-
-
     });
 </script>

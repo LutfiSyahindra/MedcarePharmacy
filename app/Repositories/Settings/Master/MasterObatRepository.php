@@ -25,18 +25,21 @@ class MasterObatRepository
         return $MasterObat;
     }
 
-    public function updateStatus($id, $status){
+    public function updateStatus($id, $status)
+    {
         $MasterObat = MasterObatModel::find($id);
         $MasterObat->is_active = $status;
         $MasterObat->save();
     }
 
-    public function getMainKategori($kategoriUtama){
+    public function getMainKategori($kategoriUtama)
+    {
         $mainKategori = MainCategoryModel::where('category_id', $kategoriUtama)->select('id', 'name')->get();
         return $mainKategori;
     }
 
-    public function getSubKategori($kategori){
+    public function getSubKategori($kategori)
+    {
         $subKategoris = SubCategoryModel::where('main_category_id', $kategori)->select('id', 'name')->get();
         return $subKategoris;
     }

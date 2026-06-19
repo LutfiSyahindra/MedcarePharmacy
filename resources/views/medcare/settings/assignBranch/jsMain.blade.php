@@ -1,44 +1,52 @@
 <script>
     $(document).ready(function() {
+        const assignBranchDefault = '<i class="mdi mdi-account-check-outline"></i>Simpan Assignment';
 
         function loadUserOptions(selectedIds = []) {
+            const normalizedSelected = selectedIds.map(String);
+
             return $.ajax({
                 url: '{{ route("assignBranch.getUser") }}',
-                type: 'GET',
-                success: function(response) {
-                    const userSelect = $('#userSelect');
-                    userSelect.empty();
+                type: 'GET'
+            }).done(function(response) {
+                const userSelect = $('#userSelect');
 
-                    // Tambah opsi satu per satu
-                    response.forEach(function(user) {
-                        const isSelected = selectedIds.includes(user.id.toString()) ?
-                            'selected' : '';
-                        userSelect.append(
-                            `<option value="${user.id}" ${isSelected}>${user.name}</option>`
-                        );
-                    });
-
-                    // Re-init select2
-                    userSelect.select2({
-                        dropdownParent: $('#assignBranchModal'),
-                        placeholder: "Pilih User",
-                        allowClear: true,
-                        width: '100%'
-                    });
-                },
-                error: function() {
-                    alert('Gagal memuat data user!');
+                if (userSelect.hasClass('select2-hidden-accessible')) {
+                    userSelect.select2('destroy');
                 }
+
+                userSelect.empty();
+                response.forEach(function(user) {
+                    const isSelected = normalizedSelected.includes(String(user.id)) ? 'selected' : '';
+                    userSelect.append(
+                        `<option value="${user.id}" ${isSelected}>${BranchUI.escapeHtml(user.name)}</option>`
+                    );
+                });
+
+                userSelect.select2({
+                    dropdownParent: $('#assignBranchModal'),
+                    placeholder: "Pilih user",
+                    allowClear: true,
+                    width: '100%'
+                });
+
+                userSelect.off('change.branchUsers').on('change.branchUsers', function() {
+                    BranchUI.updateSelectCount('#userSelect', '#userSelectionCount');
+                });
+
+                BranchUI.updateSelectCount('#userSelect', '#userSelectionCount');
+            }).fail(function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Gagal memuat data user.'
+                });
             });
         }
 
-        let assignBranchTable = $('#tableAssignBranch').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            autoWidth: false,
+        let assignBranchTable = $('#tableAssignBranch').DataTable(BranchUI.dataTableOptions({
             ajax: {
-                url: "{{ route("assignBranch.table") }}", // pastikan route ini ada
+                url: "{{ route("assignBranch.table") }}",
                 type: "GET"
             },
             columns: [{
@@ -49,11 +57,35 @@
                 },
                 {
                     data: 'code',
-                    name: 'code'
+                    name: 'code',
+                    render: function(data, type) {
+                        if (type !== 'display') return data;
+
+                        return `
+                            <span class="branch-code-badge">
+                                <i class="mdi mdi-barcode"></i>
+                                ${BranchUI.escapeHtml(data)}
+                            </span>
+                        `;
+                    }
                 },
                 {
                     data: 'name',
-                    name: 'name'
+                    name: 'name',
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+
+                        const safeName = BranchUI.escapeHtml(data);
+                        return `
+                            <div class="branch-identity">
+                                <span class="branch-avatar">${BranchUI.getInitials(data)}</span>
+                                <div>
+                                    <strong title="${safeName}">${safeName}</strong>
+                                    <small>Branch ID #${BranchUI.escapeHtml(row.id)}</small>
+                                </div>
+                            </div>
+                        `;
+                    }
                 },
                 {
                     data: 'actions',
@@ -62,55 +94,62 @@
                     searchable: false
                 }
             ]
+        }));
+
+        BranchUI.initTableTools({
+            table: assignBranchTable,
+            tableSelector: '#tableAssignBranch',
+            searchSelector: '#assignBranchSearch',
+            totalTarget: '#assignBranchTotalCount',
+            filteredTarget: '#assignBranchFilteredCount',
+            selectedTarget: '#assignBranchSelectedCount'
         });
 
         window.assignBranch = function(branchId) {
             const modal = $('#assignBranchModal');
             modal.modal('show');
-            $('#assignBranchModalLabel').text('ASSIGN BRANCH');
-            $('#submitForm').text('Update');
-
-            // set branch id ke hidden input
+            $('#assignBranchModalLabel').text('Assign Branch');
             $('#branchId').val(branchId);
+            $('#assignBranchSubmit').html(assignBranchDefault).prop('disabled', false);
+            $('#userSelectionCount').text('0');
 
-            // kosongkan select2 dulu
-            $('#userSelect').val(null).trigger('change');
-            loadUserOptions([]);
+            const optionsRequest = loadUserOptions([]);
 
-            // ambil data user yang sudah assign ke branch ini
             $.ajax({
-                url: "{{ route("assignBranch.getAssignedUsers", ":branch") }}".replace(':branch',
-                    branchId),
+                url: "{{ route("assignBranch.getAssignedUsers", ":branch") }}".replace(':branch', branchId),
                 type: "GET",
                 success: function(res) {
-                    res.forEach(function(user) {
-                        // kalau option sudah ada, tinggal select
-                        if ($('#userSelect').find("option[value='" + user.id + "']")
-                            .length) {
-                            let selected = $('#userSelect').val() || [];
-                            selected.push(user.id.toString());
-                            $('#userSelect').val(selected).trigger('change');
-                        } else {
-                            // kalau option belum ada, tambahin
-                            var newOption = new Option(user.name, user.id, true, true);
-                            $('#userSelect').append(newOption).trigger('change');
-                        }
+                    optionsRequest.done(function() {
+                        const selectedIds = (res || []).map(function(user) {
+                            return String(user.id);
+                        });
+                        $('#userSelect').val(selectedIds).trigger('change');
                     });
                 },
                 error: function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Gagal mengambil data user assign!'
+                        text: 'Gagal mengambil data user assign.'
                     });
                 }
             });
         };
 
+        $('#selectAllUsers').on('click', function() {
+            $('#userSelect option').prop('selected', true);
+            $('#userSelect').trigger('change');
+        });
+
+        $('#clearUsersSelection').on('click', function() {
+            $('#userSelect').val(null).trigger('change');
+        });
+
         $('#assignBranchForm').on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
+            const formData = $(this).serialize();
+            BranchUI.setButtonLoading('#assignBranchSubmit', true, 'Menyimpan...', assignBranchDefault);
 
             $.ajax({
                 url: "{{ route("assignBranch.assign") }}",
@@ -121,30 +160,33 @@
                         $('#assignBranchModal').modal('hide');
                         $('#assignBranchForm')[0].reset();
                         $('#userSelect').val(null).trigger('change');
-                        $('#tableAssignBranch').DataTable().ajax.reload();
+                        assignBranchTable.ajax.reload(null, false);
 
                         Swal.fire({
                             icon: 'success',
                             title: 'Berhasil',
                             text: response.message
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message
-                        });
+                        return;
                     }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: response.message
+                    });
                 },
                 error: function(xhr) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Terjadi kesalahan server!'
+                        text: xhr.status === 422 ? 'Pilih minimal satu user.' : 'Terjadi kesalahan server.'
                     });
+                },
+                complete: function() {
+                    BranchUI.setButtonLoading('#assignBranchSubmit', false, 'Menyimpan...', assignBranchDefault);
                 }
             });
         });
-
     });
 </script>

@@ -31,12 +31,14 @@ class MarginController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataMargins) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editMargins(' . $dataMargins['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteMargins(' . $dataMargins['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="margin-action-group">
+                    <button type="button" class="btn margin-action-btn margin-action-edit" title="Edit margin" onclick="editMargins(' . $dataMargins['id'] . ')"> 
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button> 
+                    <button type="button" class="btn margin-action-btn margin-action-delete" title="Hapus margin" onclick="deleteMargins(' . $dataMargins['id'] . ')">  
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -69,7 +71,8 @@ class MarginController extends Controller
     {
         $validated = $request->validate([
             'tingkat' => 'required|string|in:kategoriUtama,kategori,sub_kategori,obat',
-            'reference_id' => 'required',
+            'reference_id' => 'required|array',
+            'reference_id.*' => 'required',
             'faktor_jual' => 'required|numeric|min:0|max:100',
         ]);
 
@@ -124,7 +127,7 @@ class MarginController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Margins updated successfully',
+            'message' => 'Margins berhasil diperbarui',
             'data'    => $dataMargins
         ], 200);
     }

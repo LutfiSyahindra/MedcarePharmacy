@@ -1,79 +1,90 @@
 <script>
     $(document).ready(function() {
-
-        // --- Setup CSRF untuk semua AJAX request
         $.ajaxSetup({
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
         });
 
-        // --- Reset modal ketika dibuka
-        $('#satuanModal').on('show.bs.modal', function() {
-            let form = $('#satuanForm');
-            $('#satuanModalLabel').text('ADD SATUAN OBAT');
-            form.trigger('reset');
-            $('#submitForm').text('Add');
-            $('#addInput').show();
+        const modalSelector = '#satuanModal';
+        const formSelector = '#satuanForm';
+        const wrapperSelector = '#satuanInputWrapper';
+        const submitSelector = '#submitSatuanForm';
+        const addButtonSelector = '#addSatuanInput';
 
-            // reset error message
-            form.find('.invalid-feedback').text('');
-            form.find('.form-control').removeClass('is-invalid');
-            $('#satuanId').val('');
+        if ($.fn.dropify) {
+            $('#satuanExcelInput').dropify();
+        }
 
-            // reset input-wrapper jadi hanya 1 row
-            $('#input-wrapper').html(`
-                <div class="row g-3 mb-2 input-group-item">
-                    <div class="col-md-4">
+        function satuanRow(mode = 'create', data = {}) {
+            const isEdit = mode === 'edit';
+            const kodeName = isEdit ? 'kode' : 'kode[]';
+            const namaName = isEdit ? 'nama' : 'nama[]';
+            const kodeValue = SatuanUI.escapeHtml(data.kode || '');
+            const namaValue = SatuanUI.escapeHtml(data.nama || '');
+
+            return `
+                <div class="satuan-batch-row">
+                    <div class="satuan-field is-code">
                         <label class="form-label">Kode</label>
-                        <input class="form-control" name="kode[]" type="text">
+                        <div class="satuan-input-shell">
+                            <span class="satuan-input-icon"><i class="mdi mdi-pound"></i></span>
+                            <input class="form-control" name="${kodeName}" type="text" value="${kodeValue}" placeholder="Contoh: TAB">
+                        </div>
                         <div class="invalid-feedback"></div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="satuan-field is-name">
                         <label class="form-label">Satuan</label>
-                        <input class="form-control" name="nama[]" type="text">
+                        <div class="satuan-input-shell">
+                            <span class="satuan-input-icon"><i class="mdi mdi-ruler-square"></i></span>
+                            <input class="form-control" name="${namaName}" type="text" value="${namaValue}" placeholder="Masukkan nama satuan">
+                        </div>
                         <div class="invalid-feedback"></div>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                    </div>
-                </div>
-            `);
-        });
-
-        // --- Tambah input baru
-        $(document).on('click', '#addInput', function() {
-            let newInput = `
-                <div class="row g-3 mb-2 input-group-item">
-                    <div class="col-md-4">
-                        <label class="form-label">Kode</label>
-                        <input class="form-control" name="kode[]" type="text">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Satuan</label>
-                        <input class="form-control" name="nama[]" type="text">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                    </div>
+                    ${isEdit ? '' : `
+                        <div class="satuan-field is-action">
+                            <button type="button" class="btn btn-outline-danger satuan-row-remove remove-satuan-input" title="Hapus baris">
+                                <i class="mdi mdi-delete-outline"></i>
+                            </button>
+                        </div>
+                    `}
                 </div>
             `;
-            $('#input-wrapper').append(newInput);
+        }
+
+        function resetAddMode() {
+            const $form = $(formSelector);
+
+            $('#satuanModalLabel').text('Tambah Satuan');
+            $('#satuanModalSubtitle').text('Buat satu atau beberapa satuan obat.');
+            $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
+            $('#satuanId').val('');
+            $('#satuanBatchToolbar').show();
+            $form.trigger('reset');
+            SatuanUI.clearValidation(formSelector);
+            $(wrapperSelector).html(satuanRow());
+            SatuanUI.updateBatchCount(wrapperSelector, '#satuanRowCount');
+        }
+
+        $(modalSelector).on('show.bs.modal', resetAddMode);
+
+        $(document).on('click', addButtonSelector, function() {
+            $(wrapperSelector).append(satuanRow());
+            SatuanUI.updateBatchCount(wrapperSelector, '#satuanRowCount');
         });
 
-        // --- Hapus input tertentu
-        $(document).on('click', '.remove-input', function() {
-            $(this).closest('.input-group-item').remove();
+        $(document).on('click', '.remove-satuan-input', function() {
+            if ($(wrapperSelector).find('.satuan-batch-row').length <= 1) {
+                $(this).closest('.satuan-batch-row').find('input').val('');
+                SatuanUI.toast('info', 'Baris dibersihkan', 'Minimal satu baris input tetap tersedia.');
+                return;
+            }
+
+            $(this).closest('.satuan-batch-row').remove();
+            SatuanUI.updateBatchCount(wrapperSelector, '#satuanRowCount');
         });
 
-        // --- DataTable
-        let satuanTable = $('#tableSatuan').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            autoWidth: false,
+        const satuanTable = $('#tableSatuan').DataTable(SatuanUI.dataTableOptions({
             ajax: {
                 url: "{{ route("satuan.table") }}",
                 type: "GET"
@@ -86,24 +97,35 @@
                 },
                 {
                     data: 'kode',
-                    name: 'kode'
+                    name: 'kode',
+                    render: function(data) {
+                        return SatuanUI.codeBadge(data);
+                    }
                 },
                 {
                     data: 'nama',
-                    name: 'nama'
+                    name: 'nama',
+                    render: function(data) {
+                        return SatuanUI.identity(data, 'Satuan obat');
+                    }
                 },
                 {
                     data: 'is_active',
                     name: 'is_active',
-                    render: function(data, type, row, meta) {
-                        // jika status aktif = 1, checkbox dicentang1
-                        let checked = data == 1 ? 'checked' : '';
+                    render: function(data, type, row) {
+                        const checked = data == 1 ? 'checked' : '';
+                        const textClass = data == 1 ? 'is-active' : 'is-inactive';
+                        const text = data == 1 ? 'Aktif' : 'Nonaktif';
+
                         return `
-                        <div class="form-check form-switch mb-0">
-                            <input type="checkbox" class="form-check-input toggle-status" data-id="${row.id}" ${checked} id="switch${row.id}">
-                            <label class="form-check-label" for="switch${row.id}"></label>
-                        </div>
-                    `;
+                            <div class="satuan-status-wrap">
+                                <div class="form-check form-switch mb-0">
+                                    <input type="checkbox" class="form-check-input toggle-satuan-status" data-id="${row.id}" ${checked} id="satuanSwitch${row.id}">
+                                    <label class="form-check-label" for="satuanSwitch${row.id}"></label>
+                                </div>
+                                <span class="satuan-status-text ${textClass}">${text}</span>
+                            </div>
+                        `;
                     },
                     orderable: false,
                     searchable: false
@@ -115,279 +137,211 @@
                     searchable: false
                 }
             ]
+        }));
+
+        SatuanUI.initTableTools({
+            table: satuanTable,
+            tableSelector: '#tableSatuan',
+            searchSelector: '#satuanSearch',
+            totalTarget: '#satuanTotal',
+            filteredTarget: '#satuanFiltered',
+            selectedTarget: '#satuanSelected'
         });
 
-        // --- Hilangkan search default bawaan DataTables
-        $('.dataTables_filter').hide();
+        $('#tableSatuan').on('change', '.toggle-satuan-status', function() {
+            const $toggle = $(this);
+            const $statusText = $toggle.closest('.satuan-status-wrap').find('.satuan-status-text');
+            const satuanId = $toggle.data('id');
+            const status = $toggle.is(':checked') ? 1 : 0;
+            const previousStatus = status ? 0 : 1;
 
-        // --- Hubungkan search custom dengan DataTables
-        $('#searchSatuan').on('keyup', function() {
-            satuanTable.search(this.value).draw();
-        });
-
-        // --- Mengaktifkan dan Menonaktifkan Margin
-        $('#tableSatuan').on('change', '.toggle-status', function() {
-            let satuanId = $(this).data('id');
-            let status = $(this).is(':checked') ? 1 : 0;
-            console.log('satuan ID: ' + satuanId + ', Status: ' + status);
+            $toggle.prop('disabled', true);
 
             $.ajax({
-                url: "{{ route("satuan.updateStatus") }}", // pastikan route ini ada
+                url: "{{ route("satuan.updateStatus") }}",
                 method: 'PUT',
                 data: {
-                    _token: '{{ csrf_token() }}',
                     status: status,
                     id: satuanId
                 },
-                success: function(response) {
-                    console.log('Status updated!');
-                    // SweetAlert
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil!',
-                        text: 'Status Satuan berhasil diperbarui.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                success: function() {
+                    $statusText
+                        .toggleClass('is-active', status === 1)
+                        .toggleClass('is-inactive', status === 0)
+                        .text(status === 1 ? 'Aktif' : 'Nonaktif');
+
+                    SatuanUI.toast('success', 'Status Diperbarui', status === 1 ? 'Satuan sekarang aktif.' : 'Satuan sekarang nonaktif.');
                 },
-                error: function(err) {
-                    console.log(err);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal!',
-                        text: 'Terjadi kesalahan saat mengubah status.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                error: function() {
+                    $toggle.prop('checked', previousStatus === 1);
+                    $statusText
+                        .toggleClass('is-active', previousStatus === 1)
+                        .toggleClass('is-inactive', previousStatus === 0)
+                        .text(previousStatus === 1 ? 'Aktif' : 'Nonaktif');
+
+                    SatuanUI.toast('error', 'Gagal Mengubah Status', 'Terjadi kesalahan saat mengubah status satuan.');
+                },
+                complete: function() {
+                    $toggle.prop('disabled', false);
                 }
             });
         });
 
-        // --- Submit form
-        $('#satuanForm').on('submit', function(e) {
+        $(formSelector).on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
-            let satuanId = $('#satuanId').val();
-
-            let url = satuanId ?
+            const satuanId = $('#satuanId').val();
+            const url = satuanId ?
                 "{{ route("satuan.update", ":id") }}".replace(':id', satuanId) :
                 "{{ route("satuan.store") }}";
+            const method = satuanId ? 'PUT' : 'POST';
+            const normalHtml = satuanId ?
+                '<i class="mdi mdi-content-save-edit-outline"></i>Update' :
+                '<i class="mdi mdi-content-save-outline"></i>Simpan';
 
-            let method = satuanId ? 'PUT' : 'POST';
+            SatuanUI.clearValidation(formSelector);
+            SatuanUI.setButtonLoading(submitSelector, true, satuanId ? 'Mengupdate...' : 'Menyimpan...', normalHtml);
 
             $.ajax({
                 url: url,
                 method: method,
-                data: formData,
+                data: $(this).serialize(),
                 success: function(response) {
                     if (response.status === 'success') {
-                        $('#satuanModal').modal('hide');
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: response.message,
-                            toast: true,
-                            position: 'top-end',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-
-                        $('#satuanForm')[0].reset();
-                        $('#satuanId').val('');
-                        satuanTable.ajax.reload();
+                        $(modalSelector).modal('hide');
+                        SatuanUI.toast('success', response.message);
+                        satuanTable.ajax.reload(null, false);
                     }
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
-                        let errors = xhr.responseJSON.errors;
-                        let errorMessages = [];
-
-                        // reset semua error dulu
-                        $('#satuanForm').find('.invalid-feedback').text('');
-                        $('#satuanForm').find('.form-control').removeClass(
-                            'is-invalid');
-
-                        for (let key in errors) {
-                            // contoh key: "code.0", "name.1"
-                            let messages = errors[key];
-                            errorMessages.push(messages[0]);
-
-                            // cari input sesuai index
-                            let parts = key.split('.');
-                            let field = parts[0]; // code / name
-                            let index = parts[1]; // index array
-
-                            // ambil row ke-index lalu kasih error
-                            let row = $('#input-wrapper .input-group-item').eq(index);
-                            row.find(`input[name="${field}[]"]`).addClass('is-invalid');
-                            row.find('.invalid-feedback').first().text(messages[0]);
-                        }
-
-                        // tampilkan semua error di toast juga
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validasi Gagal',
-                            html: errorMessages.join('<br>'),
-                            toast: true,
-                            position: 'top-end',
-                            timer: 4000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
+                        const messages = SatuanUI.markBatchErrors(formSelector, wrapperSelector, xhr.responseJSON.errors);
+                        SatuanUI.toast('error', 'Validasi Gagal', messages.join('<br>'));
+                        return;
                     }
+
+                    SatuanUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan satuan.');
+                },
+                complete: function() {
+                    SatuanUI.setButtonLoading(submitSelector, false, '', normalHtml);
                 }
             });
         });
 
-        // --- Edit
         window.editSatuan = function(id) {
             $.ajax({
                 url: "{{ route("satuan.edit", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
-                    // isi modal
-                    $('#satuanModal').modal('show');
-                    $('#satuanModalLabel').text('EDIT SATUAN');
-                    $('#submitForm').text('Update');
-
-                    // sembunyikan tombol tambah input (supaya tidak bisa multiple)
-                    $('#addInput').hide();
-
-                    // set hidden ID
+                    $(modalSelector).modal('show');
+                    $('#satuanModalLabel').text('Edit Satuan');
+                    $('#satuanModalSubtitle').text('Perbarui kode dan nama satuan yang dipilih.');
+                    $(submitSelector).html('<i class="mdi mdi-content-save-edit-outline"></i>Update');
+                    $('#satuanBatchToolbar').hide();
                     $('#satuanId').val(response.id);
-
-                    // render hanya 1 row input
-                    $('#input-wrapper').html(`
-                        <div class="row g-3 mb-2 input-group-item">
-                            <div class="col-md-4">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="kode" type="text" value="${response.kode}">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Satuan</label>
-                                <input class="form-control" name="nama" type="text" value="${response.nama}">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                        </div>
-                    `);
+                    $(wrapperSelector).html(satuanRow('edit', response));
+                    SatuanUI.clearValidation(formSelector);
+                    SatuanUI.updateBatchCount(wrapperSelector, '#satuanRowCount');
+                },
+                error: function() {
+                    SatuanUI.toast('error', 'Gagal Memuat', 'Data satuan tidak bisa dimuat.');
                 }
             });
-        }
+        };
 
-        // --- Hapus
         window.deleteSatuan = function(id) {
-            // Tampilkan konfirmasi hapus
             Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: 'Satuan ini akan dihapus secara permanen!',
+                title: 'Hapus satuan?',
+                text: 'Data yang sudah dihapus tidak bisa dikembalikan.',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Ya, hapus!',
+                confirmButtonText: 'Ya, hapus',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    // Kirim request DELETE menggunakan AJAX
-                    $.ajax({
-                        url: "{{ route("satuan.destroy", ":id") }}".replace(
-                            ':id',
-                            id),
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire(
-                                    'Dihapus!',
-                                    response.message,
-                                    'success'
-                                );
-                                satuanTable.ajax.reload(); // Reload DataTables
-                            } else {
-                                Swal.fire(
-                                    'Gagal!',
-                                    response.message,
-                                    'error'
-                                );
-                            }
-                        },
-                        error: function(xhr) {
-                            Swal.fire(
-                                'Gagal!',
-                                'Terjadi kesalahan saat menghapus Satuan.',
-                                'error'
-                            );
+                if (!result.isConfirmed) return;
+
+                $.ajax({
+                    url: "{{ route("satuan.destroy", ":id") }}".replace(':id', id),
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            SatuanUI.toast('success', 'Berhasil Dihapus', response.message);
+                            satuanTable.ajax.reload(null, false);
+                            return;
                         }
-                    });
-                }
+
+                        Swal.fire('Gagal', response.message, 'error');
+                    },
+                    error: function() {
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus satuan.', 'error');
+                    }
+                });
             });
+        };
+
+        function resetSatuanExcelForm() {
+            $('#satuanExcelForm')[0].reset();
+            const dropify = $('#satuanExcelInput').data('dropify');
+
+            if (dropify) {
+                dropify.resetPreview();
+                dropify.clearElement();
+            }
         }
 
-        // --- Download Template
-        $('#downloadTemplateBtn').on('click', function() {
+        $('#satuanModalExcell').on('hidden.bs.modal', resetSatuanExcelForm);
+
+        $('#satuanDownloadTemplateBtn').on('click', function() {
             window.location.href = "{{ route("satuan.exportTemplate") }}";
-        })
+        });
 
-        // --- submitFormExcell
-        $('#submitFormExcell').on('click', function() {
-            let fileInput = $('#myDropify')[0];
-            let file = fileInput.files[0];
+        $('#satuanSubmitExcel').on('click', function() {
+            const fileInput = $('#satuanExcelInput')[0];
+            const file = fileInput.files[0];
+            const normalHtml = '<i class="mdi mdi-upload"></i>Upload';
 
-            // Jika file belum dipilih
             if (!file) {
-                // Tambahkan efek getar (shake)
-                $('#myDropify').addClass('shake border-danger');
-
-                // Hilangkan efek setelah 600ms
-                setTimeout(() => {
-                    $('#myDropify').removeClass('shake border-danger');
+                $('#satuanExcelInput').closest('.dropify-wrapper').addClass('shake border-danger');
+                setTimeout(function() {
+                    $('#satuanExcelInput').closest('.dropify-wrapper').removeClass('shake border-danger');
                 }, 600);
 
-                // Tampilkan alert
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Peringatan',
-                    text: 'Silakan pilih file Excel terlebih dahulu!',
+                    title: 'File belum dipilih',
+                    text: 'Silakan pilih file Excel terlebih dahulu.'
                 });
-
-                return; // hentikan eksekusi selanjutnya
+                return;
             }
 
-            let formData = new FormData();
+            const formData = new FormData();
             formData.append('file', file);
+            SatuanUI.setButtonLoading('#satuanSubmitExcel', true, 'Mengupload...', normalHtml);
 
-            // Alert progress
             Swal.fire({
                 title: 'Mengupload File...',
                 html: `
                     <div class="progress" style="height: 20px;">
-                        <div id="uploadProgressBar" 
-                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                        <div id="uploadProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                             role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <p class="mt-2 mb-0 text-muted">Mohon tunggu, proses import sedang berlangsung.</p>
                 `,
                 allowOutsideClick: false,
                 showConfirmButton: false,
-                didOpen: () => {
+                didOpen: function() {
                     Swal.showLoading();
                 }
             });
 
-            // Kirim AJAX
             $.ajax({
                 xhr: function() {
-                    let xhr = new window.XMLHttpRequest();
-                    xhr.upload.addEventListener("progress", function(evt) {
+                    const xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', function(evt) {
                         if (evt.lengthComputable) {
-                            let percentComplete = Math.round((evt.loaded / evt
-                                .total) * 100);
-                            $('#uploadProgressBar')
-                                .css('width', percentComplete + '%')
-                                .text(percentComplete + '%');
+                            const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                            $('#uploadProgressBar').css('width', percentComplete + '%').text(percentComplete + '%');
                         }
                     }, false);
                     return xhr;
@@ -402,46 +356,32 @@
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Berhasil',
+                            title: 'Import Berhasil',
                             html: `
                                 <p>${response.added} data berhasil ditambahkan.</p>
-                                <p>${response.skipped} data dilewati (sudah ada).</p>
+                                <p>${response.skipped} data dilewati.</p>
                             `,
-                            timer: 2500,
+                            timer: 2600,
                             showConfirmButton: false,
-                            willClose: () => {
-                                // Tutup modal
+                            willClose: function() {
                                 $('#satuanModalExcell').modal('hide');
-
-                                // Reload DataTable jika sudah diinisialisasi
-                                if (typeof satuanTable !== 'undefined') {
-                                    satuanTable.ajax.reload(null,
-                                        false
-                                    ); // false = tetap di halaman sekarang
-                                }
+                                satuanTable.ajax.reload(null, false);
                             }
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message ||
-                                'Terjadi kesalahan saat import data.',
-                        });
+                        return;
                     }
+
+                    Swal.fire('Gagal', response.message || 'Terjadi kesalahan saat import data.', 'error');
                 },
                 error: function(xhr) {
                     Swal.close();
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Gagal mengupload file: ' + xhr.responseText,
-                    });
+                    const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal mengupload file.';
+                    Swal.fire('Gagal Import', message, 'error');
+                },
+                complete: function() {
+                    SatuanUI.setButtonLoading('#satuanSubmitExcel', false, '', normalHtml);
                 }
             });
         });
-
-
-
     });
 </script>

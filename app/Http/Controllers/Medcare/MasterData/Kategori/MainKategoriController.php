@@ -39,12 +39,14 @@ class MainKategoriController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataMainCategory) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editMainCategory(' . $dataMainCategory['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteMainCategory(' . $dataMainCategory['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="category-action-group">
+                    <button type="button" class="btn category-action-btn category-action-edit" title="Edit main kategori" onclick="editMainCategory(' . $dataMainCategory['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn category-action-btn category-action-delete" title="Hapus main kategori" onclick="deleteMainCategory(' . $dataMainCategory['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -122,7 +124,7 @@ class MainKategoriController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Main Category updated successfully',
+            'message' => 'Main Kategori berhasil diperbarui',
             'data'    => $dataMainCategory
         ], 200);
     }

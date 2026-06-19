@@ -33,12 +33,14 @@ class SubKategoriController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataSubCategory) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editSubCategory(' . $dataSubCategory['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteSubCategory(' . $dataSubCategory['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="category-action-group">
+                    <button type="button" class="btn category-action-btn category-action-edit" title="Edit sub kategori" onclick="editSubCategory(' . $dataSubCategory['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn category-action-btn category-action-delete" title="Hapus sub kategori" onclick="deleteSubCategory(' . $dataSubCategory['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -120,7 +122,7 @@ class SubKategoriController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Sub Category updated successfully',
+            'message' => 'Sub Kategori berhasil diperbarui',
             'data'    => $dataSubCategory
         ], 200);
     }

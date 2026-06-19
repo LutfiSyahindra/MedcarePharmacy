@@ -43,15 +43,17 @@ class UsersController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataUsers) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editUsers(' . $dataUsers['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger" onclick="deleteUsers(' . $dataUsers['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
-                <button class="btn btn-sm btn-warning" onclick="assignRoles(' . $dataUsers['id'] . ')">  
-                    <i class="mdi mdi-eye"></i>
-                </button>
+                <div class="auth-action-group">
+                    <button type="button" class="btn auth-action-btn auth-action-edit" title="Edit user" onclick="editUsers(' . $dataUsers['id'] . ')"> 
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button> 
+                    <button type="button" class="btn auth-action-btn auth-action-delete" title="Hapus user" onclick="deleteUsers(' . $dataUsers['id'] . ')">  
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                    <button type="button" class="btn auth-action-btn auth-action-assign" title="Assign role" onclick="assignRoles(' . $dataUsers['id'] . ')">  
+                        <i class="mdi mdi-account-key-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -187,7 +189,7 @@ class UsersController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Permissions berhasil di-assign ke role.'
+            'message' => 'Role berhasil di-assign ke user.'
         ]);
     }
 

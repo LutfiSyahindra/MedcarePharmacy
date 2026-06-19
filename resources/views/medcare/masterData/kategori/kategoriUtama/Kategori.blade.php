@@ -5,76 +5,82 @@
     @include("template.AddOn.mdiicon")
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
+    @include("medcare.masterData.kategori.partials.style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.kategori.kategoriUtama.modalMain")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Kategori</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Kategori Utama</li>
-        </ol>
-    </nav>
+    <div class="category-page">
+        @include("medcare.masterData.kategori.kategoriUtama.modalMain")
+        @include("medcare.masterData.kategori.partials.header", [
+            "categoryActive" => "utama",
+            "categoryTitle" => "Kategori Utama",
+            "categoryDescription" => "Kelola level dasar klasifikasi obat sebelum diturunkan ke main kategori dan sub kategori.",
+            "categoryModalTarget" => "#kategoriUtamaModal",
+            "categoryActionLabel" => "Tambah Kategori Utama",
+            "categoryActionIcon" => "mdi-plus-circle-outline",
+        ])
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-tag-outline mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Kategori Utama</h5>
-                                <small class="text-muted">Kelola dan cari data Kategori Utama Obat dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchKategoriUtama" class="form-control border-start-0"
-                                    placeholder="Cari Kategori Utama...">
-                            </div>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#kategoriUtamaModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <h6 class="card-title"></h6>
-                    <div class="table-responsive">
-                        <table id="tableKategoriUtama" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Kategori</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="category-stats-grid">
+            <div class="category-stat">
+                <span class="category-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="kategoriUtamaTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh kategori utama yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="category-stat">
+                <span class="category-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="kategoriUtamaFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="category-stat">
+                <span class="category-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="kategoriUtamaSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai data.</small>
                 </div>
             </div>
         </div>
+
+        <section class="category-table-section">
+            <div class="category-table-toolbar">
+                <div class="category-table-title">
+                    <span class="category-table-title-icon"><i class="mdi mdi-tag-multiple-outline"></i></span>
+                    <div>
+                        <h5>Daftar Kategori Utama</h5>
+                        <p>Basis kategori untuk pengelompokan master obat.</p>
+                    </div>
+                </div>
+                <div class="category-table-tools">
+                    <label class="category-search" for="kategoriUtamaSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="kategoriUtamaSearch" placeholder="Cari kode atau nama kategori...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tableKategoriUtama" class="table category-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Kategori Utama</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.kategori.partials.scripts")
     @include("medcare.masterData.kategori.kategoriUtama.jsMain")
 @endpush

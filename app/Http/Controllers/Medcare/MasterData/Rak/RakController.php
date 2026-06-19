@@ -27,20 +27,22 @@ class RakController extends Controller
         $Rak = $this->RakService->getRakTable();
 
         return DataTables::of($Rak)
-        ->addIndexColumn()
-        ->addColumn('actions', function ($dataRak) {
-            return '
-                <button class="btn btn-sm btn-success" onclick="editRak(' . $dataRak['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteRak(' . $dataRak['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
-            ';
-        })
+            ->addIndexColumn()
+            ->addColumn('actions', function ($dataRak) {
+                return '
+                    <div class="rak-action-group">
+                        <button type="button" class="btn rak-action-btn rak-action-edit" title="Edit rak" onclick="editRak(' . $dataRak['id'] . ')">
+                            <i class="mdi mdi-pencil-outline"></i>
+                        </button>
+                        <button type="button" class="btn rak-action-btn rak-action-delete" title="Hapus rak" onclick="deleteRak(' . $dataRak['id'] . ')">
+                            <i class="mdi mdi-delete-outline"></i>
+                        </button>
+                    </div>
+                ';
+            })
 
-        ->rawColumns(['actions'])
-        ->make(true);
+            ->rawColumns(['actions'])
+            ->make(true);
     }
 
     /**
@@ -66,7 +68,7 @@ class RakController extends Controller
             $this->RakService->createRak([
                 'kode' => $kode,
                 'nama' => $request->nama[$index],
-                'lokasi' => $request->lokasi[$index],
+                'lokasi' => $request->lokasi[$index] ?? null,
             ]);
         }
 
@@ -105,12 +107,13 @@ class RakController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Rak updated successfully',
+            'message' => 'Rak Penyimpanan berhasil diperbarui',
             'data'    => $dataRak
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->RakService->updateStatus($request->id, $request->status);
     }
 

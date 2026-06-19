@@ -30,12 +30,14 @@ class PabrikanController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataPabrikan) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editPabrikan(' . $dataPabrikan['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deletePabrikan(' . $dataPabrikan['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="company-action-group">
+                    <button type="button" class="btn company-action-btn company-action-edit" title="Edit pabrikan" onclick="editPabrikan(' . $dataPabrikan['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn company-action-btn company-action-delete" title="Hapus pabrikan" onclick="deletePabrikan(' . $dataPabrikan['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -68,9 +70,9 @@ class PabrikanController extends Controller
             $this->PabrikanService->createPabrikan([
                 'kode' => $kode,
                 'nama' => $request->nama[$index],
-                'alamat' => $request->alamat[$index],
-                'telepon' => $request->telepon[$index],
-                'email' => $request->email[$index],
+                'alamat' => $request->alamat[$index] ?? null,
+                'telepon' => $request->telepon[$index] ?? null,
+                'email' => $request->email[$index] ?? null,
             ]);
         }
 
@@ -111,12 +113,13 @@ class PabrikanController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Pabrikan updated successfully',
+            'message' => 'Pabrikan berhasil diperbarui',
             'data'    => $dataPabrikan
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->PabrikanService->updateStatus($request->id, $request->status);
     }
 

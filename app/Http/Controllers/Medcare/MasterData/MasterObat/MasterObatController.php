@@ -44,69 +44,81 @@ class MasterObatController extends Controller
         $MasterObat = $this->MasterObatService->getMasterObatTable();
 
         return DataTables::of($MasterObat)
-        ->addIndexColumn()
-        ->addColumn('actions', function ($dataMasterObat) {
-            return '
-                <button class="btn btn-sm btn-success" onclick="editMasterObat(' . $dataMasterObat['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteMasterObat(' . $dataMasterObat['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
-            ';
-        })
+            ->addIndexColumn()
+            ->addColumn('actions', function ($dataMasterObat) {
+                return '
+                    <div class="obat-action-group">
+                        <button type="button" class="btn obat-action-btn obat-action-edit" title="Edit obat" onclick="editMasterObat(' . $dataMasterObat['id'] . ')">
+                            <i class="mdi mdi-pencil-outline"></i>
+                        </button>
+                        <button type="button" class="btn obat-action-btn obat-action-delete" title="Hapus obat" onclick="deleteMasterObat(' . $dataMasterObat['id'] . ')">
+                            <i class="mdi mdi-delete-outline"></i>
+                        </button>
+                    </div>
+                ';
+            })
 
-        ->rawColumns(['actions'])
-        ->make(true);
+            ->rawColumns(['actions'])
+            ->make(true);
     }
 
-    public function getMainKategori($kategoriUtama){
-        $mainKategori = $this->MasterObatService->getmainKategori($kategoriUtama);    
+    public function getMainKategori($kategoriUtama)
+    {
+        $mainKategori = $this->MasterObatService->getMainKategori($kategoriUtama);
         return response()->json($mainKategori);
     }
 
-    public function getSubKategori($kategori){
+    public function getSubKategori($kategori)
+    {
         $subKategoris = $this->MasterObatService->getSubKategori($kategori);
         return response()->json($subKategoris);
     }
 
-    public function getKategoriUtama(){
-        $kategoriUtama = $this->KategoriUtamaService->getKategoriUtama();    
+    public function getKategoriUtama()
+    {
+        $kategoriUtama = $this->KategoriUtamaService->getKategoriUtama();
         return response()->json($kategoriUtama);
     }
 
-    public function getKategori(){
-        $kategori = $this->MainCategoryService->getMainCategory();    
+    public function getKategori()
+    {
+        $kategori = $this->MainCategoryService->getMainCategory();
         return response()->json($kategori);
     }
 
-    public function getSediaan(){
-        $sediaan = $this->SediaanService->getSediaan();    
+    public function getSediaan()
+    {
+        $sediaan = $this->SediaanService->getSediaan();
         return response()->json($sediaan);
     }
 
-    public function getGolongan(){
-        $golongan = $this->GolonganService->getGolongan();    
+    public function getGolongan()
+    {
+        $golongan = $this->GolonganService->getGolongan();
         return response()->json($golongan);
     }
 
-    public function getSatuan(){
-        $satuan = $this->SatuanService->getSatuan();    
+    public function getSatuan()
+    {
+        $satuan = $this->SatuanService->getSatuan();
         return response()->json($satuan);
     }
 
-    public function getPabrikan(){
-        $pabrikan = $this->PabrikanService->getPabrikan();    
+    public function getPabrikan()
+    {
+        $pabrikan = $this->PabrikanService->getPabrikan();
         return response()->json($pabrikan);
     }
 
-    public function getDistributor(){
-        $distributor = $this->DistributorService->getDistributor();    
+    public function getDistributor()
+    {
+        $distributor = $this->DistributorService->getDistributor();
         return response()->json($distributor);
     }
 
-    public function getRak(){
-        $rak = $this->RakService->getRak();    
+    public function getRak()
+    {
+        $rak = $this->RakService->getRak();
         return response()->json($rak);
     }
 
@@ -143,14 +155,14 @@ class MasterObatController extends Controller
 
             'stok_minimum'    => 'required|numeric|min:0',
             'harga_beli'      => 'required|numeric|min:0',
-            'harga_jual'      => 'required|numeric|min:0',
 
             'is_generik'      => 'required|boolean',
             'is_active'       => 'required|boolean',
         ]);
+
         $this->MasterObatService->createMasterObat($validated);
 
-        return response()->json(['status' => 'success', 'message' => 'Pabrikan berhasil ditambahkan']);
+        return response()->json(['status' => 'success', 'message' => 'Master Obat berhasil ditambahkan']);
     } //
 
     /**
@@ -195,7 +207,6 @@ class MasterObatController extends Controller
             
             'stok_minimum'    => 'required|numeric|min:0',
             'harga_beli'      => 'required|numeric|min:0',
-            'harga_jual'      => 'required|numeric|min:0',
 
             'is_generik'      => 'required|boolean',
             'is_active'       => 'required|boolean',
@@ -205,12 +216,13 @@ class MasterObatController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'MasterObat updated successfully',
+            'message' => 'Master Obat berhasil diperbarui',
             'data'    => $dataMasterObat
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->MasterObatService->updateStatus($request->id, $request->status);
     }
 

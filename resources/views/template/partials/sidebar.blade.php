@@ -217,7 +217,7 @@
                 <a class="nav-link" data-bs-toggle="collapse" href="#konversiObat" role="button"
                     aria-expanded="false" aria-controls="konversiObat">
 
-                    <i class="mdi mdi-swap-horizontal-bold link-icon"></i>
+                    <i class="link-icon" data-feather="repeat"></i>
 
                     <span class="link-title">Konversi Satuan Obat</span>
 

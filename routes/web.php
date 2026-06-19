@@ -251,6 +251,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/pembelian/store', [PembelianController::class, 'store'])->name('pembelian.store');
         Route::get('/pembelian/{id}/edit', [PembelianController::class, 'edit'])->name('pembelian.edit');
         Route::put('/pembelian/{id}/update', [PembelianController::class, 'update'])->name('pembelian.update');
+        Route::put('/pembelian/{id}/approve', [PembelianController::class, 'approve'])->name('pembelian.approve');
+        Route::put('/pembelian/{id}/reject', [PembelianController::class, 'reject'])->name('pembelian.reject');
+        Route::put('/pembelian/{id}/reopen-approval', [PembelianController::class, 'reopenApproval'])->name('pembelian.reopenApproval');
         Route::delete('/pembelian/{id}/destroy', [PembelianController::class, 'destroy'])->name('pembelian.destroy');
         Route::get('/pembelian/{id}/show', [PembelianController::class, 'show'])->name('pembelian.show');
         Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');

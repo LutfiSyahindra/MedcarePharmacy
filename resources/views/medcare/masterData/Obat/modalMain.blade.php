@@ -1,233 +1,310 @@
-<div class="modal fade" id="obatModal" tabindex="-1" aria-labelledby="obatModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+<div class="modal fade obat-modal" id="obatModal" tabindex="-1" aria-labelledby="obatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="obatModalLabel">Tambah Obat</h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-pill"></i></span>
+                    <div>
+                        <h5 class="modal-title mb-0" id="obatModalLabel">Tambah Master Obat</h5>
+                        <p class="modal-subtitle" id="obatModalSubtitle">Lengkapi identitas, klasifikasi, pemasok, stok minimum, harga beli, dan status obat.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
                 <form id="obatForm">
                     @csrf
-                    <div class="row g-3">
+                    <input id="obatId" name="obatId" type="hidden">
 
-                        <!-- ======================= BAGIAN KIRI ======================= -->
-                        <div class="col-md-6">
-                            <input id="obatId" name="obatId" type="hidden">
-                            <!-- Informasi Utama -->
-                            <div class="card shadow-sm border-25px mb-3">
-                                <div class="card-header bg-light fw-semibold">
-                                    <i class="bi bi-capsule text-primary"></i> Informasi Obat
+                    <div class="obat-form-grid">
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-card-account-details-outline"></i>
+                                <div>
+                                    <strong>Identitas Obat</strong>
+                                    <small>Kode, nama, bentuk sediaan, dan kemasan.</small>
                                 </div>
-                                <div class="card-body">
-                                    <!-- Kode Obat -->
-                                    <div class="mb-3">
+                            </div>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field">
                                         <label class="form-label">Kode Obat</label>
-                                        <input class="form-control" name="kode_obat" type="text"
-                                            placeholder="Contoh: OBT0001">
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-barcode-scan"></i></span>
+                                            <input class="form-control" name="kode_obat" type="text" placeholder="OBT0001">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
                                     </div>
 
-                                    <!-- Nama Obat -->
-                                    <div class="mb-3">
+                                    <div class="obat-field">
                                         <label class="form-label">Nama Obat</label>
-                                        <input class="form-control" name="nama_obat" type="text"
-                                            placeholder="Contoh: Paracetamol 500mg">
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-pill"></i></span>
+                                            <input class="form-control" name="nama_obat" type="text" placeholder="Paracetamol 500mg">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
                                     </div>
 
-                                    <!-- Sediaan -->
-                                    <div class="mb-3">
+                                    <div class="obat-field">
                                         <label class="form-label">Sediaan</label>
-                                        <select class="js-example-basic-single form-select" data-width="100%"
-                                            name="sediaan_id">
-                                            <option value="">-- Pilih Sediaan --</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Kategori Utama -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Kategori Utama</label>
-                                        <select class="js-example-basic-single form-select" data-width="100%"
-                                            name="category_id" id="kategoriUtama">
-                                            <option value="">-- Pilih Kategori Utama --</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="row g-2">
-                                        <!-- Kategori -->
-                                        <div class="col-md-6">
-                                            <label class="form-label">Kategori</label>
-                                            <select class="js-example-basic-single form-select" data-width="100%"
-                                                name="main_category_id" id="kategori">
-                                                <option value="">-- Pilih Kategori --</option>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-bottle-tonic-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih sediaan" name="sediaan_id">
+                                                <option value=""></option>
                                             </select>
                                         </div>
-
-                                        <!-- Sub Kategori -->
-                                        <div class="col-md-6">
-                                            <label class="form-label">Sub Kategori</label>
-                                            <select class="js-example-basic-single form-select" data-width="100%"
-                                                name="sub_kategori_id" id="subKategori">
-                                                <option value="">-- Pilih Sub Kategori --</option>
-                                            </select>
-                                        </div>
+                                        <div class="invalid-feedback"></div>
                                     </div>
 
-                                    <div class="row g-2 mt-2">
-                                        <!-- Golongan -->
-                                        <div class="col-md-6">
-                                            <label class="form-label">Golongan</label>
-                                            <select class="js-example-basic-single form-select" data-width="100%"
-                                                name="golongan_id">
-                                                <option value="">-- Pilih Golongan --</option>
-                                            </select>
-                                        </div>
-
-                                        <!-- Satuan -->
-                                        <div class="col-md-6">
-                                            <label class="form-label">Satuan</label>
-                                            <select class="js-example-basic-single form-select" data-width="100%"
-                                                name="satuan_id">
-                                                <option value="">-- Pilih Satuan --</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Komposisi dan Indikasi -->
-                            <div class="card shadow-sm border-25px mb-3">
-                                <div class="card-header bg-light fw-semibold">
-                                    <i class="bi bi-info-circle text-primary"></i> Informasi Tambahan
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <label class="form-label">Komposisi</label>
-                                        <input class="form-control" name="komposisi"
-                                            placeholder="Contoh: Paracetamol 500mg">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Indikasi</label>
-                                        <input class="form-control" name="indikasi"
-                                            placeholder="Contoh: Penurun demam, pereda nyeri">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Dosis</label>
-                                        <input class="form-control" name="dosis"
-                                            placeholder="Contoh: 3x sehari setelah makan">
-                                    </div>
-                                    <div class="mb-3">
+                                    <div class="obat-field">
                                         <label class="form-label">Kemasan</label>
-                                        <input class="form-control" name="kemasan"
-                                            placeholder="Contoh: Strip isi 10 tablet">
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-package-variant-closed"></i></span>
+                                            <input class="form-control" name="kemasan" type="text" placeholder="Strip isi 10 tablet">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </section>
 
-                        <!-- ======================= BAGIAN KANAN ======================= -->
-                        <div class="col-md-6">
-
-                            <!-- Produksi & Penyimpanan -->
-                            <div class="card shadow-sm border-25px mb-3">
-                                <div class="card-header bg-light fw-semibold">
-                                    <i class="bi bi-building text-primary"></i> Produksi & Penyimpanan
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <label class="form-label">Pabrikan</label>
-                                        <select class="js-example-basic-single form-select" data-width="100%"
-                                            name="pabrikan_id">
-                                            <option value="">-- Pilih Pabrikan --</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Distributor</label>
-                                        <select class="js-example-basic-single form-select" data-width="100%"
-                                            name="distributor_id">
-                                            <option value="">-- Pilih Distributor --</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Rak Penyimpanan</label>
-                                        <select class="js-example-basic-single form-select" data-width="100%"
-                                            name="rak_id">
-                                            <option value="">-- Pilih Rak --</option>
-                                        </select>
-                                    </div>
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-shape-outline"></i>
+                                <div>
+                                    <strong>Klasifikasi</strong>
+                                    <small>Susun hirarki kategori dan atribut farmasi.</small>
                                 </div>
                             </div>
-
-                            <!-- Stok & Harga -->
-                            <div class="card shadow-sm border-25px mb-3">
-                                <div class="card-header bg-light fw-semibold">
-                                    <i class="bi bi-box-seam text-primary"></i> Stok & Harga
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-md-12">
-                                            <label class="form-label">Stok Minimum</label>
-                                            <input class="form-control" name="stok_minimum" type="number"
-                                                min="0" value="0">
-                                        </div>
-                                    </div>
-                                    <div class="row g-2">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Harga Beli</label>
-                                            <input class="form-control" name="harga_beli" type="number"
-                                                step="0.01" placeholder="0.00">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Harga Jual</label>
-                                            <input class="form-control" name="harga_jual" type="number"
-                                                step="0.01" placeholder="0.00">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Kadaluarsa & Status -->
-                            <div class="card shadow-sm border-25px">
-                                <div class="card-header bg-light fw-semibold">
-                                    <i class="bi bi-calendar-event text-primary"></i>Status
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-2 mt-2">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Generik?</label>
-                                            <select class="form-select" name="is_generik">
-                                                <option value="1">Ya</option>
-                                                <option value="0">Tidak</option>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field">
+                                        <label class="form-label">Kategori Utama</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-folder-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih kategori utama" name="category_id" id="kategoriUtama">
+                                                <option value=""></option>
                                             </select>
                                         </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Aktif?</label>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Kategori</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-folder-multiple-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih kategori" name="main_category_id" id="kategori">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Sub Kategori</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-source-branch"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih sub kategori" name="sub_kategori_id" id="subKategori">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Golongan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-flask-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih golongan" name="golongan_id">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field is-wide">
+                                        <label class="form-label">Satuan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-scale-balance"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih satuan" name="satuan_id">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-factory"></i>
+                                <div>
+                                    <strong>Produksi & Penyimpanan</strong>
+                                    <small>Pabrikan, distributor, dan rak obat.</small>
+                                </div>
+                            </div>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field">
+                                        <label class="form-label">Pabrikan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-factory"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih pabrikan" name="pabrikan_id">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Distributor</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-truck-delivery-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih distributor" name="distributor_id">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field is-wide">
+                                        <label class="form-label">Rak Penyimpanan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-archive-marker-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih rak penyimpanan" name="rak_id">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-clipboard-pulse-outline"></i>
+                                <div>
+                                    <strong>Informasi Klinis</strong>
+                                    <small>Catatan komposisi, indikasi, dan dosis.</small>
+                                </div>
+                            </div>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field is-wide">
+                                        <label class="form-label">Komposisi</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-test-tube"></i></span>
+                                            <input class="form-control" name="komposisi" type="text" placeholder="Paracetamol 500mg">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field is-wide">
+                                        <label class="form-label">Indikasi</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-heart-pulse"></i></span>
+                                            <input class="form-control" name="indikasi" type="text" placeholder="Penurun demam, pereda nyeri">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field is-wide">
+                                        <label class="form-label">Dosis</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-clock-outline"></i></span>
+                                            <input class="form-control" name="dosis" type="text" placeholder="3x sehari setelah makan">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-chart-box-outline"></i>
+                                <div>
+                                    <strong>Stok Minimum & Harga Beli</strong>
+                                    <small>Ambang stok dan harga beli dasar obat.</small>
+                                </div>
+                            </div>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field">
+                                        <label class="form-label">Stok Minimum</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-bell-ring-outline"></i></span>
+                                            <input class="form-control" name="stok_minimum" type="number" min="0" value="0">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Harga Beli</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-cash-minus"></i></span>
+                                            <input class="form-control" name="harga_beli" type="number" min="0" step="0.01" placeholder="0.00">
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="obat-form-section">
+                            <div class="obat-section-header">
+                                <i class="mdi mdi-toggle-switch-outline"></i>
+                                <div>
+                                    <strong>Status</strong>
+                                    <small>Tentukan jenis obat dan status aktifnya.</small>
+                                </div>
+                            </div>
+                            <div class="obat-section-body">
+                                <div class="obat-fields">
+                                    <div class="obat-field">
+                                        <label class="form-label">Jenis Obat</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-certificate-outline"></i></span>
+                                            <select class="form-select" name="is_generik">
+                                                <option value="1">Generik</option>
+                                                <option value="0">Paten</option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Status Data</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-check-decagram-outline"></i></span>
                                             <select class="form-select" name="is_active">
                                                 <option value="1">Aktif</option>
                                                 <option value="0">Nonaktif</option>
                                             </select>
                                         </div>
+                                        <div class="invalid-feedback"></div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </section>
                     </div>
 
-                    <!-- Footer -->
-                    <div class="modal-footer mt-4">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="bi bi-x-circle"></i> Tutup
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close-circle-outline"></i>
+                            Tutup
                         </button>
-                        <button type="submit" id="submitForm" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Simpan
+                        <button type="submit" id="submitObatForm" class="btn btn-primary">
+                            <i class="mdi mdi-content-save-outline"></i>
+                            Simpan
                         </button>
                     </div>
                 </form>
-
             </div>
-
         </div>
     </div>
 </div>

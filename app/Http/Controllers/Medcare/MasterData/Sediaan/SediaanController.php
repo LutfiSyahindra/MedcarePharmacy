@@ -30,12 +30,14 @@ class SediaanController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataSediaan) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editSediaan(' . $dataSediaan['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteSediaan(' . $dataSediaan['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="sediaan-action-group">
+                    <button type="button" class="btn sediaan-action-btn sediaan-action-edit" title="Edit sediaan" onclick="editSediaan(' . $dataSediaan['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn sediaan-action-btn sediaan-action-delete" title="Hapus sediaan" onclick="deleteSediaan(' . $dataSediaan['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -59,17 +61,18 @@ class SediaanController extends Controller
         $validated = $request->validate([
             'kode.*' => 'required|string|max:10|unique:sediaan_obats,kode',
             'nama.*' => 'required|string|max:100',
+            'keterangan.*' => 'nullable|string|max:100',
         ]);
 
         foreach ($request->kode as $index => $kode) {
             $this->SediaanService->createSediaan([
                 'kode' => $kode,
                 'nama' => $request->nama[$index],
-                'keterangan' => $request->keterangan[$index],
+                'keterangan' => $request->keterangan[$index] ?? null,
             ]);
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Golongan berhasil ditambahkan']);
+        return response()->json(['status' => 'success', 'message' => 'Sediaan berhasil ditambahkan']);
     }
 
     /**
@@ -97,19 +100,20 @@ class SediaanController extends Controller
         $validated = $request->validate([
             'kode' => 'required|string|max:10|unique:sediaan_obats,kode,' . $id,
             'nama' => 'required|string|max:100',
-            // 'keterangan' => 'string|max:100',
+            'keterangan' => 'nullable|string|max:100',
         ]);
 
         $dataSediaan = $this->SediaanService->updateSediaan($id, $validated);
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Sediaan updated successfully',
+            'message' => 'Sediaan berhasil diperbarui',
             'data'    => $dataSediaan
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->SediaanService->updateStatus($request->id, $request->status);
     }
 

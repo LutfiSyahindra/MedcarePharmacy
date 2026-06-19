@@ -34,17 +34,77 @@ class PembelianController extends Controller
     {
         return view('medcare.menu.pembelianPenerimaan.pembelian.pembelian');
     }
-    public function table()
+    public function table(Request $request)
     {
         $Pembelian = $this->PembelianService->getPembelianTable();
+        $dateStart = $request->input('date_start');
+        $dateEnd = $request->input('date_end');
+
+        if ($dateStart || $dateEnd) {
+            $Pembelian = collect($Pembelian)->filter(function ($row) use ($dateStart, $dateEnd) {
+                if (empty($row['tanggal_po']) || $row['tanggal_po'] === '-') {
+                    return false;
+                }
+
+                $purchaseDate = Carbon::parse($row['tanggal_po'])->startOfDay();
+
+                if ($dateStart && $purchaseDate->lt(Carbon::parse($dateStart)->startOfDay())) {
+                    return false;
+                }
+
+                if ($dateEnd && $purchaseDate->gt(Carbon::parse($dateEnd)->endOfDay())) {
+                    return false;
+                }
+
+                return true;
+            })->values()->all();
+        }
+
+        $summary = collect($Pembelian);
+        $draftCount = $summary->where('status', 'draft')->count();
+        $waitingApprovalCount = $summary->where('status', 'waiting_approval')->count();
+        $summaryData = [
+            'total'            => $summary->count(),
+            'draft'            => $draftCount,
+            'waiting_approval' => $waitingApprovalCount,
+            'pending'          => $draftCount + $waitingApprovalCount,
+            'approved'         => $summary->where('status', 'approved')->count(),
+            'rejected'         => $summary->where('status', 'rejected')->count(),
+            'total_estimasi'   => $summary->sum(function ($row) {
+                return (float) ($row['total_estimasi'] ?? 0);
+            }),
+        ];
 
         return DataTables::of($Pembelian)
         ->addIndexColumn()
         ->addColumn('actions', function ($dataPembelian) {
-            return '
-                <button class="btn btn-sm btn-success" onclick="editPembelian(' . $dataPembelian['id'] . ')"> 
+            $status = $dataPembelian['status'];
+            $approvalButton = in_array($status, ['draft', 'waiting_approval'], true)
+                ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian(' . $dataPembelian['id'] . ')">
+                    <i class="mdi mdi-check-circle"></i>
+                </button>'
+                : '';
+            $rejectButton = in_array($status, ['draft', 'waiting_approval'], true)
+                ? '<button class="btn btn-sm btn-warning btn-reject-pembelian" onclick="rejectPembelian(' . $dataPembelian['id'] . ')">
+                    <i class="mdi mdi-close-circle"></i>
+                </button>'
+                : '';
+            $reopenButton = in_array($status, ['approved', 'rejected'], true)
+                ? '<button class="btn btn-sm btn-secondary btn-reopen-pembelian" onclick="reopenPembelian(' . $dataPembelian['id'] . ')">
+                    <i class="mdi mdi-lock-open-variant"></i>
+                </button>'
+                : '';
+            $editButton = $status !== 'approved'
+                ? '<button class="btn btn-sm btn-success btn-edit-pembelian" onclick="editPembelian(' . $dataPembelian['id'] . ')">
                     <i class="mdi mdi-pencil"></i>
-                </button> 
+                </button>'
+                : '';
+
+            return '
+                ' . $approvalButton . '
+                ' . $rejectButton . '
+                ' . $reopenButton . '
+                ' . $editButton . '
                 <button class="btn btn-sm btn-info" onclick="lihatPembelian(' . $dataPembelian['id'] . ')"> 
                     <i class="mdi mdi-eye"></i>
                 </button> 
@@ -55,6 +115,7 @@ class PembelianController extends Controller
         })
 
         ->rawColumns(['actions'])
+        ->with(['summary' => $summaryData])
         ->make(true);
     }
     public function generateNoPO()
@@ -111,6 +172,9 @@ class PembelianController extends Controller
         try {
             /** @var \App\Models\User $user */
                 $user = Auth::user();
+                $isAdmin = $user->hasAnyRole(['Admin', 'admin']);
+                Log::info('User Role: ' . ($isAdmin ? 'Admin' : 'Non-Admin'));
+
             // Insert header
             $po = $this->PembelianService->createPembelian([
                 'no_po'          => $request->no_po,
@@ -119,7 +183,11 @@ class PembelianController extends Controller
                 'tanggal_po'     => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $request->total_estimasi,
                 'catatan'        => $request->catatan,
-                'created_by'     => Auth::user()->id,
+                'created_by'     => $user->id,
+
+                // Tambahan otomatis jika role admin
+                'approved_by'    => $isAdmin ? $user->id : null,
+                'status'         => $isAdmin ? 'approved' : 'waiting_approval',
             ]);
 
             // Insert detail
@@ -130,7 +198,7 @@ class PembelianController extends Controller
                     'qty'               => $request->qty[$i],
                     'harga_estimasi'    => $request->harga_estimasi[$i],
                     'subtotal'          => $request->subtotal[$i],
-                    'satuan_konversi'         => $request->satuan_id[$i],
+                    'satuan_konversi'   => $request->satuan_id[$i],
                 ]);
             }
 
@@ -139,7 +207,9 @@ class PembelianController extends Controller
             // ======================
             // 🔔 KIRIM NOTIFIKASI
             // ======================
-            $approvers = User::role(['admin'])->get();
+            $approvers = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['Admin', 'admin']);
+            })->get();
 
             if ($approvers->count()) {
                 Notification::send(
@@ -176,7 +246,137 @@ class PembelianController extends Controller
     public function edit(string $id)
     {
         $Pembelian = $this->PembelianService->findByIdPembelian($id);
+
+        if ($Pembelian && $Pembelian->status === 'approved') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
+            ], 422);
+        }
+
         return response()->json($Pembelian);
+    }
+
+    public function approve(string $id)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin yang dapat menyetujui pembelian.',
+            ], 403);
+        }
+
+        $po = $this->PembelianService->findByIdPembelian($id);
+
+        if (! $po) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Purchase order tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($po->status === 'approved') {
+            return response()->json([
+                'status' => 'info',
+                'message' => 'Purchase order sudah disetujui.',
+            ]);
+        }
+
+        if ($po->status === 'rejected') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Purchase order yang ditolak tidak dapat disetujui.',
+            ], 422);
+        }
+
+        $this->PembelianService->updateStatus($id, 'approved', $user->id);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pembelian berhasil disetujui.',
+        ]);
+    }
+
+    public function reject(string $id)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin yang dapat menolak pembelian.',
+            ], 403);
+        }
+
+        $po = $this->PembelianService->findByIdPembelian($id);
+
+        if (! $po) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Purchase order tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($po->status === 'approved') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Purchase order yang sudah disetujui harus dibuka approval-nya dulu.',
+            ], 422);
+        }
+
+        if ($po->status === 'rejected') {
+            return response()->json([
+                'status' => 'info',
+                'message' => 'Purchase order sudah ditolak.',
+            ]);
+        }
+
+        $this->PembelianService->updateStatus($id, 'rejected');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pembelian berhasil ditolak.',
+        ]);
+    }
+
+    public function reopenApproval(string $id)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin yang dapat membuka approval pembelian.',
+            ], 403);
+        }
+
+        $po = $this->PembelianService->findByIdPembelian($id);
+
+        if (! $po) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Purchase order tidak ditemukan.',
+            ], 404);
+        }
+
+        if (in_array($po->status, ['draft', 'waiting_approval'], true)) {
+            return response()->json([
+                'status' => 'info',
+                'message' => 'Approval purchase order sudah terbuka.',
+            ]);
+        }
+
+        $this->PembelianService->updateStatus($id, 'waiting_approval');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Approval pembelian berhasil dibuka.',
+        ]);
     }
 
     /**
@@ -204,6 +404,14 @@ class PembelianController extends Controller
 
             /** @var \App\Models\User $user */
             $user = Auth::user();
+            $existingPo = $this->PembelianService->findByIdPembelian($id);
+
+            if ($existingPo && $existingPo->status === 'approved') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
+                ], 422);
+            }
 
             // =========================== UPDATE HEADER ============================
             $po = $this->PembelianService->updatePembelian($id, [
@@ -213,6 +421,8 @@ class PembelianController extends Controller
                 'tanggal_po'     => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $request->total_estimasi,
                 'catatan'        => $request->catatan,
+                'approved_by'    => null,
+                'status'         => 'waiting_approval',
             ]);
 
             // =========================== RESET DETAIL ============================

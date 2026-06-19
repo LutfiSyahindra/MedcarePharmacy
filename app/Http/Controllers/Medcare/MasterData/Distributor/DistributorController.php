@@ -30,12 +30,14 @@ class DistributorController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataDistributor) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editDistributor(' . $dataDistributor['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteDistributor(' . $dataDistributor['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="company-action-group">
+                    <button type="button" class="btn company-action-btn company-action-edit" title="Edit distributor" onclick="editDistributor(' . $dataDistributor['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn company-action-btn company-action-delete" title="Hapus distributor" onclick="deleteDistributor(' . $dataDistributor['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -68,9 +70,9 @@ class DistributorController extends Controller
             $this->DistributorService->createDistributor([
                 'kode' => $kode,
                 'nama' => $request->nama[$index],
-                'alamat' => $request->alamat[$index],
-                'telepon' => $request->telepon[$index],
-                'email' => $request->email[$index],
+                'alamat' => $request->alamat[$index] ?? null,
+                'telepon' => $request->telepon[$index] ?? null,
+                'email' => $request->email[$index] ?? null,
             ]);
         }
 
@@ -111,12 +113,13 @@ class DistributorController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Distributor updated successfully',
+            'message' => 'Distributor berhasil diperbarui',
             'data'    => $dataDistributor
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->DistributorService->updateStatus($request->id, $request->status);
     }
 

@@ -1,133 +1,148 @@
 <script>
     $(document).ready(function() {
-
-        // --- Setup CSRF untuk semua AJAX request
         $.ajaxSetup({
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
         });
 
-        // --- Fungsi untuk memuat opsi main category ke select2
-        function loadMainCategoryOptions(targetSelect, selectedIds = []) {
-            // pastikan selectedIds selalu array
-            if (!Array.isArray(selectedIds)) {
-                selectedIds = [selectedIds?.toString()];
-            }
+        const modalSelector = '#subCategoryModal';
+        const formSelector = '#subCategoryForm';
+        const wrapperSelector = '#subCategoryInputWrapper';
+        const submitSelector = '#submitSubCategoryForm';
+        const addButtonSelector = '#addSubCategoryInput';
+
+        if ($.fn.dropify) {
+            $('#subCategoryExcelInput').dropify();
+        }
+
+        function normalizeSelectedIds(selectedIds) {
+            if (!selectedIds) return [];
+            if (!Array.isArray(selectedIds)) selectedIds = [selectedIds];
+            return selectedIds.map((item) => String(item));
+        }
+
+        function loadMainCategoryOptions($select, selectedIds = []) {
+            const selected = normalizeSelectedIds(selectedIds);
 
             return $.ajax({
                 url: '{{ route("kategori.subKategori.mainKategori") }}',
                 type: 'GET',
                 success: function(response) {
-                    targetSelect.empty();
+                    $select.each(function() {
+                        const $current = $(this);
 
-                    // Tambahkan opsi satu per satu
-                    response.forEach(function(mainCategory) {
-                        const isSelected = selectedIds.includes(mainCategory.id
-                                .toString()) ?
-                            'selected' :
-                            '';
-                        targetSelect.append(
-                            `<option value="${mainCategory.id}" ${isSelected}>${mainCategory.name}</option>`
-                        );
-                    });
+                        if ($current.data('select2')) {
+                            $current.select2('destroy');
+                        }
 
-                    // Inisialisasi select2
-                    targetSelect.select2({
-                        dropdownParent: $('#subCategoryModal'),
-                        placeholder: "Pilih Kategori Utama",
-                        allowClear: false,
-                        width: '100%'
+                        $current.empty().append('<option value=""></option>');
+                        response.forEach(function(mainCategory) {
+                            const id = String(mainCategory.id);
+                            const isSelected = selected.includes(id) ? 'selected' : '';
+                            $current.append(
+                                `<option value="${CategoryUI.escapeHtml(id)}" ${isSelected}>${CategoryUI.escapeHtml(mainCategory.name)}</option>`
+                            );
+                        });
+
+                        $current.select2({
+                            dropdownParent: $(modalSelector),
+                            placeholder: 'Pilih Main Kategori',
+                            allowClear: false,
+                            width: '100%'
+                        });
                     });
                 },
                 error: function() {
-                    alert('Gagal memuat data kategori!');
+                    CategoryUI.toast('error', 'Gagal Memuat', 'Data main kategori tidak bisa dimuat.');
                 }
             });
         }
 
-        // --- Reset modal ketika dibuka
-        $('#subCategoryModal').on('show.bs.modal', function() {
-            let form = $('#subCategoryForm');
-            $('#subCategoryModalLabel').text('ADD SUB KATEGORI OBAT');
-            form.trigger('reset');
-            $('#submitForm').text('Add');
-            $('#addInput').show();
+        function subCategoryRow(mode = 'create', data = {}) {
+            const isEdit = mode === 'edit';
+            const mainCategoryName = isEdit ? 'main_category_id' : 'main_category_id[]';
+            const codeName = isEdit ? 'code' : 'code[]';
+            const nameName = isEdit ? 'name' : 'name[]';
+            const codeValue = CategoryUI.escapeHtml(data.code || '');
+            const nameValue = CategoryUI.escapeHtml(data.name || '');
 
-            // Reset error message
-            form.find('.invalid-feedback').text('');
-            form.find('.form-control').removeClass('is-invalid');
+            return `
+                <div class="category-batch-row">
+                    <div class="category-field is-parent">
+                        <label class="form-label">Main Kategori</label>
+                        <select name="${mainCategoryName}" class="js-main-category form-select" data-width="100%"></select>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    <div class="category-field is-code">
+                        <label class="form-label">Kode</label>
+                        <div class="category-input-shell">
+                            <span class="category-input-icon"><i class="mdi mdi-pound"></i></span>
+                            <input class="form-control" name="${codeName}" type="text" value="${codeValue}" placeholder="Contoh: TAB">
+                        </div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    <div class="category-field is-name">
+                        <label class="form-label">Sub Kategori Obat</label>
+                        <div class="category-input-shell">
+                            <span class="category-input-icon"><i class="mdi mdi-format-list-bulleted-type"></i></span>
+                            <input class="form-control" name="${nameName}" type="text" value="${nameValue}" placeholder="Masukkan nama sub kategori">
+                        </div>
+                        <div class="invalid-feedback"></div>
+                    </div>
+                    ${isEdit ? '' : `
+                        <div class="category-field is-action">
+                            <button type="button" class="btn btn-outline-danger category-row-remove remove-sub-category-input" title="Hapus baris">
+                                <i class="mdi mdi-delete-outline"></i>
+                            </button>
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        function resetAddMode() {
+            const $form = $(formSelector);
+
+            $('#subCategoryModalLabel').text('Tambah Sub Kategori');
+            $('#subCategoryModalSubtitle').text('Pilih main kategori lalu tambahkan detail klasifikasinya.');
+            $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
             $('#subCategoryId').val('');
+            $('#subCategoryBatchToolbar').show();
+            $form.trigger('reset');
+            CategoryUI.clearValidation(formSelector);
+            $(wrapperSelector).html(subCategoryRow());
+            loadMainCategoryOptions($(wrapperSelector).find('.js-main-category'));
+            CategoryUI.updateBatchCount(wrapperSelector, '#subCategoryRowCount');
+        }
 
-            // Reset input-wrapper jadi hanya 1 row
-            $('#input-wrapper').html(`
-                <div class="row g-3 mb-2 input-group-item">
-                    <div class="col-md-4">
-                        <label class="form-label">Main Kategori</label>
-                        <select name="main_category_id[]" class="js-main-category form-select" data-width="100%"></select>
-                    </div>
-                    <div class="col-md-4">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="code[]" type="text">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Kategori Obat</label>
-                        <input class="form-control" name="name[]" type="text">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                    </div>
-                </div>
-            `);
+        $(modalSelector).on('show.bs.modal', resetAddMode);
 
-            // Load kategori utama untuk elemen pertama
-            loadMainCategoryOptions($('.js-main-category'));
+        $(document).on('click', addButtonSelector, function() {
+            const $row = $(subCategoryRow());
+            $(wrapperSelector).append($row);
+            loadMainCategoryOptions($row.find('.js-main-category'));
+            CategoryUI.updateBatchCount(wrapperSelector, '#subCategoryRowCount');
         });
 
-        // --- Tambah input baru
-        $(document).on('click', '#addInput', function() {
-            let newInput = $(`
-                <div class="row g-3 mb-2 input-group-item">
-                    <div class="col-md-4">
-                        <label class="form-label">Main Kategori</label>
-                        <select name="main_category_id[]" class="js-main-category form-select" data-width="100%"></select>
-                    </div>
-                    <div class="col-md-4">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="code[]" type="text">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Kategori Obat</label>
-                        <input class="form-control" name="name[]" type="text">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                    </div>
-                </div>
-            `);
+        $(document).on('click', '.remove-sub-category-input', function() {
+            if ($(wrapperSelector).find('.category-batch-row').length <= 1) {
+                const $row = $(this).closest('.category-batch-row');
+                $row.find('input').val('');
+                $row.find('select').val('').trigger('change');
+                CategoryUI.toast('info', 'Baris dibersihkan', 'Minimal satu baris input tetap tersedia.');
+                return;
+            }
 
-            $('#input-wrapper').append(newInput);
-
-            // Setelah ditambahkan ke DOM, panggil loadMainCategoryOptions untuk select baru
-            loadMainCategoryOptions(newInput.find('.js-main-category'));
+            const $row = $(this).closest('.category-batch-row');
+            $row.find('.js-main-category').each(function() {
+                if ($(this).data('select2')) $(this).select2('destroy');
+            });
+            $row.remove();
+            CategoryUI.updateBatchCount(wrapperSelector, '#subCategoryRowCount');
         });
 
-        // --- Hapus input tertentu
-        $(document).on('click', '.remove-input', function() {
-            $(this).closest('.input-group-item').remove();
-        });
-
-
-        // --- DataTable
-        let subCategoryTable = $('#tableSubKategori').DataTable({
-            processing: true,
-            serverSide: true,
-            responsive: true,
-            autoWidth: false,
+        const subCategoryTable = $('#tableSubKategori').DataTable(CategoryUI.dataTableOptions({
             ajax: {
                 url: "{{ route("kategori.subKategori.table") }}",
                 type: "GET"
@@ -140,15 +155,24 @@
                 },
                 {
                     data: 'main_category_id',
-                    name: 'main_category_id'
+                    name: 'main_category_id',
+                    render: function(data) {
+                        return CategoryUI.parentBadge(data, 'mdi-shape-outline');
+                    }
                 },
                 {
                     data: 'code',
-                    name: 'code'
+                    name: 'code',
+                    render: function(data) {
+                        return CategoryUI.codeBadge(data);
+                    }
                 },
                 {
                     data: 'name',
-                    name: 'name'
+                    name: 'name',
+                    render: function(data) {
+                        return CategoryUI.identity(data, 'Sub kategori');
+                    }
                 },
                 {
                     data: 'actions',
@@ -157,251 +181,173 @@
                     searchable: false
                 }
             ]
+        }));
+
+        CategoryUI.initTableTools({
+            table: subCategoryTable,
+            tableSelector: '#tableSubKategori',
+            searchSelector: '#subKategoriSearch',
+            totalTarget: '#subKategoriTotal',
+            filteredTarget: '#subKategoriFiltered',
+            selectedTarget: '#subKategoriSelected'
         });
 
-        // --- Hilangkan search default bawaan DataTables
-        $('.dataTables_filter').hide();
-
-        // --- Hubungkan search custom dengan DataTables
-        $('#searchSubKategori').on('keyup', function() {
-            subCategoryTable.search(this.value).draw();
-        });
-
-        // --- Submit form
-        $('#subCategoryForm').on('submit', function(e) {
+        $(formSelector).on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
-            let subCategoryId = $('#subCategoryId').val();
-
-            let url = subCategoryId ?
+            const subCategoryId = $('#subCategoryId').val();
+            const url = subCategoryId ?
                 "{{ route("kategori.subKategori.update", ":id") }}".replace(':id', subCategoryId) :
                 "{{ route("kategori.subKategori.store") }}";
+            const method = subCategoryId ? 'PUT' : 'POST';
+            const normalHtml = subCategoryId ?
+                '<i class="mdi mdi-content-save-edit-outline"></i>Update' :
+                '<i class="mdi mdi-content-save-outline"></i>Simpan';
 
-            let method = subCategoryId ? 'PUT' : 'POST';
+            CategoryUI.clearValidation(formSelector);
+            CategoryUI.setButtonLoading(submitSelector, true, subCategoryId ? 'Mengupdate...' : 'Menyimpan...', normalHtml);
 
             $.ajax({
                 url: url,
                 method: method,
-                data: formData,
+                data: $(this).serialize(),
                 success: function(response) {
                     if (response.status === 'success') {
-                        $('#subCategoryModal').modal('hide');
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: response.message,
-                            toast: true,
-                            position: 'top-end',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-
-                        $('#subCategoryForm')[0].reset();
-                        $('#subCategoryId').val('');
-                        subCategoryTable.ajax.reload();
+                        $(modalSelector).modal('hide');
+                        CategoryUI.toast('success', response.message);
+                        subCategoryTable.ajax.reload(null, false);
                     }
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
-                        let errors = xhr.responseJSON.errors;
-                        let errorMessages = [];
-
-                        // reset semua error dulu
-                        $('#subCategoryForm').find('.invalid-feedback').text('');
-                        $('#subCategoryForm').find('.form-control').removeClass(
-                            'is-invalid');
-
-                        for (let key in errors) {
-                            // contoh key: "code.0", "name.1"
-                            let messages = errors[key];
-                            errorMessages.push(messages[0]);
-
-                            // cari input sesuai index
-                            let parts = key.split('.');
-                            let field = parts[0]; // code / name
-                            let index = parts[1]; // index array
-
-                            // ambil row ke-index lalu kasih error
-                            let row = $('#input-wrapper .input-group-item').eq(index);
-                            row.find(`input[name="${field}[]"]`).addClass('is-invalid');
-                            row.find('.invalid-feedback').first().text(messages[0]);
-                        }
-
-                        // tampilkan semua error di toast juga
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validasi Gagal',
-                            html: errorMessages.join('<br>'),
-                            toast: true,
-                            position: 'top-end',
-                            timer: 4000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
+                        const messages = CategoryUI.markBatchErrors(formSelector, wrapperSelector, xhr.responseJSON.errors);
+                        CategoryUI.toast('error', 'Validasi Gagal', messages.join('<br>'));
+                        return;
                     }
+
+                    CategoryUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan sub kategori.');
+                },
+                complete: function() {
+                    CategoryUI.setButtonLoading(submitSelector, false, '', normalHtml);
                 }
             });
         });
 
-        // --- Edit
         window.editSubCategory = function(id) {
             $.ajax({
                 url: "{{ route("kategori.subKategori.edit", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
-                    console.log(response);
-                    // tampilkan modal
-                    $('#subCategoryModal').modal('show');
-                    $('#subCategoryModalLabel').text('EDIT SUB KATEGORI OBAT');
-                    $('#submitForm').text('Update');
-                    $('#addInput').hide();
-
-                    // set hidden ID
+                    $(modalSelector).modal('show');
+                    $('#subCategoryModalLabel').text('Edit Sub Kategori');
+                    $('#subCategoryModalSubtitle').text('Perbarui induk, kode, dan nama sub kategori.');
+                    $(submitSelector).html('<i class="mdi mdi-content-save-edit-outline"></i>Update');
+                    $('#subCategoryBatchToolbar').hide();
                     $('#subCategoryId').val(response.id);
-
-                    // render input ke modal
-                    $('#input-wrapper').html(`
-                <div class="row g-3 mb-2 input-group-item">
-                    <div class="col-md-4">
-                        <label class="form-label">Main Kategori</label>
-                        <select name="main_category_id" class="js-main-category form-select" data-width="100%"></select>
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="col-md-4">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="code" type="text" value="${response.code}">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Sub Kategori Obat</label>
-                        <input class="form-control" name="name" type="text" value="${response.name}">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                </div>
-            `);
-
-                    // ambil elemen dropdown yang baru dibuat
-                    const $select = $('.js-main-category');
-
-                    // panggil fungsi load dan berikan ID yang sedang aktif
-                    loadMainCategoryOptions($select, response.main_category_id);
+                    $(wrapperSelector).html(subCategoryRow('edit', response));
+                    loadMainCategoryOptions($(wrapperSelector).find('.js-main-category'), response.main_category_id);
+                    CategoryUI.clearValidation(formSelector);
+                    CategoryUI.updateBatchCount(wrapperSelector, '#subCategoryRowCount');
+                },
+                error: function() {
+                    CategoryUI.toast('error', 'Gagal Memuat', 'Data sub kategori tidak bisa dimuat.');
                 }
             });
-        }
+        };
 
-        // --- Hapus
         window.deleteSubCategory = function(id) {
-            // Tampilkan konfirmasi hapus
             Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: 'Sub Category ini akan dihapus secara permanen!',
+                title: 'Hapus sub kategori?',
+                text: 'Data yang sudah dihapus tidak bisa dikembalikan.',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Ya, hapus!',
+                confirmButtonText: 'Ya, hapus',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    // Kirim request DELETE menggunakan AJAX
-                    $.ajax({
-                        url: "{{ route("kategori.subKategori.destroy", ":id") }}".replace(
-                            ':id',
-                            id),
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire(
-                                    'Dihapus!',
-                                    response.message,
-                                    'success'
-                                );
-                                subCategoryTable.ajax.reload(); // Reload DataTables
-                            } else {
-                                Swal.fire(
-                                    'Gagal!',
-                                    response.message,
-                                    'error'
-                                );
-                            }
-                        },
-                        error: function(xhr) {
-                            Swal.fire(
-                                'Gagal!',
-                                'Terjadi kesalahan saat menghapus Sub Category.',
-                                'error'
-                            );
+                if (!result.isConfirmed) return;
+
+                $.ajax({
+                    url: "{{ route("kategori.subKategori.destroy", ":id") }}".replace(':id', id),
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            CategoryUI.toast('success', 'Berhasil Dihapus', response.message);
+                            subCategoryTable.ajax.reload(null, false);
+                            return;
                         }
-                    });
-                }
+
+                        Swal.fire('Gagal', response.message, 'error');
+                    },
+                    error: function() {
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus sub kategori.', 'error');
+                    }
+                });
             });
+        };
+
+        function resetSubExcelForm() {
+            $('#subCategoryExcelForm')[0].reset();
+            const dropify = $('#subCategoryExcelInput').data('dropify');
+
+            if (dropify) {
+                dropify.resetPreview();
+                dropify.clearElement();
+            }
         }
 
-        // --- Download Template
-        $('#downloadTemplateBtn').on('click', function() {
+        $('#subCategoryModalExcell').on('hidden.bs.modal', resetSubExcelForm);
+
+        $('#subDownloadTemplateBtn').on('click', function() {
             window.location.href = "{{ route("kategori.subKategori.exportTemplate") }}";
-        })
+        });
 
-        // --- submitFormExcell
-        $('#submitFormExcell').on('click', function() {
-            let fileInput = $('#myDropify')[0];
-            let file = fileInput.files[0];
+        $('#subSubmitExcel').on('click', function() {
+            const fileInput = $('#subCategoryExcelInput')[0];
+            const file = fileInput.files[0];
+            const normalHtml = '<i class="mdi mdi-upload"></i>Upload';
 
-            // Jika file belum dipilih
             if (!file) {
-                // Tambahkan efek getar (shake)
-                $('#myDropify').addClass('shake border-danger');
-
-                // Hilangkan efek setelah 600ms
-                setTimeout(() => {
-                    $('#myDropify').removeClass('shake border-danger');
+                $('#subCategoryExcelInput').closest('.dropify-wrapper').addClass('shake border-danger');
+                setTimeout(function() {
+                    $('#subCategoryExcelInput').closest('.dropify-wrapper').removeClass('shake border-danger');
                 }, 600);
 
-                // Tampilkan alert
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Peringatan',
-                    text: 'Silakan pilih file Excel terlebih dahulu!',
+                    title: 'File belum dipilih',
+                    text: 'Silakan pilih file Excel terlebih dahulu.'
                 });
-
-                return; // hentikan eksekusi selanjutnya
+                return;
             }
 
-            let formData = new FormData();
+            const formData = new FormData();
             formData.append('file', file);
+            CategoryUI.setButtonLoading('#subSubmitExcel', true, 'Mengupload...', normalHtml);
 
-            // Alert progress
             Swal.fire({
                 title: 'Mengupload File...',
                 html: `
                     <div class="progress" style="height: 20px;">
-                        <div id="uploadProgressBar" 
-                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                        <div id="uploadProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                             role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <p class="mt-2 mb-0 text-muted">Mohon tunggu, proses import sedang berlangsung.</p>
                 `,
                 allowOutsideClick: false,
                 showConfirmButton: false,
-                didOpen: () => {
+                didOpen: function() {
                     Swal.showLoading();
                 }
             });
 
-            // Kirim AJAX
             $.ajax({
                 xhr: function() {
-                    let xhr = new window.XMLHttpRequest();
-                    xhr.upload.addEventListener("progress", function(evt) {
+                    const xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', function(evt) {
                         if (evt.lengthComputable) {
-                            let percentComplete = Math.round((evt.loaded / evt
-                                .total) * 100);
-                            $('#uploadProgressBar')
-                                .css('width', percentComplete + '%')
-                                .text(percentComplete + '%');
+                            const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                            $('#uploadProgressBar').css('width', percentComplete + '%').text(percentComplete + '%');
                         }
                     }, false);
                     return xhr;
@@ -416,44 +362,32 @@
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Berhasil',
+                            title: 'Import Berhasil',
                             html: `
                                 <p>${response.added} data berhasil ditambahkan.</p>
-                                <p>${response.skipped} data dilewati (sudah ada).</p>
+                                <p>${response.skipped} data dilewati.</p>
                             `,
-                            timer: 2500,
+                            timer: 2600,
                             showConfirmButton: false,
-                            willClose: () => {
-                                // Tutup modal
+                            willClose: function() {
                                 $('#subCategoryModalExcell').modal('hide');
-
-                                // Reload DataTable jika sudah diinisialisasi
-                                if (typeof subCategoryTable !== 'undefined') {
-                                    subCategoryTable.ajax.reload(null,
-                                        false
-                                    ); // false = tetap di halaman sekarang
-                                }
+                                subCategoryTable.ajax.reload(null, false);
                             }
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message ||
-                                'Terjadi kesalahan saat import data.',
-                        });
+                        return;
                     }
+
+                    Swal.fire('Gagal', response.message || 'Terjadi kesalahan saat import data.', 'error');
                 },
                 error: function(xhr) {
                     Swal.close();
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Gagal mengupload file: ' + xhr.responseText,
-                    });
+                    const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Gagal mengupload file.';
+                    Swal.fire('Gagal Import', message, 'error');
+                },
+                complete: function() {
+                    CategoryUI.setButtonLoading('#subSubmitExcel', false, '', normalHtml);
                 }
             });
         });
-
     });
 </script>

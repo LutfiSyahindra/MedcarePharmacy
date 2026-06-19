@@ -19,7 +19,7 @@ class KategoriController extends Controller
      */
     public function kategoriUtama()
     {
-        return view('medcare.masterdata.kategori.kategoriUtama.kategori');
+        return view('medcare.masterData.kategori.kategoriUtama.Kategori');
     }
 
     public function table()
@@ -30,12 +30,14 @@ class KategoriController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataKategoriUtama) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editKategoriUtama(' . $dataKategoriUtama['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteKategoriUtama(' . $dataKategoriUtama['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="category-action-group">
+                    <button type="button" class="btn category-action-btn category-action-edit" title="Edit kategori utama" onclick="editKategoriUtama(' . $dataKategoriUtama['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn category-action-btn category-action-delete" title="Hapus kategori utama" onclick="deleteKategoriUtama(' . $dataKategoriUtama['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -102,7 +104,7 @@ class KategoriController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Kategori Utama updated successfully',
+            'message' => 'Kategori Utama berhasil diperbarui',
             'data'    => $dataKategoriUtama
         ], 200);
     }

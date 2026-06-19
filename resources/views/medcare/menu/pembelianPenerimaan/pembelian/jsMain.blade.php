@@ -8,6 +8,7 @@
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
+        let PembelianSelect2Parent = $('#pembelianModal');
 
         // --- Inisialisasi flatpickr   
         flatpickr("#flatpickr-date", {
@@ -19,7 +20,7 @@
             placeholder: "-- Pilih --",
             allowClear: false,
             width: 'resolve',
-            dropdownParent: $('#pembelianModal .modal-body')
+            dropdownParent: PembelianSelect2Parent
         });
 
         // --- Setup CSRF untuk semua AJAX request
@@ -27,6 +28,76 @@
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
+        });
+
+        function detailItemTemplate(options = {}) {
+            let selectClass = options.selectClass ? ` ${options.selectClass}` : '';
+            let satuanAttr = options.satuanTerpilih ? ` data-satuan-terpilih="${options.satuanTerpilih}"` : '';
+            let loadingOption = options.loadingOption ?
+                `<option value="${options.obatId || ''}">Loading...</option>` : '';
+
+            return `
+                <div class="detail-item purchase-detail-card"${satuanAttr}>
+                    <div class="purchase-detail-card-head">
+                        <div>
+                            <span class="purchase-detail-number">1</span>
+                            <strong>Item Obat</strong>
+                            <small>Pilih obat, satuan, qty, dan harga estimasi.</small>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
+                            <i class="mdi mdi-trash-can-outline"></i> Hapus
+                        </button>
+                    </div>
+
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label">Obat</label>
+                            <select class="js-example-basic-single form-select${selectClass}" data-width="100%" name="obat_id[]" required>
+                                ${loadingOption}
+                            </select>
+                        </div>
+
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label">Satuan</label>
+                            <select class="form-select satuan-select" name="satuan_id[]" disabled required>
+                                <option value="">-- Pilih Satuan --</option>
+                            </select>
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Qty</label>
+                            <input type="number" class="form-control" name="qty[]" min="1" value="${options.qty ?? 1}" required>
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Harga Estimasi</label>
+                            <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]" min="0" step="0.01" value="${options.harga ?? 0}">
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Subtotal</label>
+                            <input type="number" class="form-control subtotal" name="subtotal[]" value="${options.subtotal ?? ''}" readonly>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function refreshDetailNumbers() {
+            $('#detail-wrapper .detail-item').each(function(index) {
+                $(this).find('.purchase-detail-number').text(index + 1);
+            });
+        }
+
+        $(document).on('select2:opening', '#pembelianModal select[name="obat_id[]"]', function() {
+            let modalBody = $('#pembelianModal .modal-body');
+            let row = $(this).closest('.detail-item');
+
+            if (!modalBody.length || !row.length) {
+                return;
+            }
+
+            modalBody.scrollTop(modalBody.scrollTop() + row.position().top - 96);
         });
         // ==== End Inisiasi Variable Global dan Function ====
 
@@ -37,54 +108,18 @@
             $('#pembelianModalLabel').text('Form Purchase Order');
             form.trigger('reset');
 
-            $('#submitForm').text('Simpan Purchase Order');
-            $('#total_estimasi').text('0');
+            $('#submitForm').html('<i class="mdi mdi-content-save-outline"></i> Simpan Purchase Order');
+            $('#total_estimasi').text(formatRupiah(0));
             $('#total_estimasi_input').val(0);
-            $('#penerimaan_id').val('');
+            $('#pembelian_id').val('');
 
             // Reset error state
             form.find('.invalid-feedback').text('');
             form.find('.form-control, .form-select').removeClass('is-invalid');
 
             // Reset detail-wrapper jadi hanya 1 baris kosong
-            $('#detail-wrapper').html(`
-                <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Obat</label>
-                        <select class="js-example-basic-single form-select" data-width="100%" name="obat_id[]" required>
-                        
-                        </select>
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Satuan</label>
-                        <select class="form-select satuan-select" name="satuan_id[]" disabled required>
-                            <option value="">-- Pilih Satuan --</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">Qty</label>
-                        <input type="number" class="form-control" name="qty[]" min="1" value="1" required>
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Harga Estimasi</label>
-                        <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]" min="0" step="0.01" value="0">
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Subtotal</label>
-                        <input type="number" class="form-control subtotal" name="subtotal[]" readonly>
-                    </div>
-
-                    <div class="col-md-12 mt-2 d-flex justify-content-end">
-                        <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
-                            <i class="bi bi-trash"></i> Hapus
-                        </button>
-                    </div>
-                </div>
-            `);
+            $('#detail-wrapper').html(detailItemTemplate());
+            hitungTotal();
 
             // Generate No PO hanya kalau TAMBAH
             $(this).one('shown.bs.modal', function() {
@@ -110,44 +145,10 @@
         // =================== Inisiasi Event Handler ===================
         // --- Tambah baris detail obat baru
         $(document).on('click', '#addDetail', function() {
-            let newDetail = `
-                <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Obat</label>
-                        <select class="js-example-basic-single form-select" data-width="100%" name="obat_id[]" required>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Satuan</label>
-                        <select class="form-select satuan-select" name="satuan_id[]" disabled required>
-                            <option value="">-- Pilih Satuan --</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">Qty</label>
-                        <input type="number" class="form-control" name="qty[]" min="1" value="1" required>
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Harga Estimasi</label>
-                        <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]" min="0" step="0.01" value="0">
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Subtotal</label>
-                        <input type="number" class="form-control subtotal" name="subtotal[]" readonly>
-                    </div>
-
-                    <div class="col-md-12 mt-2 d-flex justify-content-end">
-                        <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
-                            <i class="bi bi-trash"></i> Hapus
-                        </button>
-                    </div>
-                </div>
-            `;
+            let newDetail = detailItemTemplate();
             $('#detail-wrapper').append(newDetail);
+            refreshDetailNumbers();
+            hitungTotal();
             // 3. Ambil select obat di BARIS BARU saja
             let $newSelect = $('#detail-wrapper .detail-item').last().find('select[name="obat_id[]"]');
 
@@ -159,6 +160,7 @@
         $(document).on('click', '.remove-detail', function() {
             if ($('.detail-item').length > 1) {
                 $(this).closest('.detail-item').remove();
+                refreshDetailNumbers();
                 hitungTotal();
             }
         });
@@ -176,11 +178,22 @@
         // --- Fungsi hitung total estimasi keseluruhan
         function hitungTotal() {
             let total = 0;
+            let totalQty = 0;
             $('.subtotal').each(function() {
                 total += parseFloat($(this).val()) || 0;
             });
-            $('#total_estimasi').text(total.toLocaleString('id-ID'));
+            $('[name="qty[]"]').each(function() {
+                totalQty += parseFloat($(this).val()) || 0;
+            });
+            let itemCount = $('.detail-item').length;
+            let average = itemCount > 0 ? total / itemCount : 0;
+
+            refreshDetailNumbers();
+            $('#total_estimasi').text(formatRupiah(total));
             $('#total_estimasi_input').val(total);
+            $('#purchaseModalLineCount, #purchaseModalItemCount').text(itemCount.toLocaleString('id-ID'));
+            $('#purchaseModalQtyCount').text(totalQty.toLocaleString('id-ID'));
+            $('#purchaseModalAverage').text(formatRupiah(average));
         }
 
         // --- Get data distributor
@@ -268,7 +281,7 @@
                         s.select2({
                             placeholder: "-- Pilih Obat --",
                             width: 'resolve',
-                            dropdownParent: $('#pembelianModal .modal-body')
+                            dropdownParent: PembelianSelect2Parent
                         });
 
                         // ========== FIX PALING PENTING ==========
@@ -296,7 +309,7 @@
                         s.select2({
                             placeholder: "-- Pilih Obat --",
                             width: 'resolve',
-                            dropdownParent: $('#pembelianModal .modal-body')
+                            dropdownParent: PembelianSelect2Parent
                         });
                     });
                 }
@@ -394,7 +407,41 @@
                 style: 'currency',
                 currency: 'IDR',
                 minimumFractionDigits: 0
-            }).format(angka);
+            }).format(Number(angka) || 0);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '-').replace(/[&<>"']/g, function(character) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                } [character];
+            });
+        }
+
+        function getInitials(value) {
+            let words = String(value || '-').trim().split(/\s+/).filter(Boolean);
+            return words.slice(0, 2).map(word => word.charAt(0)).join('') || '-';
+        }
+
+        function updatePurchaseSummary(summary, recordsTotal) {
+            let total = Number(summary.total ?? recordsTotal) || 0;
+            let draft = Number(summary.draft) || 0;
+            let waiting = Number(summary.waiting_approval) || 0;
+            let pending = Number(summary.pending ?? (draft + waiting)) || 0;
+            let approved = Number(summary.approved) || 0;
+            let rejected = Number(summary.rejected) || 0;
+
+            $('#purchaseTotalCount, #purchaseAllFilterCount').text(total.toLocaleString('id-ID'));
+            $('#purchasePendingCount').text(pending.toLocaleString('id-ID'));
+            $('#purchaseDraftFilterCount').text(draft.toLocaleString('id-ID'));
+            $('#purchaseWaitingFilterCount').text(waiting.toLocaleString('id-ID'));
+            $('#purchaseApprovedCount, #purchaseApprovedFilterCount').text(approved.toLocaleString('id-ID'));
+            $('#purchaseRejectedFilterCount').text(rejected.toLocaleString('id-ID'));
+            $('#purchaseTotalValue').text(formatRupiah(summary.total_estimasi));
         }
 
         // --- Konversi Satuan
@@ -422,91 +469,367 @@
 
         // =================== Inisiasi DataTable ======================
         // --- DataTable
+        let currentMonthStart = moment().startOf('month');
+        let currentMonthEnd = moment().endOf('month');
+        let purchaseDateStart = currentMonthStart.format('YYYY-MM-DD');
+        let purchaseDateEnd = currentMonthEnd.format('YYYY-MM-DD');
+
         let PembelianTable = $('#tablePembelian').DataTable({
             processing: true,
             serverSide: true,
             responsive: true,
             autoWidth: false,
+            pageLength: 10,
+            order: [
+                [3, 'desc']
+            ],
             ajax: {
                 url: "{{ route("pembelian.table") }}",
-                type: "GET"
+                type: "GET",
+                data: function(request) {
+                    request.date_start = purchaseDateStart;
+                    request.date_end = purchaseDateEnd;
+                },
+                dataSrc: function(response) {
+                    updatePurchaseSummary(response.summary || {}, response.recordsTotal);
+                    return response.data || [];
+                }
             },
             columns: [{
                     data: 'DT_RowIndex',
                     name: 'DT_RowIndex',
                     orderable: false,
-                    searchable: false
+                    searchable: false,
+                    render: function(data) {
+                        return `<span class="purchase-row-number">${escapeHtml(data)}</span>`;
+                    }
                 },
                 {
                     data: 'approved_by',
-                    render: function(data) {
-                        if (!data) {
-                            return `<span class="badge bg-danger">Belum disetujui</span>`;
+                    name: 'approved_by',
+                    render: function(data, type, row) {
+                        let status = String(row.status || '').toLowerCase();
+
+                        if (status === 'rejected') {
+                            return `
+                                <span class="purchase-approval is-rejected">
+                                    <i class="mdi mdi-close-circle-outline"></i>
+                                    Ditolak
+                                </span>
+                            `;
                         }
-                        return `<span class="badge bg-success">${data}</span>`;
+
+                        if (!data && status !== 'approved') {
+                            return `
+                                <span class="purchase-approval is-pending">
+                                    <i class="mdi mdi-clock-outline"></i>
+                                    Menunggu
+                                </span>
+                            `;
+                        }
+
+                        return `
+                            <span class="purchase-approval is-approved" title="Approval tercatat">
+                                <i class="mdi mdi-check-circle-outline"></i>
+                                Disetujui
+                                <br>
+                                <small class="text-muted">
+                                    ${data}
+                                </small>
+                            </span>
+                        `;
                     }
                 },
                 {
                     data: 'no_po',
-                    name: 'no_po'
+                    name: 'no_po',
+                    render: function(data) {
+                        return `
+                            <span class="purchase-po-number">
+                                <i class="mdi mdi-file-document-outline"></i>
+                                ${escapeHtml(data)}
+                            </span>
+                        `;
+                    }
                 },
                 {
                     data: 'tanggal_po',
-                    name: 'tanggal_po'
+                    name: 'tanggal_po',
+                    render: function(data) {
+                        let date = moment(data);
+                        let formattedDate = date.isValid() ? date.format('DD-MM-YYYY') :
+                            escapeHtml(data);
+                        return `
+                            <span class="purchase-date">
+                                <i class="mdi mdi-calendar-blank-outline"></i>
+                                ${formattedDate}
+                            </span>
+                        `;
+                    }
                 },
                 {
                     data: 'branch_id',
+                    name: 'branch_id',
                     render: function(data) {
-                        return `<span class="badge bg-primary">${data}</span>`;
+                        return `
+                            <span class="purchase-badge is-branch">
+                                <i class="mdi mdi-hospital-building"></i>
+                                ${escapeHtml(data)}
+                            </span>
+                        `;
                     }
                 },
                 {
                     data: 'distributor_id',
+                    name: 'distributor_id',
                     render: function(data) {
-                        return `<span class="badge bg-info text-dark">Distributor ${data}</span>`;
+                        let distributor = escapeHtml(data);
+                        return `
+                            <span class="purchase-badge is-distributor" title="${distributor}">
+                                <i class="mdi mdi-truck-delivery-outline"></i>
+                                ${distributor}
+                            </span>
+                        `;
                     }
                 },
                 {
                     data: 'total_estimasi',
+                    name: 'total_estimasi',
                     render: function(data) {
-                        return `<span class="badge bg-success">${formatRupiah(data)}</span>`;
+                        return `
+                            <span class="purchase-money">
+                                <i class="mdi mdi-cash"></i>
+                                ${formatRupiah(data)}
+                            </span>
+                        `;
                     }
                 },
                 {
                     data: 'status',
+                    name: 'status',
                     render: function(data) {
-                        let warna =
-                            data === 'approved' ? 'success' :
-                            data === 'draft' ? 'warning' :
-                            data === 'rejected' ? 'danger' :
-                            'secondary';
+                        let status = String(data || '').toLowerCase();
+                        let statusClass =
+                            status === 'approved' ? 'is-approved' :
+                            (status === 'draft' || status === 'waiting_approval') ? 'is-draft' :
+                            status === 'rejected' ? 'is-rejected' :
+                            'is-other';
+                        let statusLabel =
+                            status === 'approved' ? 'Disetujui' :
+                            status === 'draft' ? 'Draft' :
+                            status === 'waiting_approval' ? 'Menunggu Approval' :
+                            status === 'rejected' ? 'Ditolak' :
+                            (data || '-');
+                        let statusIcon =
+                            status === 'approved' ? 'mdi-check-circle-outline' :
+                            (status === 'draft' || status === 'waiting_approval') ?
+                            'mdi-file-clock-outline' :
+                            status === 'rejected' ? 'mdi-close-circle-outline' :
+                            'mdi-help-circle-outline';
 
-                        return `<span class="badge bg-${warna} text-uppercase">${data}</span>`;
+                        return `
+                            <span class="purchase-status ${statusClass}">
+                                <i class="mdi ${statusIcon}"></i>
+                                ${escapeHtml(statusLabel)}
+                            </span>
+                        `;
                     }
                 },
                 {
                     data: 'catatan',
                     name: 'catatan',
+                    render: function(data) {
+                        let note = escapeHtml(data || '-');
+                        return `<span class="purchase-note" title="${note}">${note}</span>`;
+                    }
                 },
                 {
                     data: 'created_by',
                     name: 'created_by',
+                    render: function(data) {
+                        let user = escapeHtml(data || '-');
+                        return `
+                            <span class="purchase-user">
+                                <span class="purchase-user-avatar">${escapeHtml(getInitials(data))}</span>
+                                <span>${user}</span>
+                            </span>
+                        `;
+                    }
                 },
                 {
                     data: 'actions',
                     name: 'actions',
                     orderable: false,
-                    searchable: false
+                    searchable: false,
+                    render: function(data) {
+                        return `<div class="purchase-action-group">${data || ''}</div>`;
+                    }
                 }
-            ]
+            ],
+            columnDefs: [{
+                targets: [0, 10],
+                className: 'text-center'
+            }],
+            drawCallback: function() {
+                let table = $('#tablePembelian');
+                table.find('.purchase-action-group .btn-approve-pembelian')
+                    .attr({
+                        title: 'Setujui purchase order',
+                        'aria-label': 'Setujui purchase order'
+                    });
+                table.find('.purchase-action-group .btn-reject-pembelian')
+                    .attr({
+                        title: 'Tolak purchase order',
+                        'aria-label': 'Tolak purchase order'
+                    });
+                table.find('.purchase-action-group .btn-reopen-pembelian')
+                    .attr({
+                        title: 'Buka approval purchase order',
+                        'aria-label': 'Buka approval purchase order'
+                    });
+                table.find('.purchase-action-group .btn-edit-pembelian')
+                    .attr({
+                        title: 'Edit purchase order',
+                        'aria-label': 'Edit purchase order'
+                    });
+                table.find('.purchase-action-group .btn-info')
+                    .attr({
+                        title: 'Lihat detail purchase order',
+                        'aria-label': 'Lihat detail purchase order'
+                    });
+                table.find('.purchase-action-group .btn-danger')
+                    .attr({
+                        title: 'Hapus purchase order',
+                        'aria-label': 'Hapus purchase order'
+                    });
+            },
+            language: {
+                processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat purchase order...</span>',
+                emptyTable: 'Belum ada purchase order.',
+                zeroRecords: 'Purchase order yang dicari tidak ditemukan.',
+                info: 'Menampilkan _START_-_END_ dari _TOTAL_ data',
+                infoEmpty: 'Menampilkan 0 data',
+                paginate: {
+                    previous: '<i class="mdi mdi-chevron-left"></i>',
+                    next: '<i class="mdi mdi-chevron-right"></i>'
+                }
+            }
         });
 
-        // --- Hilangkan search default bawaan DataTables
-        $('.dataTables_filter').hide();
+        let purchaseSearchTimer;
 
-        // --- Hubungkan search custom dengan DataTables
-        $('#searchPembelian').on('keyup', function() {
-            PembelianTable.search(this.value).draw();
+        $('#searchPembelian').on('input', function() {
+            let searchValue = this.value;
+            $(this).closest('.purchase-search').toggleClass('has-value', Boolean(searchValue));
+            clearTimeout(purchaseSearchTimer);
+            purchaseSearchTimer = setTimeout(function() {
+                PembelianTable.search(searchValue).draw();
+            }, 250);
+        });
+
+        $('#clearPurchaseSearch').on('click', function() {
+            $('#searchPembelian').val('').trigger('input').focus();
+        });
+
+        $('.purchase-filter-chip').on('click', function() {
+            $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
+            $(this).addClass('is-active').attr('aria-pressed', 'true');
+            PembelianTable.column(7).search($(this).data('status') || '').draw();
+        });
+
+        function formatDateParameter(date) {
+            return moment(date).format('YYYY-MM-DD');
+        }
+
+        function applyPurchaseDateRange(startDate, endDate) {
+            purchaseDateStart = formatDateParameter(startDate);
+            purchaseDateEnd = formatDateParameter(endDate);
+            $('#purchaseDateRange').closest('.purchase-date-input').addClass('has-value');
+            PembelianTable.ajax.reload();
+        }
+
+        let purchaseDatePicker = flatpickr('#purchaseDateRange', {
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'd M Y',
+            defaultDate: [
+                purchaseDateStart,
+                purchaseDateEnd
+            ],
+            locale: {
+                rangeSeparator: ' - '
+            },
+            onChange: function(selectedDates) {
+                if (selectedDates.length === 2) {
+                    $('#purchaseDatePreset').val('');
+                    applyPurchaseDateRange(selectedDates[0], selectedDates[1]);
+                }
+            },
+            onClose: function(selectedDates) {
+                if (selectedDates.length === 1) {
+                    this.clear();
+                }
+            }
+        });
+
+        $('#purchaseDatePreset').val('this_month');
+        $('#purchaseDateRange').closest('.purchase-date-input').addClass('has-value');
+
+        $('#clearPurchaseDateRange').on('click', function() {
+            purchaseDateStart = '';
+            purchaseDateEnd = '';
+            purchaseDatePicker.clear();
+            $('#purchaseDatePreset').val('');
+            $('#purchaseDateRange').closest('.purchase-date-input').removeClass('has-value');
+            PembelianTable.ajax.reload();
+        });
+
+        $('#purchaseDatePreset').on('change', function() {
+            let preset = this.value;
+
+            if (!preset) {
+                return;
+            }
+
+            let today = moment().startOf('day');
+            let startDate = today.clone();
+            let endDate = today.clone();
+
+            if (preset === '7days') {
+                startDate.subtract(6, 'days');
+            } else if (preset === '30days') {
+                startDate.subtract(29, 'days');
+            } else if (preset === 'this_month') {
+                startDate.startOf('month');
+                endDate.endOf('month');
+            }
+
+            purchaseDatePicker.setDate([
+                startDate.format('YYYY-MM-DD'),
+                endDate.format('YYYY-MM-DD')
+            ], false);
+            applyPurchaseDateRange(startDate, endDate);
+        });
+
+        $('#purchasePageLength').on('change', function() {
+            PembelianTable.page.len(Number(this.value)).draw();
+        });
+
+        $('#refreshPurchaseTable').on('click', function() {
+            $(this).addClass('is-loading').prop('disabled', true);
+            PembelianTable.ajax.reload(null, false);
+        });
+
+        $('#tablePembelian').on('xhr.dt', function() {
+            $('#refreshPurchaseTable').removeClass('is-loading').prop('disabled', false);
+        });
+
+        $('#scrollPurchaseTable').on('click', function() {
+            document.getElementById('purchaseTableSection')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
         });
         // =================== End Inisiasi DataTable ==================
 
@@ -590,6 +913,135 @@
         });
 
         // --- Edit Pembelian
+        window.approvePembelian = function(id) {
+            Swal.fire({
+                title: 'Setujui purchase order?',
+                text: 'PO ini akan ditandai sudah disetujui oleh admin.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, setujui',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route("pembelian.approve", ":id") }}".replace(':id', id),
+                    type: 'PUT',
+                    success: function(response) {
+                        Swal.fire({
+                            icon: response.status === 'info' ? 'info' : 'success',
+                            title: response.message || 'Pembelian berhasil disetujui.',
+                            toast: true,
+                            position: 'top-end',
+                            timer: 3000,
+                            timerProgressBar: true,
+                            showConfirmButton: false,
+                        });
+
+                        PembelianTable.ajax.reload(null, false);
+                    },
+                    error: function(xhr) {
+                        let message = xhr.responseJSON?.message ||
+                            'Terjadi kesalahan saat menyetujui PO.';
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Approval gagal',
+                            text: message,
+                        });
+                    }
+                });
+            });
+        };
+
+        window.rejectPembelian = function(id) {
+            Swal.fire({
+                title: 'Tolak purchase order?',
+                text: 'PO ini akan ditandai ditolak dan tidak masuk approval.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, tolak',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route("pembelian.reject", ":id") }}".replace(':id', id),
+                    type: 'PUT',
+                    success: function(response) {
+                        Swal.fire({
+                            icon: response.status === 'info' ? 'info' : 'success',
+                            title: response.message || 'Pembelian berhasil ditolak.',
+                            toast: true,
+                            position: 'top-end',
+                            timer: 3000,
+                            timerProgressBar: true,
+                            showConfirmButton: false,
+                        });
+
+                        PembelianTable.ajax.reload(null, false);
+                    },
+                    error: function(xhr) {
+                        let message = xhr.responseJSON?.message ||
+                            'Terjadi kesalahan saat menolak PO.';
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Reject gagal',
+                            text: message,
+                        });
+                    }
+                });
+            });
+        };
+
+        window.reopenPembelian = function(id) {
+            Swal.fire({
+                title: 'Buka approval purchase order?',
+                text: 'Status PO akan kembali menunggu approval sehingga bisa diedit ulang.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, buka approval',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route("pembelian.reopenApproval", ":id") }}".replace(':id', id),
+                    type: 'PUT',
+                    success: function(response) {
+                        Swal.fire({
+                            icon: response.status === 'info' ? 'info' : 'success',
+                            title: response.message || 'Approval pembelian berhasil dibuka.',
+                            toast: true,
+                            position: 'top-end',
+                            timer: 3000,
+                            timerProgressBar: true,
+                            showConfirmButton: false,
+                        });
+
+                        PembelianTable.ajax.reload(null, false);
+                    },
+                    error: function(xhr) {
+                        let message = xhr.responseJSON?.message ||
+                            'Terjadi kesalahan saat membuka approval PO.';
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Buka approval gagal',
+                            text: message,
+                        });
+                    }
+                });
+            });
+        };
+
         window.editPembelian = function(id) {
 
             editMode = true;
@@ -604,7 +1056,9 @@
 
                     $('#pembelianModal').modal('show');
                     $('#pembelianModalLabel').text('Edit Purchase Order');
-                    $('#submitForm').text('Update');
+                    $('#submitForm').html(
+                        '<i class="mdi mdi-content-save-edit-outline"></i> Update Purchase Order'
+                    );
 
                     $('#pembelian_id').val(header.id);
                     $('input[name="no_po"]').val(header.no_po);
@@ -620,52 +1074,15 @@
 
                     detail.forEach(item => {
 
-                        let row = `
-                            <div class="row g-3 mb-3 detail-item align-items-end border-bottom pb-3"
-                                data-satuan-terpilih="${item.satuan_konversi.id}">
-
-                                <div class="col-md-4">
-                                    <label class="form-label">Obat</label>
-                                    <select class="js-example-basic-single form-select obatSelect"
-                                            name="obat_id[]" required>
-                                        <option value="${item.obat_id}">Loading...</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label">Satuan</label>
-                                    <select class="form-select satuan-select"
-                                            name="satuan_id[]" disabled required>
-                                        <option value="">-- Pilih Satuan --</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="form-label">Qty</label>
-                                    <input type="number" class="form-control"
-                                        name="qty[]" value="${item.qty}" required>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label">Harga Estimasi</label>
-                                    <input type="number" class="form-control harga_estimasi"
-                                        name="harga_estimasi[]" value="${item.harga_estimasi}">
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label">Subtotal</label>
-                                    <input type="number" class="form-control subtotal"
-                                        name="subtotal[]" value="${item.subtotal}" readonly>
-                                </div>
-
-                                <div class="col-md-12 mt-2 d-flex justify-content-end">
-                                    <button type="button"
-                                            class="btn btn-outline-danger btn-sm remove-detail">
-                                        <i class="bi bi-trash"></i> Hapus
-                                    </button>
-                                </div>
-                            </div>
-                        `;
+                        let row = detailItemTemplate({
+                            obatId: item.obat_id,
+                            satuanTerpilih: item.satuan_konversi?.id,
+                            qty: item.qty,
+                            harga: item.harga_estimasi,
+                            subtotal: item.subtotal,
+                            selectClass: 'obatSelect',
+                            loadingOption: true
+                        });
 
                         $('#detail-wrapper').append(row);
                     });
@@ -677,6 +1094,16 @@
                     });
 
                     hitungTotal();
+                },
+                error: function(xhr) {
+                    let message = xhr.responseJSON?.message ||
+                        'Terjadi kesalahan saat memuat data pembelian.';
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tidak bisa edit',
+                        text: message,
+                    });
                 }
             });
         };

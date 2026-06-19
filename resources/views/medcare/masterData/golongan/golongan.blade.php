@@ -6,85 +6,78 @@
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
     @include("template.AddOn.dropify")
+    @include("medcare.masterData.golongan.partials.style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.golongan.modalMain")
-    @include("medcare.masterData.golongan.modalExcell")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Golongan</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Golongan Obat</li>
-        </ol>
-    </nav>
+    <div class="golongan-page">
+        @include("medcare.masterData.golongan.modalMain")
+        @include("medcare.masterData.golongan.modalExcell")
+        @include("medcare.masterData.golongan.partials.header")
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-shape-outline mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Golongan</h5>
-                                <small class="text-muted">Kelola dan cari data Golongan Obat dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchGolongan" class="form-control border-start-0"
-                                    placeholder="Cari Golongan...">
-                            </div>
-
-                            <!-- Tombol Import Excel -->
-                            <button type="button" class="btn btn-success btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#golonganModalExcell">
-                                <i class="mdi mdi-file-excel me-1"></i>
-                                <span>Import</span>
-                            </button>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#golonganModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <h6 class="card-title"></h6>
-                    <div class="table-responsive">
-                        <table id="tableGolongan" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Golongan</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="golongan-stats-grid">
+            <div class="golongan-stat">
+                <span class="golongan-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="golonganTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh golongan obat yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="golongan-stat">
+                <span class="golongan-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="golonganFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="golongan-stat">
+                <span class="golongan-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="golonganSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai data.</small>
                 </div>
             </div>
         </div>
+
+        <section class="golongan-table-section">
+            <div class="golongan-table-toolbar">
+                <div class="golongan-table-title">
+                    <span class="golongan-table-title-icon"><i class="mdi mdi-shape-outline"></i></span>
+                    <div>
+                        <h5>Daftar Golongan Obat</h5>
+                        <p>Kelola kode, nama, keterangan, dan status aktif golongan.</p>
+                    </div>
+                </div>
+                <div class="golongan-table-tools">
+                    <label class="golongan-search" for="golonganSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="golonganSearch" placeholder="Cari kode, nama, atau keterangan...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tableGolongan" class="table golongan-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Golongan</th>
+                            <th>Keterangan</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.golongan.partials.scripts")
     @include("medcare.masterData.golongan.jsMain")
 @endpush

@@ -31,10 +31,22 @@ class PembelianRepository
         return $Pembelian;
     }
 
-    public function updateStatus($id, $status){
-        $Pembelian = PembelianModel::find($id);
-        $Pembelian->is_active = $status;
+    public function updateStatus($id, $status, $approvedBy = null)
+    {
+        $Pembelian = PembelianModel::findOrFail($id);
+        $Pembelian->status = $status;
+
+        if ($status === 'approved') {
+            $Pembelian->approved_by = $approvedBy;
+        }
+
+        if (in_array($status, ['draft', 'waiting_approval', 'rejected'], true)) {
+            $Pembelian->approved_by = null;
+        }
+
         $Pembelian->save();
+
+        return $Pembelian;
     }
 
     public function DetailPembelian($id)

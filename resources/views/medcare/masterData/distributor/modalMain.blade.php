@@ -1,74 +1,55 @@
-<div class="modal fade" id="distributorModal" tabindex="-1" aria-labelledby="distributorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+<div class="modal fade company-modal" id="distributorModal" tabindex="-1" aria-labelledby="distributorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="distributorModalLabel"></h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-archive"></i></span>
+                    <div>
+                        <h5 class="modal-title" id="distributorModalLabel">Tambah Distributor</h5>
+                        <p class="modal-subtitle" id="distributorModalSubtitle">Buat satu atau beberapa data distributor obat.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
                 <form id="distributorForm">
                     @csrf
 
-                    <div id="input-wrapper">
-                        <div class="row g-3 mb-3 input-group-item align-items-end border-bottom pb-3">
-                            <div class="col-md-2">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="kode[]" type="text" placeholder="Contoh: SNB">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">Distributor</label>
-                                <input class="form-control" name="nama[]" type="text" placeholder="Contoh: Sanbe">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">Alamat</label>
-                                <input class="form-control" name="alamat[]" type="text" placeholder="Alamat lengkap">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-2">
-                                <label class="form-label">Telepon</label>
-                                <input class="form-control" name="telepon[]" type="text"
-                                    placeholder="Contoh: 08123456789" pattern="[0-9]*" inputmode="numeric"
-                                    maxlength="15">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-2">
-                                <label class="form-label">Email</label>
-                                <input class="form-control" name="email[]" type="email" placeholder="Alamat Email">
-                                <div class="invalid-feedback"></div>
-                            </div>
-
-                            <div class="col-md-12 mt-2 d-flex justify-content-end">
-                                <button type="button" class="btn btn-outline-danger btn-sm remove-input">
-                                    <i class="bi bi-trash"></i> Hapus
-                                </button>
-                            </div>
+                    <div class="company-form-intro">
+                        <i class="mdi mdi-truck-delivery-outline"></i>
+                        <div>
+                            <strong>Profil distributor obat</strong>
+                            <small>Isi kode, nama distributor, alamat, telepon, dan email untuk kebutuhan pembelian dan penerimaan.</small>
                         </div>
                     </div>
 
-                    <div class="mt-2">
-                        <button type="button" id="addInput" class="btn btn-success btn-sm">+ Tambah Input</button>
+                    <div class="company-batch-toolbar" id="distributorBatchToolbar">
+                        <span class="company-count-pill">
+                            <i class="mdi mdi-format-list-numbered"></i>
+                            <span id="distributorRowCount">1</span> baris input
+                        </span>
+                        <button type="button" id="addDistributorInput" class="btn btn-success btn-sm">
+                            <i class="mdi mdi-plus-circle-outline"></i>
+                            Tambah Baris
+                        </button>
                     </div>
 
+                    <div id="distributorInputWrapper" class="company-batch-list"></div>
                     <input id="distributorId" name="distributorId" type="hidden">
 
-                    <div class="modal-footer mt-3">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" id="submitForm" class="btn btn-primary"></button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close"></i>
+                            Tutup
+                        </button>
+                        <button type="submit" id="submitDistributorForm" class="btn btn-primary">
+                            <i class="mdi mdi-content-save-outline"></i>
+                            Simpan
+                        </button>
                     </div>
                 </form>
-
             </div>
-
         </div>
     </div>
 </div>

@@ -1,57 +1,68 @@
-<!-- Modal Upload Golongan Excel -->
-<div class="modal fade" id="konversiModalExcell" tabindex="-1" aria-labelledby="konversiModalExcellLabel" aria-hidden="true">
+<div class="modal fade obat-modal" id="konversiModalExcell" tabindex="-1" aria-labelledby="konversiModalExcellLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="konversiModalExcellLabel">Upload Data Konversi (Excel)</h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-file-excel-outline"></i></span>
+                    <div>
+                        <h5 class="modal-title mb-0" id="konversiModalExcellLabel">Import Konversi Satuan</h5>
+                        <p class="modal-subtitle">Upload file Excel dari template yang sudah disediakan.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
                 <form id="konversiExcellForm" enctype="multipart/form-data">
                     @csrf
-                    <div class="row g-3">
-                        <div class="col-md-12 mb-3">
-                            <div class="alert alert-info border-start border-3 border-info shadow-sm" role="alert">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong class="fs-6 mb-0">Note:</strong>
-                                    <button type="button" id="downloadTemplateBtn"
-                                        class="btn btn-primary btn-sm d-flex align-items-center">
-                                        <i data-feather="download" class="me-1"></i>
-                                        Download Template
-                                    </button>
-                                </div>
-                                <ol class="mb-0 ps-3">
-                                    <li>Unduh template dengan tombol di atas.</li>
-                                    <li>Isi data pada template sesuai kolom yang tersedia.</li>
-                                    <li>Upload kembali template yang telah diisi.</li>
-                                </ol>
+                    <section class="obat-form-section">
+                        <div class="obat-section-header">
+                            <i class="mdi mdi-file-download-outline"></i>
+                            <div>
+                                <strong>Template Excel</strong>
+                                <small>Unduh template, isi data, lalu upload kembali.</small>
                             </div>
                         </div>
+                        <div class="obat-section-body">
+                            <div class="konversi-modal-note mb-3">
+                                <i class="mdi mdi-lightbulb-outline"></i>
+                                <div>
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                        <strong class="text-dark">Pastikan format kolom sesuai template.</strong>
+                                        <button type="button" id="downloadTemplateBtn" class="btn btn-sm btn-primary">
+                                            <i class="mdi mdi-download me-1"></i>
+                                            Download Template
+                                        </button>
+                                    </div>
+                                    <ol class="mb-0 ps-3">
+                                        <li>Unduh template dengan tombol di atas.</li>
+                                        <li>Isi data pada template sesuai kolom yang tersedia.</li>
+                                        <li>Upload kembali template yang telah diisi.</li>
+                                    </ol>
+                                </div>
+                            </div>
 
-                        <div class="col-md-12">
-                            <label class="form-label fw-bold mb-2">Pilih File Excel</label>
-                            <input type="file" id="myDropify" name="file" class="dropify"
-                                data-allowed-file-extensions="xls xlsx" data-max-file-size="5M" />
-                            <small class="text-muted">Format file yang diperbolehkan: .xls, .xlsx (maks. 5MB)</small>
+                            <div class="obat-field is-wide">
+                                <label class="form-label">Pilih File Excel</label>
+                                <input type="file" id="myDropify" name="file" class="dropify"
+                                    data-allowed-file-extensions="xls xlsx" data-max-file-size="5M" />
+                                <small class="text-muted">Format file yang diperbolehkan: .xls, .xlsx (maks. 5MB)</small>
+                            </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Modal Footer -->
-                    <div class="modal-footer mt-4">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i data-feather="x"></i> Tutup
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close-circle-outline"></i>
+                            Tutup
                         </button>
                         <button type="button" id="submitFormExcell" class="btn btn-primary">
-                            <i data-feather="upload"></i> Upload
+                            <i class="mdi mdi-upload"></i>
+                            Upload
                         </button>
                     </div>
                 </form>
             </div>
-
         </div>
     </div>
 </div>

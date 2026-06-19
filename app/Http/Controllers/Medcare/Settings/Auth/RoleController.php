@@ -33,15 +33,17 @@ class RoleController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataRoles) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editRoles(' . $dataRoles['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger" onclick="deleteRoles(' . $dataRoles['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
-                <button class="btn btn-sm btn-warning" onclick="assignPermissions(' . $dataRoles['id'] . ')">  
-                    <i class="mdi mdi-shield-key"></i>
-                </button>
+                <div class="auth-action-group">
+                    <button type="button" class="btn auth-action-btn auth-action-edit" title="Edit role" onclick="editRoles(' . $dataRoles['id'] . ')"> 
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button> 
+                    <button type="button" class="btn auth-action-btn auth-action-delete" title="Hapus role" onclick="deleteRoles(' . $dataRoles['id'] . ')">  
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                    <button type="button" class="btn auth-action-btn auth-action-assign" title="Assign permission" onclick="assignPermissions(' . $dataRoles['id'] . ')">  
+                        <i class="mdi mdi-shield-key-outline"></i>
+                    </button>
+                </div>
             ';
         })
 

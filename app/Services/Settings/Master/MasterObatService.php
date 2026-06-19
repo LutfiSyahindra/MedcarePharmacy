@@ -36,19 +36,21 @@ class MasterObatService
         return $dataMasterObat;
     }
 
-    public function getSubKategori($kategori){
+    public function getSubKategori($kategori)
+    {
         $subKategoris = $this->MasterObatRepository->getSubKategori($kategori);
         return $subKategoris;
     }
 
-    public function getMainKategori($kategoriUtama){
+    public function getMainKategori($kategoriUtama)
+    {
         $mainKategori = $this->MasterObatRepository->getMainKategori($kategoriUtama);
         return $mainKategori;
     }
 
     public function getMasterObatTable()
     {
-        $MasterObat = $this->MasterObatRepository->getMasterObat()->load(['kategoriUtama','kategori','subKategori','golongan','satuan','sediaan','pabrikan','distributor','rakPenyimpanan']);
+        $MasterObat = $this->MasterObatRepository->getMasterObat()->load(['kategoriUtama', 'kategori', 'subKategori', 'golongan', 'satuan', 'sediaan', 'pabrikan', 'distributor', 'rakPenyimpanan']);
 
         $dataMasterObat = [];
         foreach ($MasterObat as $r) {
@@ -56,8 +58,8 @@ class MasterObatService
                 'id'        => $r->id,
                 'kode_obat' => $r->kode_obat,
                 'nama_obat'      => $r->nama_obat,
-                'category_id'=> $r->kategoriUtama->name ?? '-',
-                'main_category_id'=> $r->kategori->name ?? '-',
+                'category_id' => $r->kategoriUtama->name ?? '-',
+                'main_category_id' => $r->kategori->name ?? '-',
                 'sub_kategori_id'   => $r->subKategori->name ?? '-',
                 'golongan_id'   => $r->golongan->nama ?? '-',
                 'satuan_id'   => $r->satuan->nama ?? '-',
@@ -66,10 +68,11 @@ class MasterObatService
                 'distributor_id'   => $r->distributor->nama ?? '-',
                 'rak_id'   => $r->rakPenyimpanan->nama ?? '-',
                 'kemasan'   => $r->kemasan ?? '-',
-                'stok'   => $r->stok ?? '-',
+                'komposisi'   => $r->komposisi ?? '-',
+                'indikasi'   => $r->indikasi ?? '-',
+                'dosis'   => $r->dosis ?? '-',
                 'stok_minimum'   => $r->stok_minimum ?? '-',
                 'harga_beli'   => $r->harga_beli ?? '-',
-                'harga_jual'   => $r->harga_jual ?? '-',
                 'tgl_kadaluarsa'   => $r->tgl_kadaluarsa ?? '-',
                 'no_batch'   => $r->no_batch ?? '-',
                 'jenis'   => $r->is_generik == 1 ? 'Generik' : 'Paten',
@@ -138,26 +141,25 @@ class MasterObatService
 
             // Lewati header (baris pertama)
             foreach (array_slice($rows, 1) as $row) {
-                $kode_obat = trim($row['A']);
-                $nama_obat = trim($row['B']);
-                $category_id = trim($row['C']);
-                $main_category_id = trim($row['D']);
-                $sub_kategori_id = trim($row['E']);
-                $golongan_id = trim($row['F']);
-                $satuan_id = trim($row['G']);
-                $sediaan_id = trim($row['H']);
-                $pabrikan_id = trim($row['I']);
-                $distributor_id = trim($row['J']);
-                $rak_id = trim($row['K']);
-                $komposisi = trim($row['L']);
-                $indikasi = trim($row['M']);
-                $dosis = trim($row['N']);
-                $kemasan = trim($row['O']);
-                $stok_minimum = trim($row['P']) ?: 0;
-                $harga_beli = trim($row['Q']) ?: 0;
-                $harga_jual = trim($row['R']) ?: 0;
-                $is_generik = trim($row['S']) ?: 1;
-                $is_active = trim($row['T']) ?: 1;
+                $kode_obat = trim((string) ($row['A'] ?? ''));
+                $nama_obat = trim((string) ($row['B'] ?? ''));
+                $category_id = trim((string) ($row['C'] ?? ''));
+                $main_category_id = trim((string) ($row['D'] ?? ''));
+                $sub_kategori_id = trim((string) ($row['E'] ?? ''));
+                $golongan_id = trim((string) ($row['F'] ?? ''));
+                $satuan_id = trim((string) ($row['G'] ?? ''));
+                $sediaan_id = trim((string) ($row['H'] ?? ''));
+                $pabrikan_id = trim((string) ($row['I'] ?? ''));
+                $distributor_id = trim((string) ($row['J'] ?? ''));
+                $rak_id = trim((string) ($row['K'] ?? ''));
+                $komposisi = trim((string) ($row['L'] ?? ''));
+                $indikasi = trim((string) ($row['M'] ?? ''));
+                $dosis = trim((string) ($row['N'] ?? ''));
+                $kemasan = trim((string) ($row['O'] ?? ''));
+                $stok_minimum = trim((string) ($row['P'] ?? '')) ?: 0;
+                $harga_beli = trim((string) ($row['Q'] ?? '')) ?: 0;
+                $is_generik = $this->normalizeBoolean($row['R'] ?? 1, true);
+                $is_active = $this->normalizeBoolean($row['S'] ?? 1, true);
 
                 if (!$kode_obat || !$nama_obat) continue; // lewati baris kosong
 
@@ -196,9 +198,8 @@ class MasterObatService
                         'kemasan' => $kemasan ?: null,
                         'stok_minimum' => $stok_minimum ?: 0,
                         'harga_beli' => $harga_beli ?: 0,
-                        'harga_jual' => $harga_jual ?: 0,
-                        'is_generik' => (bool) $is_generik,
-                        'is_active' => (bool) $is_active,
+                        'is_generik' => $is_generik,
+                        'is_active' => $is_active,
                     ]);
                     $added++;
                 }
@@ -221,5 +222,22 @@ class MasterObatService
         }
     }
 
+    private function normalizeBoolean($value, bool $default = true): bool
+    {
+        $normalized = strtolower(trim((string) $value));
 
+        if ($normalized === '') {
+            return $default;
+        }
+
+        if (in_array($normalized, ['1', 'true', 'ya', 'yes', 'aktif', 'generik'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['0', 'false', 'tidak', 'no', 'nonaktif', 'paten'], true)) {
+            return false;
+        }
+
+        return $default;
+    }
 }

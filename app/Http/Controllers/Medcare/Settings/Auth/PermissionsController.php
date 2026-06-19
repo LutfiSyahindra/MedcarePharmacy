@@ -31,12 +31,14 @@ class PermissionsController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataPermissions) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editPermissions(' . $dataPermissions['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger" onclick="deletePermissions(' . $dataPermissions['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="auth-action-group">
+                    <button type="button" class="btn auth-action-btn auth-action-edit" title="Edit permission" onclick="editPermissions(' . $dataPermissions['id'] . ')"> 
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button> 
+                    <button type="button" class="btn auth-action-btn auth-action-delete" title="Hapus permission" onclick="deletePermissions(' . $dataPermissions['id'] . ')">  
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -68,7 +70,7 @@ class PermissionsController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Role berhasil dibuat',
+            'message' => 'Permission berhasil dibuat',
             'data' => $Permissions
         ]);
     }

@@ -1,57 +1,55 @@
-<!-- Modal Upload Satuan Excel -->
-<div class="modal fade" id="rakModalExcell" tabindex="-1" aria-labelledby="rakModalExcellLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade rak-modal" id="rakModalExcell" tabindex="-1" aria-labelledby="rakModalExcellLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="rakModalExcellLabel">Upload Data Rak Penyimpanan (Excel)</h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-file-excel-outline"></i></span>
+                    <div>
+                        <h5 class="modal-title mb-0" id="rakModalExcellLabel">Import Rak Penyimpanan</h5>
+                        <p class="modal-subtitle">Upload template Excel berisi kode, nama rak, lokasi, dan keterangan.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
-                <form id="rakExcellForm" enctype="multipart/form-data">
+                <form id="rakExcelForm" enctype="multipart/form-data">
                     @csrf
-                    <div class="row g-3">
-                        <div class="col-md-12 mb-3">
-                            <div class="alert alert-info border-start border-3 border-info shadow-sm" role="alert">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong class="fs-6 mb-0">Note:</strong>
-                                    <button type="button" id="downloadTemplateBtn"
-                                        class="btn btn-primary btn-sm d-flex align-items-center">
-                                        <i data-feather="download" class="me-1"></i>
-                                        Download Template
-                                    </button>
-                                </div>
-                                <ol class="mb-0 ps-3">
-                                    <li>Unduh template dengan tombol di atas.</li>
-                                    <li>Isi data pada template sesuai kolom yang tersedia.</li>
-                                    <li>Upload kembali template yang telah diisi.</li>
-                                </ol>
-                            </div>
-                        </div>
 
-                        <div class="col-md-12">
-                            <label class="form-label fw-bold mb-2">Pilih File Excel</label>
-                            <input type="file" id="myDropify" name="file" class="dropify"
-                                data-allowed-file-extensions="xls xlsx" data-max-file-size="5M" />
-                            <small class="text-muted">Format file yang diperbolehkan: .xls, .xlsx (maks. 5MB)</small>
+                    <div class="rak-import-panel">
+                        <div>
+                            <strong>Gunakan template resmi</strong>
+                            <ol class="rak-import-steps">
+                                <li>Download template Excel Rak Penyimpanan.</li>
+                                <li>Isi kolom Kode, Nama, Lokasi, dan Keterangan.</li>
+                                <li>Upload kembali file yang sudah diisi.</li>
+                            </ol>
                         </div>
+                        <button type="button" id="rakDownloadTemplateBtn" class="btn btn-outline-primary">
+                            <i class="mdi mdi-download"></i>
+                            Download Template
+                        </button>
                     </div>
 
-                    <!-- Modal Footer -->
-                    <div class="modal-footer mt-4">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i data-feather="x"></i> Tutup
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-2" for="rakExcelInput">Pilih File Excel</label>
+                        <input type="file" id="rakExcelInput" name="file" class="dropify"
+                            data-allowed-file-extensions="xls xlsx" data-max-file-size="5M" />
+                        <small class="rak-form-hint">Format file yang diperbolehkan: .xls atau .xlsx dengan ukuran maksimal 5MB.</small>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close-circle-outline"></i>
+                            Tutup
                         </button>
-                        <button type="button" id="submitFormExcell" class="btn btn-primary">
-                            <i data-feather="upload"></i> Upload
+                        <button type="button" id="rakSubmitExcel" class="btn btn-primary">
+                            <i class="mdi mdi-upload"></i>
+                            Upload
                         </button>
                     </div>
                 </form>
             </div>
-
         </div>
     </div>
 </div>

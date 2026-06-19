@@ -6,85 +6,77 @@
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
     @include("template.AddOn.dropify")
+    @include("medcare.masterData.satuan.partials.style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.satuan.modalMain")
-    @include("medcare.masterData.satuan.modalExcell")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Satuan</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Main Satuan</li>
-        </ol>
-    </nav>
+    <div class="satuan-page">
+        @include("medcare.masterData.satuan.modalMain")
+        @include("medcare.masterData.satuan.modalExcell")
+        @include("medcare.masterData.satuan.partials.header")
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-scale-balance mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Satuan</h5>
-                                <small class="text-muted">Kelola dan cari data Satuan Obat dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchSatuan" class="form-control border-start-0"
-                                    placeholder="Cari Satuan...">
-                            </div>
-
-                            <!-- Tombol Import Excel -->
-                            <button type="button" class="btn btn-success btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#satuanModalExcell">
-                                <i class="mdi mdi-file-excel me-1"></i>
-                                <span>Import</span>
-                            </button>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#satuanModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <h6 class="card-title"></h6>
-                    <div class="table-responsive">
-                        <table id="tableSatuan" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Satuan</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="satuan-stats-grid">
+            <div class="satuan-stat">
+                <span class="satuan-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="satuanTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh satuan obat yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="satuan-stat">
+                <span class="satuan-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="satuanFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="satuan-stat">
+                <span class="satuan-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="satuanSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai data.</small>
                 </div>
             </div>
         </div>
+
+        <section class="satuan-table-section">
+            <div class="satuan-table-toolbar">
+                <div class="satuan-table-title">
+                    <span class="satuan-table-title-icon"><i class="mdi mdi-scale-balance"></i></span>
+                    <div>
+                        <h5>Daftar Satuan Obat</h5>
+                        <p>Kelola kode, nama satuan, dan status aktif satuan.</p>
+                    </div>
+                </div>
+                <div class="satuan-table-tools">
+                    <label class="satuan-search" for="satuanSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="satuanSearch" placeholder="Cari kode atau nama satuan...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tableSatuan" class="table satuan-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Satuan</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.satuan.partials.scripts")
     @include("medcare.masterData.satuan.jsMain")
 @endpush

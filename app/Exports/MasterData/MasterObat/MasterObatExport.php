@@ -30,7 +30,6 @@ class MasterObatExport implements WithHeadings, WithStyles, WithColumnWidths, Wi
             'kemasan',
             'stok_minimum',
             'harga_beli',
-            'harga_jual',
             'is_generik',
             'is_active',
         ];
@@ -70,12 +69,11 @@ class MasterObatExport implements WithHeadings, WithStyles, WithColumnWidths, Wi
             'L' => 40, // indikasi
             'M' => 30, // dosis
             'N' => 25, // kemasan
-            'O' => 10, // stok
+            'O' => 25, // kemasan
             'P' => 10, // stok_minimum
             'Q' => 15, // harga_beli
-            'R' => 15, // harga_jual
-            'S' => 12, // is_generik
-            'T' => 12, // is_generik
+            'R' => 12, // is_generik
+            'S' => 12, // is_active
         ];
     }
 

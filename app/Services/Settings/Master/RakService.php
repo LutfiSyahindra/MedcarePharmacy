@@ -105,10 +105,10 @@ class RakService
 
             // Lewati header (baris pertama)
             foreach (array_slice($rows, 1) as $row) {
-                $kode = trim($row['A']);
-                $nama = trim($row['B']);
-                $lokasi = trim($row['B']);
-                $keterangan = trim($row['B']);
+                $kode = trim((string) ($row['A'] ?? ''));
+                $nama = trim((string) ($row['B'] ?? ''));
+                $lokasi = trim((string) ($row['C'] ?? ''));
+                $keterangan = trim((string) ($row['D'] ?? ''));
 
                 if (!$kode || !$nama) continue; // lewati baris kosong
 

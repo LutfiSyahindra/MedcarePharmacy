@@ -17,6 +17,226 @@
 <!-- End custom js for this page -->
 
 <script>
+    (function medcarePageTabs() {
+        const storageKey = 'medcare_open_page_tabs_v1';
+        const maxTabs = 10;
+
+        function normalizeUrl(url) {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.pathname + parsed.search;
+        }
+
+        function readTabs() {
+            try {
+                return JSON.parse(localStorage.getItem(storageKey)) || [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function writeTabs(tabs) {
+            localStorage.setItem(storageKey, JSON.stringify(tabs.slice(-maxTabs)));
+        }
+
+        function getMenuTitle(url) {
+            const normalizedUrl = normalizeUrl(url);
+            const links = document.querySelectorAll('.sidebar-body a.nav-link[href]');
+
+            for (const link of links) {
+                const href = link.getAttribute('href');
+
+                if (!href || href === '#' || href.startsWith('javascript:')) {
+                    continue;
+                }
+
+                if (normalizeUrl(href) === normalizedUrl) {
+                    return link.textContent.trim().replace(/\s+/g, ' ');
+                }
+            }
+
+            return '';
+        }
+
+        function getMenuIcon(url) {
+            const normalizedUrl = normalizeUrl(url);
+            const links = document.querySelectorAll('.sidebar-body a.nav-link[href]');
+
+            for (const link of links) {
+                const href = link.getAttribute('href');
+
+                if (!href || href === '#' || href.startsWith('javascript:')) {
+                    continue;
+                }
+
+                if (normalizeUrl(href) !== normalizedUrl) {
+                    continue;
+                }
+
+                const parentMenu = link.closest('.collapse')?.previousElementSibling;
+                const icon = parentMenu?.querySelector('[data-feather]') || link.querySelector('[data-feather]');
+
+                return icon?.getAttribute('data-feather') || 'file-text';
+            }
+
+            return 'file-text';
+        }
+
+        function getCurrentTitle() {
+            const breadcrumbTitle = document.querySelector('.breadcrumb-item.active')?.textContent?.trim();
+            const menuTitle = getMenuTitle(window.location.href);
+
+            return breadcrumbTitle || menuTitle || document.title || 'Halaman';
+        }
+
+        function upsertTab(tab) {
+            let tabs = readTabs().filter(item => item.url !== tab.url);
+            tabs.push(tab);
+            writeTabs(tabs);
+            renderTabs();
+        }
+
+        function addCurrentPage() {
+            const currentUrl = normalizeUrl(window.location.href);
+
+            upsertTab({
+                title: getCurrentTitle(),
+                url: currentUrl,
+                icon: getMenuIcon(currentUrl),
+                openedAt: Date.now()
+            });
+        }
+
+        function closeTab(url) {
+            writeTabs(readTabs().filter(tab => tab.url !== url));
+            renderTabs();
+        }
+
+        function renderTabs() {
+            const wrapper = document.getElementById('medcarePageTabs');
+            const countEl = document.getElementById('medcarePageTabCount');
+            const clearButton = document.getElementById('medcarePageTabClear');
+
+            if (!wrapper) {
+                return;
+            }
+
+            const currentUrl = normalizeUrl(window.location.href);
+            const tabs = readTabs();
+
+            wrapper.innerHTML = '';
+
+            if (!tabs.length) {
+                if (countEl) {
+                    countEl.innerHTML = '<i data-feather="copy"></i> 0 tab';
+                }
+                if (clearButton) {
+                    clearButton.disabled = true;
+                }
+                replaceFeatherIcons();
+                return;
+            }
+
+            if (countEl) {
+                countEl.innerHTML = `<i data-feather="copy"></i> ${tabs.length} tab`;
+            }
+            if (clearButton) {
+                clearButton.disabled = tabs.length <= 1;
+            }
+
+            tabs.forEach(tab => {
+                const item = document.createElement('a');
+                item.href = tab.url;
+                item.className = 'medcare-page-tab' + (tab.url === currentUrl ? ' is-active' : '');
+                item.title = tab.title;
+                item.innerHTML = `
+                    <span class="medcare-page-tab-icon">
+                        <i data-feather="${escapeHtml(tab.icon || 'file-text')}"></i>
+                    </span>
+                    <span class="medcare-page-tab-title">${escapeHtml(tab.title)}</span>
+                    <span class="medcare-page-tab-close" role="button" tabindex="0" aria-label="Tutup tab ${escapeHtml(tab.title)}">
+                        &times;
+                    </span>
+                `;
+
+                const closeButton = item.querySelector('.medcare-page-tab-close');
+
+                closeButton.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeTab(tab.url);
+                });
+
+                closeButton.addEventListener('keydown', function(event) {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeTab(tab.url);
+                });
+
+                wrapper.appendChild(item);
+            });
+
+            replaceFeatherIcons();
+        }
+
+        function clearTabs() {
+            const currentUrl = normalizeUrl(window.location.href);
+            writeTabs([{
+                title: getCurrentTitle(),
+                url: currentUrl,
+                icon: getMenuIcon(currentUrl),
+                openedAt: Date.now()
+            }]);
+            renderTabs();
+        }
+
+        function replaceFeatherIcons() {
+            if (window.feather) {
+                feather.replace();
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(character) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                } [character];
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            addCurrentPage();
+
+            document.querySelectorAll('.sidebar-body a.nav-link[href]').forEach(link => {
+                link.addEventListener('click', function() {
+                    const href = this.getAttribute('href');
+
+                    if (!href || href === '#' || href.startsWith('javascript:') || this.dataset.bsToggle) {
+                        return;
+                    }
+
+                    upsertTab({
+                        title: this.textContent.trim().replace(/\s+/g, ' ') || 'Halaman',
+                        url: normalizeUrl(href),
+                        icon: getMenuIcon(href),
+                        openedAt: Date.now()
+                    });
+                });
+            });
+
+            document.getElementById('medcarePageTabClear')?.addEventListener('click', clearTabs);
+        });
+    })();
+</script>
+
+<script>
     (function notificationSoundSetup() {
 
         let audio = new Audio("{{ asset("sound/mixkit-bell-notification-933.wav") }}");

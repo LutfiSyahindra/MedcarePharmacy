@@ -30,12 +30,14 @@ class GolonganController extends Controller
         ->addIndexColumn()
         ->addColumn('actions', function ($dataGolongan) {
             return '
-                <button class="btn btn-sm btn-success" onclick="editGolongan(' . $dataGolongan['id'] . ')"> 
-                    <i class="mdi mdi-pencil"></i>
-                </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deleteGolongan(' . $dataGolongan['id'] . ')">  
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                <div class="golongan-action-group">
+                    <button type="button" class="btn golongan-action-btn golongan-action-edit" title="Edit golongan" onclick="editGolongan(' . $dataGolongan['id'] . ')">
+                        <i class="mdi mdi-pencil-outline"></i>
+                    </button>
+                    <button type="button" class="btn golongan-action-btn golongan-action-delete" title="Hapus golongan" onclick="deleteGolongan(' . $dataGolongan['id'] . ')">
+                        <i class="mdi mdi-delete-outline"></i>
+                    </button>
+                </div>
             ';
         })
 
@@ -59,13 +61,14 @@ class GolonganController extends Controller
         $validated = $request->validate([
             'kode.*' => 'required|string|max:10|unique:golongan_obats,kode',
             'nama.*' => 'required|string|max:100',
+            'keterangan.*' => 'nullable|string|max:100',
         ]);
 
         foreach ($request->kode as $index => $kode) {
             $this->GolonganService->createGolongan([
                 'kode' => $kode,
                 'nama' => $request->nama[$index],
-                'keterangan' => $request->keterangan[$index],
+                'keterangan' => $request->keterangan[$index] ?? null,
             ]);
         }
 
@@ -97,19 +100,20 @@ class GolonganController extends Controller
         $validated = $request->validate([
             'kode' => 'required|string|max:10|unique:golongan_obats,kode,' . $id,
             'nama' => 'required|string|max:100',
-            'keterangan' => 'string|max:100',
+            'keterangan' => 'nullable|string|max:100',
         ]);
 
         $dataGolongan = $this->GolonganService->updateGolongan($id, $validated);
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Golongan updated successfully',
+            'message' => 'Golongan berhasil diperbarui',
             'data'    => $dataGolongan
         ], 200);
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->GolonganService->updateStatus($request->id, $request->status);
     }
 

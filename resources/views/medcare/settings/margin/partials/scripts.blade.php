@@ -1,0 +1,161 @@
+<script>
+    window.MarginUI = window.MarginUI || (function() {
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getInitials(value) {
+            const words = String(value || 'MG').trim().split(/\s+/).filter(Boolean);
+            return words.slice(0, 2).map((word) => word.charAt(0)).join('').toUpperCase() || 'MG';
+        }
+
+        function tierLabel(value) {
+            const labels = {
+                kategoriUtama: 'Kategori Utama',
+                kategori: 'Kategori',
+                sub_kategori: 'Sub Kategori',
+                obat: 'Obat'
+            };
+            return labels[value] || value || '-';
+        }
+
+        function dataTableOptions(options) {
+            return $.extend(true, {
+                processing: true,
+                serverSide: true,
+                responsive: true,
+                autoWidth: false,
+                order: [],
+                pageLength: 10,
+                lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100]
+                ],
+                dom: '<"margin-table-meta"l>rt<"margin-table-footer"ip>',
+                language: {
+                    processing: '<span class="margin-loading"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Memuat data...</span>',
+                    lengthMenu: 'Tampilkan _MENU_ data',
+                    zeroRecords: 'Data belum ditemukan',
+                    emptyTable: 'Belum ada data untuk ditampilkan',
+                    info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+                    infoEmpty: 'Belum ada data',
+                    infoFiltered: '(difilter dari _MAX_ total)',
+                    paginate: {
+                        first: 'Awal',
+                        last: 'Akhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya'
+                    }
+                }
+            }, options);
+        }
+
+        function updateTableStats(table, config) {
+            if (!table || !table.page) return;
+            const info = table.page.info();
+            $(config.totalTarget).text(Number(info.recordsTotal || 0).toLocaleString('id-ID'));
+            $(config.filteredTarget).text(Number(info.recordsDisplay || 0).toLocaleString('id-ID'));
+            updateSelectedCount(config.tableSelector, config.selectedTarget);
+        }
+
+        function updateSelectedCount(tableSelector, selectedTarget) {
+            if (!selectedTarget) return;
+            const selected = $(`${tableSelector} tbody tr.is-selected`).length;
+            $(selectedTarget).text(Number(selected).toLocaleString('id-ID'));
+        }
+
+        function initTableTools(config) {
+            const table = config.table;
+            const $table = $(config.tableSelector);
+            const $search = $(config.searchSelector);
+            let searchTimer = null;
+
+            $search.on('input', function() {
+                const value = this.value;
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function() {
+                    table.search(value).draw();
+                }, 220);
+            });
+
+            $('.margin-refresh-table').on('click', function() {
+                const $button = $(this);
+                $button.addClass('disabled');
+                table.ajax.reload(function() {
+                    $button.removeClass('disabled');
+                }, false);
+            });
+
+            $table.find('tbody').on('click', 'tr', function(event) {
+                if ($(event.target).closest('button, a, input, label, .form-check, .select2-container').length) {
+                    return;
+                }
+                $(this).toggleClass('is-selected');
+                updateSelectedCount(config.tableSelector, config.selectedTarget);
+            });
+
+            table.on('draw', function() {
+                updateTableStats(table, config);
+                initTooltips();
+            });
+
+            updateTableStats(table, config);
+            initTooltips();
+        }
+
+        function initTooltips() {
+            if (!window.bootstrap || !bootstrap.Tooltip) return;
+
+            document.querySelectorAll('.margin-page [title]').forEach(function(el) {
+                if (!bootstrap.Tooltip.getInstance(el)) {
+                    new bootstrap.Tooltip(el);
+                }
+            });
+        }
+
+        function clearValidation(formSelector) {
+            const $form = $(formSelector);
+            $form.find('.invalid-feedback').text('');
+            $form.find('.form-control, .form-select').removeClass('is-invalid');
+            $form.find('.margin-field').removeClass('has-error');
+        }
+
+        function markInvalid(fieldId, message) {
+            const normalizedId = fieldId.replace(/\./g, '_');
+            $(`#error-${normalizedId}`).text(message);
+            $(`#${fieldId}`).addClass('is-invalid').closest('.margin-field').addClass('has-error');
+        }
+
+        function updateSelectCount(selectSelector, targetSelector) {
+            const count = ($(selectSelector).val() || []).length;
+            $(targetSelector).text(Number(count).toLocaleString('id-ID'));
+        }
+
+        function setButtonLoading(buttonSelector, isLoading, loadingLabel, normalLabel) {
+            const $button = $(buttonSelector);
+            $button.prop('disabled', isLoading);
+            $button.html(isLoading ?
+                `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>${loadingLabel}` :
+                normalLabel
+            );
+        }
+
+        return {
+            escapeHtml,
+            getInitials,
+            tierLabel,
+            dataTableOptions,
+            initTableTools,
+            initTooltips,
+            clearValidation,
+            markInvalid,
+            updateSelectCount,
+            setButtonLoading
+        };
+    })();
+</script>

@@ -1,54 +1,55 @@
-<div class="modal fade" id="mainCategoryModal" tabindex="-1" aria-labelledby="mainCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade category-modal" id="mainCategoryModal" tabindex="-1" aria-labelledby="mainCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-
-            <!-- Modal Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="mainCategoryModalLabel"></h5>
+                <div class="modal-title-wrap">
+                    <span class="modal-icon"><i class="mdi mdi-shape-outline"></i></span>
+                    <div>
+                        <h5 class="modal-title" id="mainCategoryModalLabel">Tambah Main Kategori</h5>
+                        <p class="modal-subtitle" id="mainCategoryModalSubtitle">Pilih kategori utama lalu tambahkan kelompok obat turunannya.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body">
                 <form id="mainCategoryForm">
                     @csrf
 
-                    <div id="input-wrapper">
-                        <div class="row g-3 mb-2 input-group-item">
-                            <div class="col-md-4">
-                                <label class="form-label">Kategori Utama</label>
-                                <select name="category_id[]" id="kategoriUtamaSelect"
-                                    class="js-example-basic-single form-select" data-width="100%"></select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Kode</label>
-                                <input class="form-control" name="code[]" type="text">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Kategori Obat</label>
-                                <input class="form-control" name="name[]" type="text">
-                                <div class="invalid-feedback"></div>
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button type="button" class="btn btn-danger btn-sm remove-input">Hapus</button>
-                            </div>
+                    <div class="category-form-intro">
+                        <i class="mdi mdi-source-branch"></i>
+                        <div>
+                            <strong>Turunan dari kategori utama</strong>
+                            <small>Main kategori membantu tim mencari kelompok obat dengan konteks induknya.</small>
                         </div>
                     </div>
 
-                    <div class="mt-2">
-                        <button type="button" id="addInput" class="btn btn-success btn-sm">+ Tambah Input</button>
+                    <div class="category-batch-toolbar" id="mainCategoryBatchToolbar">
+                        <span class="category-count-pill">
+                            <i class="mdi mdi-format-list-numbered"></i>
+                            <span id="mainCategoryRowCount">1</span> baris input
+                        </span>
+                        <button type="button" id="addMainCategoryInput" class="btn btn-success btn-sm">
+                            <i class="mdi mdi-plus-circle-outline"></i>
+                            Tambah Baris
+                        </button>
                     </div>
 
+                    <div id="mainCategoryInputWrapper" class="category-batch-list"></div>
                     <input id="mainCategoryId" name="mainCategoryId" type="hidden">
 
-                    <div class="modal-footer mt-3">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" id="submitForm" class="btn btn-primary"></button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="mdi mdi-close"></i>
+                            Tutup
+                        </button>
+                        <button type="submit" id="submitMainCategoryForm" class="btn btn-primary">
+                            <i class="mdi mdi-content-save-outline"></i>
+                            Simpan
+                        </button>
                     </div>
                 </form>
             </div>
-
         </div>
     </div>
 </div>

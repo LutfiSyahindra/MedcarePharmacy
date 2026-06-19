@@ -6,88 +6,95 @@
     @include("template.AddOn.sweetAlert")
     @include("template.AddOn.select2")
     @include("template.AddOn.dropify")
+    @include("medcare.masterData.partials.company-style")
 @endpush
 
 @section("content")
-    @include("medcare.masterData.pabrikan.modalMain")
-    @include("medcare.masterData.pabrikan.modalExcell")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Pabrikan / Produksi</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Pabrikan / Produksi Obat</li>
-        </ol>
-    </nav>
+    <div class="company-page">
+        @include("medcare.masterData.pabrikan.modalMain")
+        @include("medcare.masterData.pabrikan.modalExcell")
+        @include("medcare.masterData.partials.company-header", [
+            "companyTitle" => "Pabrikan / Produksi Obat",
+            "companyBreadcrumb" => "Pabrikan",
+            "companyKicker" => "Manufacturer Master",
+            "companyDescription" => "Kelola data pabrikan atau produsen obat lengkap dengan alamat dan kontak agar master obat lebih mudah ditelusuri.",
+            "companyIcon" => "mdi-factory",
+            "companyModalTarget" => "#pabrikanModal",
+            "companyImportTarget" => "#pabrikanModalExcell",
+            "companyActionLabel" => "Tambah Pabrikan",
+            "companyImportLabel" => "Import Pabrikan",
+            "companyFlow" => [
+                ["icon" => "mdi-barcode-scan", "title" => "Kode", "subtitle" => "Identitas singkat pabrikan"],
+                ["icon" => "mdi-factory", "title" => "Pabrikan", "subtitle" => "Nama dan alamat produksi"],
+                ["icon" => "mdi-card-account-phone-outline", "title" => "Kontak", "subtitle" => "Telepon dan email aktif"],
+            ],
+        ])
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-factory mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Master Pabrikan / Produksi Obat</h5>
-                                <small class="text-muted">Kelola dan cari data Pabrikan/Produksi Obat dengan cepat</small>
-                            </div>
-                        </div>
-
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchPabrikan" class="form-control border-start-0"
-                                    placeholder="Cari Pabrikan...">
-                            </div>
-
-                            <!-- Tombol Import Excel -->
-                            <button type="button" class="btn btn-success btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#pabrikanModalExcell">
-                                <i class="mdi mdi-file-excel me-1"></i>
-                                <span>Import</span>
-                            </button>
-
-                            <!-- Tombol Tambah Data -->
-                            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center"
-                                data-bs-toggle="modal" data-bs-target="#pabrikanModal">
-                                <i class="mdi mdi-plus-circle me-1"></i>
-                                <span>Tambah</span>
-                            </button>
-                        </div>
-                    </div>
-                    <h6 class="card-title"></h6>
-                    <div class="table-responsive">
-                        <table id="tablePabrikan" class="table">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Kode</th>
-                                    <th>Pabrikan</th>
-                                    <th>Alamat</th>
-                                    <th>Telp</th>
-                                    <th>Email</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="company-stats-grid">
+            <div class="company-stat">
+                <span class="company-stat-icon"><i class="mdi mdi-database-outline"></i></span>
+                <div>
+                    <strong id="pabrikanTotal">0</strong>
+                    <span>Total Data</span>
+                    <small>Seluruh pabrikan yang tersimpan.</small>
+                </div>
+            </div>
+            <div class="company-stat">
+                <span class="company-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
+                <div>
+                    <strong id="pabrikanFiltered">0</strong>
+                    <span>Hasil Filter</span>
+                    <small>Jumlah data sesuai pencarian aktif.</small>
+                </div>
+            </div>
+            <div class="company-stat">
+                <span class="company-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
+                <div>
+                    <strong id="pabrikanSelected">0</strong>
+                    <span>Dipilih</span>
+                    <small>Klik baris tabel untuk menandai data.</small>
                 </div>
             </div>
         </div>
+
+        <section class="company-table-section">
+            <div class="company-table-toolbar">
+                <div class="company-table-title">
+                    <span class="company-table-title-icon"><i class="mdi mdi-factory"></i></span>
+                    <div>
+                        <h5>Daftar Pabrikan</h5>
+                        <p>Kelola profil pabrikan, kontak, dan status aktif.</p>
+                    </div>
+                </div>
+                <div class="company-table-tools">
+                    <label class="company-search" for="pabrikanSearch">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="pabrikanSearch" placeholder="Cari kode, nama, alamat, telepon, atau email...">
+                    </label>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tablePabrikan" class="table company-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode</th>
+                            <th>Pabrikan</th>
+                            <th>Alamat</th>
+                            <th>Telp</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 
 @push("scripts")
+    @include("medcare.masterData.partials.company-scripts")
     @include("medcare.masterData.pabrikan.jsMain")
 @endpush
