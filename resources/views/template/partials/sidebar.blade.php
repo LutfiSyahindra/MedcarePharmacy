@@ -279,6 +279,28 @@
                         <li class="nav-item">
                             <a href="{{ route("pembelian.pembelian") }}" class="nav-link">Pembelian</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route("penerimaan.penerimaan") }}" class="nav-link">Penerimaan</a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="collapse" href="#stok" role="button"
+                    aria-expanded="false" aria-controls="stok">
+                    <i class="link-icon" data-feather="database"></i>
+                    <span class="link-title">Stok</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse" id="stok">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item">
+                            <a href="{{ route("stok.stok") }}" class="nav-link">Stok Barang</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("kartuStok.kartuStok") }}" class="nav-link">Kartu Stok</a>
+                        </li>
                     </ul>
                 </div>
             </li>

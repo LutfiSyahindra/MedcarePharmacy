@@ -13,6 +13,7 @@ use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
+use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
 use App\Http\Controllers\Medcare\Notifikasi\PembelianNotifikasiController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
@@ -258,7 +259,32 @@ Route::middleware('auth')->group(function () {
         Route::get('/pembelian/{id}/show', [PembelianController::class, 'show'])->name('pembelian.show');
         Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');
 
+        Route::get('/penerimaan', [PenerimaanController::class, 'penerimaan'])->name('penerimaan.penerimaan');
+        Route::get('/penerimaan/table', [PenerimaanController::class, 'table'])->name('penerimaan.table');
+        Route::get('/penerimaan/generateNoPenerimaan', [PenerimaanController::class, 'generateNoPenerimaan'])->name('penerimaan.generateNoPenerimaan');
+        Route::get('/penerimaan/approved-po', [PenerimaanController::class, 'approvedPurchaseOrders'])->name('penerimaan.approvedPo');
+        Route::get('/penerimaan/po/{id}', [PenerimaanController::class, 'purchaseOrderDetail'])->name('penerimaan.purchaseOrderDetail');
+        Route::post('/penerimaan/store', [PenerimaanController::class, 'store'])->name('penerimaan.store');
+        Route::get('/penerimaan/{id}/show', [PenerimaanController::class, 'show'])->name('penerimaan.show');
+        Route::get('/penerimaan/{id}/edit', [PenerimaanController::class, 'edit'])->name('penerimaan.edit');
+        Route::put('/penerimaan/{id}/update', [PenerimaanController::class, 'update'])->name('penerimaan.update');
+        Route::put('/penerimaan/{id}/post', [PenerimaanController::class, 'post'])->name('penerimaan.post');
+        Route::put('/penerimaan/{id}/cancel', [PenerimaanController::class, 'cancel'])->name('penerimaan.cancel');
+        Route::delete('/penerimaan/{id}/destroy', [PenerimaanController::class, 'destroy'])->name('penerimaan.destroy');
 
+
+    });
+
+    Route::prefix('medcare/menu/stok')->group(function () {
+        Route::get('/stok', [StokController::class, 'stok'])->name('stok.stok');
+        Route::get('/stok/table', [StokController::class, 'stockTable'])->name('stok.table');
+        Route::get('/stok/batch/table', [StokController::class, 'batchTable'])->name('stok.batchTable');
+        Route::get('/stok/obat-options', [StokController::class, 'obatOptions'])->name('stok.obatOptions');
+        Route::get('/stok/batch-options/{obatId}', [StokController::class, 'batchOptions'])->name('stok.batchOptions');
+        Route::post('/stok/mutasi/store', [StokController::class, 'storeMutation'])->name('stok.mutasi.store');
+
+        Route::get('/kartu-stok', [StokController::class, 'kartuStok'])->name('kartuStok.kartuStok');
+        Route::get('/kartu-stok/table', [StokController::class, 'kartuTable'])->name('kartuStok.table');
     });
 });
 

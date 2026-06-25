@@ -94,7 +94,7 @@ class PembelianController extends Controller
                     <i class="mdi mdi-lock-open-variant"></i>
                 </button>'
                 : '';
-            $editButton = $status !== 'approved'
+            $editButton = ! in_array($status, ['approved', 'diterima_sebagian', 'selesai'], true)
                 ? '<button class="btn btn-sm btn-success btn-edit-pembelian" onclick="editPembelian(' . $dataPembelian['id'] . ')">
                     <i class="mdi mdi-pencil"></i>
                 </button>'

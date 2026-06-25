@@ -269,6 +269,77 @@
         overflow: hidden;
     }
 
+    .receive-insight-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .85rem;
+        margin: 0 0 1rem;
+    }
+
+    .receive-insight-card {
+        display: flex;
+        gap: .78rem;
+        align-items: center;
+        min-width: 0;
+        padding: .95rem;
+        border: 1px solid var(--purchase-border);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fff, #f8fbff);
+        box-shadow: 0 10px 28px rgba(15, 23, 42, .04);
+    }
+
+    .receive-insight-icon {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        place-items: center;
+        border-radius: 10px;
+        font-size: 1.25rem;
+    }
+
+    .receive-insight-icon.is-primary {
+        color: var(--purchase-primary-strong);
+        background: var(--purchase-soft);
+    }
+
+    .receive-insight-icon.is-warning {
+        color: var(--purchase-warning);
+        background: var(--purchase-soft-yellow);
+    }
+
+    .receive-insight-icon.is-danger {
+        color: var(--purchase-danger);
+        background: var(--purchase-soft-red);
+    }
+
+    .receive-insight-card small,
+    .receive-insight-card span {
+        display: block;
+        color: var(--purchase-muted);
+    }
+
+    .receive-insight-card small {
+        font-size: .73rem;
+        font-weight: 800;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+
+    .receive-insight-card strong {
+        display: block;
+        margin-top: .12rem;
+        color: var(--purchase-text);
+        font-size: 1.28rem;
+        font-weight: 900;
+        line-height: 1.15;
+    }
+
+    .receive-insight-card span {
+        margin-top: .18rem;
+        line-height: 1.35;
+    }
+
     .purchase-table-toolbar {
         display: flex;
         align-items: center;
@@ -541,7 +612,8 @@
         background: var(--purchase-soft-red);
     }
 
-    #purchaseDatePreset {
+    #purchaseDatePreset,
+    #receiveDatePreset {
         width: auto;
         min-width: 138px;
         border-color: var(--purchase-border);
@@ -665,11 +737,6 @@
     .purchase-approval.is-pending {
         color: var(--purchase-warning);
         background: var(--purchase-soft-yellow);
-    }
-
-    .purchase-status.is-partial {
-        color: var(--purchase-info);
-        background: #ecfeff;
     }
 
     .purchase-status.is-rejected {
@@ -914,6 +981,80 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: .75rem;
         margin-bottom: 1rem;
+    }
+
+    .receive-form-progress {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) 42px minmax(150px, 1fr) 42px minmax(150px, 1fr);
+        align-items: center;
+        gap: .35rem;
+        margin-bottom: 1rem;
+        padding: .85rem;
+        border: 1px solid var(--purchase-border);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .035);
+    }
+
+    .receive-progress-step {
+        display: flex;
+        align-items: center;
+        gap: .65rem;
+        min-width: 0;
+        color: var(--purchase-muted);
+    }
+
+    .receive-progress-step > span {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        place-items: center;
+        border-radius: 999px;
+        color: var(--purchase-muted);
+        background: #f2f4f7;
+        font-size: .82rem;
+        font-weight: 900;
+    }
+
+    .receive-progress-step strong,
+    .receive-progress-step small {
+        display: block;
+    }
+
+    .receive-progress-step strong {
+        color: var(--purchase-text);
+        font-weight: 900;
+        line-height: 1.2;
+    }
+
+    .receive-progress-step small {
+        margin-top: .08rem;
+        line-height: 1.3;
+    }
+
+    .receive-progress-step.is-active > span {
+        color: #fff;
+        background: var(--purchase-accent);
+        box-shadow: 0 8px 18px rgba(37, 99, 235, .16);
+    }
+
+    .receive-progress-step.is-complete > span {
+        color: #fff;
+        background: var(--purchase-success);
+        box-shadow: 0 8px 18px rgba(22, 163, 74, .16);
+    }
+
+    .receive-progress-step.is-warning > span {
+        color: #fff;
+        background: var(--purchase-warning);
+        box-shadow: 0 8px 18px rgba(217, 119, 6, .14);
+    }
+
+    .receive-progress-line {
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--purchase-border), #edf2f7);
     }
 
     .purchase-overview-item {
@@ -1291,6 +1432,197 @@
         white-space: nowrap;
     }
 
+    .receive-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    .receive-summary-grid > div {
+        min-width: 0;
+        padding: .8rem;
+        border: 1px solid var(--purchase-border);
+        border-radius: 8px;
+        background: #f8fbff;
+    }
+
+    .receive-summary-grid span,
+    .receive-qty-stack small {
+        display: block;
+        color: var(--purchase-muted);
+        font-size: .74rem;
+        font-weight: 700;
+    }
+
+    .receive-summary-grid strong {
+        display: block;
+        overflow: hidden;
+        margin-top: .25rem;
+        color: var(--purchase-text);
+        font-size: .92rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .receive-progress-meter {
+        height: 9px;
+        margin-top: .85rem;
+        border-radius: 999px;
+        background: #eef2f7;
+        overflow: hidden;
+    }
+
+    .receive-progress-meter span {
+        display: block;
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--purchase-primary), var(--purchase-success));
+        transition: width .2s ease;
+    }
+
+    .receive-detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: .45rem;
+    }
+
+    .receive-detail-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border-radius: 8px;
+        font-weight: 800;
+    }
+
+    .receive-empty-state {
+        display: grid;
+        min-height: 180px;
+        place-items: center;
+        align-content: center;
+        gap: .3rem;
+        border: 1px dashed var(--purchase-border);
+        border-radius: 10px;
+        background: #f8fbff;
+        color: var(--purchase-muted);
+        text-align: center;
+    }
+
+    .receive-empty-state i {
+        color: var(--purchase-primary);
+        font-size: 2.1rem;
+    }
+
+    .receive-empty-state strong {
+        color: var(--purchase-text);
+        font-size: 1rem;
+    }
+
+    .receive-detail-editor .table {
+        min-width: 1320px;
+    }
+
+    .receive-detail-row td {
+        vertical-align: middle;
+    }
+
+    .receive-detail-row {
+        transition: background .16s ease, box-shadow .16s ease;
+    }
+
+    .receive-detail-row.is-filled {
+        background: #fbfffd;
+        box-shadow: inset 3px 0 0 var(--purchase-success);
+    }
+
+    .receive-detail-row.is-warning {
+        background: #fffaf0;
+        box-shadow: inset 3px 0 0 var(--purchase-warning);
+    }
+
+    .receive-detail-row.is-empty {
+        background: #fff;
+    }
+
+    .receive-detail-row .form-control-sm {
+        min-width: 96px;
+        border-color: var(--purchase-border);
+        border-radius: 7px;
+    }
+
+    .receive-detail-row input[name="no_batch[]"] {
+        min-width: 130px;
+    }
+
+    .receive-detail-row input[name="expired_date[]"] {
+        min-width: 125px;
+    }
+
+    .receive-qty-control {
+        display: flex;
+        align-items: center;
+        min-width: 132px;
+        border: 1px solid var(--purchase-border);
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .receive-qty-control .form-control-sm {
+        min-width: 76px;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .receive-qty-control .receive-fill-max {
+        align-self: stretch;
+        border: 0;
+        border-left: 1px solid var(--purchase-border);
+        border-radius: 0;
+        color: var(--purchase-primary-strong);
+        font-size: .72rem;
+        font-weight: 900;
+    }
+
+    .receive-row-total {
+        color: var(--purchase-primary-strong);
+        white-space: nowrap;
+    }
+
+    .receive-qty-stack strong {
+        display: block;
+        color: var(--purchase-text);
+        font-weight: 800;
+    }
+
+    .receive-row-check {
+        display: inline-flex;
+        align-items: center;
+        gap: .32rem;
+        border-radius: 999px;
+        padding: .35rem .55rem;
+        font-size: .72rem;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .receive-row-check.is-empty {
+        color: var(--purchase-muted);
+        background: #f2f4f7;
+    }
+
+    .receive-row-check.is-warning {
+        color: var(--purchase-warning);
+        background: var(--purchase-soft-yellow);
+    }
+
+    .receive-row-check.is-ok {
+        color: var(--purchase-success);
+        background: #ecfdf3;
+    }
+
     @keyframes purchase-spin {
         to {
             transform: rotate(360deg);
@@ -1298,7 +1630,8 @@
     }
 
     @media (max-width: 1199.98px) {
-        .purchase-stats-grid {
+        .purchase-stats-grid,
+        .receive-insight-strip {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
@@ -1310,6 +1643,18 @@
 
         .purchase-modal-overview {
             grid-template-columns: 1fr;
+        }
+
+        .receive-summary-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .receive-form-progress {
+            grid-template-columns: 1fr;
+        }
+
+        .receive-progress-line {
+            display: none;
         }
 
         .purchase-table-toolbar,
@@ -1373,7 +1718,12 @@
             padding: 1rem;
         }
 
-        .purchase-stats-grid {
+        .purchase-stats-grid,
+        .receive-insight-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .receive-summary-grid {
             grid-template-columns: 1fr;
         }
 

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Menu\Stok\KartuStokModel;
+use App\Models\Menu\Stok\StokBatchModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,4 +24,6 @@ class MasterObatModel extends Model
     public function distributor()    { return $this->belongsTo(DistributorModel::class, 'distributor_id'); }
     public function rakPenyimpanan() { return $this->belongsTo(RakPenyimpananModel::class, 'rak_id'); }
     public function konversiSatuan() { return $this->hasMany(KonversiSatuanModel::class, 'obat_id'); }
+    public function stokBatches()    { return $this->hasMany(StokBatchModel::class, 'obat_id'); }
+    public function kartuStok()      { return $this->hasMany(KartuStokModel::class, 'obat_id'); }
 }

@@ -610,18 +610,23 @@
                     render: function(data) {
                         let status = String(data || '').toLowerCase();
                         let statusClass =
-                            status === 'approved' ? 'is-approved' :
+                            (status === 'approved' || status === 'selesai') ? 'is-approved' :
                             (status === 'draft' || status === 'waiting_approval') ? 'is-draft' :
+                            status === 'diterima_sebagian' ? 'is-partial' :
                             status === 'rejected' ? 'is-rejected' :
                             'is-other';
                         let statusLabel =
                             status === 'approved' ? 'Disetujui' :
+                            status === 'diterima_sebagian' ? 'Diterima Sebagian' :
+                            status === 'selesai' ? 'Selesai' :
                             status === 'draft' ? 'Draft' :
                             status === 'waiting_approval' ? 'Menunggu Approval' :
                             status === 'rejected' ? 'Ditolak' :
                             (data || '-');
                         let statusIcon =
                             status === 'approved' ? 'mdi-check-circle-outline' :
+                            status === 'diterima_sebagian' ? 'mdi-progress-check' :
+                            status === 'selesai' ? 'mdi-package-variant-closed-check' :
                             (status === 'draft' || status === 'waiting_approval') ?
                             'mdi-file-clock-outline' :
                             status === 'rejected' ? 'mdi-close-circle-outline' :

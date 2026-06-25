@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('obat_id');
 
             // Nama satuan pembelian (box, strip, pcs, botol, pack)
-            $table->unsignedBigInteger('satuan');
+            $table->unsignedBigInteger('satuan_id');
 
             // Berapa PCS dalam 1 satuan ini
             $table->integer('konversi')->default(1);
@@ -31,7 +31,7 @@ return new class extends Migration
                 ->references('id')
                 ->on('master_obats')
                 ->onDelete('cascade');
-            $table->foreign('satuan')
+            $table->foreign('satuan_id')
                 ->references('id')
                 ->on('satuans')
                 ->onDelete('cascade');
