@@ -6,13 +6,13 @@ use App\Exports\MasterData\MasterObat\MasterObatExport;
 use App\Models\CategoryModel;
 use App\Models\DistributorModel;
 use App\Models\GolonganModel;
-use App\Models\MainCategoryModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
 use App\Models\PabrikanModel;
 use App\Models\RakPenyimpananModel;
 use App\Models\SatuansModel;
 use App\Models\SediaanModel;
-use App\Models\SubCategoryModel;
+use App\Models\SubGolonganModel;
 use App\Repositories\Settings\Master\MasterObatRepository;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -36,21 +36,19 @@ class MasterObatService
         return $dataMasterObat;
     }
 
-    public function getSubKategori($kategori)
+    public function getMainGolongan($golongan)
     {
-        $subKategoris = $this->MasterObatRepository->getSubKategori($kategori);
-        return $subKategoris;
+        return $this->MasterObatRepository->getMainGolongan($golongan);
     }
 
-    public function getMainKategori($kategoriUtama)
+    public function getSubGolongan($mainGolongan)
     {
-        $mainKategori = $this->MasterObatRepository->getMainKategori($kategoriUtama);
-        return $mainKategori;
+        return $this->MasterObatRepository->getSubGolongan($mainGolongan);
     }
 
     public function getMasterObatTable()
     {
-        $MasterObat = $this->MasterObatRepository->getMasterObat()->load(['kategoriUtama', 'kategori', 'subKategori', 'golongan', 'satuan', 'sediaan', 'pabrikan', 'distributor', 'rakPenyimpanan']);
+        $MasterObat = $this->MasterObatRepository->getMasterObat()->load(['kategori', 'golongan', 'mainGolongan', 'subGolongan', 'satuan', 'sediaan', 'pabrikan', 'distributor', 'rakPenyimpanan']);
 
         $dataMasterObat = [];
         foreach ($MasterObat as $r) {
@@ -58,10 +56,10 @@ class MasterObatService
                 'id'        => $r->id,
                 'kode_obat' => $r->kode_obat,
                 'nama_obat'      => $r->nama_obat,
-                'category_id' => $r->kategoriUtama->name ?? '-',
-                'main_category_id' => $r->kategori->name ?? '-',
-                'sub_kategori_id'   => $r->subKategori->name ?? '-',
+                'category_id' => $r->kategori->name ?? '-',
                 'golongan_id'   => $r->golongan->nama ?? '-',
+                'main_golongan_id' => $r->mainGolongan->nama ?? '-',
+                'sub_golongan_id' => $r->subGolongan->nama ?? '-',
                 'satuan_id'   => $r->satuan->nama ?? '-',
                 'sediaan_id'   => $r->sediaan->nama ?? '-',
                 'pabrikan_id'   => $r->pabrikan->nama ?? '-',
@@ -144,9 +142,9 @@ class MasterObatService
                 $kode_obat = trim((string) ($row['A'] ?? ''));
                 $nama_obat = trim((string) ($row['B'] ?? ''));
                 $category_id = trim((string) ($row['C'] ?? ''));
-                $main_category_id = trim((string) ($row['D'] ?? ''));
-                $sub_kategori_id = trim((string) ($row['E'] ?? ''));
-                $golongan_id = trim((string) ($row['F'] ?? ''));
+                $golongan_id = trim((string) ($row['D'] ?? ''));
+                $main_golongan_id = trim((string) ($row['E'] ?? ''));
+                $sub_golongan_id = trim((string) ($row['F'] ?? ''));
                 $satuan_id = trim((string) ($row['G'] ?? ''));
                 $sediaan_id = trim((string) ($row['H'] ?? ''));
                 $pabrikan_id = trim((string) ($row['I'] ?? ''));
@@ -168,9 +166,9 @@ class MasterObatService
 
                 // cari
                 $category_id = CategoryModel::where('code', $category_id)->first();
-                $main_category_id = MainCategoryModel::where('code', $main_category_id)->first();
-                $sub_kategori_id = SubCategoryModel::where('code', $sub_kategori_id)->first();
                 $golongan_id = GolonganModel::where('kode', $golongan_id)->first();
+                $main_golongan_id = MainGolonganModel::where('kode', $main_golongan_id)->first();
+                $sub_golongan_id = SubGolonganModel::where('kode', $sub_golongan_id)->first();
                 $satuan_id = SatuansModel::where('kode', $satuan_id)->first();
                 $sediaan_id = SediaanModel::where('kode', $sediaan_id)->first();
                 $pabrikan_id = PabrikanModel::where('kode', $pabrikan_id)->first();
@@ -184,9 +182,9 @@ class MasterObatService
                         'kode_obat' => $kode_obat,
                         'nama_obat' => $nama_obat,
                         'category_id' => $category_id?->id,
-                        'main_category_id' => $main_category_id?->id,
-                        'sub_kategori_id' => $sub_kategori_id?->id,
                         'golongan_id' => $golongan_id?->id,
+                        'main_golongan_id' => $main_golongan_id?->id,
+                        'sub_golongan_id' => $sub_golongan_id?->id,
                         'satuan_id' => $satuan_id?->id,
                         'sediaan_id' => $sediaan_id?->id,
                         'pabrikan_id' => $pabrikan_id?->id,

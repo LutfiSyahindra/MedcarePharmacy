@@ -99,12 +99,6 @@
                         <li class="nav-item">
                             <a href="{{ route("kategori.kategoriUtama") }}" class="nav-link">Kategori</a>
                         </li>
-                        <li class="nav-item">
-                            <a href="{{ route("kategori.mainKategori") }}" class="nav-link">Main Kategori</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route("kategori.subKategori") }}" class="nav-link">Sub Kategori</a>
-                        </li>
                     </ul>
                 </div>
             </li>
@@ -134,6 +128,12 @@
                     <ul class="nav sub-menu">
                         <li class="nav-item">
                             <a href="{{ route("golongan.golongan") }}" class="nav-link">Golongan Obat</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("golongan.mainGolongan") }}" class="nav-link">Main Golongan</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("golongan.subGolongan") }}" class="nav-link">Sub Golongan</a>
                         </li>
                     </ul>
                 </div>

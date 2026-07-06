@@ -12,7 +12,7 @@
             Pricing Rules
         </span>
         <h2>Margin</h2>
-        <p>Kelola faktor jual dan persentase margin berdasarkan kategori, sub kategori, atau reference produk.</p>
+        <p>Kelola faktor jual dan persentase margin berdasarkan kategori, golongan, atau reference produk.</p>
         <div class="margin-hero-actions">
             <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#marginsModal">
                 <i class="mdi mdi-plus-circle-outline"></i>

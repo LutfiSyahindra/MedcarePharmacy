@@ -14,10 +14,10 @@ class MasterObatModel extends Model
     protected $table = 'master_obats';
     protected $guarded = [];
 
-    public function kategoriUtama()  { return $this->belongsTo(CategoryModel::class, 'category_id'); }
-    public function kategori()       { return $this->belongsTo(MainCategoryModel::class, 'main_category_id'); }
-    public function subKategori()    { return $this->belongsTo(SubCategoryModel::class, 'sub_kategori_id'); }
+    public function kategori()       { return $this->belongsTo(CategoryModel::class, 'category_id'); }
     public function golongan()       { return $this->belongsTo(GolonganModel::class, 'golongan_id'); }
+    public function mainGolongan()   { return $this->belongsTo(MainGolonganModel::class, 'main_golongan_id'); }
+    public function subGolongan()    { return $this->belongsTo(SubGolonganModel::class, 'sub_golongan_id'); }
     public function satuan()         { return $this->belongsTo(SatuansModel::class, 'satuan_id'); }
     public function sediaan()        { return $this->belongsTo(SediaanModel::class, 'sediaan_id'); }
     public function pabrikan()       { return $this->belongsTo(PabrikanModel::class, 'pabrikan_id'); }

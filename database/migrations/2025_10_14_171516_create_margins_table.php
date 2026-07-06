@@ -14,18 +14,18 @@ return new class extends Migration
         Schema::create('margins', function (Blueprint $table) {
         $table->id();
 
-        // Relasi fleksibel: bisa untuk kategori, sub_kategori, atau obat
+        // Relasi fleksibel: bisa untuk kategori, golongan, atau obat
         $table->unsignedBigInteger('reference_id')->nullable()
-            ->comment('ID referensi tergantung tingkat: kategori, sub_kategori, atau obat');
+            ->comment('ID referensi tergantung tingkat: kategori, golongan, atau obat');
 
         // Faktor jual (contoh: 1.25 = margin 25%)
         $table->decimal('faktor_jual', 8, 3)->default(1.000)
             ->comment('Nilai pengali harga beli, contoh: 1.25 = 25% margin');
 
         // Menentukan tingkat margin
-        $table->enum('tingkat', ['kategori', 'sub_kategori', 'obat'])
-            ->default('sub_kategori')
-            ->comment('Menentukan apakah margin berlaku untuk kategori, sub kategori, atau obat');
+        $table->enum('tingkat', ['kategori', 'golongan', 'main_golongan', 'sub_golongan', 'obat'])
+            ->default('kategori')
+            ->comment('Menentukan apakah margin berlaku untuk kategori, golongan, atau obat');
 
         // Status aktif margin
         $table->boolean('is_active')->default(true);

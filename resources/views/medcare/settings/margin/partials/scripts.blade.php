@@ -16,9 +16,10 @@
 
         function tierLabel(value) {
             const labels = {
-                kategoriUtama: 'Kategori Utama',
                 kategori: 'Kategori',
-                sub_kategori: 'Sub Kategori',
+                golongan: 'Golongan',
+                main_golongan: 'Main Golongan',
+                sub_golongan: 'Sub Golongan',
                 obat: 'Obat'
             };
             return labels[value] || value || '-';

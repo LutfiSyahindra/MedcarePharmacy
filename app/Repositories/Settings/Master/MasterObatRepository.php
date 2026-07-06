@@ -2,9 +2,9 @@
 
 namespace App\Repositories\Settings\Master;
 
-use App\Models\MainCategoryModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
-use App\Models\SubCategoryModel;
+use App\Models\SubGolonganModel;
 
 class MasterObatRepository
 {
@@ -32,18 +32,13 @@ class MasterObatRepository
         $MasterObat->save();
     }
 
-    public function getMainKategori($kategoriUtama)
+    public function getMainGolongan($golongan)
     {
-        $mainKategori = MainCategoryModel::where('category_id', $kategoriUtama)->select('id', 'name')->get();
-        return $mainKategori;
+        return MainGolonganModel::where('golongan_id', $golongan)->select('id', 'kode', 'nama')->get();
     }
 
-    public function getSubKategori($kategori)
+    public function getSubGolongan($mainGolongan)
     {
-        $subKategoris = SubCategoryModel::where('main_category_id', $kategori)->select('id', 'name')->get();
-        return $subKategoris;
+        return SubGolonganModel::where('main_golongan_id', $mainGolongan)->select('id', 'kode', 'nama')->get();
     }
-
-
-
 }

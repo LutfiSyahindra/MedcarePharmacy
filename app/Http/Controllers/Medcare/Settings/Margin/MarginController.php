@@ -70,7 +70,7 @@ class MarginController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tingkat' => 'required|string|in:kategoriUtama,kategori,sub_kategori,obat',
+            'tingkat' => 'required|string|in:kategori,golongan,main_golongan,sub_golongan,obat',
             'reference_id' => 'required|array',
             'reference_id.*' => 'required',
             'faktor_jual' => 'required|numeric|min:0|max:100',
@@ -116,7 +116,7 @@ class MarginController extends Controller
     {
         Log::info($request->all());
         $validated = $request->validate([
-            'tingkat' => 'required|string|in:kategoriUtama,kategori,sub_kategori,obat',
+            'tingkat' => 'required|string|in:kategori,golongan,main_golongan,sub_golongan,obat',
             'reference_id' => 'required',
             'faktor_jual' => 'required|numeric|min:0|max:100',
         ]);

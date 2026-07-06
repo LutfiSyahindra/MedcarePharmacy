@@ -114,10 +114,10 @@
                     <section class="obat-detail-group">
                         <h6><i class="mdi mdi-shape-outline"></i>Klasifikasi</h6>
                         <div class="obat-detail-grid">
-                            ${detailItem('Kategori Utama', row.category_id, 'mdi-folder-outline')}
-                            ${detailItem('Kategori', row.main_category_id, 'mdi-folder-multiple-outline')}
-                            ${detailItem('Sub Kategori', row.sub_kategori_id, 'mdi-source-branch')}
+                            ${detailItem('Kategori', row.category_id, 'mdi-folder-outline')}
                             ${detailItem('Golongan', row.golongan_id, 'mdi-flask-outline')}
+                            ${detailItem('Main Golongan', row.main_golongan_id, 'mdi-shape-plus-outline')}
+                            ${detailItem('Sub Golongan', row.sub_golongan_id, 'mdi-source-branch')}
                             ${detailItem('Satuan', row.satuan_id, 'mdi-scale-balance')}
                             ${detailItem('Sediaan', row.sediaan_id, 'mdi-bottle-tonic-outline')}
                         </div>

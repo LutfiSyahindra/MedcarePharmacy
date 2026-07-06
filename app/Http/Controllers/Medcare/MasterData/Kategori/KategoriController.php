@@ -31,10 +31,10 @@ class KategoriController extends Controller
         ->addColumn('actions', function ($dataKategoriUtama) {
             return '
                 <div class="category-action-group">
-                    <button type="button" class="btn category-action-btn category-action-edit" title="Edit kategori utama" onclick="editKategoriUtama(' . $dataKategoriUtama['id'] . ')">
+                    <button type="button" class="btn category-action-btn category-action-edit" title="Edit kategori" onclick="editKategoriUtama(' . $dataKategoriUtama['id'] . ')">
                         <i class="mdi mdi-pencil-outline"></i>
                     </button>
-                    <button type="button" class="btn category-action-btn category-action-delete" title="Hapus kategori utama" onclick="deleteKategoriUtama(' . $dataKategoriUtama['id'] . ')">
+                    <button type="button" class="btn category-action-btn category-action-delete" title="Hapus kategori" onclick="deleteKategoriUtama(' . $dataKategoriUtama['id'] . ')">
                         <i class="mdi mdi-delete-outline"></i>
                     </button>
                 </div>
@@ -70,7 +70,7 @@ class KategoriController extends Controller
             ]);
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Kategori Utama berhasil ditambahkan']);
+        return response()->json(['status' => 'success', 'message' => 'Kategori berhasil ditambahkan']);
     }
 
     /**
@@ -104,7 +104,7 @@ class KategoriController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Kategori Utama berhasil diperbarui',
+            'message' => 'Kategori berhasil diperbarui',
             'data'    => $dataKategoriUtama
         ], 200);
     }
@@ -118,7 +118,7 @@ class KategoriController extends Controller
             $this->KategoriUtamaService->deleteKategoriUtama($id);
             return response()->json([
                 'success' => true,
-                'message' => 'Kategori Utama berhasil dihapus.'
+                'message' => 'Kategori berhasil dihapus.'
             ]);
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan

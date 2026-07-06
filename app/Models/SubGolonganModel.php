@@ -5,21 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class GolonganModel extends Model
+class SubGolonganModel extends Model
 {
     use HasFactory;
 
-    protected $table = "golongan_obats";
+    protected $table = 'sub_golongan_obats';
     protected $fillable = [
-        'id',
+        'main_golongan_id',
         'kode',
         'nama',
         'keterangan',
-        'is_active',
     ];
 
     public function mainGolongan()
     {
-        return $this->hasMany(MainGolonganModel::class, 'golongan_id');
+        return $this->belongsTo(MainGolonganModel::class, 'main_golongan_id');
     }
 }

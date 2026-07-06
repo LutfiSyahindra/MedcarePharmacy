@@ -11,13 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sub_categories', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('main_category_id')->constrained('main_category')->onDelete('cascade');
-            $table->string('name');
-            $table->decimal('margin', 5, 2)->default(0); // margin persen sub kategori
-            $table->timestamps();
-        });
+        //
     }
 
     /**
@@ -25,6 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sub_category');
+        //
     }
 };

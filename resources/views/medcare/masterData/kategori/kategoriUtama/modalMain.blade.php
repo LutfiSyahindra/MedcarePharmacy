@@ -5,8 +5,8 @@
                 <div class="modal-title-wrap">
                     <span class="modal-icon"><i class="mdi mdi-tag-outline"></i></span>
                     <div>
-                        <h5 class="modal-title" id="kategoriUtamaModalLabel">Tambah Kategori Utama</h5>
-                        <p class="modal-subtitle" id="kategoriUtamaModalSubtitle">Buat satu atau beberapa kategori utama obat.</p>
+                        <h5 class="modal-title" id="kategoriUtamaModalLabel">Tambah Kategori</h5>
+                        <p class="modal-subtitle" id="kategoriUtamaModalSubtitle">Buat satu atau beberapa kategori obat.</p>
                     </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -19,7 +19,7 @@
                     <div class="category-form-intro">
                         <i class="mdi mdi-sitemap-outline"></i>
                         <div>
-                            <strong>Level pertama kategori obat</strong>
+                            <strong>Kategori obat</strong>
                             <small>Gunakan kode singkat dan nama yang mudah dikenali oleh tim farmasi.</small>
                         </div>
                     </div>

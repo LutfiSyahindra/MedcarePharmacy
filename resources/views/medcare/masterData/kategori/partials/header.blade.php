@@ -1,7 +1,7 @@
 @php
-    $categoryActive = $categoryActive ?? 'utama';
+    $categoryActive = $categoryActive ?? 'kategori';
     $categoryTitle = $categoryTitle ?? 'Kategori';
-    $categoryDescription = $categoryDescription ?? 'Kelola struktur kategori obat dengan cepat dan rapi.';
+    $categoryDescription = $categoryDescription ?? 'Kelola kategori obat dengan cepat dan rapi.';
     $categoryModalTarget = $categoryModalTarget ?? '#kategoriUtamaModal';
     $categoryActionLabel = $categoryActionLabel ?? 'Tambah Data';
     $categoryActionIcon = $categoryActionIcon ?? 'mdi-plus-circle-outline';
@@ -11,21 +11,9 @@
     $categoryMenus = [
         [
             'key' => 'utama',
-            'label' => 'Kategori Utama',
+            'label' => 'Kategori',
             'icon' => 'mdi-tag-outline',
             'route' => route('kategori.kategoriUtama'),
-        ],
-        [
-            'key' => 'main',
-            'label' => 'Main Kategori',
-            'icon' => 'mdi-shape-outline',
-            'route' => route('kategori.mainKategori'),
-        ],
-        [
-            'key' => 'sub',
-            'label' => 'Sub Kategori',
-            'icon' => 'mdi-format-list-bulleted-type',
-            'route' => route('kategori.subKategori'),
         ],
     ];
 @endphp
@@ -42,7 +30,7 @@
     <div>
         <span class="category-kicker">
             <i class="mdi mdi-layers-triple-outline"></i>
-            Category Tree
+            Category
         </span>
         <h2>{{ $categoryTitle }}</h2>
         <p>{{ $categoryDescription }}</p>
@@ -67,22 +55,8 @@
         <div class="category-flow-item {{ $categoryActive === 'utama' ? 'is-active' : '' }}">
             <i class="mdi mdi-tag-outline"></i>
             <div>
-                <span>Kategori Utama</span>
-                <small>Level dasar pengelompokan obat</small>
-            </div>
-        </div>
-        <div class="category-flow-item {{ $categoryActive === 'main' ? 'is-active' : '' }}">
-            <i class="mdi mdi-shape-outline"></i>
-            <div>
-                <span>Main Kategori</span>
-                <small>Turunan dari kategori utama</small>
-            </div>
-        </div>
-        <div class="category-flow-item {{ $categoryActive === 'sub' ? 'is-active' : '' }}">
-            <i class="mdi mdi-format-list-bulleted-type"></i>
-            <div>
-                <span>Sub Kategori</span>
-                <small>Detail klasifikasi untuk master obat</small>
+                <span>Kategori</span>
+                <small>Pengelompokan utama obat</small>
             </div>
         </div>
     </div>

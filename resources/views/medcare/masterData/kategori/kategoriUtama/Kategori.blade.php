@@ -13,10 +13,10 @@
         @include("medcare.masterData.kategori.kategoriUtama.modalMain")
         @include("medcare.masterData.kategori.partials.header", [
             "categoryActive" => "utama",
-            "categoryTitle" => "Kategori Utama",
-            "categoryDescription" => "Kelola level dasar klasifikasi obat sebelum diturunkan ke main kategori dan sub kategori.",
+            "categoryTitle" => "Kategori",
+            "categoryDescription" => "Kelola kategori obat satu level sebelum dipakai pada master obat.",
             "categoryModalTarget" => "#kategoriUtamaModal",
-            "categoryActionLabel" => "Tambah Kategori Utama",
+            "categoryActionLabel" => "Tambah Kategori",
             "categoryActionIcon" => "mdi-plus-circle-outline",
         ])
 
@@ -26,7 +26,7 @@
                 <div>
                     <strong id="kategoriUtamaTotal">0</strong>
                     <span>Total Data</span>
-                    <small>Seluruh kategori utama yang tersimpan.</small>
+                    <small>Seluruh kategori yang tersimpan.</small>
                 </div>
             </div>
             <div class="category-stat">
@@ -52,7 +52,7 @@
                 <div class="category-table-title">
                     <span class="category-table-title-icon"><i class="mdi mdi-tag-multiple-outline"></i></span>
                     <div>
-                        <h5>Daftar Kategori Utama</h5>
+                        <h5>Daftar Kategori</h5>
                         <p>Basis kategori untuk pengelompokan master obat.</p>
                     </div>
                 </div>
@@ -69,7 +69,7 @@
                         <tr>
                             <th>No</th>
                             <th>Kode</th>
-                            <th>Kategori Utama</th>
+                            <th>Kategori</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>

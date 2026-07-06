@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Exports\MasterData\Kategori;
+namespace App\Exports\MasterData\golongan;
 
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -8,14 +8,15 @@ use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class SubKategoriObatExport implements WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class SubGolonganObatExport implements WithHeadings, WithStyles, WithColumnWidths, WithTitle
 {
     public function headings(): array
     {
         return [
-            'Main_Kategori',
-            'Kode', // kolom pertama sesuai field di database
-            'Nama', // kolom kedua sesuai field di database
+            'Kode Main Golongan',
+            'Kode Sub Golongan',
+            'Nama Sub Golongan',
+            'Keterangan',
         ];
     }
 
@@ -26,7 +27,7 @@ class SubKategoriObatExport implements WithHeadings, WithStyles, WithColumnWidth
                 'font' => ['bold' => true],
                 'alignment' => [
                     'horizontal' => 'center',
-                    'vertical' => 'center'
+                    'vertical' => 'center',
                 ],
                 'fill' => [
                     'fillType' => 'solid',
@@ -39,14 +40,15 @@ class SubKategoriObatExport implements WithHeadings, WithStyles, WithColumnWidth
     public function columnWidths(): array
     {
         return [
-            'A' => 20, // kolom "Kode"
-            'B' => 40, // kolom "Nama"
-            'C' => 40, // kolom "Nama"
+            'A' => 22,
+            'B' => 22,
+            'C' => 40,
+            'D' => 40,
         ];
     }
 
     public function title(): string
     {
-        return 'Template Sub Kategori Obat';
+        return 'Template Sub Golongan Obat';
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Services\Settings\Margins;
 
 use App\Models\CategoryModel;
-use App\Models\MainCategoryModel;
-use App\Models\SubCategoryModel;
+use App\Models\GolonganModel;
+use App\Models\MainGolonganModel;
+use App\Models\MasterObatModel;
+use App\Models\SubGolonganModel;
 use App\Repositories\Settings\Margins\MarginsRepository;
 
 class MarginsService
@@ -37,7 +39,7 @@ class MarginsService
             $persentase = ($r->faktor_jual - 1) * 100;
             $dataMargins[] = [
                 'id'            => $r->id,
-                'reference_id'  => $reference?->name ?? '-', // gunakan safe operator
+                'reference_id'  => $reference?->name ?? $reference?->nama ?? $reference?->nama_obat ?? '-',
                 'faktor_jual'   => $r->faktor_jual,
                 'persentase'    => number_format($persentase) . '%',
                 'tingkat'       => $r->tingkat,
@@ -77,18 +79,21 @@ class MarginsService
     public function getReferences($tingkat)
     {
         switch ($tingkat) {
-            case 'kategoriUtama':
+            case 'kategori':
                 $data = CategoryModel::select('id', 'name')->get();
                 break;
-            case 'kategori':
-                $data = MainCategoryModel::select('id', 'name')->get();
+            case 'golongan':
+                $data = GolonganModel::select('id', 'nama')->get();
                 break;
-            case 'sub_kategori':
-                $data = SubCategoryModel::select('id', 'name')->get();
+            case 'main_golongan':
+                $data = MainGolonganModel::select('id', 'nama')->get();
                 break;
-            // case 'obat':
-            //     $data = \App\Models\Obat::select('id', 'nama')->get();
-            //     break;
+            case 'sub_golongan':
+                $data = SubGolonganModel::select('id', 'nama')->get();
+                break;
+            case 'obat':
+                $data = MasterObatModel::select('id', 'nama_obat as nama')->get();
+                break;
             default:
                 $data = collect();
                 break;

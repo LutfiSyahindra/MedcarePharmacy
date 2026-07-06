@@ -2,9 +2,9 @@
 
 use App\Http\Controllers\Medcare\MasterData\Distributor\DistributorController;
 use App\Http\Controllers\Medcare\MasterData\Golongan\GolonganController;
+use App\Http\Controllers\Medcare\MasterData\Golongan\MainGolonganController;
+use App\Http\Controllers\Medcare\MasterData\Golongan\SubGolonganController;
 use App\Http\Controllers\Medcare\MasterData\Kategori\KategoriController;
-use App\Http\Controllers\Medcare\MasterData\Kategori\MainKategoriController;
-use App\Http\Controllers\Medcare\MasterData\Kategori\SubKategoriController;
 use App\Http\Controllers\Medcare\MasterData\Konversi\KonversiSatuanObatController;
 use App\Http\Controllers\Medcare\MasterData\MasterObat\MasterObatController;
 use App\Http\Controllers\Medcare\MasterData\Pabrikan\PabrikanController;
@@ -107,29 +107,6 @@ Route::middleware('auth')->group(function () {
         Route::put('/kategori/{id}/update', [KategoriController::class, 'update'])->name('kategori.kategoriUtama.update');
         Route::delete('/kategori/{id}/destroy', [KategoriController::class, 'destroy'])->name('kategori.kategoriUtama.destroy');
 
-        // --- Main Kategori
-        Route::get('/kategori/mainKategori', [MainKategoriController::class, 'mainKategori'])->name('kategori.mainKategori');
-        Route::get('/kategori/mainKategori/kategoriUtama', [MainKategoriController::class, 'kategoriUtama'])->name('kategoriMain.kategoriUtama');
-        Route::get('/kategori/mainKategori/table', [MainKategoriController::class, 'table'])->name('kategori.mainKategori.table');
-        Route::get('/kategori/mainKategori/table', [MainKategoriController::class, 'table'])->name('kategori.mainKategori.table');
-        Route::post('/kategori/mainKategori/store', [MainKategoriController::class, 'store'])->name('kategori.mainKategori.store');
-        Route::get('/kategori/mainKategori/{id}/edit', [MainKategoriController::class, 'edit'])->name('kategori.mainKategori.edit');
-        Route::put('/kategori/mainKategori/{id}/update', [MainKategoriController::class, 'update'])->name('kategori.mainKategori.update');
-        Route::delete('/kategori/mainKategori/{id}/destroy', [MainKategoriController::class, 'destroy'])->name('kategori.mainKategori.destroy');
-        Route::get('/kategori/mainKategori/exportTemplate', [MainKategoriController::class, 'exportTemplate'])->name('kategori.mainKategori.exportTemplate');
-        Route::post('/kategori/mainKategori/import', [MainKategoriController::class, 'import'])->name('kategori.mainKategori.import');
-
-        // --- Sub Kategori
-        Route::get('/kategori/subKategori', [SubKategoriController::class, 'subKategori'])->name('kategori.subKategori');
-        Route::get('/kategori/subKategori/table', [SubKategoriController::class, 'table'])->name('kategori.subKategori.table');
-        Route::get('/kategori/subKategori/mainKategori', [SubKategoriController::class, 'mainKategori'])->name('kategori.subKategori.mainKategori');
-        Route::post('/kategori/subKategori/store', [SubKategoriController::class, 'store'])->name('kategori.subKategori.store');
-        Route::get('/kategori/subKategori/{id}/edit', [SubKategoriController::class, 'edit'])->name('kategori.subKategori.edit');
-        Route::put('/kategori/subKategori/{id}/update', [SubKategoriController::class, 'update'])->name('kategori.subKategori.update');
-        Route::delete('/kategori/subKategori/{id}/destroy', [SubKategoriController::class, 'destroy'])->name('kategori.subKategori.destroy');
-        Route::get('/kategori/subKategori/exportTemplate', [SubKategoriController::class, 'exportTemplate'])->name('kategori.subKategori.exportTemplate');
-        Route::post('/kategori/subKategori/import', [subKategoriController::class, 'import'])->name('kategori.subKategori.import');
-
         // --- Margin
         Route::get('/margin', [MarginController::class, 'margin'])->name('margin.margin');
         Route::get('/margin/table', [MarginController::class, 'table'])->name('margin.table');
@@ -161,6 +138,28 @@ Route::middleware('auth')->group(function () {
         Route::delete('/golongan/{id}/destroy', [GolonganController::class, 'destroy'])->name('golongan.destroy');
         Route::get('/golongan/exportTemplate', [GolonganController::class, 'exportTemplate'])->name('golongan.exportTemplate');
         Route::post('/golongan/import', [GolonganController::class, 'import'])->name('golongan.import');
+
+        // --- Main Golongan
+        Route::get('/golongan/mainGolongan', [MainGolonganController::class, 'mainGolongan'])->name('golongan.mainGolongan');
+        Route::get('/golongan/mainGolongan/golongan', [MainGolonganController::class, 'golongan'])->name('golongan.mainGolongan.golongan');
+        Route::get('/golongan/mainGolongan/table', [MainGolonganController::class, 'table'])->name('golongan.mainGolongan.table');
+        Route::post('/golongan/mainGolongan/store', [MainGolonganController::class, 'store'])->name('golongan.mainGolongan.store');
+        Route::get('/golongan/mainGolongan/{id}/edit', [MainGolonganController::class, 'edit'])->name('golongan.mainGolongan.edit');
+        Route::put('/golongan/mainGolongan/{id}/update', [MainGolonganController::class, 'update'])->name('golongan.mainGolongan.update');
+        Route::delete('/golongan/mainGolongan/{id}/destroy', [MainGolonganController::class, 'destroy'])->name('golongan.mainGolongan.destroy');
+        Route::get('/golongan/mainGolongan/exportTemplate', [MainGolonganController::class, 'exportTemplate'])->name('golongan.mainGolongan.exportTemplate');
+        Route::post('/golongan/mainGolongan/import', [MainGolonganController::class, 'import'])->name('golongan.mainGolongan.import');
+
+        // --- Sub Golongan
+        Route::get('/golongan/subGolongan', [SubGolonganController::class, 'subGolongan'])->name('golongan.subGolongan');
+        Route::get('/golongan/subGolongan/mainGolongan', [SubGolonganController::class, 'mainGolongan'])->name('golongan.subGolongan.mainGolongan');
+        Route::get('/golongan/subGolongan/table', [SubGolonganController::class, 'table'])->name('golongan.subGolongan.table');
+        Route::post('/golongan/subGolongan/store', [SubGolonganController::class, 'store'])->name('golongan.subGolongan.store');
+        Route::get('/golongan/subGolongan/{id}/edit', [SubGolonganController::class, 'edit'])->name('golongan.subGolongan.edit');
+        Route::put('/golongan/subGolongan/{id}/update', [SubGolonganController::class, 'update'])->name('golongan.subGolongan.update');
+        Route::delete('/golongan/subGolongan/{id}/destroy', [SubGolonganController::class, 'destroy'])->name('golongan.subGolongan.destroy');
+        Route::get('/golongan/subGolongan/exportTemplate', [SubGolonganController::class, 'exportTemplate'])->name('golongan.subGolongan.exportTemplate');
+        Route::post('/golongan/subGolongan/import', [SubGolonganController::class, 'import'])->name('golongan.subGolongan.import');
 
         // -- Sediaan
         Route::get('/sediaan', [SediaanController::class, 'sediaan'])->name('sediaan.sediaan');
@@ -216,16 +215,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/masterObat/{id}/destroy', [MasterObatController::class, 'destroy'])->name('masterObat.destroy');
         Route::get('/masterObat/exportTemplate', [MasterObatController::class, 'exportTemplate'])->name('masterObat.exportTemplate');
         Route::post('/masterObat/import', [MasterObatController::class, 'import'])->name('masterObat.import');
-        Route::get('/masterObat/{id}/getSubKategori', [MasterObatController::class, 'getSubKategori'])->name('masterObat.getSubKategori');
         Route::get('/masterObat/getKategori', [MasterObatController::class, 'getKategori'])->name('masterObat.getKategori');
         Route::get('/masterObat/getSediaan', [MasterObatController::class, 'getSediaan'])->name('masterObat.getSediaan');
         Route::get('/masterObat/getGolongan', [MasterObatController::class, 'getGolongan'])->name('masterObat.getGolongan');
+        Route::get('/masterObat/{id}/getMainGolongan', [MasterObatController::class, 'getMainGolongan'])->name('masterObat.getMainGolongan');
+        Route::get('/masterObat/{id}/getSubGolongan', [MasterObatController::class, 'getSubGolongan'])->name('masterObat.getSubGolongan');
         Route::get('/masterObat/getSatuan', [MasterObatController::class, 'getSatuan'])->name('masterObat.getSatuan');
         Route::get('/masterObat/getPabrikan', [MasterObatController::class, 'getPabrikan'])->name('masterObat.getPabrikan');
         Route::get('/masterObat/getDistributor', [MasterObatController::class, 'getDistributor'])->name('masterObat.getDistributor');
         Route::get('/masterObat/getRak', [MasterObatController::class, 'getRak'])->name('masterObat.getRak');
-        Route::get('/masterObat/getKategoriUtama', [MasterObatController::class, 'getKategoriUtama'])->name('masterObat.getKategoriUtama');
-        Route::get('/masterObat/{id}/getMainKategori', [MasterObatController::class, 'getMainKategori'])->name('masterObat.getMainKategori');
 
         // --- Konversi Satuan Obat
         Route::get('/konversiSatuanObat', [KonversiSatuanObatController::class, 'konversi'])->name('konversiSatuanObat.konversiSatuanObat');

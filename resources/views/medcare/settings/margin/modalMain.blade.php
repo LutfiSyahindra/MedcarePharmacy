@@ -22,9 +22,10 @@
                                 <span class="margin-input-icon"><i class="mdi mdi-layers-outline"></i></span>
                                 <select id="tingkat" class="form-select" name="tingkat">
                                     <option value="">Pilih tingkat</option>
-                                    <option value="kategoriUtama">Kategori Utama</option>
                                     <option value="kategori">Kategori</option>
-                                    <option value="sub_kategori">Sub Kategori</option>
+                                    <option value="golongan">Golongan</option>
+                                    <option value="main_golongan">Main Golongan</option>
+                                    <option value="sub_golongan">Sub Golongan</option>
                                     <option value="obat">Obat</option>
                                 </select>
                             </div>

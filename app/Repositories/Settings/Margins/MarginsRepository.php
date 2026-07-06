@@ -25,7 +25,7 @@ class MarginsRepository
         $margins = MarginsModel::find($id);
         if ($margins) {
             $reference = $margins->getReference();
-            $margins->reference_text = $reference?->nama ?? $reference?->name ?? 'Tanpa Nama';
+            $margins->reference_text = $reference?->nama ?? $reference?->name ?? $reference?->nama_obat ?? 'Tanpa Nama';
         }
         return $margins;
     }

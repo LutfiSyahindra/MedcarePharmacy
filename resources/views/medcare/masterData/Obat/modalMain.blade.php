@@ -74,38 +74,16 @@
                                 <i class="mdi mdi-shape-outline"></i>
                                 <div>
                                     <strong>Klasifikasi</strong>
-                                    <small>Susun hirarki kategori dan atribut farmasi.</small>
+                                    <small>Susun kategori dan hirarki golongan obat.</small>
                                 </div>
                             </div>
                             <div class="obat-section-body">
                                 <div class="obat-fields">
                                     <div class="obat-field">
-                                        <label class="form-label">Kategori Utama</label>
-                                        <div class="obat-input-shell">
-                                            <span class="obat-input-icon"><i class="mdi mdi-folder-outline"></i></span>
-                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih kategori utama" name="category_id" id="kategoriUtama">
-                                                <option value=""></option>
-                                            </select>
-                                        </div>
-                                        <div class="invalid-feedback"></div>
-                                    </div>
-
-                                    <div class="obat-field">
                                         <label class="form-label">Kategori</label>
                                         <div class="obat-input-shell">
-                                            <span class="obat-input-icon"><i class="mdi mdi-folder-multiple-outline"></i></span>
-                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih kategori" name="main_category_id" id="kategori">
-                                                <option value=""></option>
-                                            </select>
-                                        </div>
-                                        <div class="invalid-feedback"></div>
-                                    </div>
-
-                                    <div class="obat-field">
-                                        <label class="form-label">Sub Kategori</label>
-                                        <div class="obat-input-shell">
-                                            <span class="obat-input-icon"><i class="mdi mdi-source-branch"></i></span>
-                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih sub kategori" name="sub_kategori_id" id="subKategori">
+                                            <span class="obat-input-icon"><i class="mdi mdi-folder-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih kategori" name="category_id" id="kategori">
                                                 <option value=""></option>
                                             </select>
                                         </div>
@@ -116,7 +94,29 @@
                                         <label class="form-label">Golongan</label>
                                         <div class="obat-input-shell">
                                             <span class="obat-input-icon"><i class="mdi mdi-flask-outline"></i></span>
-                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih golongan" name="golongan_id">
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih golongan" name="golongan_id" id="golongan">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Main Golongan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-shape-plus-outline"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih main golongan" name="main_golongan_id" id="mainGolongan">
+                                                <option value=""></option>
+                                            </select>
+                                        </div>
+                                        <div class="invalid-feedback"></div>
+                                    </div>
+
+                                    <div class="obat-field">
+                                        <label class="form-label">Sub Golongan</label>
+                                        <div class="obat-input-shell">
+                                            <span class="obat-input-icon"><i class="mdi mdi-source-branch"></i></span>
+                                            <select class="form-select master-obat-select" data-width="100%" data-placeholder="Pilih sub golongan" name="sub_golongan_id" id="subGolongan">
                                                 <option value=""></option>
                                             </select>
                                         </div>

@@ -6,14 +6,14 @@
             }
         });
 
-        const modalSelector = '#mainCategoryModal';
-        const formSelector = '#mainCategoryForm';
-        const wrapperSelector = '#mainCategoryInputWrapper';
-        const submitSelector = '#submitMainCategoryForm';
-        const addButtonSelector = '#addMainCategoryInput';
+        const modalSelector = '#mainGolonganModal';
+        const formSelector = '#mainGolonganForm';
+        const wrapperSelector = '#mainGolonganInputWrapper';
+        const submitSelector = '#submitMainGolonganForm';
+        const addButtonSelector = '#addMainGolonganInput';
 
         if ($.fn.dropify) {
-            $('#mainCategoryExcelInput').dropify();
+            $('#mainGolonganExcelInput').dropify();
         }
 
         function normalizeSelectedIds(selectedIds) {
@@ -22,11 +22,11 @@
             return selectedIds.map((item) => String(item));
         }
 
-        function loadKategoriUtamaOptions($select, selectedIds = []) {
+        function loadGolonganOptions($select, selectedIds = []) {
             const selected = normalizeSelectedIds(selectedIds);
 
             return $.ajax({
-                url: '{{ route("kategoriMain.kategoriUtama") }}',
+                url: '{{ route("golongan.mainGolongan.golongan") }}',
                 type: 'GET',
                 success: function(response) {
                     $select.each(function() {
@@ -37,62 +37,63 @@
                         }
 
                         $current.empty().append('<option value=""></option>');
-                        response.forEach(function(kategoriUtama) {
-                            const id = String(kategoriUtama.id);
+                        response.forEach(function(golongan) {
+                            const id = String(golongan.id);
+                            const label = golongan.kode ? `${golongan.kode} - ${golongan.nama}` : golongan.nama;
                             const isSelected = selected.includes(id) ? 'selected' : '';
                             $current.append(
-                                `<option value="${CategoryUI.escapeHtml(id)}" ${isSelected}>${CategoryUI.escapeHtml(kategoriUtama.name)}</option>`
+                                `<option value="${CategoryUI.escapeHtml(id)}" ${isSelected}>${CategoryUI.escapeHtml(label)}</option>`
                             );
                         });
 
                         $current.select2({
                             dropdownParent: $(modalSelector),
-                            placeholder: 'Pilih Kategori Utama',
+                            placeholder: 'Pilih Golongan',
                             allowClear: false,
                             width: '100%'
                         });
                     });
                 },
                 error: function() {
-                    CategoryUI.toast('error', 'Gagal Memuat', 'Data kategori utama tidak bisa dimuat.');
+                    CategoryUI.toast('error', 'Gagal Memuat', 'Data golongan tidak bisa dimuat.');
                 }
             });
         }
 
-        function mainCategoryRow(mode = 'create', data = {}) {
+        function mainGolonganRow(mode = 'create', data = {}) {
             const isEdit = mode === 'edit';
-            const categoryName = isEdit ? 'category_id' : 'category_id[]';
-            const codeName = isEdit ? 'code' : 'code[]';
-            const nameName = isEdit ? 'name' : 'name[]';
-            const codeValue = CategoryUI.escapeHtml(data.code || '');
-            const nameValue = CategoryUI.escapeHtml(data.name || '');
+            const golonganName = isEdit ? 'golongan_id' : 'golongan_id[]';
+            const kodeName = isEdit ? 'kode' : 'kode[]';
+            const namaName = isEdit ? 'nama' : 'nama[]';
+            const kodeValue = CategoryUI.escapeHtml(data.kode || '');
+            const namaValue = CategoryUI.escapeHtml(data.nama || '');
 
             return `
                 <div class="category-batch-row">
                     <div class="category-field is-parent">
-                        <label class="form-label">Kategori Utama</label>
-                        <select name="${categoryName}" class="js-kategori-utama form-select" data-width="100%"></select>
+                        <label class="form-label">Golongan</label>
+                        <select name="${golonganName}" class="js-golongan form-select" data-width="100%"></select>
                         <div class="invalid-feedback"></div>
                     </div>
                     <div class="category-field is-code">
                         <label class="form-label">Kode</label>
                         <div class="category-input-shell">
                             <span class="category-input-icon"><i class="mdi mdi-pound"></i></span>
-                            <input class="form-control" name="${codeName}" type="text" value="${codeValue}" placeholder="Contoh: ANT">
+                            <input class="form-control" name="${kodeName}" type="text" value="${kodeValue}" placeholder="Contoh: ABT">
                         </div>
                         <div class="invalid-feedback"></div>
                     </div>
                     <div class="category-field is-name">
-                        <label class="form-label">Main Kategori Obat</label>
+                        <label class="form-label">Main Golongan Obat</label>
                         <div class="category-input-shell">
-                            <span class="category-input-icon"><i class="mdi mdi-shape-outline"></i></span>
-                            <input class="form-control" name="${nameName}" type="text" value="${nameValue}" placeholder="Masukkan nama main kategori">
+                            <span class="category-input-icon"><i class="mdi mdi-shape-plus-outline"></i></span>
+                            <input class="form-control" name="${namaName}" type="text" value="${namaValue}" placeholder="Masukkan nama main golongan">
                         </div>
                         <div class="invalid-feedback"></div>
                     </div>
                     ${isEdit ? '' : `
                         <div class="category-field is-action">
-                            <button type="button" class="btn btn-outline-danger category-row-remove remove-main-category-input" title="Hapus baris">
+                            <button type="button" class="btn btn-outline-danger category-row-remove remove-main-golongan-input" title="Hapus baris">
                                 <i class="mdi mdi-delete-outline"></i>
                             </button>
                         </div>
@@ -104,28 +105,28 @@
         function resetAddMode() {
             const $form = $(formSelector);
 
-            $('#mainCategoryModalLabel').text('Tambah Main Kategori');
-            $('#mainCategoryModalSubtitle').text('Pilih kategori utama lalu tambahkan kelompok obat turunannya.');
+            $('#mainGolonganModalLabel').text('Tambah Main Golongan');
+            $('#mainGolonganModalSubtitle').text('Pilih golongan lalu tambahkan kelompok turunannya.');
             $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
-            $('#mainCategoryId').val('');
-            $('#mainCategoryBatchToolbar').show();
+            $('#mainGolonganId').val('');
+            $('#mainGolonganBatchToolbar').show();
             $form.trigger('reset');
             CategoryUI.clearValidation(formSelector);
-            $(wrapperSelector).html(mainCategoryRow());
-            loadKategoriUtamaOptions($(wrapperSelector).find('.js-kategori-utama'));
-            CategoryUI.updateBatchCount(wrapperSelector, '#mainCategoryRowCount');
+            $(wrapperSelector).html(mainGolonganRow());
+            loadGolonganOptions($(wrapperSelector).find('.js-golongan'));
+            CategoryUI.updateBatchCount(wrapperSelector, '#mainGolonganRowCount');
         }
 
         $(modalSelector).on('show.bs.modal', resetAddMode);
 
         $(document).on('click', addButtonSelector, function() {
-            const $row = $(mainCategoryRow());
+            const $row = $(mainGolonganRow());
             $(wrapperSelector).append($row);
-            loadKategoriUtamaOptions($row.find('.js-kategori-utama'));
-            CategoryUI.updateBatchCount(wrapperSelector, '#mainCategoryRowCount');
+            loadGolonganOptions($row.find('.js-golongan'));
+            CategoryUI.updateBatchCount(wrapperSelector, '#mainGolonganRowCount');
         });
 
-        $(document).on('click', '.remove-main-category-input', function() {
+        $(document).on('click', '.remove-main-golongan-input', function() {
             if ($(wrapperSelector).find('.category-batch-row').length <= 1) {
                 const $row = $(this).closest('.category-batch-row');
                 $row.find('input').val('');
@@ -135,16 +136,16 @@
             }
 
             const $row = $(this).closest('.category-batch-row');
-            $row.find('.js-kategori-utama').each(function() {
+            $row.find('.js-golongan').each(function() {
                 if ($(this).data('select2')) $(this).select2('destroy');
             });
             $row.remove();
-            CategoryUI.updateBatchCount(wrapperSelector, '#mainCategoryRowCount');
+            CategoryUI.updateBatchCount(wrapperSelector, '#mainGolonganRowCount');
         });
 
-        const mainCategoryTable = $('#tableMainKategori').DataTable(CategoryUI.dataTableOptions({
+        const mainGolonganTable = $('#tableMainGolongan').DataTable(CategoryUI.dataTableOptions({
             ajax: {
-                url: "{{ route("kategori.mainKategori.table") }}",
+                url: "{{ route("golongan.mainGolongan.table") }}",
                 type: "GET"
             },
             columns: [{
@@ -154,24 +155,24 @@
                     searchable: false
                 },
                 {
-                    data: 'category_id',
-                    name: 'category_id',
+                    data: 'golongan_id',
+                    name: 'golongan_id',
                     render: function(data) {
-                        return CategoryUI.parentBadge(data, 'mdi-tag-outline');
+                        return CategoryUI.parentBadge(data, 'mdi-shape-outline');
                     }
                 },
                 {
-                    data: 'code',
-                    name: 'code',
+                    data: 'kode',
+                    name: 'kode',
                     render: function(data) {
                         return CategoryUI.codeBadge(data);
                     }
                 },
                 {
-                    data: 'name',
-                    name: 'name',
+                    data: 'nama',
+                    name: 'nama',
                     render: function(data) {
-                        return CategoryUI.identity(data, 'Main kategori');
+                        return CategoryUI.identity(data, 'Main golongan');
                     }
                 },
                 {
@@ -184,28 +185,28 @@
         }));
 
         CategoryUI.initTableTools({
-            table: mainCategoryTable,
-            tableSelector: '#tableMainKategori',
-            searchSelector: '#mainKategoriSearch',
-            totalTarget: '#mainKategoriTotal',
-            filteredTarget: '#mainKategoriFiltered',
-            selectedTarget: '#mainKategoriSelected'
+            table: mainGolonganTable,
+            tableSelector: '#tableMainGolongan',
+            searchSelector: '#mainGolonganSearch',
+            totalTarget: '#mainGolonganTotal',
+            filteredTarget: '#mainGolonganFiltered',
+            selectedTarget: '#mainGolonganSelected'
         });
 
         $(formSelector).on('submit', function(e) {
             e.preventDefault();
 
-            const mainCategoryId = $('#mainCategoryId').val();
-            const url = mainCategoryId ?
-                "{{ route("kategori.mainKategori.update", ":id") }}".replace(':id', mainCategoryId) :
-                "{{ route("kategori.mainKategori.store") }}";
-            const method = mainCategoryId ? 'PUT' : 'POST';
-            const normalHtml = mainCategoryId ?
+            const mainGolonganId = $('#mainGolonganId').val();
+            const url = mainGolonganId ?
+                "{{ route("golongan.mainGolongan.update", ":id") }}".replace(':id', mainGolonganId) :
+                "{{ route("golongan.mainGolongan.store") }}";
+            const method = mainGolonganId ? 'PUT' : 'POST';
+            const normalHtml = mainGolonganId ?
                 '<i class="mdi mdi-content-save-edit-outline"></i>Update' :
                 '<i class="mdi mdi-content-save-outline"></i>Simpan';
 
             CategoryUI.clearValidation(formSelector);
-            CategoryUI.setButtonLoading(submitSelector, true, mainCategoryId ? 'Mengupdate...' : 'Menyimpan...', normalHtml);
+            CategoryUI.setButtonLoading(submitSelector, true, mainGolonganId ? 'Mengupdate...' : 'Menyimpan...', normalHtml);
 
             $.ajax({
                 url: url,
@@ -215,7 +216,7 @@
                     if (response.status === 'success') {
                         $(modalSelector).modal('hide');
                         CategoryUI.toast('success', response.message);
-                        mainCategoryTable.ajax.reload(null, false);
+                        mainGolonganTable.ajax.reload(null, false);
                     }
                 },
                 error: function(xhr) {
@@ -225,7 +226,7 @@
                         return;
                     }
 
-                    CategoryUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan main kategori.');
+                    CategoryUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan main golongan.');
                 },
                 complete: function() {
                     CategoryUI.setButtonLoading(submitSelector, false, '', normalHtml);
@@ -233,31 +234,31 @@
             });
         });
 
-        window.editMainCategory = function(id) {
+        window.editMainGolongan = function(id) {
             $.ajax({
-                url: "{{ route("kategori.mainKategori.edit", ":id") }}".replace(':id', id),
+                url: "{{ route("golongan.mainGolongan.edit", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
                     $(modalSelector).modal('show');
-                    $('#mainCategoryModalLabel').text('Edit Main Kategori');
-                    $('#mainCategoryModalSubtitle').text('Perbarui induk, kode, dan nama main kategori.');
+                    $('#mainGolonganModalLabel').text('Edit Main Golongan');
+                    $('#mainGolonganModalSubtitle').text('Perbarui induk, kode, dan nama main golongan.');
                     $(submitSelector).html('<i class="mdi mdi-content-save-edit-outline"></i>Update');
-                    $('#mainCategoryBatchToolbar').hide();
-                    $('#mainCategoryId').val(response.id);
-                    $(wrapperSelector).html(mainCategoryRow('edit', response));
-                    loadKategoriUtamaOptions($(wrapperSelector).find('.js-kategori-utama'), response.category_id);
+                    $('#mainGolonganBatchToolbar').hide();
+                    $('#mainGolonganId').val(response.id);
+                    $(wrapperSelector).html(mainGolonganRow('edit', response));
+                    loadGolonganOptions($(wrapperSelector).find('.js-golongan'), response.golongan_id);
                     CategoryUI.clearValidation(formSelector);
-                    CategoryUI.updateBatchCount(wrapperSelector, '#mainCategoryRowCount');
+                    CategoryUI.updateBatchCount(wrapperSelector, '#mainGolonganRowCount');
                 },
                 error: function() {
-                    CategoryUI.toast('error', 'Gagal Memuat', 'Data main kategori tidak bisa dimuat.');
+                    CategoryUI.toast('error', 'Gagal Memuat', 'Data main golongan tidak bisa dimuat.');
                 }
             });
         };
 
-        window.deleteMainCategory = function(id) {
+        window.deleteMainGolongan = function(id) {
             Swal.fire({
-                title: 'Hapus main kategori?',
+                title: 'Hapus main golongan?',
                 text: 'Data yang sudah dihapus tidak bisa dikembalikan.',
                 icon: 'warning',
                 showCancelButton: true,
@@ -267,27 +268,27 @@
                 if (!result.isConfirmed) return;
 
                 $.ajax({
-                    url: "{{ route("kategori.mainKategori.destroy", ":id") }}".replace(':id', id),
+                    url: "{{ route("golongan.mainGolongan.destroy", ":id") }}".replace(':id', id),
                     type: 'DELETE',
                     success: function(response) {
                         if (response.success) {
                             CategoryUI.toast('success', 'Berhasil Dihapus', response.message);
-                            mainCategoryTable.ajax.reload(null, false);
+                            mainGolonganTable.ajax.reload(null, false);
                             return;
                         }
 
                         Swal.fire('Gagal', response.message, 'error');
                     },
                     error: function() {
-                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus main kategori.', 'error');
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus main golongan.', 'error');
                     }
                 });
             });
         };
 
-        function resetMainExcelForm() {
-            $('#mainCategoryExcelForm')[0].reset();
-            const dropify = $('#mainCategoryExcelInput').data('dropify');
+        function resetMainGolonganExcelForm() {
+            $('#mainGolonganExcelForm')[0].reset();
+            const dropify = $('#mainGolonganExcelInput').data('dropify');
 
             if (dropify) {
                 dropify.resetPreview();
@@ -295,21 +296,21 @@
             }
         }
 
-        $('#mainCategoryModalExcell').on('hidden.bs.modal', resetMainExcelForm);
+        $('#mainGolonganModalExcell').on('hidden.bs.modal', resetMainGolonganExcelForm);
 
-        $('#mainDownloadTemplateBtn').on('click', function() {
-            window.location.href = "{{ route("kategori.mainKategori.exportTemplate") }}";
+        $('#mainGolonganDownloadTemplateBtn').on('click', function() {
+            window.location.href = "{{ route("golongan.mainGolongan.exportTemplate") }}";
         });
 
-        $('#mainSubmitExcel').on('click', function() {
-            const fileInput = $('#mainCategoryExcelInput')[0];
+        $('#mainGolonganSubmitExcel').on('click', function() {
+            const fileInput = $('#mainGolonganExcelInput')[0];
             const file = fileInput.files[0];
             const normalHtml = '<i class="mdi mdi-upload"></i>Upload';
 
             if (!file) {
-                $('#mainCategoryExcelInput').closest('.dropify-wrapper').addClass('shake border-danger');
+                $('#mainGolonganExcelInput').closest('.dropify-wrapper').addClass('shake border-danger');
                 setTimeout(function() {
-                    $('#mainCategoryExcelInput').closest('.dropify-wrapper').removeClass('shake border-danger');
+                    $('#mainGolonganExcelInput').closest('.dropify-wrapper').removeClass('shake border-danger');
                 }, 600);
 
                 Swal.fire({
@@ -322,7 +323,7 @@
 
             const formData = new FormData();
             formData.append('file', file);
-            CategoryUI.setButtonLoading('#mainSubmitExcel', true, 'Mengupload...', normalHtml);
+            CategoryUI.setButtonLoading('#mainGolonganSubmitExcel', true, 'Mengupload...', normalHtml);
 
             Swal.fire({
                 title: 'Mengupload File...',
@@ -352,7 +353,7 @@
                     }, false);
                     return xhr;
                 },
-                url: "{{ route("kategori.mainKategori.import") }}",
+                url: "{{ route("golongan.mainGolongan.import") }}",
                 type: 'POST',
                 data: formData,
                 processData: false,
@@ -370,8 +371,8 @@
                             timer: 2600,
                             showConfirmButton: false,
                             willClose: function() {
-                                $('#mainCategoryModalExcell').modal('hide');
-                                mainCategoryTable.ajax.reload(null, false);
+                                $('#mainGolonganModalExcell').modal('hide');
+                                mainGolonganTable.ajax.reload(null, false);
                             }
                         });
                         return;
@@ -385,7 +386,7 @@
                     Swal.fire('Gagal Import', message, 'error');
                 },
                 complete: function() {
-                    CategoryUI.setButtonLoading('#mainSubmitExcel', false, '', normalHtml);
+                    CategoryUI.setButtonLoading('#mainGolonganSubmitExcel', false, '', normalHtml);
                 }
             });
         });

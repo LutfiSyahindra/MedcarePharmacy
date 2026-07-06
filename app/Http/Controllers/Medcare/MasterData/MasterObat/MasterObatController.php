@@ -6,23 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Services\Settings\Master\DistributorService;
 use App\Services\Settings\Master\GolonganService;
 use App\Services\Settings\Master\KategoriUtamaService;
-use App\Services\Settings\Master\MainCategoryService;
 use App\Services\Settings\Master\MasterObatService;
 use App\Services\Settings\Master\PabrikanService;
 use App\Services\Settings\Master\RakService;
 use App\Services\Settings\Master\SatuanService;
 use App\Services\Settings\Master\SediaanService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Yajra\DataTables\Facades\DataTables;
 
 class MasterObatController extends Controller
 {
-    protected $MasterObatService, $MainCategoryService, $SediaanService, $GolonganService, $SatuanService, $PabrikanService, $DistributorService, $RakService, $KategoriUtamaService;
-    public function __construct(MasterObatService $MasterObatService, MainCategoryService $MainCategoryService, SediaanService $SediaanService, GolonganService $GolonganService, SatuanService $SatuanService, PabrikanService $PabrikanService, DistributorService $DistributorService, RakService $RakService, KategoriUtamaService $KategoriUtamaService)
+    protected $MasterObatService, $SediaanService, $GolonganService, $SatuanService, $PabrikanService, $DistributorService, $RakService, $KategoriUtamaService;
+    public function __construct(MasterObatService $MasterObatService, SediaanService $SediaanService, GolonganService $GolonganService, SatuanService $SatuanService, PabrikanService $PabrikanService, DistributorService $DistributorService, RakService $RakService, KategoriUtamaService $KategoriUtamaService)
     {
         $this->MasterObatService = $MasterObatService;
-        $this->MainCategoryService = $MainCategoryService;
         $this->SediaanService = $SediaanService;
         $this->GolonganService = $GolonganService;
         $this->SatuanService = $SatuanService;
@@ -62,27 +59,21 @@ class MasterObatController extends Controller
             ->make(true);
     }
 
-    public function getMainKategori($kategoriUtama)
+    public function getMainGolongan($golongan)
     {
-        $mainKategori = $this->MasterObatService->getMainKategori($kategoriUtama);
-        return response()->json($mainKategori);
+        $mainGolongan = $this->MasterObatService->getMainGolongan($golongan);
+        return response()->json($mainGolongan);
     }
 
-    public function getSubKategori($kategori)
+    public function getSubGolongan($mainGolongan)
     {
-        $subKategoris = $this->MasterObatService->getSubKategori($kategori);
-        return response()->json($subKategoris);
-    }
-
-    public function getKategoriUtama()
-    {
-        $kategoriUtama = $this->KategoriUtamaService->getKategoriUtama();
-        return response()->json($kategoriUtama);
+        $subGolongan = $this->MasterObatService->getSubGolongan($mainGolongan);
+        return response()->json($subGolongan);
     }
 
     public function getKategori()
     {
-        $kategori = $this->MainCategoryService->getMainCategory();
+        $kategori = $this->KategoriUtamaService->getKategoriUtama();
         return response()->json($kategori);
     }
 
@@ -140,9 +131,9 @@ class MasterObatController extends Controller
             'nama_obat'       => 'required|string|max:150',
             'sediaan_id'      => 'required|exists:sediaan_obats,id',
             'category_id'     => 'required|exists:categories,id',
-            'main_category_id'=> 'required|exists:main_category,id',
-            'sub_kategori_id' => 'nullable|exists:sub_categories,id',
             'golongan_id'     => 'required|exists:golongan_obats,id',
+            'main_golongan_id'=> 'nullable|exists:main_golongan_obats,id',
+            'sub_golongan_id' => 'nullable|exists:sub_golongan_obats,id',
             'satuan_id'       => 'required|exists:satuans,id',
             'pabrikan_id'     => 'required|exists:pabrikan,id',
             'distributor_id'  => 'nullable|exists:distributors,id',
@@ -192,9 +183,9 @@ class MasterObatController extends Controller
             'nama_obat'       => 'required|string|max:150',
             'sediaan_id'      => 'required|exists:sediaan_obats,id',
             'category_id'     => 'required|exists:categories,id',
-            'main_category_id'=> 'required|exists:main_category,id',
-            'sub_kategori_id' => 'nullable|exists:sub_categories,id',
             'golongan_id'     => 'required|exists:golongan_obats,id',
+            'main_golongan_id'=> 'nullable|exists:main_golongan_obats,id',
+            'sub_golongan_id' => 'nullable|exists:sub_golongan_obats,id',
             'satuan_id'       => 'required|exists:satuans,id',
             'pabrikan_id'     => 'required|exists:pabrikan,id',
             'distributor_id'  => 'nullable|exists:distributors,id',

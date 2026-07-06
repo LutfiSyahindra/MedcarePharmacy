@@ -11,32 +11,31 @@
 
 @section("content")
     <div class="category-page">
-        @include("medcare.masterData.kategori.subKategori.modalMain")
-        @include("medcare.masterData.kategori.subKategori.modalExcell")
-        @include("medcare.masterData.kategori.partials.header", [
-            "categoryActive" => "sub",
-            "categoryTitle" => "Sub Kategori",
-            "categoryDescription" => "Kelola detail klasifikasi obat agar pemetaan master obat lebih presisi dan mudah dicari.",
-            "categoryModalTarget" => "#subCategoryModal",
-            "categoryActionLabel" => "Tambah Sub Kategori",
-            "categoryActionIcon" => "mdi-plus-circle-outline",
-            "categoryImportTarget" => "#subCategoryModalExcell",
-            "categoryImportLabel" => "Import Sub Kategori",
+        @include("medcare.masterData.golongan.subGolongan.modalMain")
+        @include("medcare.masterData.golongan.subGolongan.modalExcell")
+        @include("medcare.masterData.golongan.partials.hierarchy-header", [
+            "golonganActive" => "sub",
+            "golonganTitle" => "Sub Golongan",
+            "golonganDescription" => "Kelola detail golongan obat agar master obat punya klasifikasi yang lebih tepat.",
+            "golonganModalTarget" => "#subGolonganModal",
+            "golonganActionLabel" => "Tambah Sub Golongan",
+            "golonganImportTarget" => "#subGolonganModalExcell",
+            "golonganImportLabel" => "Import Sub Golongan",
         ])
 
         <div class="category-stats-grid">
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-database-outline"></i></span>
                 <div>
-                    <strong id="subKategoriTotal">0</strong>
+                    <strong id="subGolonganTotal">0</strong>
                     <span>Total Data</span>
-                    <small>Seluruh sub kategori yang tersimpan.</small>
+                    <small>Seluruh sub golongan yang tersimpan.</small>
                 </div>
             </div>
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
                 <div>
-                    <strong id="subKategoriFiltered">0</strong>
+                    <strong id="subGolonganFiltered">0</strong>
                     <span>Hasil Filter</span>
                     <small>Jumlah data sesuai pencarian aktif.</small>
                 </div>
@@ -44,7 +43,7 @@
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
                 <div>
-                    <strong id="subKategoriSelected">0</strong>
+                    <strong id="subGolonganSelected">0</strong>
                     <span>Dipilih</span>
                     <small>Klik baris tabel untuk menandai data.</small>
                 </div>
@@ -56,25 +55,25 @@
                 <div class="category-table-title">
                     <span class="category-table-title-icon"><i class="mdi mdi-format-list-bulleted-type"></i></span>
                     <div>
-                        <h5>Daftar Sub Kategori</h5>
-                        <p>Detail klasifikasi yang dipakai pada master obat.</p>
+                        <h5>Daftar Sub Golongan</h5>
+                        <p>Detail golongan yang dipakai pada master obat.</p>
                     </div>
                 </div>
                 <div class="category-table-tools">
-                    <label class="category-search" for="subKategoriSearch">
+                    <label class="category-search" for="subGolonganSearch">
                         <i class="mdi mdi-magnify"></i>
-                        <input type="text" id="subKategoriSearch" placeholder="Cari main kategori, kode, atau nama...">
+                        <input type="text" id="subGolonganSearch" placeholder="Cari main golongan, kode, atau nama...">
                     </label>
                 </div>
             </div>
             <div class="table-responsive">
-                <table id="tableSubKategori" class="table category-table align-middle">
+                <table id="tableSubGolongan" class="table category-table align-middle">
                     <thead>
                         <tr>
                             <th>No</th>
-                            <th>Main Kategori</th>
+                            <th>Main Golongan</th>
                             <th>Kode</th>
-                            <th>Sub Kategori</th>
+                            <th>Sub Golongan</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -87,5 +86,5 @@
 
 @push("scripts")
     @include("medcare.masterData.kategori.partials.scripts")
-    @include("medcare.masterData.kategori.subKategori.jsMain")
+    @include("medcare.masterData.golongan.subGolongan.jsMain")
 @endpush

@@ -16,13 +16,13 @@ return new class extends Migration
             $table->string('kode_obat', 50)->unique();           // contoh: OBT0001, PAR500, AMOX250
             $table->string('nama_obat', 150);                    // contoh: Paracetamol 500mg
 
-            // Relasi kategori 3 level
+            // Relasi kategori dan golongan
             $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete();
-            $table->foreignId('main_category_id')->nullable()->constrained('main_category')->nullOnDelete();
-            $table->foreignId('sub_kategori_id')->nullable()->constrained('sub_categories')->nullOnDelete();
+            $table->foreignId('golongan_id')->nullable()->constrained('golongan_obats')->nullOnDelete();
+            $table->foreignId('main_golongan_id')->nullable()->constrained('main_golongan_obats')->nullOnDelete();
+            $table->foreignId('sub_golongan_id')->nullable()->constrained('sub_golongan_obats')->nullOnDelete();
 
             // Relasi ke tabel master lain
-            $table->foreignId('golongan_id')->nullable()->constrained('golongan_obats')->nullOnDelete();
             $table->foreignId('satuan_id')->nullable()->constrained('satuans')->nullOnDelete();
             $table->foreignId('sediaan_id')->nullable()->constrained('sediaan_obats')->nullOnDelete();
             $table->foreignId('pabrikan_id')->nullable()->constrained('pabrikan')->nullOnDelete();
@@ -57,6 +57,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('master_obat');
+        Schema::dropIfExists('master_obats');
     }
 };

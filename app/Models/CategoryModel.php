@@ -16,8 +16,4 @@ class CategoryModel extends Model
         'code',
     ];
 
-    public function mainCategory()
-    {
-        return $this->belongsTo(MainCategoryModel::class);
-    }
 }

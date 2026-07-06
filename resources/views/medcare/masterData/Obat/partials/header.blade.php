@@ -40,7 +40,7 @@
             <i class="mdi mdi-shape-outline"></i>
             <div>
                 <span>Klasifikasi</span>
-                <small>Kategori utama, kategori, sub kategori, dan golongan</small>
+                <small>Kategori, golongan, main golongan, dan sub golongan</small>
             </div>
         </div>
         <div class="obat-flow-item">

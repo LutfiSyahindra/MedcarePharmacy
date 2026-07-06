@@ -11,8 +11,9 @@
         const submitSelector = '#submitObatForm';
         const excelModalSelector = '#obatModalExcell';
         const categorySelector = '[name="category_id"]';
-        const mainCategorySelector = '[name="main_category_id"]';
-        const subCategorySelector = '[name="sub_kategori_id"]';
+        const golonganSelector = '[name="golongan_id"]';
+        const mainGolonganSelector = '[name="main_golongan_id"]';
+        const subGolonganSelector = '[name="sub_golongan_id"]';
         let modalMode = 'create';
         let isHydratingEdit = false;
         let lookupRequest = null;
@@ -90,72 +91,72 @@
             });
         }
 
-        function loadMainKategori(categoryId, selectedValue = '') {
-            const $main = $(mainCategorySelector);
-            const $sub = $(subCategorySelector);
+        function loadMainGolongan(golonganId, selectedValue = '') {
+            const $main = $(mainGolonganSelector);
+            const $sub = $(subGolonganSelector);
             resetSelect($main);
             resetSelect($sub);
             $sub.prop('disabled', true);
 
-            if (!categoryId) {
+            if (!golonganId) {
                 $main.prop('disabled', true);
                 return $.Deferred().resolve([]).promise();
             }
 
             return loadOptions(
                 $main,
-                "{{ route("masterObat.getMainKategori", ":kategoriUtama") }}".replace(':kategoriUtama', categoryId),
-                'Memuat kategori...',
-                'Tidak ada kategori tersedia',
+                "{{ route("masterObat.getMainGolongan", ":golongan") }}".replace(':golongan', golonganId),
+                'Memuat main golongan...',
+                'Tidak ada main golongan tersedia',
                 selectedValue
             );
         }
 
-        function loadSubKategori(mainCategoryId, selectedValue = '') {
-            const $sub = $(subCategorySelector);
+        function loadSubGolongan(mainGolonganId, selectedValue = '') {
+            const $sub = $(subGolonganSelector);
             resetSelect($sub);
 
-            if (!mainCategoryId) {
+            if (!mainGolonganId) {
                 $sub.prop('disabled', true);
                 return $.Deferred().resolve([]).promise();
             }
 
             return loadOptions(
                 $sub,
-                "{{ route("masterObat.getSubKategori", ":kategori") }}".replace(':kategori', mainCategoryId),
-                'Memuat sub kategori...',
-                'Tidak ada sub kategori tersedia',
+                "{{ route("masterObat.getSubGolongan", ":mainGolongan") }}".replace(':mainGolongan', mainGolonganId),
+                'Memuat sub golongan...',
+                'Tidak ada sub golongan tersedia',
                 selectedValue
             );
         }
 
         function loadLookupOptions() {
             const requests = [
-                loadOptions($(categorySelector), "{{ route("masterObat.getKategoriUtama") }}", 'Memuat kategori utama...', 'Tidak ada kategori utama tersedia'),
+                loadOptions($(categorySelector), "{{ route("masterObat.getKategori") }}", 'Memuat kategori...', 'Tidak ada kategori tersedia'),
                 loadOptions($('[name="sediaan_id"]'), "{{ route("masterObat.getSediaan") }}", 'Memuat sediaan...', 'Tidak ada sediaan tersedia'),
-                loadOptions($('[name="golongan_id"]'), "{{ route("masterObat.getGolongan") }}", 'Memuat golongan...', 'Tidak ada golongan tersedia'),
+                loadOptions($(golonganSelector), "{{ route("masterObat.getGolongan") }}", 'Memuat golongan...', 'Tidak ada golongan tersedia'),
                 loadOptions($('[name="satuan_id"]'), "{{ route("masterObat.getSatuan") }}", 'Memuat satuan...', 'Tidak ada satuan tersedia'),
                 loadOptions($('[name="pabrikan_id"]'), "{{ route("masterObat.getPabrikan") }}", 'Memuat pabrikan...', 'Tidak ada pabrikan tersedia'),
                 loadOptions($('[name="distributor_id"]'), "{{ route("masterObat.getDistributor") }}", 'Memuat distributor...', 'Tidak ada distributor tersedia'),
                 loadOptions($('[name="rak_id"]'), "{{ route("masterObat.getRak") }}", 'Memuat rak...', 'Tidak ada rak tersedia')
             ];
 
-            $(mainCategorySelector).prop('disabled', true);
-            $(subCategorySelector).prop('disabled', true);
+            $(mainGolonganSelector).prop('disabled', true);
+            $(subGolonganSelector).prop('disabled', true);
 
             return $.when.apply($, requests);
         }
 
         lookupRequest = loadLookupOptions();
 
-        $(categorySelector).on('change', function() {
+        $(golonganSelector).on('change', function() {
             if (isHydratingEdit) return;
-            loadMainKategori($(this).val());
+            loadMainGolongan($(this).val());
         });
 
-        $(mainCategorySelector).on('change', function() {
+        $(mainGolonganSelector).on('change', function() {
             if (isHydratingEdit) return;
-            loadSubKategori($(this).val());
+            loadSubGolongan($(this).val());
         });
 
         function resetFormForCreate() {
@@ -167,10 +168,10 @@
             $('#obatId').val('');
             MasterObatUI.clearValidation(formSelector);
             $('.master-obat-select').val('').trigger('change.select2');
-            resetSelect($(mainCategorySelector));
-            resetSelect($(subCategorySelector));
-            $(mainCategorySelector).prop('disabled', true);
-            $(subCategorySelector).prop('disabled', true);
+            resetSelect($(mainGolonganSelector));
+            resetSelect($(subGolonganSelector));
+            $(mainGolonganSelector).prop('disabled', true);
+            $(subGolonganSelector).prop('disabled', true);
             $('[name="stok_minimum"]').val(0);
             $('[name="is_generik"]').val('1');
             $('[name="is_active"]').val('1');
@@ -238,7 +239,7 @@
                     data: 'category_id',
                     name: 'category_id',
                     render: function(data, type, row) {
-                        return MasterObatUI.miniStack(row.category_id, row.main_category_id);
+                        return MasterObatUI.miniStack(row.category_id, row.golongan_id);
                     }
                 },
                 {
@@ -437,16 +438,16 @@
                     lookupRequest.always(function() {
                         isHydratingEdit = true;
                         setSelectValue('[name="sediaan_id"]', response.sediaan_id);
-                        setSelectValue('[name="golongan_id"]', response.golongan_id);
                         setSelectValue('[name="satuan_id"]', response.satuan_id);
                         setSelectValue('[name="pabrikan_id"]', response.pabrikan_id);
                         setSelectValue('[name="distributor_id"]', response.distributor_id);
                         setSelectValue('[name="rak_id"]', response.rak_id);
                         setSelectValue(categorySelector, response.category_id);
+                        setSelectValue(golonganSelector, response.golongan_id);
 
-                        loadMainKategori(response.category_id, response.main_category_id)
+                        loadMainGolongan(response.golongan_id, response.main_golongan_id)
                             .always(function() {
-                                loadSubKategori(response.main_category_id, response.sub_kategori_id)
+                                loadSubGolongan(response.main_golongan_id, response.sub_golongan_id)
                                     .always(function() {
                                         isHydratingEdit = false;
                                     });

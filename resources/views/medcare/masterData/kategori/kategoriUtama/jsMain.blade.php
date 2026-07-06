@@ -30,10 +30,10 @@
                         <div class="invalid-feedback"></div>
                     </div>
                     <div class="category-field is-name-wide">
-                        <label class="form-label">Kategori Utama Obat</label>
+                        <label class="form-label">Kategori Obat</label>
                         <div class="category-input-shell">
                             <span class="category-input-icon"><i class="mdi mdi-tag-outline"></i></span>
-                            <input class="form-control" name="${nameName}" type="text" value="${nameValue}" placeholder="Masukkan nama kategori utama">
+                            <input class="form-control" name="${nameName}" type="text" value="${nameValue}" placeholder="Masukkan nama kategori">
                         </div>
                         <div class="invalid-feedback"></div>
                     </div>
@@ -51,8 +51,8 @@
         function resetAddMode() {
             const $form = $(formSelector);
 
-            $('#kategoriUtamaModalLabel').text('Tambah Kategori Utama');
-            $('#kategoriUtamaModalSubtitle').text('Buat satu atau beberapa kategori utama obat.');
+            $('#kategoriUtamaModalLabel').text('Tambah Kategori');
+            $('#kategoriUtamaModalSubtitle').text('Buat satu atau beberapa kategori obat.');
             $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
             $('#kategoriUtamaId').val('');
             $('#kategoriUtamaBatchToolbar').show();
@@ -102,7 +102,7 @@
                     data: 'name',
                     name: 'name',
                     render: function(data) {
-                        return CategoryUI.identity(data, 'Kategori utama');
+                        return CategoryUI.identity(data, 'Kategori');
                     }
                 },
                 {
@@ -156,7 +156,7 @@
                         return;
                     }
 
-                    CategoryUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan kategori utama.');
+                    CategoryUI.toast('error', 'Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan kategori.');
                 },
                 complete: function() {
                     CategoryUI.setButtonLoading(submitSelector, false, '', normalHtml);
@@ -170,8 +170,8 @@
                 type: "GET",
                 success: function(response) {
                     $(modalSelector).modal('show');
-                    $('#kategoriUtamaModalLabel').text('Edit Kategori Utama');
-                    $('#kategoriUtamaModalSubtitle').text('Perbarui kode dan nama kategori utama yang dipilih.');
+                    $('#kategoriUtamaModalLabel').text('Edit Kategori');
+                    $('#kategoriUtamaModalSubtitle').text('Perbarui kode dan nama kategori yang dipilih.');
                     $(submitSelector).html('<i class="mdi mdi-content-save-edit-outline"></i>Update');
                     $('#kategoriUtamaBatchToolbar').hide();
                     $('#kategoriUtamaId').val(response.id);
@@ -180,14 +180,14 @@
                     CategoryUI.updateBatchCount(wrapperSelector, '#kategoriUtamaRowCount');
                 },
                 error: function() {
-                    CategoryUI.toast('error', 'Gagal Memuat', 'Data kategori utama tidak bisa dimuat.');
+                    CategoryUI.toast('error', 'Gagal Memuat', 'Data kategori tidak bisa dimuat.');
                 }
             });
         };
 
         window.deleteKategoriUtama = function(id) {
             Swal.fire({
-                title: 'Hapus kategori utama?',
+                title: 'Hapus kategori?',
                 text: 'Data yang sudah dihapus tidak bisa dikembalikan.',
                 icon: 'warning',
                 showCancelButton: true,
@@ -209,7 +209,7 @@
                         Swal.fire('Gagal', response.message, 'error');
                     },
                     error: function() {
-                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus kategori utama.', 'error');
+                        Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus kategori.', 'error');
                     }
                 });
             });

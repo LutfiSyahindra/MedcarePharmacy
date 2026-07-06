@@ -16,9 +16,9 @@ class MasterObatExport implements WithHeadings, WithStyles, WithColumnWidths, Wi
             'kode_obat',
             'nama_obat',
             'category_id',
-            'main_category_id',
-            'sub_kategori_id',
             'golongan_id',
+            'main_golongan_id',
+            'sub_golongan_id',
             'satuan_id',
             'sediaan_id',
             'pabrikan_id',
@@ -58,17 +58,17 @@ class MasterObatExport implements WithHeadings, WithStyles, WithColumnWidths, Wi
             'A' => 15, // kode_obat
             'B' => 30, // nama_obat
             'C' => 15, // kategori_id
-            'D' => 15, // sub_kategori_id
-            'E' => 15, // golongan_id
-            'F' => 15, // satuan_id
-            'G' => 15, // sediaan_id
-            'H' => 15, // pabrikan_id
-            'I' => 15, // distributor_id
-            'J' => 15, // rak_id
-            'K' => 30, // komposisi
-            'L' => 40, // indikasi
-            'M' => 30, // dosis
-            'N' => 25, // kemasan
+            'D' => 15, // golongan_id
+            'E' => 15, // main_golongan_id
+            'F' => 15, // sub_golongan_id
+            'G' => 15, // satuan_id
+            'H' => 15, // sediaan_id
+            'I' => 15, // pabrikan_id
+            'J' => 15, // distributor_id
+            'K' => 15, // rak_id
+            'L' => 30, // komposisi
+            'M' => 40, // indikasi
+            'N' => 30, // dosis
             'O' => 25, // kemasan
             'P' => 10, // stok_minimum
             'Q' => 15, // harga_beli

@@ -20,10 +20,11 @@ class MarginsModel extends Model
     public function getReference()
     {
         return match ($this->tingkat) {
-            'kategori' => MainCategoryModel::find($this->reference_id),
-            'sub_kategori' => SubCategoryModel::find($this->reference_id),
-            'kategoriUtama' => CategoryModel::find($this->reference_id),
-            // 'obat' => \App\Models\Obat::find($this->reference_id),
+            'kategori' => CategoryModel::find($this->reference_id),
+            'golongan' => GolonganModel::find($this->reference_id),
+            'main_golongan' => MainGolonganModel::find($this->reference_id),
+            'sub_golongan' => SubGolonganModel::find($this->reference_id),
+            'obat' => MasterObatModel::find($this->reference_id),
             default => null,
         };
     }

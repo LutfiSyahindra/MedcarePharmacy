@@ -11,32 +11,31 @@
 
 @section("content")
     <div class="category-page">
-        @include("medcare.masterData.kategori.mainKategori.modalMain")
-        @include("medcare.masterData.kategori.mainKategori.modalExcell")
-        @include("medcare.masterData.kategori.partials.header", [
-            "categoryActive" => "main",
-            "categoryTitle" => "Main Kategori",
-            "categoryDescription" => "Hubungkan kategori utama dengan kelompok obat yang lebih spesifik dan siap dipakai di master obat.",
-            "categoryModalTarget" => "#mainCategoryModal",
-            "categoryActionLabel" => "Tambah Main Kategori",
-            "categoryActionIcon" => "mdi-plus-circle-outline",
-            "categoryImportTarget" => "#mainCategoryModalExcell",
-            "categoryImportLabel" => "Import Main Kategori",
+        @include("medcare.masterData.golongan.mainGolongan.modalMain")
+        @include("medcare.masterData.golongan.mainGolongan.modalExcell")
+        @include("medcare.masterData.golongan.partials.hierarchy-header", [
+            "golonganActive" => "main",
+            "golonganTitle" => "Main Golongan",
+            "golonganDescription" => "Hubungkan golongan obat dengan kelompok turunannya agar master obat bisa dipetakan lebih presisi.",
+            "golonganModalTarget" => "#mainGolonganModal",
+            "golonganActionLabel" => "Tambah Main Golongan",
+            "golonganImportTarget" => "#mainGolonganModalExcell",
+            "golonganImportLabel" => "Import Main Golongan",
         ])
 
         <div class="category-stats-grid">
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-database-outline"></i></span>
                 <div>
-                    <strong id="mainKategoriTotal">0</strong>
+                    <strong id="mainGolonganTotal">0</strong>
                     <span>Total Data</span>
-                    <small>Seluruh main kategori yang tersimpan.</small>
+                    <small>Seluruh main golongan yang tersimpan.</small>
                 </div>
             </div>
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-filter-outline"></i></span>
                 <div>
-                    <strong id="mainKategoriFiltered">0</strong>
+                    <strong id="mainGolonganFiltered">0</strong>
                     <span>Hasil Filter</span>
                     <small>Jumlah data sesuai pencarian aktif.</small>
                 </div>
@@ -44,7 +43,7 @@
             <div class="category-stat">
                 <span class="category-stat-icon"><i class="mdi mdi-cursor-pointer"></i></span>
                 <div>
-                    <strong id="mainKategoriSelected">0</strong>
+                    <strong id="mainGolonganSelected">0</strong>
                     <span>Dipilih</span>
                     <small>Klik baris tabel untuk menandai data.</small>
                 </div>
@@ -54,27 +53,27 @@
         <section class="category-table-section">
             <div class="category-table-toolbar">
                 <div class="category-table-title">
-                    <span class="category-table-title-icon"><i class="mdi mdi-shape-outline"></i></span>
+                    <span class="category-table-title-icon"><i class="mdi mdi-shape-plus-outline"></i></span>
                     <div>
-                        <h5>Daftar Main Kategori</h5>
-                        <p>Turunan kategori utama untuk memperjelas kelompok obat.</p>
+                        <h5>Daftar Main Golongan</h5>
+                        <p>Turunan golongan obat yang dipakai pada master obat.</p>
                     </div>
                 </div>
                 <div class="category-table-tools">
-                    <label class="category-search" for="mainKategoriSearch">
+                    <label class="category-search" for="mainGolonganSearch">
                         <i class="mdi mdi-magnify"></i>
-                        <input type="text" id="mainKategoriSearch" placeholder="Cari kategori utama, kode, atau nama...">
+                        <input type="text" id="mainGolonganSearch" placeholder="Cari golongan, kode, atau nama...">
                     </label>
                 </div>
             </div>
             <div class="table-responsive">
-                <table id="tableMainKategori" class="table category-table align-middle">
+                <table id="tableMainGolongan" class="table category-table align-middle">
                     <thead>
                         <tr>
                             <th>No</th>
-                            <th>Kategori Utama</th>
+                            <th>Golongan</th>
                             <th>Kode</th>
-                            <th>Main Kategori</th>
+                            <th>Main Golongan</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -87,5 +86,5 @@
 
 @push("scripts")
     @include("medcare.masterData.kategori.partials.scripts")
-    @include("medcare.masterData.kategori.mainKategori.jsMain")
+    @include("medcare.masterData.golongan.mainGolongan.jsMain")
 @endpush
