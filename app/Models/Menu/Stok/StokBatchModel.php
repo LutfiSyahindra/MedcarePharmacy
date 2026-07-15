@@ -21,6 +21,7 @@ class StokBatchModel extends Model
         'harga_beli' => 'decimal:2',
         'harga_jual' => 'decimal:2',
         'diskon' => 'decimal:2',
+        'ppn' => 'decimal:2',
         'last_movement_at' => 'datetime',
     ];
 
@@ -32,6 +33,11 @@ class StokBatchModel extends Model
     public function kartuStok()
     {
         return $this->hasMany(KartuStokModel::class, 'stok_batch_id');
+    }
+
+    public function riwayatHarga()
+    {
+        return $this->hasMany(RiwayatHargaModel::class, 'stok_batch_id');
     }
 
     public function createdBy()

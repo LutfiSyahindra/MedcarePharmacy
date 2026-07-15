@@ -229,6 +229,63 @@
                             <th>Nilai Stok</th>
                             <th>Status</th>
                             <th>Mutasi Terakhir</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="stock-table-section" id="riwayatHargaSection">
+            <div class="stock-section-header">
+                <div class="stock-section-title">
+                    <span class="stock-section-icon"><i class="mdi mdi-cash-clock"></i></span>
+                    <div>
+                        <h5>Riwayat Harga Jual</h5>
+                        <p>Jejak perubahan harga jual per batch, termasuk alasan dan user pengubah.</p>
+                    </div>
+                </div>
+                <div class="stock-section-tools">
+                    <span class="stock-batch-filter-note" id="riwayatHargaFilterLabel">
+                        <i class="mdi mdi-filter-variant"></i>
+                        Semua riwayat harga
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-history"></i>
+                        Total: <strong id="riwayatTotalCount">0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-trending-up"></i>
+                        Naik: <strong id="riwayatUpCount">0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-trending-down"></i>
+                        Turun: <strong id="riwayatDownCount">0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-clock-outline"></i>
+                        Terakhir: <strong id="riwayatLastChange">-</strong>
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="resetRiwayatHargaFilter">
+                        <i class="mdi mdi-filter-remove-outline"></i>
+                        Reset
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive stock-table-wrap">
+                <table id="tableRiwayatHarga" class="table stock-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Tanggal</th>
+                            <th>Obat</th>
+                            <th>No Batch</th>
+                            <th>Harga Lama</th>
+                            <th>Harga Baru</th>
+                            <th>Selisih</th>
+                            <th>Alasan</th>
+                            <th>User</th>
                         </tr>
                     </thead>
                     <tbody></tbody>

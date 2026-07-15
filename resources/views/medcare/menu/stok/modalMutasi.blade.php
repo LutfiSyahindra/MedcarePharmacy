@@ -101,7 +101,7 @@
                             </div>
 
                             <div class="stock-field-grid">
-                                <div class="stock-field stock-out-field is-full">
+                                <div class="stock-field stock-batch-select-field is-full">
                                     <label for="mutasi_stok_batch_id"><i class="mdi mdi-package-variant-closed-check"></i> Batch Stok</label>
                                     <select class="form-select" name="stok_batch_id" id="mutasi_stok_batch_id"></select>
                                     <div class="stock-help" id="mutasiBatchHelp">Pilih obat terlebih dahulu.</div>
@@ -131,6 +131,12 @@
                                     <label for="mutasi_harga_jual"><i class="mdi mdi-cash-plus"></i> Harga Jual Satuan Stok</label>
                                     <input type="number" class="form-control" name="harga_jual" id="mutasi_harga_jual"
                                         min="0" step="0.01" placeholder="0">
+                                </div>
+                                <div class="stock-field stock-in-field is-full">
+                                    <label for="mutasi_alasan_harga"><i class="mdi mdi-text-box-edit-outline"></i> Alasan Perubahan Harga</label>
+                                    <textarea class="form-control" name="alasan_harga" id="mutasi_alasan_harga" rows="2"
+                                        maxlength="1000" placeholder="Contoh: update margin jual, penyesuaian harga supplier, atau promo selesai"></textarea>
+                                    <div class="stock-help">Dicatat ke riwayat jika harga jual batch berubah.</div>
                                 </div>
                             </div>
                         </div>

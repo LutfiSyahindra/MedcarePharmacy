@@ -278,8 +278,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/stok', [StokController::class, 'stok'])->name('stok.stok');
         Route::get('/stok/table', [StokController::class, 'stockTable'])->name('stok.table');
         Route::get('/stok/batch/table', [StokController::class, 'batchTable'])->name('stok.batchTable');
+        Route::get('/stok/riwayat-harga/table', [StokController::class, 'riwayatHargaTable'])->name('stok.riwayatHarga.table');
         Route::get('/stok/obat-options', [StokController::class, 'obatOptions'])->name('stok.obatOptions');
         Route::get('/stok/batch-options/{obatId}', [StokController::class, 'batchOptions'])->name('stok.batchOptions');
+        Route::put('/stok/batch/{id}/harga-jual', [StokController::class, 'updateBatchHargaJual'])->name('stok.batch.updateHargaJual');
         Route::post('/stok/mutasi/store', [StokController::class, 'storeMutation'])->name('stok.mutasi.store');
 
         Route::get('/kartu-stok', [StokController::class, 'kartuStok'])->name('kartuStok.kartuStok');

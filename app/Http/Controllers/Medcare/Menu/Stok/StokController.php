@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Medcare\Menu\Stok;
 use App\Http\Controllers\Controller;
 use App\Models\MasterObatModel;
 use App\Models\Menu\Stok\KartuStokModel;
+use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
@@ -77,7 +79,7 @@ class StokController extends Controller
         $warningDays = $this->warningDays($request);
         $today = Carbon::today();
         $warningDate = Carbon::today()->addDays($warningDays);
-        $query = StokBatchModel::with(['obat.satuan'])
+        $query = StokBatchModel::with(['obat.satuan', 'obat.golongan'])
             ->where('qty', '>', 0)
             ->orderBy('expired_date')
             ->orderBy('no_batch');
@@ -89,6 +91,7 @@ class StokController extends Controller
         $rows = $query->get()
             ->map(function ($batch) use ($today, $warningDate) {
                 $status = $this->batchStatus($batch, $today, $warningDate);
+                $marginPrice = $this->stockService->batchSellingPriceMarginPreview($batch);
 
                 return [
                     'id' => $batch->id,
@@ -101,7 +104,15 @@ class StokController extends Controller
                     'qty' => (float) $batch->qty,
                     'harga_beli' => (float) $batch->harga_beli,
                     'harga_jual' => (float) $batch->harga_jual,
+                    'harga_jual_margin' => (float) $marginPrice['harga_jual'],
+                    'margin_harga_beli_dasar' => (float) $marginPrice['harga_beli_dasar'],
+                    'margin_harga_beli_include_ppn' => (float) $marginPrice['harga_beli_include_ppn'],
+                    'margin_faktor_jual' => (float) $marginPrice['faktor_jual'],
+                    'margin_ppn' => (float) $marginPrice['ppn'],
+                    'margin_has_margin' => (bool) $marginPrice['has_margin'],
+                    'margin_reference' => $marginPrice['margin_reference'],
                     'diskon' => (float) ($batch->diskon ?? 0),
+                    'ppn' => (float) ($batch->ppn ?? 0),
                     'nilai_stok' => (float) $batch->qty * (float) $batch->harga_beli,
                     'status' => $status,
                     'status_label' => $this->statusLabel($status),
@@ -119,6 +130,52 @@ class StokController extends Controller
             'nilai_stok' => $rows->sum('nilai_stok'),
             'expired' => $rows->where('status', 'expired')->count(),
             'akan_expired' => $rows->where('status', 'akan_expired')->count(),
+        ];
+
+        return DataTables::of($rows)
+            ->addIndexColumn()
+            ->with(['summary' => $summary])
+            ->make(true);
+    }
+
+    public function riwayatHargaTable(Request $request)
+    {
+        $query = RiwayatHargaModel::with(['obat.satuan', 'batch', 'changedBy'])
+            ->when($request->filled('obat_id'), fn ($query) => $query->where('obat_id', $request->obat_id))
+            ->when($request->filled('stok_batch_id'), fn ($query) => $query->where('stok_batch_id', $request->stok_batch_id))
+            ->latest('created_at')
+            ->latest('id');
+
+        $rows = $query->get()
+            ->map(function ($riwayat) {
+                $hargaLama = (float) $riwayat->harga_jual_lama;
+                $hargaBaru = (float) $riwayat->harga_jual_baru;
+
+                return [
+                    'id' => $riwayat->id,
+                    'created_at' => optional($riwayat->created_at)->format('Y-m-d H:i'),
+                    'obat_id' => $riwayat->obat_id,
+                    'stok_batch_id' => $riwayat->stok_batch_id,
+                    'kode_obat' => $riwayat->obat->kode_obat ?? '-',
+                    'nama_obat' => $riwayat->obat->nama_obat ?? '-',
+                    'satuan' => $riwayat->obat->satuan->nama ?? '-',
+                    'no_batch' => $riwayat->batch->no_batch ?? '-',
+                    'expired_date' => optional($riwayat->batch?->expired_date)->format('Y-m-d'),
+                    'harga_jual_lama' => $hargaLama,
+                    'harga_jual_baru' => $hargaBaru,
+                    'selisih' => $hargaBaru - $hargaLama,
+                    'alasan' => $riwayat->alasan ?? '-',
+                    'user' => $riwayat->changedBy->name ?? '-',
+                ];
+            });
+
+        $latestRow = $rows->first();
+
+        $summary = [
+            'total_riwayat' => $rows->count(),
+            'kenaikan' => $rows->where('selisih', '>', 0)->count(),
+            'penurunan' => $rows->where('selisih', '<', 0)->count(),
+            'terakhir' => $latestRow['created_at'] ?? null,
         ];
 
         return DataTables::of($rows)
@@ -215,10 +272,10 @@ class StokController extends Controller
         return response()->json($obats);
     }
 
-    public function batchOptions($obatId)
+    public function batchOptions(Request $request, $obatId)
     {
         $batches = StokBatchModel::where('obat_id', $obatId)
-            ->where('qty', '>', 0)
+            ->when(! $request->boolean('include_empty'), fn ($query) => $query->where('qty', '>', 0))
             ->orderBy('expired_date')
             ->orderBy('no_batch')
             ->get()
@@ -228,6 +285,7 @@ class StokController extends Controller
                     'text' => $batch->no_batch
                         . ' | ED ' . (optional($batch->expired_date)->format('Y-m-d') ?: '-')
                         . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
+                        . ' | PPN ' . number_format((float) ($batch->ppn ?? 0), 2, ',', '.') . '%'
                         . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
                     'no_batch' => $batch->no_batch,
                     'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
@@ -235,6 +293,7 @@ class StokController extends Controller
                     'harga_beli' => (float) $batch->harga_beli,
                     'harga_jual' => (float) $batch->harga_jual,
                     'diskon' => (float) ($batch->diskon ?? 0),
+                    'ppn' => (float) ($batch->ppn ?? 0),
                 ];
             });
 
@@ -252,6 +311,8 @@ class StokController extends Controller
             'qty' => ['required', 'numeric', 'min:0.01'],
             'harga_beli' => ['nullable', 'numeric', 'min:0'],
             'harga_jual' => ['nullable', 'numeric', 'min:0'],
+            'ppn' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'alasan_harga' => ['nullable', 'string', 'max:1000'],
             'tanggal_mutasi' => ['required', 'string'],
             'nomor_referensi' => ['nullable', 'string', 'max:100'],
             'keterangan' => ['nullable', 'string'],
@@ -264,6 +325,50 @@ class StokController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Mutasi stok berhasil dicatat.',
+        ]);
+    }
+
+    public function updateBatchHargaJual(Request $request, $id)
+    {
+        $request->merge([
+            'metode_harga' => $request->input('metode_harga', 'manual'),
+        ]);
+
+        $validated = $request->validate([
+            'metode_harga' => ['required', Rule::in(['manual', 'margin'])],
+            'harga_jual_baru' => [
+                Rule::requiredIf(fn () => $request->input('metode_harga') === 'manual'),
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+            'alasan' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $result = DB::transaction(function () use ($validated, $id) {
+            if ($validated['metode_harga'] === 'margin') {
+                return $this->stockService->updateBatchSellingPriceFromMargin(
+                    (int) $id,
+                    $validated['alasan'],
+                    Auth::id()
+                );
+            }
+
+            return $this->stockService->updateBatchSellingPrice(
+                (int) $id,
+                (float) $validated['harga_jual_baru'],
+                $validated['alasan'],
+                Auth::id()
+            );
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'changed' => $result['changed'],
+            'harga_jual_baru' => $result['harga_jual_baru'],
+            'message' => $result['changed']
+                ? 'Harga jual batch berhasil diperbarui.'
+                : 'Harga jual batch tidak berubah.',
         ]);
     }
 

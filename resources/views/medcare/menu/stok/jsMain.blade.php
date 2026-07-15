@@ -4,8 +4,11 @@
         let stockAlertStatus = '';
         let batchObatId = '';
         let batchExpiryStatus = '';
+        let riwayatObatId = '';
+        let riwayatBatchId = '';
         let expiredWarningDays = $('#expiredWarningDays').val() || 90;
         const batchOptionsBaseUrl = '{{ url("medcare/menu/stok/stok/batch-options") }}';
+        const updateBatchHargaUrl = '{{ route("stok.batch.updateHargaJual", ":id") }}';
 
         $.ajaxSetup({
             headers: {
@@ -210,6 +213,30 @@
             $('#batchRiskCount').text(formatNumber(riskCount));
         }
 
+        function updateRiwayatSummary(summary) {
+            $('#riwayatTotalCount').text(formatNumber(summary.total_riwayat));
+            $('#riwayatUpCount').text(formatNumber(summary.kenaikan));
+            $('#riwayatDownCount').text(formatNumber(summary.penurunan));
+            $('#riwayatLastChange').text(summary.terakhir || '-');
+        }
+
+        function batchCell(row) {
+            return `
+                <span class="stock-qty-stack">
+                    <span class="stock-number"><i class="mdi mdi-barcode"></i>${escapeHtml(row.no_batch)}</span>
+                    <small>${row.expired_date ? 'ED ' + escapeHtml(formatDate(row.expired_date)) : 'Tanpa ED'}</small>
+                </span>
+            `;
+        }
+
+        function priceDiffCell(value) {
+            const diff = Number(value) || 0;
+            const icon = diff > 0 ? 'mdi-trending-up' : (diff < 0 ? 'mdi-trending-down' : 'mdi-minus');
+            const sign = diff > 0 ? '+' : '';
+
+            return `<span class="stock-money"><i class="mdi ${icon}"></i>${sign}${formatCurrency(diff)}</span>`;
+        }
+
         let StockTable = $('#tableStock').DataTable({
             processing: true,
             serverSide: true,
@@ -356,6 +383,21 @@
                 {
                     data: 'last_movement_at',
                     render: data => `<span class="stock-number"><i class="mdi mdi-clock-outline"></i>${escapeHtml(data || '-')}</span>`
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    render: row => `
+                        <span class="stock-action-group">
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="ubahHargaBatch(${Number(row.id)})" title="Ubah harga jual tanpa menambah stok">
+                                <i class="mdi mdi-cash-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterRiwayatHarga(${Number(row.id)}, ${Number(row.obat_id)})" title="Lihat riwayat harga">
+                                <i class="mdi mdi-cash-clock"></i>
+                            </button>
+                        </span>
+                    `
                 }
             ],
             columnDefs: [{
@@ -371,6 +413,79 @@
                 processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat batch...</span>',
                 emptyTable: 'Belum ada batch stok aktif.',
                 zeroRecords: 'Batch yang dicari tidak ditemukan.',
+                info: 'Menampilkan _START_-_END_ dari _TOTAL_ data',
+                infoEmpty: 'Menampilkan 0 data',
+                paginate: {
+                    previous: '<i class="mdi mdi-chevron-left"></i>',
+                    next: '<i class="mdi mdi-chevron-right"></i>'
+                }
+            }
+        });
+
+        let RiwayatHargaTable = $('#tableRiwayatHarga').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            autoWidth: false,
+            pageLength: 10,
+            ajax: {
+                url: '{{ route("stok.riwayatHarga.table") }}',
+                type: 'GET',
+                data: function(request) {
+                    request.obat_id = riwayatObatId;
+                    request.stok_batch_id = riwayatBatchId;
+                },
+                dataSrc: function(response) {
+                    updateRiwayatSummary(response.summary || {});
+                    return response.data || [];
+                }
+            },
+            columns: [{
+                    data: 'DT_RowIndex',
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    data: 'created_at',
+                    render: data => `<span class="stock-number"><i class="mdi mdi-clock-outline"></i>${escapeHtml(data || '-')}</span>`
+                },
+                {
+                    data: null,
+                    render: row => itemCell(row)
+                },
+                {
+                    data: null,
+                    render: row => batchCell(row)
+                },
+                {
+                    data: 'harga_jual_lama',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-minus"></i>${formatCurrency(data)}</span>`
+                },
+                {
+                    data: 'harga_jual_baru',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
+                },
+                {
+                    data: 'selisih',
+                    render: data => priceDiffCell(data)
+                },
+                {
+                    data: 'alasan',
+                    render: data => `<span class="stock-reason">${escapeHtml(data || '-')}</span>`
+                },
+                {
+                    data: 'user',
+                    render: data => `<span class="stock-number"><i class="mdi mdi-account-outline"></i>${escapeHtml(data || '-')}</span>`
+                }
+            ],
+            columnDefs: [{
+                targets: [0],
+                className: 'text-center'
+            }],
+            language: {
+                processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat riwayat harga...</span>',
+                emptyTable: 'Belum ada riwayat perubahan harga.',
+                zeroRecords: 'Riwayat harga yang dicari tidak ditemukan.',
                 info: 'Menampilkan _START_-_END_ dari _TOTAL_ data',
                 infoEmpty: 'Menampilkan 0 data',
                 paginate: {
@@ -421,13 +536,21 @@
             BatchTable.ajax.reload();
         });
 
+        $('#resetRiwayatHargaFilter').on('click', function() {
+            riwayatObatId = '';
+            riwayatBatchId = '';
+            $('#riwayatHargaFilterLabel').html('<i class="mdi mdi-filter-variant"></i> Semua riwayat harga');
+            RiwayatHargaTable.ajax.reload();
+        });
+
         $('#refreshStockTable').on('click', function() {
             $(this).addClass('is-loading').prop('disabled', true);
             StockTable.ajax.reload(null, false);
             BatchTable.ajax.reload(null, false);
+            RiwayatHargaTable.ajax.reload(null, false);
         });
 
-        $('#tableStock, #tableBatchStock').on('xhr.dt', function() {
+        $('#tableStock, #tableBatchStock, #tableRiwayatHarga').on('xhr.dt', function() {
             $('#refreshStockTable').removeClass('is-loading').prop('disabled', false);
         });
 
@@ -439,6 +562,153 @@
             document.getElementById('batchStockSection')?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
+            });
+        };
+
+        window.filterRiwayatHarga = function(batchId, obatId) {
+            riwayatBatchId = batchId || '';
+            riwayatObatId = obatId || '';
+            const row = BatchTable.rows().data().toArray().find(item => String(item.id) === String(batchId));
+            const label = row ? `${row.nama_obat || 'Obat'} - Batch ${row.no_batch || '-'}` : `Batch #${batchId}`;
+            $('#riwayatHargaFilterLabel').html(`<i class="mdi mdi-filter-variant"></i> ${escapeHtml(label)}`);
+            RiwayatHargaTable.ajax.reload();
+            document.getElementById('riwayatHargaSection')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        };
+
+        window.ubahHargaBatch = function(batchId) {
+            const row = BatchTable.rows().data().toArray().find(item => String(item.id) === String(batchId));
+
+            if (!row) {
+                Swal.fire('Gagal', 'Data batch tidak ditemukan di tabel.', 'error');
+                return;
+            }
+
+            const hargaSekarang = Number(row.harga_jual) || 0;
+            const hargaMargin = Number(row.harga_jual_margin) || 0;
+            const faktorMargin = Number(row.margin_faktor_jual) || 1;
+            const ppnMargin = Number(row.margin_ppn) || 0;
+            const hargaDasarMargin = Number(row.margin_harga_beli_include_ppn) || 0;
+            const marginHasMargin = Boolean(row.margin_has_margin);
+            const marginReference = row.margin_reference || 'golongan belum tersedia';
+            const marginInfoClass = marginHasMargin ? 'text-success' : 'text-warning';
+            const marginCalcText = `dasar ${formatCurrency(hargaDasarMargin)} sudah termasuk PPN ${ppnMargin.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
+            const marginInfoText = marginHasMargin
+                ? `Sesuai margin ${marginReference} (${marginCalcText}, faktor ${faktorMargin.toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}): ${formatCurrency(hargaMargin)}`
+                : `Belum ada margin golongan aktif, ${marginCalcText}, faktor 1.000: ${formatCurrency(hargaMargin)}`;
+
+            Swal.fire({
+                title: 'Ubah Harga Jual',
+                html: `
+                    <div class="text-start">
+                        <label class="form-label fw-bold">Batch</label>
+                        <div class="mb-3 small text-muted">${escapeHtml(row.nama_obat)} - ${escapeHtml(row.no_batch)}</div>
+                        <label for="swalMetodeHarga" class="form-label fw-bold">Metode Harga</label>
+                        <select id="swalMetodeHarga" class="form-select mb-2">
+                            <option value="manual">Input manual</option>
+                            <option value="margin">Sesuai dengan margin</option>
+                        </select>
+                        <div class="form-text ${marginInfoClass} mb-3">${escapeHtml(marginInfoText)}</div>
+                        <label for="swalHargaJualBaru" class="form-label fw-bold">Harga Jual Baru</label>
+                        <input type="number" id="swalHargaJualBaru" class="form-control" min="0" step="0.01" value="${hargaSekarang}">
+                        <div class="form-text mb-3">Harga sekarang: ${formatCurrency(row.harga_jual)}</div>
+                        <label for="swalAlasanHarga" class="form-label fw-bold">Alasan</label>
+                        <textarea id="swalAlasanHarga" class="form-control" rows="3" maxlength="1000" placeholder="Contoh: penyesuaian margin, perubahan HET, atau koreksi harga"></textarea>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Simpan Harga',
+                cancelButtonText: 'Batal',
+                focusConfirm: false,
+                didOpen: () => {
+                    const methodSelect = document.getElementById('swalMetodeHarga');
+                    const priceInput = document.getElementById('swalHargaJualBaru');
+                    let manualHargaValue = String(hargaSekarang);
+
+                    const syncHargaMethod = () => {
+                        const useMargin = methodSelect?.value === 'margin';
+
+                        if (!priceInput) {
+                            return;
+                        }
+
+                        if (useMargin) {
+                            priceInput.value = hargaMargin;
+                            priceInput.readOnly = true;
+                            priceInput.classList.add('bg-light');
+                            return;
+                        }
+
+                        priceInput.value = manualHargaValue;
+                        priceInput.readOnly = false;
+                        priceInput.classList.remove('bg-light');
+                    };
+
+                    priceInput?.addEventListener('input', function() {
+                        if (methodSelect?.value !== 'margin') {
+                            manualHargaValue = this.value;
+                        }
+                    });
+                    methodSelect?.addEventListener('change', syncHargaMethod);
+                    syncHargaMethod();
+                    priceInput?.focus();
+                },
+                preConfirm: () => {
+                    const metodeHarga = document.getElementById('swalMetodeHarga')?.value || 'manual';
+                    const harga = Number(document.getElementById('swalHargaJualBaru')?.value);
+                    const alasan = document.getElementById('swalAlasanHarga')?.value?.trim() || '';
+
+                    if (metodeHarga === 'manual' && (Number.isNaN(harga) || harga < 0)) {
+                        Swal.showValidationMessage('Harga jual baru wajib angka minimal 0.');
+                        return false;
+                    }
+
+                    if (!alasan) {
+                        Swal.showValidationMessage('Alasan perubahan harga wajib diisi.');
+                        return false;
+                    }
+
+                    return metodeHarga === 'margin'
+                        ? {
+                            metode_harga: 'margin',
+                            alasan
+                        }
+                        : {
+                            metode_harga: 'manual',
+                            harga_jual_baru: harga,
+                            alasan
+                        };
+                }
+            }).then(function(result) {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: updateBatchHargaUrl.replace(':id', batchId),
+                    type: 'PUT',
+                    data: result.value,
+                    success: function(response) {
+                        Swal.fire({
+                            icon: response.changed ? 'success' : 'info',
+                            title: response.message,
+                            toast: true,
+                            position: 'top-end',
+                            timer: 2500,
+                            timerProgressBar: true,
+                            showConfirmButton: false
+                        });
+                        BatchTable.ajax.reload(null, false);
+                        RiwayatHargaTable.ajax.reload(null, false);
+                    },
+                    error: function(xhr) {
+                        const errors = xhr.responseJSON?.errors || {};
+                        const firstError = Object.values(errors)[0]?.[0];
+                        Swal.fire('Gagal', firstError || xhr.responseJSON?.message || 'Harga jual batch gagal diperbarui.', 'error');
+                    }
+                });
             });
         };
 
@@ -517,9 +787,43 @@
                 qty: Number(selected.data('qty')) || 0,
                 harga: Number(selected.data('harga')) || 0,
                 hargaJual: Number(selected.data('harga-jual')) || 0,
+                ppn: Number(selected.data('ppn')) || 0,
                 batch: selected.data('batch') || '',
                 expired: selected.data('expired') || ''
             };
+        }
+
+        function updateBatchPlaceholder() {
+            const emptyOption = $('#mutasi_stok_batch_id').find('option[value=""]').first();
+            const label = isInboundMutation() ? 'Batch baru / isi manual' : 'Pilih batch';
+
+            if (emptyOption.length) {
+                emptyOption.text(label);
+            }
+        }
+
+        function syncInboundBatchFields() {
+            const inbound = isInboundMutation();
+            const batch = selectedBatchMeta();
+            const usingExistingBatch = inbound && Boolean(batch.id);
+            const identityWasLocked = $('#mutasi_no_batch').prop('disabled');
+
+            $('#mutasi_no_batch, #mutasi_expired_date')
+                .prop('required', inbound && !usingExistingBatch)
+                .prop('disabled', !inbound || usingExistingBatch);
+
+            if (!inbound) {
+                return;
+            }
+
+            if (usingExistingBatch) {
+                $('#mutasi_no_batch').val(batch.batch);
+                $('#mutasi_expired_date').val(batch.expired);
+                $('#mutasi_harga_beli').val(batch.harga || '');
+                $('#mutasi_harga_jual').val(batch.hargaJual || '');
+            } else if (identityWasLocked) {
+                $('#mutasi_no_batch, #mutasi_expired_date').val('');
+            }
         }
 
         function updateMutationPreview() {
@@ -535,12 +839,19 @@
             $('#mutasiPreviewQty').text(`${prefix}${formatNumber(qty)}`);
             $('#mutasiPreviewValue').text(formatCurrency(value));
 
-            if (!inbound && batch.id) {
+            if (inbound && batch.id) {
+                $('#mutasiBatchHelp').text(`Batch existing dipilih. Stok saat ini ${formatNumber(batch.qty)}. ${batch.expired ? 'ED ' + batch.expired : 'Tanpa ED'}`);
+            } else if (!inbound && batch.id) {
                 $('#mutasiBatchHelp').text(`Stok batch tersedia ${formatNumber(batch.qty)}. ${batch.expired ? 'ED ' + batch.expired : ''}`);
             }
 
             if (!qty) {
                 $('#mutasiFooterSummary').text(meta.footer);
+                return;
+            }
+
+            if (inbound && !batch.id && !$('#mutasi_no_batch').val()?.trim()) {
+                $('#mutasiFooterSummary').text('Pilih batch existing atau isi nomor batch baru sebelum menyimpan.');
                 return;
             }
 
@@ -554,6 +865,7 @@
 
         function setMutationMode(mode) {
             const meta = mutationModes[mode] || mutationModes.masuk;
+            const wasInbound = isInboundMutation();
 
             $('#jenis_mutasi').val(mode);
             $('.stock-mutation-mode-btn')
@@ -576,20 +888,36 @@
                 .html(`<i class="mdi mdi-content-save-outline"></i> ${meta.submitText}`);
 
             toggleMutationFields();
+
+            if ($('#mutasi_obat_id').val() && wasInbound !== isInboundMutation()) {
+                loadMutationBatches($('#mutasi_obat_id').val());
+            }
+
             updateMutationPreview();
         }
 
         function toggleMutationFields() {
             const inbound = isInboundMutation();
+            const batch = selectedBatchMeta();
+            const usingExistingBatch = inbound && Boolean(batch.id);
+
             $('.stock-in-field').toggleClass('d-none', !inbound);
-            $('.stock-out-field').toggleClass('d-none', inbound);
-            $('#mutasi_no_batch, #mutasi_expired_date').prop('required', inbound).prop('disabled', !inbound);
-            $('#mutasi_harga_beli, #mutasi_harga_jual').prop('disabled', !inbound);
-            $('#mutasi_stok_batch_id').prop('required', !inbound).prop('disabled', inbound);
+            $('.stock-batch-select-field').toggleClass('d-none', false);
+            updateBatchPlaceholder();
+            $('#mutasi_no_batch, #mutasi_expired_date')
+                .prop('required', inbound && !usingExistingBatch)
+                .prop('disabled', !inbound || usingExistingBatch);
+            $('#mutasi_harga_beli, #mutasi_harga_jual, #mutasi_alasan_harga').prop('disabled', !inbound);
+            $('#mutasi_stok_batch_id').prop('required', !inbound).prop('disabled', false);
 
             if (inbound) {
-                $('#mutasi_stok_batch_id').val('').trigger('change.select2');
-                $('#mutasiBatchHelp').text('Batch aktif tidak wajib untuk mutasi masuk.');
+                if (usingExistingBatch) {
+                    syncInboundBatchFields();
+                } else {
+                    $('#mutasi_no_batch, #mutasi_expired_date').prop('disabled', false);
+                }
+
+                $('#mutasiBatchHelp').text('Pilih batch existing, atau kosongkan untuk mengisi batch baru.');
             } else if (!$('#mutasi_obat_id').val()) {
                 $('#mutasiBatchHelp').text('Pilih obat terlebih dahulu.');
             }
@@ -597,7 +925,8 @@
 
         function loadMutationBatches(obatId) {
             const select = $('#mutasi_stok_batch_id');
-            select.empty().append('<option value="">Pilih batch</option>').trigger('change');
+            const emptyLabel = isInboundMutation() ? 'Batch baru / isi manual' : 'Pilih batch';
+            select.empty().append(`<option value="">${emptyLabel}</option>`).trigger('change');
 
             if (!obatId) {
                 $('#mutasiBatchHelp').text('Pilih obat terlebih dahulu.');
@@ -605,18 +934,23 @@
                 return;
             }
 
-            $.get(`${batchOptionsBaseUrl}/${obatId}`, function(response) {
+            $.get(`${batchOptionsBaseUrl}/${obatId}`, {
+                include_empty: isInboundMutation() ? 1 : 0
+            }, function(response) {
                 (response || []).forEach(function(batch) {
                     const option = new Option(batch.text, batch.id, false, false);
                     $(option)
                         .attr('data-qty', batch.qty)
                         .attr('data-harga', batch.harga_beli)
                         .attr('data-harga-jual', batch.harga_jual)
+                        .attr('data-ppn', batch.ppn)
                         .attr('data-batch', batch.no_batch)
                         .attr('data-expired', batch.expired_date || '');
                     select.append(option);
                 });
-                $('#mutasiBatchHelp').text((response || []).length ? 'Batch tersedia untuk mutasi keluar.' : 'Belum ada batch aktif untuk obat ini.');
+                $('#mutasiBatchHelp').text((response || []).length
+                    ? (isInboundMutation() ? 'Pilih batch existing, atau kosongkan untuk mengisi batch baru.' : 'Batch tersedia untuk mutasi keluar.')
+                    : (isInboundMutation() ? 'Belum ada batch. Isi nomor batch baru.' : 'Belum ada batch aktif untuk obat ini.'));
                 updateMutationPreview();
             });
         }
@@ -632,8 +966,12 @@
             updateMutationPreview();
         });
 
-        $('#mutasi_stok_batch_id').on('change', updateMutationPreview);
-        $('#mutasi_qty, #mutasi_harga_beli, #mutasi_harga_jual').on('input', updateMutationPreview);
+        $('#mutasi_stok_batch_id').on('change', function() {
+            syncInboundBatchFields();
+            toggleMutationFields();
+            updateMutationPreview();
+        });
+        $('#mutasi_qty, #mutasi_harga_beli, #mutasi_harga_jual, #mutasi_no_batch').on('input', updateMutationPreview);
 
         $('#mutasiStokModal').on('show.bs.modal', function() {
             $('#mutasiStokForm')[0].reset();
@@ -670,6 +1008,7 @@
                     });
                     StockTable.ajax.reload(null, false);
                     BatchTable.ajax.reload(null, false);
+                    RiwayatHargaTable.ajax.reload(null, false);
                 },
                 error: function(xhr) {
                     const errors = xhr.responseJSON?.errors || {};

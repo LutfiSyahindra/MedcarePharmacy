@@ -71,15 +71,23 @@
                 return batch.text;
             }
 
-            return `${batch.no_batch || '-'} | ED ${batch.expired_date || '-'} | Diskon ${formatDecimal(batch.diskon, 0, 2)}% | Stok ${formatDecimal(batch.qty, 0, 2)}`;
+            return `${batch.no_batch || '-'} | ED ${batch.expired_date || '-'} | Diskon ${formatDecimal(batch.diskon, 0, 2)}% | PPN ${formatDecimal(batch.ppn, 0, 2)}% | Stok ${formatDecimal(batch.qty, 0, 2)}`;
         }
 
-        function normalizedDiscount(value) {
+        function normalizedPercent(value) {
             return Math.min(100, Math.max(0, Number(value) || 0));
         }
 
+        function normalizedDiscount(value) {
+            return normalizedPercent(value);
+        }
+
         function sameDiscount(left, right) {
-            return Math.abs(normalizedDiscount(left) - normalizedDiscount(right)) < 0.00001;
+            return samePercent(left, right);
+        }
+
+        function samePercent(left, right) {
+            return Math.abs(normalizedPercent(left) - normalizedPercent(right)) < 0.00001;
         }
 
         function receiveBatchOptionsHtml(batchOptions, selectedBatchId) {
@@ -93,7 +101,8 @@
                     ` data-expired="${escapeHtml(batch.expired_date || '')}"` +
                     ` data-qty="${Number(batch.qty) || 0}"` +
                     ` data-harga="${Number(batch.harga_beli) || 0}"` +
-                    ` data-diskon="${Number(batch.diskon) || 0}">` +
+                    ` data-diskon="${Number(batch.diskon) || 0}"` +
+                    ` data-ppn="${Number(batch.ppn) || 0}">` +
                     `${escapeHtml(batchOptionLabel(batch))}</option>`
                 );
             });
@@ -110,6 +119,7 @@
                 expired: selected.data('expired') || '',
                 qty: Number(selected.data('qty')) || 0,
                 diskon: Number(selected.data('diskon')) || 0,
+                ppn: Number(selected.data('ppn')) || 0,
                 label: selected.text() || ''
             };
         }
@@ -136,25 +146,26 @@
             let expiredInput = row.find('input[name="expired_date[]"]');
             let hint = row.find('.receive-batch-mode');
             let rowDiscount = normalizedDiscount(row.find('.receive-discount').val());
+            let rowTax = normalizedPercent(row.find('.receive-tax').val());
 
             if (meta.id) {
                 batchInput.val(meta.batch).prop('readonly', true);
                 setReceiveExpiredValue(expiredInput, meta.expired);
                 expiredInput.prop('readonly', true);
 
-                if (!sameDiscount(meta.diskon, rowDiscount)) {
+                if (!sameDiscount(meta.diskon, rowDiscount) || !samePercent(meta.ppn, rowTax)) {
                     hint
                         .removeClass('is-manual is-existing')
                         .addClass('is-warning')
-                        .text(`Diskon ${formatDecimal(rowDiscount, 0, 2)}% akan dibuat batch stok terpisah dari diskon ${formatDecimal(meta.diskon, 0, 2)}%.`);
-                    row.data('batch-mode', 'separate-discount');
+                        .text(`Diskon ${formatDecimal(rowDiscount, 0, 2)}% dan PPN ${formatDecimal(rowTax, 0, 2)}% akan dibuat batch stok terpisah dari batch existing (${formatDecimal(meta.diskon, 0, 2)}% / ${formatDecimal(meta.ppn, 0, 2)}%).`);
+                    row.data('batch-mode', 'separate-price-factor');
                     return;
                 }
 
                 hint
                     .removeClass('is-manual is-warning')
                     .addClass('is-existing')
-                    .text(`Batch existing diskon ${formatDecimal(meta.diskon, 0, 2)}%, stok ${formatDecimal(meta.qty, 0, 2)}${meta.expired ? ', ED ' + meta.expired : ''}.`);
+                    .text(`Batch existing diskon ${formatDecimal(meta.diskon, 0, 2)}%, PPN ${formatDecimal(meta.ppn, 0, 2)}%, stok ${formatDecimal(meta.qty, 0, 2)}${meta.expired ? ', ED ' + meta.expired : ''}.`);
                 row.data('batch-mode', 'existing');
                 return;
             }
@@ -365,7 +376,8 @@
                     qty: 0,
                     harga_beli: harga,
                     diskon,
-                    text: `${batch || 'Batch terpilih'} | ED ${expired || '-'} | Diskon ${formatDecimal(diskon, 0, 2)}%`
+                    ppn,
+                    text: `${batch || 'Batch terpilih'} | ED ${expired || '-'} | Diskon ${formatDecimal(diskon, 0, 2)}% | PPN ${formatDecimal(ppn, 0, 2)}%`
                 });
             }
 
@@ -562,7 +574,7 @@
                 input.val(max);
             }
 
-            if (input.hasClass('receive-discount')) {
+            if (input.hasClass('receive-discount') || input.hasClass('receive-tax')) {
                 setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
             }
 

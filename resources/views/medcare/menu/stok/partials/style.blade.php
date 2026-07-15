@@ -575,6 +575,17 @@
         white-space: nowrap;
     }
 
+    .stock-reason {
+        display: inline-block;
+        min-width: 220px;
+        max-width: 360px;
+        color: #334155;
+        font-size: .82rem;
+        font-weight: 600;
+        line-height: 1.35;
+        white-space: normal;
+    }
+
     .stock-qty-value {
         display: inline-flex;
         align-items: baseline;

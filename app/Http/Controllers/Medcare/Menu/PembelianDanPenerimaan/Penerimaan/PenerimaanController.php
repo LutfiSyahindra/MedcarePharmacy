@@ -458,7 +458,7 @@ class PenerimaanController extends Controller
                 'konversi_satuan' => $conversion,
                 'satuan_beli' => $this->purchaseUnitLabel($poDetail),
                 'satuan_stok' => $this->stockUnitLabel($poDetail),
-                'stok_batch_id' => $this->stockBatchIdForDiscount($selectedBatch, $diskon),
+                'stok_batch_id' => $this->stockBatchIdForDiscountAndTax($selectedBatch, $diskon, $ppn),
                 'no_batch' => $batch,
                 'expired_date' => $expired === '' ? null : $this->parseDate($expired),
                 'harga_beli' => $harga,
@@ -655,6 +655,7 @@ class PenerimaanController extends Controller
             'text' => $batch->no_batch
                 . ' | ED ' . ($expiredDate ?: '-')
                 . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
+                . ' | PPN ' . number_format((float) ($batch->ppn ?? 0), 2, ',', '.') . '%'
                 . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
             'no_batch' => $batch->no_batch,
             'expired_date' => $expiredDate,
@@ -662,16 +663,20 @@ class PenerimaanController extends Controller
             'harga_beli' => (float) $batch->harga_beli,
             'harga_jual' => (float) $batch->harga_jual,
             'diskon' => (float) ($batch->diskon ?? 0),
+            'ppn' => (float) ($batch->ppn ?? 0),
         ];
     }
 
-    private function stockBatchIdForDiscount(?StokBatchModel $batch, float $diskon): ?int
+    private function stockBatchIdForDiscountAndTax(?StokBatchModel $batch, float $diskon, float $ppn): ?int
     {
         if (! $batch) {
             return null;
         }
 
-        return $this->sameDiscount((float) ($batch->diskon ?? 0), $diskon) ? $batch->id : null;
+        $sameDiscount = $this->samePercent((float) ($batch->diskon ?? 0), $diskon);
+        $sameTax = $this->samePercent((float) ($batch->ppn ?? 0), $ppn);
+
+        return $sameDiscount && $sameTax ? $batch->id : null;
     }
 
     private function discountPercent($value): float
@@ -680,6 +685,11 @@ class PenerimaanController extends Controller
     }
 
     private function sameDiscount(float $left, float $right): bool
+    {
+        return $this->samePercent($left, $right);
+    }
+
+    private function samePercent(float $left, float $right): bool
     {
         return abs($this->discountPercent($left) - $this->discountPercent($right)) < 0.00001;
     }
