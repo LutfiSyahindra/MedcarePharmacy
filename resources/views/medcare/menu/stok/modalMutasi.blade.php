@@ -127,6 +127,11 @@
                                     <input type="number" class="form-control" name="harga_beli" id="mutasi_harga_beli"
                                         min="0" step="0.01" placeholder="0">
                                 </div>
+                                <div class="stock-field stock-in-field">
+                                    <label for="mutasi_harga_jual"><i class="mdi mdi-cash-plus"></i> Harga Jual Satuan Stok</label>
+                                    <input type="number" class="form-control" name="harga_jual" id="mutasi_harga_jual"
+                                        min="0" step="0.01" placeholder="0">
+                                </div>
                             </div>
                         </div>
 

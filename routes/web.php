@@ -265,6 +265,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/penerimaan/store', [PenerimaanController::class, 'store'])->name('penerimaan.store');
         Route::get('/penerimaan/{id}/show', [PenerimaanController::class, 'show'])->name('penerimaan.show');
         Route::get('/penerimaan/{id}/edit', [PenerimaanController::class, 'edit'])->name('penerimaan.edit');
+        Route::get('/penerimaan/{id}/harga-jual-preview', [PenerimaanController::class, 'hargaJualPreview'])->name('penerimaan.hargaJualPreview');
         Route::put('/penerimaan/{id}/update', [PenerimaanController::class, 'update'])->name('penerimaan.update');
         Route::put('/penerimaan/{id}/post', [PenerimaanController::class, 'post'])->name('penerimaan.post');
         Route::put('/penerimaan/{id}/cancel', [PenerimaanController::class, 'cancel'])->name('penerimaan.cancel');

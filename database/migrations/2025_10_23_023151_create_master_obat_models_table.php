@@ -35,10 +35,9 @@ return new class extends Migration
             $table->string('dosis')->nullable();
             $table->string('kemasan')->nullable();
 
-            // Ambang stok & harga
+            // Ambang stok & harga beli
             $table->integer('stok_minimum')->default(0);
             $table->decimal('harga_beli', 15, 2)->default(0);
-            $table->decimal('harga_jual', 15, 2)->default(0);
 
             // Informasi batch & kedaluwarsa
             $table->date('tgl_kadaluarsa')->nullable();

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan;
 
 use App\Http\Controllers\Controller;
+use App\Models\MarginsModel;
+use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
+use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -174,6 +177,26 @@ class PenerimaanController extends Controller
         return response()->json($this->penerimaanPayload($id));
     }
 
+    public function hargaJualPreview($id)
+    {
+        $penerimaan = PenerimaanBarangModel::with([
+            'purchaseOrder',
+            'distributor',
+            'details.obat.satuan',
+            'details.obat.golongan',
+            'details.purchaseOrderDetail.satuanKonversi.satuan',
+        ])->findOrFail($id);
+
+        if ($penerimaan->status !== 'draft') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Harga jual hanya bisa dipreview dari penerimaan berstatus draft.',
+            ], 422);
+        }
+
+        return response()->json($this->sellingPricePayload($penerimaan));
+    }
+
     public function update(Request $request, $id)
     {
         $request->validate($this->rules($id));
@@ -213,6 +236,7 @@ class PenerimaanController extends Controller
             $penerimaan = PenerimaanBarangModel::with([
                 'purchaseOrder',
                 'details.obat.satuan',
+                'details.obat.golongan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
             ])->lockForUpdate()->findOrFail($id);
 
@@ -223,9 +247,17 @@ class PenerimaanController extends Controller
                 ], 422);
             }
 
+            $sellingPricesByDetailId = $this->sellingPriceRowsByDetailId($penerimaan);
+
             foreach ($penerimaan->details as $detail) {
-                $this->stockService->recordReceipt($penerimaan, $detail);
+                $this->stockService->recordReceipt(
+                    $penerimaan,
+                    $detail,
+                    $sellingPricesByDetailId[$detail->id]['harga_jual'] ?? null
+                );
             }
+
+            $sellingPrices = array_values($sellingPricesByDetailId);
 
             $penerimaan->update([
                 'status' => 'posted',
@@ -237,7 +269,8 @@ class PenerimaanController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Penerimaan berhasil diposting dan stok obat diperbarui.',
+                'message' => 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.',
+                'selling_prices' => $sellingPrices,
             ]);
         });
     }
@@ -315,6 +348,8 @@ class PenerimaanController extends Controller
             'obat_id.*' => ['required', 'integer', 'exists:master_obats,id'],
             'qty_diterima' => ['required', 'array'],
             'qty_diterima.*' => ['required', 'numeric', 'min:0'],
+            'stok_batch_id' => ['nullable', 'array'],
+            'stok_batch_id.*' => ['nullable', 'integer', 'exists:stok_batches,id'],
             'no_batch' => ['required', 'array'],
             'no_batch.*' => ['nullable', 'string', 'max:80'],
             'expired_date' => ['required', 'array'],
@@ -373,14 +408,24 @@ class PenerimaanController extends Controller
                 continue;
             }
 
+            $selectedBatch = $this->selectedStockBatch(
+                $request->input('stok_batch_id.' . $index),
+                (int) $poDetail->obat_id,
+                $index
+            );
             $batch = trim((string) ($request->no_batch[$index] ?? ''));
             $expired = trim((string) ($request->expired_date[$index] ?? ''));
+
+            if ($selectedBatch) {
+                $batch = $selectedBatch->no_batch;
+                $expired = optional($selectedBatch->expired_date)->format('Y-m-d') ?: '';
+            }
 
             if ($batch === '') {
                 throw ValidationException::withMessages(['no_batch.' . $index => 'Nomor batch wajib diisi.']);
             }
 
-            if ($expired === '') {
+            if ($expired === '' && ! $selectedBatch) {
                 throw ValidationException::withMessages(['expired_date.' . $index => 'Expired date wajib diisi.']);
             }
 
@@ -396,7 +441,7 @@ class PenerimaanController extends Controller
             $conversion = $this->conversionFactor($poDetail);
             $qtyStock = $qty * $conversion;
             $hargaStock = $conversion > 0 ? $harga / $conversion : $harga;
-            $diskon = (float) ($request->diskon[$index] ?? 0);
+            $diskon = $this->discountPercent($request->diskon[$index] ?? 0);
             $ppn = (float) ($request->ppn[$index] ?? 0);
             $subtotal = $qty * $harga;
             $nilaiDiskon = $subtotal * ($diskon / 100);
@@ -413,8 +458,9 @@ class PenerimaanController extends Controller
                 'konversi_satuan' => $conversion,
                 'satuan_beli' => $this->purchaseUnitLabel($poDetail),
                 'satuan_stok' => $this->stockUnitLabel($poDetail),
+                'stok_batch_id' => $this->stockBatchIdForDiscount($selectedBatch, $diskon),
                 'no_batch' => $batch,
-                'expired_date' => $this->parseDate($expired),
+                'expired_date' => $expired === '' ? null : $this->parseDate($expired),
                 'harga_beli' => $harga,
                 'harga_beli_stok' => $hargaStock,
                 'diskon' => $diskon,
@@ -504,7 +550,9 @@ class PenerimaanController extends Controller
             ]);
         }
 
-        $details = $po->details->map(function ($detail) use ($ignorePenerimaanId) {
+        $batchOptionsByObat = $this->stockBatchOptionsByObat($po->details->pluck('obat_id')->all());
+
+        $details = $po->details->map(function ($detail) use ($ignorePenerimaanId, $batchOptionsByObat) {
             $received = $this->receivedQtyForPoDetail($detail->id, $ignorePenerimaanId);
             $outstanding = max(0, (float) $detail->qty - $received);
 
@@ -526,6 +574,7 @@ class PenerimaanController extends Controller
                 'harga_estimasi_stok' => $this->conversionFactor($detail) > 0
                     ? (float) $detail->harga_estimasi / $this->conversionFactor($detail)
                     : (float) $detail->harga_estimasi,
+                'batch_options' => $batchOptionsByObat[(int) $detail->obat_id] ?? [],
             ];
         })->values();
 
@@ -553,6 +602,86 @@ class PenerimaanController extends Controller
                 }
             })
             ->sum('qty_diterima');
+    }
+
+    private function selectedStockBatch($batchId, int $obatId, int $index): ?StokBatchModel
+    {
+        if ($batchId === null || $batchId === '') {
+            return null;
+        }
+
+        $batch = StokBatchModel::where('id', $batchId)
+            ->where('obat_id', $obatId)
+            ->first();
+
+        if (! $batch) {
+            throw ValidationException::withMessages([
+                'stok_batch_id.' . $index => 'Batch stok tidak sesuai dengan obat yang dipilih.',
+            ]);
+        }
+
+        return $batch;
+    }
+
+    private function stockBatchOptionsByObat(array $obatIds): array
+    {
+        $obatIds = collect($obatIds)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($obatIds->isEmpty()) {
+            return [];
+        }
+
+        return StokBatchModel::whereIn('obat_id', $obatIds)
+            ->orderBy('expired_date')
+            ->orderBy('no_batch')
+            ->get()
+            ->groupBy('obat_id')
+            ->map(fn ($batches) => $batches
+                ->map(fn (StokBatchModel $batch) => $this->stockBatchOption($batch))
+                ->values()
+                ->all())
+            ->all();
+    }
+
+    private function stockBatchOption(StokBatchModel $batch): array
+    {
+        $expiredDate = optional($batch->expired_date)->format('Y-m-d');
+
+        return [
+            'id' => $batch->id,
+            'text' => $batch->no_batch
+                . ' | ED ' . ($expiredDate ?: '-')
+                . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
+                . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
+            'no_batch' => $batch->no_batch,
+            'expired_date' => $expiredDate,
+            'qty' => (float) $batch->qty,
+            'harga_beli' => (float) $batch->harga_beli,
+            'harga_jual' => (float) $batch->harga_jual,
+            'diskon' => (float) ($batch->diskon ?? 0),
+        ];
+    }
+
+    private function stockBatchIdForDiscount(?StokBatchModel $batch, float $diskon): ?int
+    {
+        if (! $batch) {
+            return null;
+        }
+
+        return $this->sameDiscount((float) ($batch->diskon ?? 0), $diskon) ? $batch->id : null;
+    }
+
+    private function discountPercent($value): float
+    {
+        return round(min(100, max(0, (float) ($value ?: 0))), 2);
+    }
+
+    private function sameDiscount(float $left, float $right): bool
+    {
+        return abs($this->discountPercent($left) - $this->discountPercent($right)) < 0.00001;
     }
 
     private function postedReceivedQtyForPoDetail($poDetailId): float
@@ -594,6 +723,164 @@ class PenerimaanController extends Controller
             $po->status = $nextStatus;
             $po->save();
         }
+    }
+
+    private function sellingPricePayload(PenerimaanBarangModel $penerimaan): array
+    {
+        $details = $penerimaan->details
+            ->map(fn (PenerimaanBarangDetailModel $detail) => $this->sellingPriceRow($detail))
+            ->values();
+
+        return [
+            'header' => [
+                'id' => $penerimaan->id,
+                'nomor_penerimaan' => $penerimaan->nomor_penerimaan,
+                'no_po' => $penerimaan->purchaseOrder->no_po ?? '-',
+                'supplier' => $penerimaan->distributor->nama ?? '-',
+                'tanggal_penerimaan' => optional($penerimaan->tanggal_penerimaan)->format('Y-m-d'),
+            ],
+            'details' => $details,
+            'summary' => [
+                'item_count' => $details->count(),
+                'missing_margin_count' => $details->where('has_margin', false)->count(),
+            ],
+        ];
+    }
+
+    private function sellingPriceRowsByDetailId(PenerimaanBarangModel $penerimaan): array
+    {
+        return $penerimaan->details
+            ->mapWithKeys(fn (PenerimaanBarangDetailModel $detail) => [
+                $detail->id => $this->sellingPriceRow($detail),
+            ])
+            ->all();
+    }
+
+    private function sellingPriceRow(PenerimaanBarangDetailModel $detail): array
+    {
+        $detail->loadMissing([
+            'obat.satuan',
+            'obat.golongan',
+            'purchaseOrderDetail.satuanKonversi.satuan',
+        ]);
+
+        $obat = $detail->obat;
+
+        if (! $obat) {
+            throw ValidationException::withMessages([
+                'obat_id' => 'Obat pada detail penerimaan tidak ditemukan.',
+            ]);
+        }
+
+        $conversion = $this->detailConversionFactor($detail);
+        $qtySatuanTerkecil = $this->detailStockQuantity($detail, $conversion);
+        $totalHargaBeli = $this->detailTotalPurchasePriceIncludingTax($detail);
+        $ppn = (float) ($detail->ppn ?? 0);
+        $diskon = (float) ($detail->diskon ?? 0);
+        $margin = $this->activeGolonganMargin($obat);
+        $faktorJual = $margin ? (float) $margin->faktor_jual : 1.0;
+
+        if ($qtySatuanTerkecil <= 0) {
+            throw ValidationException::withMessages([
+                'qty_diterima' => 'Qty satuan terkecil tidak valid untuk menghitung harga jual.',
+            ]);
+        }
+
+        $nilaiDiskon = $this->detailDiscountValue($detail, $totalHargaBeli, $diskon);
+        $totalHargaJual = max(0, $totalHargaBeli * $faktorJual);
+        $hargaJual = round($totalHargaJual / $qtySatuanTerkecil, 2);
+        $hargaBeliTerkecil = $totalHargaBeli / $qtySatuanTerkecil;
+        $satuanBeli = $detail->satuan_beli
+            ?: ($detail->purchaseOrderDetail?->satuanKonversi?->satuan?->nama ?? ($obat->satuan->nama ?? 'satuan'));
+        $satuanTerkecil = $detail->satuan_stok ?: ($obat->satuan->nama ?? 'satuan terkecil');
+
+        return [
+            'detail_id' => $detail->id,
+            'obat_id' => $obat->id,
+            'kode_obat' => $obat->kode_obat,
+            'nama_obat' => $obat->nama_obat,
+            'golongan' => $obat->golongan->nama ?? '-',
+            'satuan_beli' => $satuanBeli,
+            'satuan_terkecil' => $satuanTerkecil,
+            'konversi_satuan' => $conversion,
+            'qty_diterima' => round((float) $detail->qty_diterima, 4),
+            'qty_satuan_terkecil' => round($qtySatuanTerkecil, 4),
+            'harga_beli' => round((float) $detail->harga_beli, 2),
+            'total_harga_beli' => round($totalHargaBeli, 2),
+            'harga_beli_satuan_terkecil' => round($hargaBeliTerkecil, 2),
+            'ppn' => $ppn,
+            'faktor_jual' => $faktorJual,
+            'has_margin' => (bool) $margin,
+            'diskon' => $diskon,
+            'nilai_diskon_beli' => round($nilaiDiskon, 2),
+            'nilai_diskon_jual' => round($nilaiDiskon, 2),
+            'total_harga_beli_include_ppn' => round($totalHargaBeli, 2),
+            'total_harga_jual' => round($totalHargaJual, 2),
+            'harga_jual' => $hargaJual,
+        ];
+    }
+
+    private function activeGolonganMargin(MasterObatModel $obat): ?MarginsModel
+    {
+        if (! $obat->golongan_id) {
+            return null;
+        }
+
+        return MarginsModel::where('tingkat', 'golongan')
+            ->where('reference_id', $obat->golongan_id)
+            ->where('is_active', true)
+            ->latest('id')
+            ->first();
+    }
+
+    private function detailConversionFactor(PenerimaanBarangDetailModel $detail): float
+    {
+        $storedConversion = (float) ($detail->konversi_satuan ?? 0);
+
+        if ($storedConversion > 0) {
+            return max(1, $storedConversion);
+        }
+
+        return max(1, (float) ($detail->purchaseOrderDetail?->satuanKonversi?->konversi ?? 1));
+    }
+
+    private function detailStockQuantity(PenerimaanBarangDetailModel $detail, float $conversion): float
+    {
+        $storedQty = (float) ($detail->qty_diterima_stok ?? 0);
+
+        if ($storedQty > 0) {
+            return $storedQty;
+        }
+
+        return (float) $detail->qty_diterima * $conversion;
+    }
+
+    private function detailTotalPurchasePriceIncludingTax(PenerimaanBarangDetailModel $detail): float
+    {
+        $storedTotal = (float) ($detail->total ?? 0);
+
+        if ($storedTotal > 0) {
+            return $storedTotal;
+        }
+
+        $subtotal = (float) ($detail->subtotal ?? ((float) $detail->qty_diterima * (float) $detail->harga_beli));
+        $nilaiDiskon = (float) ($detail->nilai_diskon ?? 0);
+        $nilaiPpn = (float) ($detail->nilai_ppn ?? 0);
+
+        return max(0, $subtotal - $nilaiDiskon + $nilaiPpn);
+    }
+
+    private function detailDiscountValue(PenerimaanBarangDetailModel $detail, float $totalHargaBeli, float $diskon): float
+    {
+        $storedDiscount = (float) ($detail->nilai_diskon ?? 0);
+
+        if ($storedDiscount > 0) {
+            return $storedDiscount;
+        }
+
+        $subtotal = (float) ($detail->subtotal ?? ((float) $detail->qty_diterima * (float) $detail->harga_beli));
+
+        return $subtotal > 0 ? $subtotal * ($diskon / 100) : $totalHargaBeli * ($diskon / 100);
     }
 
     private function parseDate($date): string

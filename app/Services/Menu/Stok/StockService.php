@@ -13,19 +13,22 @@ use Illuminate\Validation\ValidationException;
 
 class StockService
 {
-    public function recordReceipt(PenerimaanBarangModel $penerimaan, PenerimaanBarangDetailModel $detail): KartuStokModel
+    public function recordReceipt(PenerimaanBarangModel $penerimaan, PenerimaanBarangDetailModel $detail, ?float $hargaJual = null): KartuStokModel
     {
         $detail->loadMissing(['purchaseOrderDetail.satuanKonversi.satuan', 'obat.satuan']);
         $penerimaan->loadMissing('purchaseOrder');
         $qtyStock = $this->receiptStockQuantity($detail);
         $basePrice = $this->receiptBasePrice($detail);
 
-        return $this->recordMovement([
+        $movement = $this->recordMovement([
             'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $detail->stok_batch_id,
             'no_batch' => $detail->no_batch,
             'expired_date' => $detail->expired_date,
             'qty' => $qtyStock,
             'harga_beli' => $basePrice,
+            'harga_jual' => $hargaJual,
+            'diskon' => $detail->diskon ?? 0,
             'jenis_mutasi' => 'masuk',
             'tanggal_mutasi' => $penerimaan->posted_at ?: now(),
             'reference_type' => PenerimaanBarangModel::class,
@@ -35,6 +38,12 @@ class StockService
             'keterangan' => 'Penerimaan barang dari PO ' . ($penerimaan->purchaseOrder->no_po ?? '-') . ' - ' . $this->conversionNote($detail, $qtyStock),
             'created_by' => $penerimaan->posted_by ?: Auth::id(),
         ]);
+
+        if (! $detail->stok_batch_id && $movement->stok_batch_id) {
+            $detail->forceFill(['stok_batch_id' => $movement->stok_batch_id])->save();
+        }
+
+        return $movement;
     }
 
     public function reverseReceipt(PenerimaanBarangModel $penerimaan, PenerimaanBarangDetailModel $detail): KartuStokModel
@@ -45,10 +54,14 @@ class StockService
 
         return $this->recordMovement([
             'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $detail->stok_batch_id,
             'no_batch' => $detail->no_batch,
             'expired_date' => $detail->expired_date,
             'qty' => $qtyStock,
             'harga_beli' => $basePrice,
+            'harga_jual' => null,
+            'diskon' => $detail->diskon ?? 0,
+            'allow_identity_outbound' => true,
             'jenis_mutasi' => 'pembatalan_penerimaan',
             'tanggal_mutasi' => $penerimaan->cancelled_at ?: now(),
             'reference_type' => PenerimaanBarangModel::class,
@@ -72,6 +85,8 @@ class StockService
             'expired_date' => $data['expired_date'] ?? null,
             'qty' => $data['qty'],
             'harga_beli' => $data['harga_beli'] ?? 0,
+            'harga_jual' => $data['harga_jual'] ?? null,
+            'diskon' => $data['diskon'] ?? 0,
             'jenis_mutasi' => $jenisMutasi,
             'tanggal_mutasi' => $data['tanggal_mutasi'] ?? now(),
             'nomor_referensi' => $data['nomor_referensi'] ?? null,
@@ -102,8 +117,9 @@ class StockService
         $isInbound = in_array($jenisMutasi, ['masuk', 'penyesuaian_masuk'], true);
         $direction = $isInbound ? 1 : -1;
         $tanggalMutasi = $this->parseDateTime($payload['tanggal_mutasi'] ?? now());
+        $diskon = $this->discountPercent($payload['diskon'] ?? 0);
         $obat = MasterObatModel::lockForUpdate()->findOrFail($payload['obat_id']);
-        $batch = $this->resolveBatch($payload, $obat, $isInbound, $tanggalMutasi);
+        $batch = $this->resolveBatch($payload, $obat, $isInbound, $tanggalMutasi, $diskon);
         $nextBatchQty = (float) $batch->qty + ($direction * $qty);
 
         if ($nextBatchQty < -0.00001) {
@@ -117,6 +133,12 @@ class StockService
 
         if ($isInbound) {
             $batch->harga_beli = (float) ($payload['harga_beli'] ?: $batch->harga_beli);
+            $batch->diskon = $diskon;
+            $hargaJual = $this->optionalPrice($payload['harga_jual'] ?? null);
+
+            if ($hargaJual !== null) {
+                $batch->harga_jual = $hargaJual;
+            }
         }
 
         $batch->save();
@@ -144,7 +166,7 @@ class StockService
         ]);
     }
 
-    private function resolveBatch(array $payload, MasterObatModel $obat, bool $isInbound, Carbon $tanggalMutasi): StokBatchModel
+    private function resolveBatch(array $payload, MasterObatModel $obat, bool $isInbound, Carbon $tanggalMutasi, float $diskon): StokBatchModel
     {
         if (! empty($payload['stok_batch_id'])) {
             $batch = StokBatchModel::where('obat_id', $obat->id)
@@ -158,6 +180,10 @@ class StockService
                 ]);
             }
 
+            if ($isInbound && ! $this->sameDiscount((float) ($batch->diskon ?? 0), $diskon)) {
+                return $this->resolveInboundBatchByIdentity($payload, $obat, $tanggalMutasi, $diskon);
+            }
+
             return $batch;
         }
 
@@ -169,17 +195,38 @@ class StockService
             ]);
         }
 
-        $expiredDate = $this->parseDate($payload['expired_date'] ?? null, 'expired_date');
-
         if (! $isInbound) {
+            if (! empty($payload['allow_identity_outbound'])) {
+                return $this->resolveOutboundBatchByIdentity($payload, $obat, $diskon);
+            }
+
             throw ValidationException::withMessages([
                 'stok_batch_id' => 'Pilih batch stok untuk mutasi keluar.',
             ]);
         }
 
+        return $this->resolveInboundBatchByIdentity($payload, $obat, $tanggalMutasi, $diskon);
+    }
+
+    private function resolveInboundBatchByIdentity(array $payload, MasterObatModel $obat, Carbon $tanggalMutasi, float $diskon): StokBatchModel
+    {
+        $batchNumber = trim((string) ($payload['no_batch'] ?? ''));
+
+        if ($batchNumber === '') {
+            throw ValidationException::withMessages([
+                'no_batch' => 'Nomor batch wajib diisi.',
+            ]);
+        }
+
+        $expiredDate = $this->parseOptionalDate($payload['expired_date'] ?? null, 'expired_date');
         $batch = StokBatchModel::where('obat_id', $obat->id)
             ->where('no_batch', $batchNumber)
-            ->whereDate('expired_date', $expiredDate)
+            ->when(
+                $expiredDate === null,
+                fn ($query) => $query->whereNull('expired_date'),
+                fn ($query) => $query->whereDate('expired_date', $expiredDate)
+            )
+            ->where('diskon', $diskon)
             ->lockForUpdate()
             ->first();
 
@@ -193,9 +240,61 @@ class StockService
             'expired_date' => $expiredDate,
             'qty' => 0,
             'harga_beli' => (float) ($payload['harga_beli'] ?? 0),
+            'harga_jual' => $this->optionalPrice($payload['harga_jual'] ?? null) ?? 0,
+            'diskon' => $diskon,
             'last_movement_at' => $tanggalMutasi,
             'created_by' => $payload['created_by'] ?? Auth::id(),
         ]);
+    }
+
+    private function resolveOutboundBatchByIdentity(array $payload, MasterObatModel $obat, float $diskon): StokBatchModel
+    {
+        $batchNumber = trim((string) ($payload['no_batch'] ?? ''));
+
+        if ($batchNumber === '') {
+            throw ValidationException::withMessages([
+                'no_batch' => 'Nomor batch wajib diisi.',
+            ]);
+        }
+
+        $expiredDate = $this->parseOptionalDate($payload['expired_date'] ?? null, 'expired_date');
+        $batch = StokBatchModel::where('obat_id', $obat->id)
+            ->where('no_batch', $batchNumber)
+            ->when(
+                $expiredDate === null,
+                fn ($query) => $query->whereNull('expired_date'),
+                fn ($query) => $query->whereDate('expired_date', $expiredDate)
+            )
+            ->where('diskon', $diskon)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $batch) {
+            throw ValidationException::withMessages([
+                'stok_batch_id' => 'Batch stok penerimaan tidak ditemukan.',
+            ]);
+        }
+
+        return $batch;
+    }
+
+    private function optionalPrice($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return max(0, (float) $value);
+    }
+
+    private function discountPercent($value): float
+    {
+        return round(min(100, max(0, (float) ($value ?: 0))), 2);
+    }
+
+    private function sameDiscount(float $left, float $right): bool
+    {
+        return abs($this->discountPercent($left) - $this->discountPercent($right)) < 0.00001;
     }
 
     private function receiptStockQuantity(PenerimaanBarangDetailModel $detail): float
@@ -254,6 +353,23 @@ class StockService
             throw ValidationException::withMessages([
                 $field => 'Expired date wajib diisi.',
             ]);
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                $field => 'Format tanggal tidak valid.',
+            ]);
+        }
+    }
+
+    private function parseOptionalDate($date, string $field): ?string
+    {
+        $value = trim((string) $date);
+
+        if ($value === '') {
+            return null;
         }
 
         try {

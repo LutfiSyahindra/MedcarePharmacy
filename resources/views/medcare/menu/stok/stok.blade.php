@@ -225,6 +225,7 @@
                             <th>Expired Date</th>
                             <th>Qty</th>
                             <th>Harga Beli</th>
+                            <th>Harga Jual</th>
                             <th>Nilai Stok</th>
                             <th>Status</th>
                             <th>Mutasi Terakhir</th>

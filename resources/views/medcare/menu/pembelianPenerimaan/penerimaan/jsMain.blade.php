@@ -32,6 +32,13 @@
             }).format(Number(value) || 0);
         }
 
+        function formatDecimal(value, minimumFractionDigits = 0, maximumFractionDigits = 2) {
+            return Number(value || 0).toLocaleString('id-ID', {
+                minimumFractionDigits,
+                maximumFractionDigits
+            });
+        }
+
         function escapeHtml(value) {
             return String(value ?? '-').replace(/[&<>"']/g, function(character) {
                 return {
@@ -57,6 +64,131 @@
         function conversionText(qty, conversion, purchaseUnit, stockUnit) {
             let stockQty = (Number(qty) || 0) * (Number(conversion) || 1);
             return `${Number(qty || 0).toLocaleString('id-ID')} ${purchaseUnit || 'satuan'} = ${stockQty.toLocaleString('id-ID')} ${stockUnit || 'satuan stok'}`;
+        }
+
+        function batchOptionLabel(batch) {
+            if (batch.text) {
+                return batch.text;
+            }
+
+            return `${batch.no_batch || '-'} | ED ${batch.expired_date || '-'} | Diskon ${formatDecimal(batch.diskon, 0, 2)}% | Stok ${formatDecimal(batch.qty, 0, 2)}`;
+        }
+
+        function normalizedDiscount(value) {
+            return Math.min(100, Math.max(0, Number(value) || 0));
+        }
+
+        function sameDiscount(left, right) {
+            return Math.abs(normalizedDiscount(left) - normalizedDiscount(right)) < 0.00001;
+        }
+
+        function receiveBatchOptionsHtml(batchOptions, selectedBatchId) {
+            let options = ['<option value="">Input manual / batch baru</option>'];
+
+            (batchOptions || []).forEach(function(batch) {
+                let selected = String(batch.id) === String(selectedBatchId) ? ' selected' : '';
+                options.push(
+                    `<option value="${escapeHtml(batch.id)}"${selected}` +
+                    ` data-batch="${escapeHtml(batch.no_batch || '')}"` +
+                    ` data-expired="${escapeHtml(batch.expired_date || '')}"` +
+                    ` data-qty="${Number(batch.qty) || 0}"` +
+                    ` data-harga="${Number(batch.harga_beli) || 0}"` +
+                    ` data-diskon="${Number(batch.diskon) || 0}">` +
+                    `${escapeHtml(batchOptionLabel(batch))}</option>`
+                );
+            });
+
+            return options.join('');
+        }
+
+        function selectedReceiveBatchMeta(select) {
+            let selected = select.find(':selected');
+
+            return {
+                id: selected.val() || '',
+                batch: selected.data('batch') || '',
+                expired: selected.data('expired') || '',
+                qty: Number(selected.data('qty')) || 0,
+                diskon: Number(selected.data('diskon')) || 0,
+                label: selected.text() || ''
+            };
+        }
+
+        function setReceiveExpiredValue(input, value) {
+            let picker = input[0]?._flatpickr;
+
+            if (picker) {
+                if (value) {
+                    picker.setDate(value, false, 'Y-m-d');
+                } else {
+                    picker.clear();
+                }
+                return;
+            }
+
+            input.val(value || '');
+        }
+
+        function setReceiveBatchMode(select, preserveManualValue = false) {
+            let row = select.closest('.receive-detail-row');
+            let meta = selectedReceiveBatchMeta(select);
+            let batchInput = row.find('input[name="no_batch[]"]');
+            let expiredInput = row.find('input[name="expired_date[]"]');
+            let hint = row.find('.receive-batch-mode');
+            let rowDiscount = normalizedDiscount(row.find('.receive-discount').val());
+
+            if (meta.id) {
+                batchInput.val(meta.batch).prop('readonly', true);
+                setReceiveExpiredValue(expiredInput, meta.expired);
+                expiredInput.prop('readonly', true);
+
+                if (!sameDiscount(meta.diskon, rowDiscount)) {
+                    hint
+                        .removeClass('is-manual is-existing')
+                        .addClass('is-warning')
+                        .text(`Diskon ${formatDecimal(rowDiscount, 0, 2)}% akan dibuat batch stok terpisah dari diskon ${formatDecimal(meta.diskon, 0, 2)}%.`);
+                    row.data('batch-mode', 'separate-discount');
+                    return;
+                }
+
+                hint
+                    .removeClass('is-manual is-warning')
+                    .addClass('is-existing')
+                    .text(`Batch existing diskon ${formatDecimal(meta.diskon, 0, 2)}%, stok ${formatDecimal(meta.qty, 0, 2)}${meta.expired ? ', ED ' + meta.expired : ''}.`);
+                row.data('batch-mode', 'existing');
+                return;
+            }
+
+            if (!preserveManualValue && row.data('batch-mode') !== 'manual') {
+                batchInput.val('');
+                setReceiveExpiredValue(expiredInput, '');
+            }
+
+            batchInput.prop('readonly', false);
+            expiredInput.prop('readonly', false);
+            hint
+                .removeClass('is-existing is-warning')
+                .addClass('is-manual')
+                .text('Input manual jika batch belum tersedia.');
+            row.data('batch-mode', 'manual');
+        }
+
+        function initializeReceiveBatchSelects() {
+            $('.receive-batch-select').each(function() {
+                let select = $(this);
+
+                if (select.data('select2')) {
+                    select.select2('destroy');
+                }
+
+                select.select2({
+                    dropdownParent: $('#penerimaanModal'),
+                    width: '100%',
+                    minimumResultsForSearch: 5
+                });
+
+                setReceiveBatchMode(select, true);
+            });
         }
 
         function statusMeta(status) {
@@ -217,11 +349,25 @@
             let ppn = existing ? Number(existing.ppn || 0) : 11;
             let batch = existing ? (existing.no_batch || '') : '';
             let expired = existing && existing.expired_date ? moment(existing.expired_date).format('YYYY-MM-DD') : '';
+            let selectedBatchId = existing ? (existing.stok_batch_id || '') : '';
+            let batchOptions = Array.isArray(item.batch_options) ? [...item.batch_options] : [];
             let conversion = Number(item.konversi || existing?.konversi_satuan || 1) || 1;
             let stockUnit = item.satuan_stok || existing?.satuan_stok || 'satuan stok';
             let conversionHint = conversion > 1
                 ? `<small class="d-block text-muted receive-conversion-hint">${conversionText(qtyValue, conversion, item.satuan, stockUnit)}</small>`
                 : '';
+
+            if (selectedBatchId && !batchOptions.some(batchItem => String(batchItem.id) === String(selectedBatchId))) {
+                batchOptions.push({
+                    id: selectedBatchId,
+                    no_batch: batch,
+                    expired_date: expired,
+                    qty: 0,
+                    harga_beli: harga,
+                    diskon,
+                    text: `${batch || 'Batch terpilih'} | ED ${expired || '-'} | Diskon ${formatDecimal(diskon, 0, 2)}%`
+                });
+            }
 
             return `
                 <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}">
@@ -249,8 +395,14 @@
                         ${conversionHint}
                     </td>
                     <td>
-                        <input type="text" class="form-control form-control-sm" name="no_batch[]"
-                            value="${escapeHtml(batch)}" placeholder="Batch">
+                        <div class="receive-batch-picker">
+                            <select class="form-select form-select-sm receive-batch-select" name="stok_batch_id[]">
+                                ${receiveBatchOptionsHtml(batchOptions, selectedBatchId)}
+                            </select>
+                            <input type="text" class="form-control form-control-sm" name="no_batch[]"
+                                value="${escapeHtml(batch)}" placeholder="Batch manual">
+                            <small class="receive-batch-mode">Input manual jika batch belum tersedia.</small>
+                        </div>
                     </td>
                     <td>
                         <input type="text" class="form-control form-control-sm receive-expired-date"
@@ -308,6 +460,7 @@
                 allowInput: true
             });
 
+            initializeReceiveBatchSelects();
             recalculateReceiveTotals();
             updateFormProgress();
         }
@@ -332,8 +485,10 @@
                 let conversion = Number(row.data('konversi')) || 1;
                 let purchaseUnit = row.data('satuan') || 'satuan';
                 let stockUnit = row.data('satuan-stok') || 'satuan stok';
+                let selectedBatchId = row.find('.receive-batch-select').val();
                 let batch = row.find('input[name="no_batch[]"]').val()?.trim();
                 let expired = row.find('input[name="expired_date[]"]').val()?.trim();
+                let hasBatchInfo = selectedBatchId ? Boolean(batch) : Boolean(batch && expired);
                 let subtotal = qty * price;
                 let discountValue = subtotal * discount / 100;
                 let taxBase = Math.max(0, subtotal - discountValue);
@@ -356,7 +511,7 @@
                     totalTax += taxValue;
                     grandTotal += total;
 
-                    if (!batch || !expired) {
+                    if (!hasBatchInfo) {
                         invalidRows++;
                         row.addClass('is-warning');
                         check.addClass('is-warning').html(
@@ -407,6 +562,15 @@
                 input.val(max);
             }
 
+            if (input.hasClass('receive-discount')) {
+                setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
+            }
+
+            recalculateReceiveTotals();
+        });
+
+        $(document).on('change', '.receive-batch-select', function() {
+            setReceiveBatchMode($(this));
             recalculateReceiveTotals();
         });
 
@@ -784,28 +948,128 @@
             });
         };
 
-        window.postPenerimaan = function(id) {
-            Swal.fire({
-                title: 'Posting penerimaan?',
-                text: 'Stok obat akan bertambah sesuai qty diterima.',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, posting',
-                cancelButtonText: 'Batal'
-            }).then(function(result) {
-                if (!result.isConfirmed) return;
+        function renderHargaJualPreview(preview) {
+            let header = preview.header || {};
+            let details = preview.details || [];
+            let missingMargin = Number(preview.summary?.missing_margin_count || 0);
+            let rows = details.map(function(item) {
+                let marginBadge = item.has_margin
+                    ? '<span class="badge bg-success bg-opacity-10 text-success">Aktif</span>'
+                    : '<span class="badge bg-warning bg-opacity-10 text-warning">Faktor 1</span>';
 
-                $.ajax({
-                    url: '{{ route("penerimaan.post", ":id") }}'.replace(':id', id),
-                    type: 'PUT',
-                    success: function(response) {
-                        Swal.fire('Berhasil', response.message, 'success');
-                        PenerimaanTable.ajax.reload(null, false);
-                    },
-                    error: function(xhr) {
-                        Swal.fire('Gagal', xhr.responseJSON?.message || 'Penerimaan gagal diposting.', 'error');
-                    }
+                return `
+                    <tr>
+                        <td class="text-start">
+                            <strong>${escapeHtml(item.nama_obat)}</strong>
+                            <small class="d-block text-muted">${escapeHtml(item.kode_obat)} - ${escapeHtml(item.golongan)}</small>
+                        </td>
+                        <td class="text-end">
+                            <strong>${formatRupiah(item.total_harga_beli_include_ppn || item.total_harga_beli)}</strong>
+                            <small class="d-block text-muted">${formatDecimal(item.qty_diterima, 0, 2)} ${escapeHtml(item.satuan_beli)} x ${formatRupiah(item.harga_beli)}</small>
+                            <small class="d-block text-muted">Sudah termasuk PPN</small>
+                            <small class="d-block text-muted">Dasar ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
+                        </td>
+                        <td class="text-end">
+                            <strong>${formatDecimal(item.qty_satuan_terkecil, 0, 2)}</strong>
+                            <small class="d-block text-muted">${escapeHtml(item.satuan_terkecil)}</small>
+                            <small class="d-block text-muted">Konversi ${formatDecimal(item.konversi_satuan, 0, 2)}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="d-block">${formatDecimal(item.ppn, 0, 2)}%</span>
+                            <small class="text-muted">Include total</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="d-block">${formatDecimal(item.faktor_jual, 3, 3)}</span>
+                            ${marginBadge}
+                        </td>
+                        <td class="text-end">
+                            <span class="d-block">${formatDecimal(item.diskon, 0, 2)}%</span>
+                            <small class="text-muted">${formatRupiah(item.nilai_diskon_beli || item.nilai_diskon_jual)}</small>
+                            <small class="d-block text-muted">Sudah masuk total</small>
+                        </td>
+                        <td class="text-end">
+                            <strong>${formatRupiah(item.harga_jual)}</strong>
+                            <small class="d-block text-muted">/${escapeHtml(item.satuan_terkecil)}</small>
+                            <small class="d-block text-muted">Total ${formatRupiah(item.total_harga_jual)}</small>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (!rows) {
+                rows = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Tidak ada detail harga jual.</td>
+                    </tr>
+                `;
+            }
+
+            return `
+                <div class="receive-selling-preview text-start">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                        <div>
+                            <strong>${escapeHtml(header.nomor_penerimaan || '-')}</strong>
+                            <small class="d-block text-muted">${escapeHtml(header.no_po || '-')} - ${escapeHtml(header.supplier || '-')}</small>
+                        </div>
+                        <span class="badge bg-primary bg-opacity-10 text-primary align-self-start">${details.length} item</span>
+                    </div>
+                    ${missingMargin > 0 ? `
+                        <div class="alert alert-warning py-2 mb-3">
+                            ${missingMargin} item belum memiliki margin golongan aktif, sehingga faktor 1.000 dipakai.
+                        </div>
+                    ` : ''}
+                    <div class="table-responsive" style="max-height: 420px; overflow: auto;">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Obat</th>
+                                    <th class="text-end">Total Beli + PPN</th>
+                                    <th class="text-end">Qty Terkecil</th>
+                                    <th class="text-center">PPN</th>
+                                    <th class="text-center">Faktor</th>
+                                    <th class="text-end">Diskon</th>
+                                    <th class="text-end">Harga Jual</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function submitPostPenerimaan(id) {
+            $.ajax({
+                url: '{{ route("penerimaan.post", ":id") }}'.replace(':id', id),
+                type: 'PUT',
+                success: function(response) {
+                    Swal.fire('Berhasil', response.message, 'success');
+                    PenerimaanTable.ajax.reload(null, false);
+                },
+                error: function(xhr) {
+                    Swal.fire('Gagal', xhr.responseJSON?.message || 'Penerimaan gagal diposting.', 'error');
+                }
+            });
+        }
+
+        window.postPenerimaan = function(id) {
+            $.get('{{ route("penerimaan.hargaJualPreview", ":id") }}'.replace(':id', id), function(preview) {
+                Swal.fire({
+                    title: 'Harga jual saat posting',
+                    html: renderHargaJualPreview(preview),
+                    icon: 'info',
+                    width: '72rem',
+                    showCancelButton: true,
+                    confirmButtonText: 'Posting & Simpan Harga Jual Batch',
+                    cancelButtonText: 'Batal',
+                    focusConfirm: false
+                }).then(function(result) {
+                    if (!result.isConfirmed) return;
+
+                    submitPostPenerimaan(id);
                 });
+            }).fail(function(xhr) {
+                Swal.fire('Gagal', xhr.responseJSON?.message || 'Harga jual penerimaan gagal dimuat.', 'error');
             });
         };
 

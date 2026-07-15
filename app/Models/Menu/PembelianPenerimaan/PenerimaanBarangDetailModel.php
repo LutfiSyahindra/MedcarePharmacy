@@ -3,6 +3,7 @@
 namespace App\Models\Menu\PembelianPenerimaan;
 
 use App\Models\MasterObatModel;
+use App\Models\Menu\Stok\StokBatchModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -31,5 +32,10 @@ class PenerimaanBarangDetailModel extends Model
     public function obat()
     {
         return $this->belongsTo(MasterObatModel::class, 'obat_id');
+    }
+
+    public function stokBatch()
+    {
+        return $this->belongsTo(StokBatchModel::class, 'stok_batch_id');
     }
 }

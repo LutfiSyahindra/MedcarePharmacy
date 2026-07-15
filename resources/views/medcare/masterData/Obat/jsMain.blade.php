@@ -173,6 +173,7 @@
             $(mainGolonganSelector).prop('disabled', true);
             $(subGolonganSelector).prop('disabled', true);
             $('[name="stok_minimum"]').val(0);
+            $('[name="harga_beli"]').val('');
             $('[name="is_generik"]').val('1');
             $('[name="is_active"]').val('1');
         }

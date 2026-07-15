@@ -17,6 +17,10 @@ class StokBatchModel extends Model
 
     protected $casts = [
         'expired_date' => 'date',
+        'qty' => 'decimal:2',
+        'harga_beli' => 'decimal:2',
+        'harga_jual' => 'decimal:2',
+        'diskon' => 'decimal:2',
         'last_movement_at' => 'datetime',
     ];
 

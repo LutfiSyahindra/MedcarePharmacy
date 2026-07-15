@@ -100,6 +100,8 @@ class StokController extends Controller
                     'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
                     'qty' => (float) $batch->qty,
                     'harga_beli' => (float) $batch->harga_beli,
+                    'harga_jual' => (float) $batch->harga_jual,
+                    'diskon' => (float) ($batch->diskon ?? 0),
                     'nilai_stok' => (float) $batch->qty * (float) $batch->harga_beli,
                     'status' => $status,
                     'status_label' => $this->statusLabel($status),
@@ -223,11 +225,16 @@ class StokController extends Controller
             ->map(function ($batch) {
                 return [
                     'id' => $batch->id,
-                    'text' => $batch->no_batch . ' | ED ' . optional($batch->expired_date)->format('Y-m-d') . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
+                    'text' => $batch->no_batch
+                        . ' | ED ' . (optional($batch->expired_date)->format('Y-m-d') ?: '-')
+                        . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
+                        . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
                     'no_batch' => $batch->no_batch,
                     'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
                     'qty' => (float) $batch->qty,
                     'harga_beli' => (float) $batch->harga_beli,
+                    'harga_jual' => (float) $batch->harga_jual,
+                    'diskon' => (float) ($batch->diskon ?? 0),
                 ];
             });
 
@@ -244,6 +251,7 @@ class StokController extends Controller
             'expired_date' => ['nullable', 'string'],
             'qty' => ['required', 'numeric', 'min:0.01'],
             'harga_beli' => ['nullable', 'numeric', 'min:0'],
+            'harga_jual' => ['nullable', 'numeric', 'min:0'],
             'tanggal_mutasi' => ['required', 'string'],
             'nomor_referensi' => ['nullable', 'string', 'max:100'],
             'keterangan' => ['nullable', 'string'],

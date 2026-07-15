@@ -342,6 +342,10 @@
                     render: data => `<span class="stock-money"><i class="mdi mdi-cash"></i>${formatCurrency(data)}</span>`
                 },
                 {
+                    data: 'harga_jual',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
+                },
+                {
                     data: 'nilai_stok',
                     render: data => `<span class="stock-money">${formatCurrency(data)}</span>`
                 },
@@ -512,6 +516,7 @@
                 label: selected.text() || '',
                 qty: Number(selected.data('qty')) || 0,
                 harga: Number(selected.data('harga')) || 0,
+                hargaJual: Number(selected.data('harga-jual')) || 0,
                 batch: selected.data('batch') || '',
                 expired: selected.data('expired') || ''
             };
@@ -579,7 +584,7 @@
             $('.stock-in-field').toggleClass('d-none', !inbound);
             $('.stock-out-field').toggleClass('d-none', inbound);
             $('#mutasi_no_batch, #mutasi_expired_date').prop('required', inbound).prop('disabled', !inbound);
-            $('#mutasi_harga_beli').prop('disabled', !inbound);
+            $('#mutasi_harga_beli, #mutasi_harga_jual').prop('disabled', !inbound);
             $('#mutasi_stok_batch_id').prop('required', !inbound).prop('disabled', inbound);
 
             if (inbound) {
@@ -606,6 +611,7 @@
                     $(option)
                         .attr('data-qty', batch.qty)
                         .attr('data-harga', batch.harga_beli)
+                        .attr('data-harga-jual', batch.harga_jual)
                         .attr('data-batch', batch.no_batch)
                         .attr('data-expired', batch.expired_date || '');
                     select.append(option);
@@ -627,7 +633,7 @@
         });
 
         $('#mutasi_stok_batch_id').on('change', updateMutationPreview);
-        $('#mutasi_qty, #mutasi_harga_beli').on('input', updateMutationPreview);
+        $('#mutasi_qty, #mutasi_harga_beli, #mutasi_harga_jual').on('input', updateMutationPreview);
 
         $('#mutasiStokModal').on('show.bs.modal', function() {
             $('#mutasiStokForm')[0].reset();

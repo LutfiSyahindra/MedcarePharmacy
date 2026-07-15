@@ -1521,7 +1521,7 @@
     }
 
     .receive-detail-editor .table {
-        min-width: 1320px;
+        min-width: 1420px;
     }
 
     .receive-detail-row td {
@@ -1553,11 +1553,53 @@
     }
 
     .receive-detail-row input[name="no_batch[]"] {
-        min-width: 130px;
+        min-width: 170px;
     }
 
     .receive-detail-row input[name="expired_date[]"] {
         min-width: 125px;
+    }
+
+    .receive-batch-picker {
+        display: grid;
+        min-width: 230px;
+        gap: .38rem;
+    }
+
+    .receive-batch-picker .select2-container--default .select2-selection--single {
+        min-height: 32px;
+        border-color: var(--purchase-border);
+        border-radius: 7px;
+    }
+
+    .receive-batch-picker .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 30px;
+        font-size: .78rem;
+    }
+
+    .receive-batch-picker .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 30px;
+    }
+
+    .receive-batch-picker .form-control[readonly] {
+        background: #f8fafc;
+        color: var(--purchase-muted);
+    }
+
+    .receive-batch-mode {
+        display: block;
+        color: var(--purchase-muted);
+        font-size: .69rem;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .receive-batch-mode.is-existing {
+        color: var(--purchase-primary-strong);
+    }
+
+    .receive-batch-mode.is-warning {
+        color: var(--purchase-warning);
     }
 
     .receive-qty-control {
