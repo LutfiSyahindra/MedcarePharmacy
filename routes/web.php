@@ -22,6 +22,7 @@ use App\Http\Controllers\Medcare\Settings\Auth\UsersController;
 use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
+use App\Http\Controllers\Medcare\Settings\Notification\NotificationSettingController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -94,6 +95,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/assignBranch/getUser', [AssignBranchController::class, 'getUser'])->name('assignBranch.getUser');
         Route::post('/assignBranch/assign', [AssignBranchController::class, 'assign'])->name('assignBranch.assign');
         Route::get('/assignBranch/{branch}/getAssignedUsers', [AssignBranchController::class, 'getAssignedUsers'])->name('assignBranch.getAssignedUsers');
+
+        // Notification configuration
+        Route::get('/notifikasi', [NotificationSettingController::class, 'index'])->name('settings.notifikasi.index');
+        Route::put('/notifikasi/update', [NotificationSettingController::class, 'update'])->name('settings.notifikasi.update');
     });
 
     Route::prefix('medcare/masterData')->group(function () {

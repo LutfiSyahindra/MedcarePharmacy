@@ -11,10 +11,12 @@ use Yajra\DataTables\Facades\DataTables;
 class MainController extends Controller
 {
     protected $NotifikasiService;
+
     public function __construct(NotifikasiService $NotifikasiService)
     {
         $this->NotifikasiService = $NotifikasiService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -24,59 +26,34 @@ class MainController extends Controller
 
         return DataTables::of($data)
             ->addIndexColumn()
-            ->addColumn('actions', function ($row) {
-                return '
-                    <button 
-                        class="btn btn-sm btn-primary"
-                        onclick="readNotifikasi(
-                            \'' . $row['id'] . '\',
-                            \'' . ($row['url'] ?? '#') . '\'
-                        )"
-                    >
-                        <i class="mdi mdi-eye"></i>
-                    </button>
-                ';
-            })
-
-            ->rawColumns(['actions', 'status'])
+            ->rawColumns(['document', 'summary', 'status_badge', 'actions'])
             ->make(true);
     }
 
     public function readNotifikasi(Request $request)
     {
         $request->validate([
-            'id' => 'required|string'
+            'id' => 'required|string',
         ]);
 
-        // panggil service
-        $this->NotifikasiService->markAsRead($request->id);
+        $notification = $this->NotifikasiService->markAsRead($request->id);
+
+        if (! $notification) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Notifikasi tidak ditemukan.',
+            ], 404);
+        }
 
         return response()->json([
-            'status' => 'success'
+            'status' => 'success',
+            'notification' => $notification,
         ]);
     }
 
     public function latest()
     {
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-
-        $notifs = $user
-            ->unreadNotifications()
-            ->latest()
-            ->get();
-
-        return response()->json(
-            $notifs->map(function ($n) {
-                return [
-                    'id'      => $n->id,
-                    'title'   => $n->data['title'] ?? 'Notifikasi',
-                    'message' => $n->data['message'] ?? '',
-                    'url'     => $n->data['url'] ?? '#',
-                    'time'    => $n->created_at->diffForHumans(),
-                ];
-            })
-        );
+        return response()->json($this->NotifikasiService->latestUnread());
     }
 
     public function markAllRead()
@@ -86,7 +63,7 @@ class MainController extends Controller
             ->markAsRead();
 
         return response()->json([
-            'status' => 'success'
+            'status' => 'success',
         ]);
     }
 
@@ -95,10 +72,10 @@ class MainController extends Controller
      */
     public function index()
     {
-        return view('medcare.menu.notifikasi.semuaNotifikasi');
+        return view('medcare.menu.notifikasi.semuaNotifikasi', [
+            'summary' => $this->NotifikasiService->summaryForUser(),
+        ]);
     }
-
-
 
     /**
      * Show the form for creating a new resource.

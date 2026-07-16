@@ -490,7 +490,6 @@
 <script>
     (function notifNavbar() {
 
-        if (!window.Echo) return setTimeout(notifNavbar, 100);
         if (window.__navbarNotifReady) return;
         window.__navbarNotifReady = true;
 
@@ -517,6 +516,13 @@
                 `;
 
                     data.forEach(n => {
+                        const actionPill = n.can_action ?
+                            '<span class="badge bg-warning text-dark mt-1">Perlu aksi</span>' :
+                            `<span class="badge bg-light text-muted mt-1">${escapeNotifHtml(n.status_label || '')}</span>`;
+                        const itemsLine = n.items_summary ?
+                            `<small class="text-muted d-block">Isi: ${escapeNotifHtml(n.items_summary)}</small>` :
+                            '';
+
                         listEl.innerHTML += `
                         <a href="javascript:;" 
                            class="dropdown-item d-flex align-items-start py-2"
@@ -524,10 +530,12 @@
                             <div class="me-2 text-primary">
                                 <i data-feather="bell"></i>
                             </div>
-                            <div>
-                                <p class="mb-0 fw-semibold">${n.title}</p>
-                                <small class="text-muted">${n.message}</small><br>
-                                <small class="text-muted">${n.time}</small>
+                            <div class="flex-grow-1">
+                                <p class="mb-0 fw-semibold">${escapeNotifHtml(n.document_no || n.title)}</p>
+                                <small class="text-muted">${escapeNotifHtml(n.module_label || 'Notifikasi')} · ${escapeNotifHtml(n.message || '')}</small><br>
+                                ${itemsLine}
+                                <small class="text-muted">${escapeNotifHtml(n.time || '')}</small><br>
+                                ${actionPill}
                             </div>
                         </a>`;
                     });
@@ -536,14 +544,29 @@
                 });
         }
 
+        function escapeNotifHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        window.loadNotif = loadNotif;
+
         // initial load
         loadNotif();
 
         // realtime update
-        Echo.private(`App.Models.User.{{ auth()->id() }}`)
-            .listen('.Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', () => {
-                loadNotif();
-            });
+        (function bindNavbarEcho() {
+            if (!window.Echo) return setTimeout(bindNavbarEcho, 100);
+
+            Echo.private(`App.Models.User.{{ auth()->id() }}`)
+                .listen('.Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', () => {
+                    loadNotif();
+                });
+        })();
 
         window.readNotif = function(id, url) {
             fetch("{{ route("notifikasi.readNotifikasi") }}", {
@@ -584,7 +607,7 @@
                 /* =====================
                  * 🔊 SOUND
                  * ===================== */
-                if (window.playNotifSound) {
+                if (e.sound_enabled !== false && window.playNotifSound) {
                     window.playNotifSound();
                 }
 
@@ -617,6 +640,11 @@
                  * ===================== */
                 if (window.NotifikasiTable) {
                     window.NotifikasiTable.ajax.reload(null, false);
+                }
+                const summaryUnread = document.getElementById('notificationUnreadSummary');
+                if (summaryUnread) {
+                    const current = parseInt((summaryUnread.textContent || '0').replace(/\D/g, '')) || 0;
+                    summaryUnread.textContent = (current + 1).toLocaleString('id-ID');
                 }
 
                 /* =====================
@@ -682,6 +710,10 @@
                  * ===================== */
                 if (window.NotifikasiTable) {
                     window.NotifikasiTable.ajax.reload(null, false);
+                }
+                const summaryUnread = document.getElementById('notificationUnreadSummary');
+                if (summaryUnread) {
+                    summaryUnread.textContent = '0';
                 }
             });
     }

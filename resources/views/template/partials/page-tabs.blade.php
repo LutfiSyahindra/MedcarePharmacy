@@ -11,7 +11,7 @@
         top: 60px;
         right: 0;
         left: var(--medcare-tab-sidebar-width);
-        z-index: 990;
+        z-index: 970;
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;

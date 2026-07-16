@@ -84,6 +84,24 @@
                     </div>
                 </li>
             @endcan
+            @if (auth()->user()->hasAnyRole(["Admin", "admin", "Apoteker", "apoteker"]))
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="collapse" href="#settings-notifikasi" role="button"
+                        aria-expanded="false" aria-controls="settings-notifikasi">
+                        <i class="link-icon" data-feather="bell"></i>
+                        <span class="link-title">Notifikasi</span>
+                        <i class="link-arrow" data-feather="chevron-down"></i>
+                    </a>
+
+                    <div class="collapse" id="settings-notifikasi">
+                        <ul class="nav sub-menu">
+                            <li class="nav-item">
+                                <a href="{{ route("settings.notifikasi.index") }}" class="nav-link">Konfigurasi</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+            @endif
 
             {{-- Master Data --}}
             <li class="nav-item nav-category">Master Data</li>

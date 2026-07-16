@@ -4,95 +4,98 @@
     @include("template.AddOn.dataTables")
     @include("template.AddOn.mdiicon")
     @include("template.AddOn.sweetAlert")
-    @include("template.AddOn.select2")
-    @include("template.AddOn.dropify")
-    @include("template.AddOn.datePicker")
-    <style>
-        .modal-dialog {
-            overflow-y: initial !important;
-        }
-
-        .modal-body {
-            max-height: auto !important;
-            overflow-y: auto;
-        }
-
-        .select2-container {
-            z-index: 999999 !important;
-        }
-
-        .select2-dropdown {
-            z-index: 999999 !important;
-        }
-
-        .notif-unread {
-            background-color: #fff7e6 !important;
-            font-weight: 600;
-        }
-    </style>
+    @include("medcare.menu.notifikasi.partials.style")
 @endpush
 
 @section("content")
     @include("medcare.menu.notifikasi.readModal")
-    <nav class="page-breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#">Notifikasi</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Semua Notifikasi</li>
-        </ol>
-    </nav>
 
-    <div class="row">
-        <div class="col-md-12 grid-margin stretch-card">
-            <div class="card">
-                <div class="card-body">
-                    <div
-                        class="d-flex flex-wrap justify-content-between align-items-center mb-3 p-3 bg-light rounded-3 shadow-sm">
-                        <!-- Bagian Kiri: Ikon dan Judul -->
-                        <div class="d-flex align-items-center mb-3 mb-md-0">
-                            <div class="icon bg-primary bg-opacity-10 text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                style="width: 44px; height: 44px;">
-                                <i class="mdi mdi-cart-outline mdi-24px"></i>
-                            </div>
-                            <div>
-                                <h5 class="fw-bold text-primary mb-1">Data Notifikasi</h5>
-                                <small class="text-muted">Kelola dan cari data Notifikasi dengan cepat</small>
-                            </div>
-                        </div>
+    <div class="notification-page">
+        <nav class="page-breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#">Notifikasi</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Semua Notifikasi</li>
+            </ol>
+        </nav>
 
-                        <!-- Bagian Kanan: Search dan Tombol Aksi -->
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <!-- Search Bar -->
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-white border-end-0">
-                                    <i class="mdi mdi-magnify text-muted"></i>
-                                </span>
-                                <input type="text" id="searchNotifikasi" class="form-control border-start-0"
-                                    placeholder="Cari Notifikasi...">
-                            </div>
-                        </div>
-                    </div>
+        <section class="notification-command">
+            <div>
+                <span class="notification-kicker">Notification command center</span>
+                <h4>Semua Notifikasi</h4>
+                <p>Pantau request pembelian, penerimaan, retur pembelian, dan hasil aksi admin/apoteker.</p>
+            </div>
+            <div class="notification-command-actions">
+                <button type="button" class="notification-icon-button" id="refreshNotificationTable" title="Refresh">
+                    <i class="mdi mdi-refresh"></i>
+                </button>
+                <button type="button" class="notification-mark-read" onclick="markAllNotifRead()">
+                    <i class="mdi mdi-check-all"></i>
+                    <span>Tandai Dibaca</span>
+                </button>
+            </div>
+        </section>
 
-                    <div class="table-responsive">
-                        <table id="tableNotifikasi" class="table">
-                            <thead>
-                                <tr>
-                                    <th width="40">No</th>
-                                    <th>Tipe</th>
-                                    <th>Pesan</th>
-                                    <th>Nomor PO</th>
-                                    <th>Waktu</th>
-                                    <th>Status</th>
-                                    <th width="120">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="notification-metrics">
+            <div class="notification-metric">
+                <span class="metric-icon is-total"><i class="mdi mdi-bell-outline"></i></span>
+                <div>
+                    <strong>{{ number_format($summary["total"] ?? 0, 0, ",", ".") }}</strong>
+                    <span>Total</span>
+                </div>
+            </div>
+            <div class="notification-metric">
+                <span class="metric-icon is-unread"><i class="mdi mdi-email-alert-outline"></i></span>
+                <div>
+                    <strong id="notificationUnreadSummary">{{ number_format($summary["unread"] ?? 0, 0, ",", ".") }}</strong>
+                    <span>Belum Dibaca</span>
+                </div>
+            </div>
+            <div class="notification-metric">
+                <span class="metric-icon is-action"><i class="mdi mdi-cursor-default-click-outline"></i></span>
+                <div>
+                    <strong>{{ number_format($summary["pending_action"] ?? 0, 0, ",", ".") }}</strong>
+                    <span>Perlu Aksi</span>
+                </div>
+            </div>
+            <div class="notification-metric">
+                <span class="metric-icon is-result"><i class="mdi mdi-check-decagram-outline"></i></span>
+                <div>
+                    <strong>{{ number_format($summary["results"] ?? 0, 0, ",", ".") }}</strong>
+                    <span>Hasil Aksi</span>
                 </div>
             </div>
         </div>
+
+        <section class="notification-inbox">
+            <div class="notification-toolbar">
+                <div class="notification-filters" role="tablist" aria-label="Filter notifikasi">
+                    <button type="button" class="notification-filter is-active" data-filter="">Semua</button>
+                    <button type="button" class="notification-filter" data-filter="Perlu aksi">Perlu Aksi</button>
+                    <button type="button" class="notification-filter" data-filter="Hasil Aksi">Hasil Aksi</button>
+                    <button type="button" class="notification-filter" data-filter="Belum dibaca">Belum Dibaca</button>
+                </div>
+                <label class="notification-search" for="searchNotifikasi">
+                    <i class="mdi mdi-magnify"></i>
+                    <input type="search" id="searchNotifikasi" placeholder="Cari nomor, modul, supplier, atau pesan">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="tableNotifikasi" class="table notification-table align-middle">
+                    <thead>
+                        <tr>
+                            <th width="48">No</th>
+                            <th>Dokumen</th>
+                            <th>Ringkasan</th>
+                            <th width="180">Status</th>
+                            <th width="130">Waktu</th>
+                            <th width="112">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 @endsection
 

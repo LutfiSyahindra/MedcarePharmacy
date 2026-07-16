@@ -9,6 +9,7 @@ use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
+use App\Services\Notifikasi\TransactionNotificationService;
 use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,7 +20,10 @@ use Yajra\DataTables\Facades\DataTables;
 
 class ReturPembelianController extends Controller
 {
-    public function __construct(private readonly StockService $stockService) {}
+    public function __construct(
+        private readonly StockService $stockService,
+        private readonly TransactionNotificationService $transactionNotifications
+    ) {}
 
     public function returPembelian()
     {
@@ -53,6 +57,7 @@ class ReturPembelianController extends Controller
             'total_qty' => $activeRetur->sum('total_qty'),
             'grand_total' => $activeRetur->sum('grand_total'),
         ];
+        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
 
         return DataTables::of($retur)
             ->addIndexColumn()
@@ -61,7 +66,7 @@ class ReturPembelianController extends Controller
             ->addColumn('supplier', fn ($row) => $row->distributor->nama ?? '-')
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_retur)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
-            ->addColumn('actions', function ($row) {
+            ->addColumn('actions', function ($row) use ($canApprove) {
                 $actionButton = function (string $type, string $icon, string $label, string $handler) use ($row): string {
                     return '<button type="button" class="return-action-btn is-'.$type.'" onclick="'.$handler.'('.$row->id.')" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$label.'" aria-label="'.$label.'">
                         <i class="mdi '.$icon.'"></i>
@@ -72,10 +77,10 @@ class ReturPembelianController extends Controller
                 $editButton = $row->status === 'draft'
                     ? $actionButton('edit', 'mdi-pencil-outline', 'Edit draft', 'editReturPembelian')
                     : '';
-                $postButton = $row->status === 'draft'
+                $postButton = $canApprove && $row->status === 'draft'
                     ? $actionButton('post', 'mdi-send-check-outline', 'Posting retur', 'postReturPembelian')
                     : '';
-                $cancelButton = $row->status !== 'cancelled'
+                $cancelButton = $canApprove && $row->status !== 'cancelled'
                     ? $actionButton('cancel', 'mdi-cancel', 'Batalkan retur', 'cancelReturPembelian')
                     : '';
                 $deleteButton = $row->status === 'draft'
@@ -167,6 +172,9 @@ class ReturPembelianController extends Controller
                 $retur->details()->create($detail);
             }
 
+            $creator = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('retur_pembelian', $retur, $creator));
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Draft retur pembelian berhasil disimpan.',
@@ -227,6 +235,13 @@ class ReturPembelianController extends Controller
 
     public function post($id)
     {
+        if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin/apoteker yang dapat memposting retur pembelian.',
+            ], 403);
+        }
+
         return DB::transaction(function () use ($id) {
             $retur = $this->returQueryForBranch([
                 'penerimaanBarang',
@@ -254,6 +269,8 @@ class ReturPembelianController extends Controller
 
             $retur->status = 'posted';
             $retur->save();
+            $actor = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyActionResult('retur_pembelian', $retur, 'posted', $actor));
 
             return response()->json([
                 'status' => 'success',
@@ -264,6 +281,13 @@ class ReturPembelianController extends Controller
 
     public function cancel($id)
     {
+        if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin/apoteker yang dapat membatalkan retur pembelian.',
+            ], 403);
+        }
+
         return DB::transaction(function () use ($id) {
             $retur = $this->returQueryForBranch([
                 'penerimaanBarang',
@@ -290,6 +314,8 @@ class ReturPembelianController extends Controller
 
             $retur->status = 'cancelled';
             $retur->save();
+            $actor = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyActionResult('retur_pembelian', $retur, 'cancelled', $actor));
 
             return response()->json([
                 'status' => 'success',

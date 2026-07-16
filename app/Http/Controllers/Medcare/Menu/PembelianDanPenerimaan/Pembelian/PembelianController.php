@@ -3,9 +3,8 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Notifications\PoCreatedNotification;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
+use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Master\DistributorService;
 use App\Services\Settings\Master\MasterObatService;
 use App\Support\BranchAccess;
@@ -14,7 +13,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Yajra\DataTables\Facades\DataTables;
 
 class PembelianController extends Controller
@@ -25,8 +23,12 @@ class PembelianController extends Controller
 
     protected $MasterObatService;
 
-    public function __construct(PembelianService $PembelianService, DistributorService $DistributorService, MasterObatService $MasterObatService)
-    {
+    public function __construct(
+        PembelianService $PembelianService,
+        DistributorService $DistributorService,
+        MasterObatService $MasterObatService,
+        private readonly TransactionNotificationService $transactionNotifications
+    ) {
         $this->PembelianService = $PembelianService;
         $this->DistributorService = $DistributorService;
         $this->MasterObatService = $MasterObatService;
@@ -81,22 +83,23 @@ class PembelianController extends Controller
                 return (float) ($row['total_estimasi'] ?? 0);
             }),
         ];
+        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
 
         return DataTables::of($Pembelian)
             ->addIndexColumn()
-            ->addColumn('actions', function ($dataPembelian) {
+            ->addColumn('actions', function ($dataPembelian) use ($canApprove) {
                 $status = $dataPembelian['status'];
-                $approvalButton = in_array($status, ['draft', 'waiting_approval'], true)
+                $approvalButton = $canApprove && in_array($status, ['draft', 'waiting_approval'], true)
                     ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-check-circle"></i>
                 </button>'
                     : '';
-                $rejectButton = in_array($status, ['draft', 'waiting_approval'], true)
+                $rejectButton = $canApprove && in_array($status, ['draft', 'waiting_approval'], true)
                     ? '<button class="btn btn-sm btn-warning btn-reject-pembelian" onclick="rejectPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-close-circle"></i>
                 </button>'
                     : '';
-                $reopenButton = in_array($status, ['approved', 'rejected'], true)
+                $reopenButton = $canApprove && in_array($status, ['approved', 'rejected'], true)
                     ? '<button class="btn btn-sm btn-secondary btn-reopen-pembelian" onclick="reopenPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-lock-open-variant"></i>
                 </button>'
@@ -187,8 +190,8 @@ class PembelianController extends Controller
             /** @var \App\Models\User $user */
             $user = Auth::user();
             $branchId = BranchAccess::requireUserBranchId($user);
-            $isAdmin = $user->hasAnyRole(['Admin', 'admin']);
-            Log::info('User Role: '.($isAdmin ? 'Admin' : 'Non-Admin'));
+            $isApprover = $this->transactionNotifications->isApprovalRole($user);
+            Log::info('User Role: '.($isApprover ? 'Approver' : 'Non-Approver'));
 
             // Insert header
             $po = $this->PembelianService->createPembelian([
@@ -200,9 +203,8 @@ class PembelianController extends Controller
                 'catatan' => $request->catatan,
                 'created_by' => $user->id,
 
-                // Tambahan otomatis jika role admin
-                'approved_by' => $isAdmin ? $user->id : null,
-                'status' => $isAdmin ? 'approved' : 'waiting_approval',
+                'approved_by' => $isApprover ? $user->id : null,
+                'status' => $isApprover ? 'approved' : 'waiting_approval',
             ]);
 
             // Insert detail
@@ -222,21 +224,7 @@ class PembelianController extends Controller
             // ======================
             // 🔔 KIRIM NOTIFIKASI
             // ======================
-            $approvers = User::whereHas('roles', function ($query) {
-                $query->whereIn('name', ['Admin', 'admin']);
-            })
-                ->where(function ($query) use ($branchId) {
-                    $query->where('branch_id', $branchId)
-                        ->orWhereHas('branches', fn ($branchQuery) => $branchQuery->where('branches.id', $branchId));
-                })
-                ->get();
-
-            if ($approvers->count()) {
-                Notification::send(
-                    $approvers,
-                    new PoCreatedNotification($po)
-                );
-            }
+            $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
 
             return response()->json([
                 'status' => 'success',
@@ -290,10 +278,10 @@ class PembelianController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+        if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin yang dapat menyetujui pembelian.',
+                'message' => 'Hanya admin/apoteker yang dapat menyetujui pembelian.',
             ], 403);
         }
 
@@ -321,7 +309,8 @@ class PembelianController extends Controller
             ], 422);
         }
 
-        $this->PembelianService->updateStatus($id, 'approved', $user->id, $branchIds);
+        $updatedPo = $this->PembelianService->updateStatus($id, 'approved', $user->id, $branchIds);
+        $this->transactionNotifications->notifyActionResult('pembelian', $updatedPo, 'approved', $user);
 
         return response()->json([
             'status' => 'success',
@@ -334,10 +323,10 @@ class PembelianController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+        if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin yang dapat menolak pembelian.',
+                'message' => 'Hanya admin/apoteker yang dapat menolak pembelian.',
             ], 403);
         }
 
@@ -365,7 +354,8 @@ class PembelianController extends Controller
             ]);
         }
 
-        $this->PembelianService->updateStatus($id, 'rejected', null, $branchIds);
+        $updatedPo = $this->PembelianService->updateStatus($id, 'rejected', null, $branchIds);
+        $this->transactionNotifications->notifyActionResult('pembelian', $updatedPo, 'rejected', $user);
 
         return response()->json([
             'status' => 'success',
@@ -378,10 +368,10 @@ class PembelianController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (! $user || ! $user->hasAnyRole(['Admin', 'admin'])) {
+        if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin yang dapat membuka approval pembelian.',
+                'message' => 'Hanya admin/apoteker yang dapat membuka approval pembelian.',
             ], 403);
         }
 
@@ -485,6 +475,8 @@ class PembelianController extends Controller
             }
 
             DB::commit();
+
+            $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
 
             return response()->json([
                 'status' => 'success',

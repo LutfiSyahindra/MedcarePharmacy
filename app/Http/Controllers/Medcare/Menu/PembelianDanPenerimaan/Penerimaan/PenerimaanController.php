@@ -10,6 +10,7 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
+use App\Services\Notifikasi\TransactionNotificationService;
 use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,7 +23,10 @@ class PenerimaanController extends Controller
 {
     private const RECEIVABLE_PO_STATUSES = ['approved', 'diterima_sebagian'];
 
-    public function __construct(private readonly StockService $stockService) {}
+    public function __construct(
+        private readonly StockService $stockService,
+        private readonly TransactionNotificationService $transactionNotifications
+    ) {}
 
     public function penerimaan()
     {
@@ -56,6 +60,7 @@ class PenerimaanController extends Controller
             'total_qty' => $activePenerimaan->sum('total_qty'),
             'grand_total' => $activePenerimaan->sum('grand_total'),
         ];
+        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
 
         return DataTables::of($penerimaan)
             ->addIndexColumn()
@@ -63,15 +68,15 @@ class PenerimaanController extends Controller
             ->addColumn('supplier', fn ($row) => $row->distributor->nama ?? '-')
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_penerimaan)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
-            ->addColumn('actions', function ($row) {
+            ->addColumn('actions', function ($row) use ($canApprove) {
                 $detailButton = '<button class="btn btn-sm btn-info" onclick="lihatPenerimaan('.$row->id.')"><i class="mdi mdi-eye"></i></button>';
                 $editButton = $row->status === 'draft'
                     ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan('.$row->id.')"><i class="mdi mdi-pencil"></i></button>'
                     : '';
-                $postButton = $row->status === 'draft'
+                $postButton = $canApprove && $row->status === 'draft'
                     ? '<button class="btn btn-sm btn-primary" onclick="postPenerimaan('.$row->id.')"><i class="mdi mdi-send-check-outline"></i></button>'
                     : '';
-                $cancelButton = $row->status !== 'cancelled'
+                $cancelButton = $canApprove && $row->status !== 'cancelled'
                     ? '<button class="btn btn-sm btn-warning" onclick="cancelPenerimaan('.$row->id.')"><i class="mdi mdi-cancel"></i></button>'
                     : '';
                 $deleteButton = $row->status === 'draft'
@@ -154,6 +159,9 @@ class PenerimaanController extends Controller
             foreach ($computed['details'] as $detail) {
                 $penerimaan->details()->create($detail);
             }
+
+            $creator = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('penerimaan', $penerimaan, $creator));
 
             return response()->json([
                 'status' => 'success',
@@ -240,6 +248,13 @@ class PenerimaanController extends Controller
 
     public function post($id)
     {
+        if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin/apoteker yang dapat memposting penerimaan.',
+            ], 403);
+        }
+
         return DB::transaction(function () use ($id) {
             $penerimaan = $this->penerimaanQueryForBranch([
                 'purchaseOrder',
@@ -274,6 +289,8 @@ class PenerimaanController extends Controller
             ]);
 
             $this->syncPurchaseOrderReceivingStatus($penerimaan->purchase_order_id);
+            $actor = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyActionResult('penerimaan', $penerimaan, 'posted', $actor));
 
             return response()->json([
                 'status' => 'success',
@@ -285,6 +302,13 @@ class PenerimaanController extends Controller
 
     public function cancel($id)
     {
+        if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya admin/apoteker yang dapat membatalkan penerimaan.',
+            ], 403);
+        }
+
         return DB::transaction(function () use ($id) {
             $penerimaan = $this->penerimaanQueryForBranch(['details.obat'])->lockForUpdate()->findOrFail($id);
 
@@ -308,6 +332,8 @@ class PenerimaanController extends Controller
             ]);
 
             $this->syncPurchaseOrderReceivingStatus($penerimaan->purchase_order_id);
+            $actor = Auth::user();
+            DB::afterCommit(fn () => $this->transactionNotifications->notifyActionResult('penerimaan', $penerimaan, 'cancelled', $actor));
 
             return response()->json([
                 'status' => 'success',
