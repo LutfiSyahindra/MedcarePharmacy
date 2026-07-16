@@ -6,6 +6,8 @@ use App\Models\MarginsModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
+use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
+use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
@@ -88,10 +90,71 @@ class StockService
         ]);
     }
 
+    public function recordPurchaseReturn(ReturPembelianModel $retur, ReturPembelianDetailModel $detail): KartuStokModel
+    {
+        $detail->loadMissing(['purchaseOrderDetail.satuanKonversi.satuan', 'obat.satuan']);
+        $retur->loadMissing(['purchaseOrder', 'penerimaanBarang']);
+        $branchId = (int) ($retur->purchaseOrder?->branch_id ?: BranchAccess::requireUserBranchId());
+        $qtyStock = $this->returnStockQuantity($detail);
+        $basePrice = $this->returnBasePrice($detail);
+
+        return $this->recordMovement([
+            'branch_id' => $branchId,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $detail->stok_batch_id,
+            'no_batch' => $detail->no_batch,
+            'expired_date' => $detail->expired_date,
+            'qty' => $qtyStock,
+            'harga_beli' => $basePrice,
+            'harga_jual' => null,
+            'diskon' => $detail->diskon ?? 0,
+            'ppn' => $detail->ppn ?? 0,
+            'jenis_mutasi' => 'retur_pembelian',
+            'tanggal_mutasi' => $retur->posted_at ?: now(),
+            'reference_type' => ReturPembelianModel::class,
+            'reference_id' => $retur->id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $retur->nomor_retur,
+            'keterangan' => 'Retur pembelian ke supplier dari penerimaan '.($retur->penerimaanBarang->nomor_penerimaan ?? '-').' - '.$this->returnConversionNote($detail, $qtyStock),
+            'created_by' => $retur->posted_by ?: Auth::id(),
+        ]);
+    }
+
+    public function reversePurchaseReturn(ReturPembelianModel $retur, ReturPembelianDetailModel $detail): KartuStokModel
+    {
+        $detail->loadMissing(['purchaseOrderDetail.satuanKonversi.satuan', 'obat.satuan']);
+        $retur->loadMissing(['purchaseOrder', 'penerimaanBarang']);
+        $branchId = (int) ($retur->purchaseOrder?->branch_id ?: BranchAccess::requireUserBranchId());
+        $qtyStock = $this->returnStockQuantity($detail);
+        $basePrice = $this->returnBasePrice($detail);
+
+        return $this->recordMovement([
+            'branch_id' => $branchId,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $detail->stok_batch_id,
+            'no_batch' => $detail->no_batch,
+            'expired_date' => $detail->expired_date,
+            'qty' => $qtyStock,
+            'harga_beli' => $basePrice,
+            'harga_jual' => null,
+            'diskon' => $detail->diskon ?? 0,
+            'ppn' => $detail->ppn ?? 0,
+            'preserve_batch_cost' => true,
+            'jenis_mutasi' => 'pembatalan_retur_pembelian',
+            'tanggal_mutasi' => $retur->cancelled_at ?: now(),
+            'reference_type' => ReturPembelianModel::class,
+            'reference_id' => $retur->id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $retur->nomor_retur,
+            'keterangan' => 'Pembatalan retur pembelian dari penerimaan '.($retur->penerimaanBarang->nomor_penerimaan ?? '-').' - '.$this->returnConversionNote($detail, $qtyStock),
+            'created_by' => $retur->cancelled_by ?: Auth::id(),
+        ]);
+    }
+
     public function recordManualMutation(array $data): KartuStokModel
     {
         $jenisMutasi = $data['jenis_mutasi'];
-        $isInbound = in_array($jenisMutasi, ['masuk', 'penyesuaian_masuk'], true);
+        $isInbound = $this->isInboundMutation($jenisMutasi);
 
         $payload = [
             'branch_id' => BranchAccess::requireUserBranchId(),
@@ -197,11 +260,12 @@ class StockService
             $branchId = BranchAccess::requireUserBranchId();
         }
 
-        $isInbound = in_array($jenisMutasi, ['masuk', 'penyesuaian_masuk'], true);
+        $isInbound = $this->isInboundMutation($jenisMutasi);
         $direction = $isInbound ? 1 : -1;
         $tanggalMutasi = $this->parseDateTime($payload['tanggal_mutasi'] ?? now());
-        $hasDiscountPayload = array_key_exists('diskon', $payload) && $payload['diskon'] !== null && $payload['diskon'] !== '';
-        $hasTaxPayload = array_key_exists('ppn', $payload) && $payload['ppn'] !== null && $payload['ppn'] !== '';
+        $preserveBatchCost = ! empty($payload['preserve_batch_cost']);
+        $hasDiscountPayload = ! $preserveBatchCost && array_key_exists('diskon', $payload) && $payload['diskon'] !== null && $payload['diskon'] !== '';
+        $hasTaxPayload = ! $preserveBatchCost && array_key_exists('ppn', $payload) && $payload['ppn'] !== null && $payload['ppn'] !== '';
         $diskon = $hasDiscountPayload ? $this->discountPercent($payload['diskon']) : 0;
         $ppn = $hasTaxPayload ? $this->percent($payload['ppn']) : 0;
         $obat = MasterObatModel::lockForUpdate()->findOrFail($payload['obat_id']);
@@ -221,7 +285,7 @@ class StockService
         $batch->qty = max(0, $nextBatchQty);
         $batch->last_movement_at = $tanggalMutasi;
 
-        if ($isInbound) {
+        if ($isInbound && empty($payload['preserve_batch_cost'])) {
             $batch->harga_beli = (float) ($payload['harga_beli'] ?: $batch->harga_beli);
             $batch->diskon = $diskon;
             $batch->ppn = $ppn;
@@ -518,6 +582,15 @@ class StockService
         return abs(round($left, 2) - round($right, 2)) < 0.01;
     }
 
+    private function isInboundMutation(string $jenisMutasi): bool
+    {
+        return in_array($jenisMutasi, [
+            'masuk',
+            'penyesuaian_masuk',
+            'pembatalan_retur_pembelian',
+        ], true);
+    }
+
     private function receiptStockQuantity(PenerimaanBarangDetailModel $detail): float
     {
         $storedQty = (float) ($detail->qty_diterima_stok ?? 0);
@@ -562,6 +635,54 @@ class StockService
             ?: ($detail->obat?->satuan?->nama ?? 'satuan stok');
 
         return number_format((float) $detail->qty_diterima, 2, ',', '.').' '.$purchaseUnit
+            .' x '.number_format($conversion, 2, ',', '.')
+            .' = '.number_format($qtyStock, 2, ',', '.').' '.$stockUnit;
+    }
+
+    private function returnStockQuantity(ReturPembelianDetailModel $detail): float
+    {
+        $storedQty = (float) ($detail->qty_retur_stok ?? 0);
+
+        if ($storedQty > 0) {
+            return $storedQty;
+        }
+
+        return (float) $detail->qty_retur * $this->returnConversion($detail);
+    }
+
+    private function returnBasePrice(ReturPembelianDetailModel $detail): float
+    {
+        $storedPrice = (float) ($detail->harga_beli_stok ?? 0);
+
+        if ($storedPrice > 0) {
+            return $storedPrice;
+        }
+
+        $conversion = $this->returnConversion($detail);
+
+        return $conversion > 0 ? (float) $detail->harga_beli / $conversion : (float) $detail->harga_beli;
+    }
+
+    private function returnConversion(ReturPembelianDetailModel $detail): float
+    {
+        $storedConversion = (float) ($detail->konversi_satuan ?? 0);
+
+        if ($storedConversion > 0) {
+            return $storedConversion;
+        }
+
+        return max(1, (float) ($detail->purchaseOrderDetail?->satuanKonversi?->konversi ?? 1));
+    }
+
+    private function returnConversionNote(ReturPembelianDetailModel $detail, float $qtyStock): string
+    {
+        $conversion = $this->returnConversion($detail);
+        $purchaseUnit = $detail->satuan_beli
+            ?: ($detail->purchaseOrderDetail?->satuanKonversi?->satuan?->nama ?? 'satuan');
+        $stockUnit = $detail->satuan_stok
+            ?: ($detail->obat?->satuan?->nama ?? 'satuan stok');
+
+        return number_format((float) $detail->qty_retur, 2, ',', '.').' '.$purchaseUnit
             .' x '.number_format($conversion, 2, ',', '.')
             .' = '.number_format($qtyStock, 2, ',', '.').' '.$stockUnit;
     }

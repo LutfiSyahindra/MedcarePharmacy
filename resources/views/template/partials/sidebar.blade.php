@@ -282,6 +282,9 @@
                         <li class="nav-item">
                             <a href="{{ route("penerimaan.penerimaan") }}" class="nav-link">Penerimaan</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route("returPembelian.returPembelian") }}" class="nav-link">Retur Pembelian</a>
+                        </li>
                     </ul>
                 </div>
             </li>

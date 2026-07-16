@@ -13,9 +13,9 @@ use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
+use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
-use App\Http\Controllers\Medcare\Notifikasi\PembelianNotifikasiController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
 use App\Http\Controllers\Medcare\Settings\Auth\RoleController;
 use App\Http\Controllers\Medcare\Settings\Auth\UsersController;
@@ -23,8 +23,6 @@ use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
 use App\Http\Controllers\ProfileController;
-use App\Notifications\TestNotification;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -237,8 +235,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/konversiSatuanObat/exportTemplate', [KonversiSatuanObatController::class, 'exportTemplate'])->name('konversiSatuanObat.exportTemplate');
         Route::post('/konversiSatuanObat/import', [KonversiSatuanObatController::class, 'import'])->name('konversiSatuanObat.import');
 
-
-
     });
 
     Route::prefix('medcare/menu/pembelian-dan-penerimaan')->group(function () {
@@ -271,6 +267,18 @@ Route::middleware('auth')->group(function () {
         Route::put('/penerimaan/{id}/cancel', [PenerimaanController::class, 'cancel'])->name('penerimaan.cancel');
         Route::delete('/penerimaan/{id}/destroy', [PenerimaanController::class, 'destroy'])->name('penerimaan.destroy');
 
+        Route::get('/retur-pembelian', [ReturPembelianController::class, 'returPembelian'])->name('returPembelian.returPembelian');
+        Route::get('/retur-pembelian/table', [ReturPembelianController::class, 'table'])->name('returPembelian.table');
+        Route::get('/retur-pembelian/generateNoRetur', [ReturPembelianController::class, 'generateNoRetur'])->name('returPembelian.generateNoRetur');
+        Route::get('/retur-pembelian/posted-receipts', [ReturPembelianController::class, 'postedReceipts'])->name('returPembelian.postedReceipts');
+        Route::get('/retur-pembelian/penerimaan/{id}', [ReturPembelianController::class, 'receiptDetail'])->name('returPembelian.receiptDetail');
+        Route::post('/retur-pembelian/store', [ReturPembelianController::class, 'store'])->name('returPembelian.store');
+        Route::get('/retur-pembelian/{id}/show', [ReturPembelianController::class, 'show'])->name('returPembelian.show');
+        Route::get('/retur-pembelian/{id}/edit', [ReturPembelianController::class, 'edit'])->name('returPembelian.edit');
+        Route::put('/retur-pembelian/{id}/update', [ReturPembelianController::class, 'update'])->name('returPembelian.update');
+        Route::put('/retur-pembelian/{id}/post', [ReturPembelianController::class, 'post'])->name('returPembelian.post');
+        Route::put('/retur-pembelian/{id}/cancel', [ReturPembelianController::class, 'cancel'])->name('returPembelian.cancel');
+        Route::delete('/retur-pembelian/{id}/destroy', [ReturPembelianController::class, 'destroy'])->name('returPembelian.destroy');
 
     });
 
