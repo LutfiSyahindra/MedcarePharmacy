@@ -2,6 +2,7 @@
 
 namespace App\Models\Menu\Stok;
 
+use App\Models\BranchModel;
 use App\Models\MasterObatModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,11 @@ class KartuStokModel extends Model
     public function obat()
     {
         return $this->belongsTo(MasterObatModel::class, 'obat_id');
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(BranchModel::class, 'branch_id');
     }
 
     public function batch()

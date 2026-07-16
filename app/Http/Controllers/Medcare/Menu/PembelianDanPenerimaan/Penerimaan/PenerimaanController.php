@@ -10,6 +10,7 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
+use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -21,9 +22,7 @@ class PenerimaanController extends Controller
 {
     private const RECEIVABLE_PO_STATUSES = ['approved', 'diterima_sebagian'];
 
-    public function __construct(private readonly StockService $stockService)
-    {
-    }
+    public function __construct(private readonly StockService $stockService) {}
 
     public function penerimaan()
     {
@@ -35,6 +34,8 @@ class PenerimaanController extends Controller
         $query = PenerimaanBarangModel::with(['purchaseOrder', 'distributor', 'createdBy'])
             ->latest('tanggal_penerimaan')
             ->latest('id');
+
+        $this->scopePenerimaanBranch($query);
 
         if ($request->filled('date_start')) {
             $query->whereDate('tanggal_penerimaan', '>=', $request->date_start);
@@ -63,21 +64,21 @@ class PenerimaanController extends Controller
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_penerimaan)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
             ->addColumn('actions', function ($row) {
-                $detailButton = '<button class="btn btn-sm btn-info" onclick="lihatPenerimaan(' . $row->id . ')"><i class="mdi mdi-eye"></i></button>';
+                $detailButton = '<button class="btn btn-sm btn-info" onclick="lihatPenerimaan('.$row->id.')"><i class="mdi mdi-eye"></i></button>';
                 $editButton = $row->status === 'draft'
-                    ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan(' . $row->id . ')"><i class="mdi mdi-pencil"></i></button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan('.$row->id.')"><i class="mdi mdi-pencil"></i></button>'
                     : '';
                 $postButton = $row->status === 'draft'
-                    ? '<button class="btn btn-sm btn-primary" onclick="postPenerimaan(' . $row->id . ')"><i class="mdi mdi-send-check-outline"></i></button>'
+                    ? '<button class="btn btn-sm btn-primary" onclick="postPenerimaan('.$row->id.')"><i class="mdi mdi-send-check-outline"></i></button>'
                     : '';
                 $cancelButton = $row->status !== 'cancelled'
-                    ? '<button class="btn btn-sm btn-warning" onclick="cancelPenerimaan(' . $row->id . ')"><i class="mdi mdi-cancel"></i></button>'
+                    ? '<button class="btn btn-sm btn-warning" onclick="cancelPenerimaan('.$row->id.')"><i class="mdi mdi-cancel"></i></button>'
                     : '';
                 $deleteButton = $row->status === 'draft'
-                    ? '<button class="btn btn-sm btn-danger" onclick="deletePenerimaan(' . $row->id . ')"><i class="mdi mdi-delete"></i></button>'
+                    ? '<button class="btn btn-sm btn-danger" onclick="deletePenerimaan('.$row->id.')"><i class="mdi mdi-delete"></i></button>'
                     : '';
 
-                return $detailButton . ' ' . $editButton . ' ' . $postButton . ' ' . $cancelButton . ' ' . $deleteButton;
+                return $detailButton.' '.$editButton.' '.$postButton.' '.$cancelButton.' '.$deleteButton;
             })
             ->rawColumns(['actions'])
             ->with(['summary' => $summary])
@@ -88,23 +89,26 @@ class PenerimaanController extends Controller
     {
         $year = date('Y');
         $month = date('m');
-        $prefix = 'PB-' . $year . '-' . $month . '-';
+        $prefix = 'PB-'.$year.'-'.$month.'-';
 
-        $last = PenerimaanBarangModel::where('nomor_penerimaan', 'like', $prefix . '%')
+        $last = PenerimaanBarangModel::where('nomor_penerimaan', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->first();
 
         $lastNumber = $last ? (int) substr($last->nomor_penerimaan, -4) : 0;
 
-        return response()->json($prefix . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT));
+        return response()->json($prefix.str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT));
     }
 
     public function approvedPurchaseOrders()
     {
-        $orders = PembelianModel::with(['distributor', 'details'])
+        $query = PembelianModel::with(['distributor', 'details'])
             ->whereIn('status', self::RECEIVABLE_PO_STATUSES)
-            ->latest('tanggal_po')
-            ->get()
+            ->latest('tanggal_po');
+
+        $this->scopePurchaseOrderBranch($query);
+
+        $orders = $query->get()
             ->map(function ($po) {
                 $totalOutstanding = 0;
                 $outstandingItems = 0;
@@ -118,7 +122,7 @@ class PenerimaanController extends Controller
                 return [
                     'id' => $po->id,
                     'no_po' => $po->no_po,
-                    'text' => $po->no_po . ' - ' . ($po->distributor->nama ?? 'Supplier tidak diketahui'),
+                    'text' => $po->no_po.' - '.($po->distributor->nama ?? 'Supplier tidak diketahui'),
                     'supplier' => $po->distributor->nama ?? '-',
                     'tanggal_po' => $po->tanggal_po,
                     'item_count' => $po->details->count(),
@@ -165,7 +169,7 @@ class PenerimaanController extends Controller
 
     public function edit($id)
     {
-        $penerimaan = PenerimaanBarangModel::findOrFail($id);
+        $penerimaan = $this->penerimaanQueryForBranch()->findOrFail($id);
 
         if ($penerimaan->status !== 'draft') {
             return response()->json([
@@ -185,7 +189,11 @@ class PenerimaanController extends Controller
             'details.obat.satuan',
             'details.obat.golongan',
             'details.purchaseOrderDetail.satuanKonversi.satuan',
-        ])->findOrFail($id);
+        ]);
+
+        $this->scopePenerimaanBranch($penerimaan);
+
+        $penerimaan = $penerimaan->findOrFail($id);
 
         if ($penerimaan->status !== 'draft') {
             return response()->json([
@@ -202,7 +210,7 @@ class PenerimaanController extends Controller
         $request->validate($this->rules($id));
 
         return DB::transaction(function () use ($request, $id) {
-            $penerimaan = PenerimaanBarangModel::with('details')->findOrFail($id);
+            $penerimaan = $this->penerimaanQueryForBranch(['details'])->findOrFail($id);
 
             if ($penerimaan->status !== 'draft') {
                 throw ValidationException::withMessages([
@@ -233,7 +241,7 @@ class PenerimaanController extends Controller
     public function post($id)
     {
         return DB::transaction(function () use ($id) {
-            $penerimaan = PenerimaanBarangModel::with([
+            $penerimaan = $this->penerimaanQueryForBranch([
                 'purchaseOrder',
                 'details.obat.satuan',
                 'details.obat.golongan',
@@ -278,7 +286,7 @@ class PenerimaanController extends Controller
     public function cancel($id)
     {
         return DB::transaction(function () use ($id) {
-            $penerimaan = PenerimaanBarangModel::with('details.obat')->lockForUpdate()->findOrFail($id);
+            $penerimaan = $this->penerimaanQueryForBranch(['details.obat'])->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status === 'cancelled') {
                 return response()->json([
@@ -310,7 +318,7 @@ class PenerimaanController extends Controller
 
     public function destroy($id)
     {
-        $penerimaan = PenerimaanBarangModel::findOrFail($id);
+        $penerimaan = $this->penerimaanQueryForBranch()->findOrFail($id);
 
         if ($penerimaan->status !== 'draft') {
             return response()->json([
@@ -332,7 +340,7 @@ class PenerimaanController extends Controller
         $unique = 'unique:penerimaan_barang,nomor_penerimaan';
 
         if ($ignoreId) {
-            $unique .= ',' . $ignoreId;
+            $unique .= ','.$ignoreId;
         }
 
         return [
@@ -365,11 +373,15 @@ class PenerimaanController extends Controller
 
     private function approvedPo($id): PembelianModel
     {
-        $po = PembelianModel::with([
+        $query = PembelianModel::with([
             'distributor',
             'details.obat.satuan',
             'details.satuanKonversi.satuan',
-        ])->findOrFail($id);
+        ]);
+
+        $this->scopePurchaseOrderBranch($query);
+
+        $po = $query->findOrFail($id);
 
         if (! in_array($po->status, self::RECEIVABLE_PO_STATUSES, true)) {
             throw ValidationException::withMessages([
@@ -383,6 +395,7 @@ class PenerimaanController extends Controller
     private function buildComputedDetails(Request $request, PembelianModel $po, ?int $ignorePenerimaanId = null): array
     {
         $detailsById = $po->details->keyBy('id');
+        $branchId = (int) $po->branch_id;
         $rows = [];
         $summary = [
             'total_barang' => 0,
@@ -398,7 +411,7 @@ class PenerimaanController extends Controller
 
             if (! $poDetail) {
                 throw ValidationException::withMessages([
-                    'purchase_order_detail_id.' . $index => 'Item tidak sesuai dengan PO yang dipilih.',
+                    'purchase_order_detail_id.'.$index => 'Item tidak sesuai dengan PO yang dipilih.',
                 ]);
             }
 
@@ -409,9 +422,10 @@ class PenerimaanController extends Controller
             }
 
             $selectedBatch = $this->selectedStockBatch(
-                $request->input('stok_batch_id.' . $index),
+                $request->input('stok_batch_id.'.$index),
                 (int) $poDetail->obat_id,
-                $index
+                $index,
+                $branchId
             );
             $batch = trim((string) ($request->no_batch[$index] ?? ''));
             $expired = trim((string) ($request->expired_date[$index] ?? ''));
@@ -422,18 +436,18 @@ class PenerimaanController extends Controller
             }
 
             if ($batch === '') {
-                throw ValidationException::withMessages(['no_batch.' . $index => 'Nomor batch wajib diisi.']);
+                throw ValidationException::withMessages(['no_batch.'.$index => 'Nomor batch wajib diisi.']);
             }
 
             if ($expired === '' && ! $selectedBatch) {
-                throw ValidationException::withMessages(['expired_date.' . $index => 'Expired date wajib diisi.']);
+                throw ValidationException::withMessages(['expired_date.'.$index => 'Expired date wajib diisi.']);
             }
 
             $outstanding = max(0, (float) $poDetail->qty - $this->receivedQtyForPoDetail($poDetail->id, $ignorePenerimaanId));
 
             if ($qty > $outstanding) {
                 throw ValidationException::withMessages([
-                    'qty_diterima.' . $index => 'Qty diterima melebihi sisa PO (' . $outstanding . ').',
+                    'qty_diterima.'.$index => 'Qty diterima melebihi sisa PO ('.$outstanding.').',
                 ]);
             }
 
@@ -510,7 +524,7 @@ class PenerimaanController extends Controller
 
     private function penerimaanPayload($id, bool $requireReceivablePo = true): array
     {
-        $penerimaan = PenerimaanBarangModel::with([
+        $penerimaan = $this->penerimaanQueryForBranch([
             'purchaseOrder.distributor',
             'distributor',
             'details.obat',
@@ -534,15 +548,18 @@ class PenerimaanController extends Controller
         $poId,
         ?int $ignorePenerimaanId = null,
         bool $requireReceivableStatus = true
-    ): array
-    {
-        $po = PembelianModel::with([
+    ): array {
+        $query = PembelianModel::with([
             'distributor',
             'branch',
             'details.obat',
             'details.obat.satuan',
             'details.satuanKonversi.satuan',
-        ])->findOrFail($poId);
+        ]);
+
+        $this->scopePurchaseOrderBranch($query);
+
+        $po = $query->findOrFail($poId);
 
         if ($requireReceivableStatus && ! in_array($po->status, self::RECEIVABLE_PO_STATUSES, true)) {
             throw ValidationException::withMessages([
@@ -550,7 +567,7 @@ class PenerimaanController extends Controller
             ]);
         }
 
-        $batchOptionsByObat = $this->stockBatchOptionsByObat($po->details->pluck('obat_id')->all());
+        $batchOptionsByObat = $this->stockBatchOptionsByObat($po->details->pluck('obat_id')->all(), (int) $po->branch_id);
 
         $details = $po->details->map(function ($detail) use ($ignorePenerimaanId, $batchOptionsByObat) {
             $received = $this->receivedQtyForPoDetail($detail->id, $ignorePenerimaanId);
@@ -604,7 +621,7 @@ class PenerimaanController extends Controller
             ->sum('qty_diterima');
     }
 
-    private function selectedStockBatch($batchId, int $obatId, int $index): ?StokBatchModel
+    private function selectedStockBatch($batchId, int $obatId, int $index, int $branchId): ?StokBatchModel
     {
         if ($batchId === null || $batchId === '') {
             return null;
@@ -612,18 +629,19 @@ class PenerimaanController extends Controller
 
         $batch = StokBatchModel::where('id', $batchId)
             ->where('obat_id', $obatId)
+            ->where('branch_id', $branchId)
             ->first();
 
         if (! $batch) {
             throw ValidationException::withMessages([
-                'stok_batch_id.' . $index => 'Batch stok tidak sesuai dengan obat yang dipilih.',
+                'stok_batch_id.'.$index => 'Batch stok tidak sesuai dengan obat yang dipilih.',
             ]);
         }
 
         return $batch;
     }
 
-    private function stockBatchOptionsByObat(array $obatIds): array
+    private function stockBatchOptionsByObat(array $obatIds, int $branchId): array
     {
         $obatIds = collect($obatIds)
             ->filter()
@@ -635,6 +653,7 @@ class PenerimaanController extends Controller
         }
 
         return StokBatchModel::whereIn('obat_id', $obatIds)
+            ->where('branch_id', $branchId)
             ->orderBy('expired_date')
             ->orderBy('no_batch')
             ->get()
@@ -653,10 +672,10 @@ class PenerimaanController extends Controller
         return [
             'id' => $batch->id,
             'text' => $batch->no_batch
-                . ' | ED ' . ($expiredDate ?: '-')
-                . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
-                . ' | PPN ' . number_format((float) ($batch->ppn ?? 0), 2, ',', '.') . '%'
-                . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
+                .' | ED '.($expiredDate ?: '-')
+                .' | Diskon '.number_format((float) ($batch->diskon ?? 0), 2, ',', '.').'%'
+                .' | PPN '.number_format((float) ($batch->ppn ?? 0), 2, ',', '.').'%'
+                .' | Stok '.number_format((float) $batch->qty, 2, ',', '.'),
             'no_batch' => $batch->no_batch,
             'expired_date' => $expiredDate,
             'qty' => (float) $batch->qty,
@@ -893,6 +912,37 @@ class PenerimaanController extends Controller
         return $subtotal > 0 ? $subtotal * ($diskon / 100) : $totalHargaBeli * ($diskon / 100);
     }
 
+    private function penerimaanQueryForBranch(array $with = [])
+    {
+        $query = PenerimaanBarangModel::with($with);
+
+        $this->scopePenerimaanBranch($query);
+
+        return $query;
+    }
+
+    private function scopePenerimaanBranch($query): void
+    {
+        $branchIds = BranchAccess::userBranchIds();
+
+        $query->whereHas('purchaseOrder', function ($purchaseOrderQuery) use ($branchIds) {
+            $this->scopePurchaseOrderBranch($purchaseOrderQuery, $branchIds);
+        });
+    }
+
+    private function scopePurchaseOrderBranch($query, ?array $branchIds = null): void
+    {
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
+
+        if (empty($branchIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('branch_id', $branchIds);
+    }
+
     private function parseDate($date): string
     {
         $date = trim((string) $date);
@@ -924,5 +974,4 @@ class PenerimaanController extends Controller
     {
         return $poDetail->obat->satuan->nama ?? 'PCS';
     }
-
 }

@@ -8,6 +8,7 @@ use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
+use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -19,9 +20,7 @@ class StokController extends Controller
 {
     private const DEFAULT_EXPIRED_WARNING_DAYS = 90;
 
-    public function __construct(private readonly StockService $stockService)
-    {
-    }
+    public function __construct(private readonly StockService $stockService) {}
 
     public function stok()
     {
@@ -38,13 +37,21 @@ class StokController extends Controller
         $warningDays = $this->warningDays($request);
         $today = Carbon::today();
         $warningDate = Carbon::today()->addDays($warningDays);
-        $rows = MasterObatModel::with([
-            'satuan',
-            'stokBatches' => fn ($query) => $query->orderBy('expired_date')->orderBy('no_batch'),
-        ])
-            ->orderBy('nama_obat')
-            ->get()
-            ->map(fn ($obat) => $this->stockRow($obat, $today, $warningDate));
+        $branchIds = BranchAccess::userBranchIds();
+        $rows = collect();
+
+        if (! empty($branchIds)) {
+            $rows = MasterObatModel::with([
+                'satuan',
+                'stokBatches' => function ($query) use ($branchIds) {
+                    $this->scopeStockBatchBranch($query, $branchIds);
+                    $query->orderBy('expired_date')->orderBy('no_batch');
+                },
+            ])
+                ->orderBy('nama_obat')
+                ->get()
+                ->map(fn ($obat) => $this->stockRow($obat, $today, $warningDate));
+        }
 
         if ($request->filled('alert_status')) {
             $rows = $rows->where('status', $request->alert_status)->values();
@@ -64,10 +71,10 @@ class StokController extends Controller
         return DataTables::of($rows)
             ->addIndexColumn()
             ->addColumn('actions', function ($row) {
-                $batchButton = '<button type="button" class="btn btn-sm btn-info" onclick="filterBatchObat(' . $row['id'] . ')"><i class="mdi mdi-package-variant-closed"></i></button>';
-                $cardButton = '<a class="btn btn-sm btn-primary" href="' . route('kartuStok.kartuStok', ['obat_id' => $row['id']]) . '"><i class="mdi mdi-card-bulleted-outline"></i></a>';
+                $batchButton = '<button type="button" class="btn btn-sm btn-info" onclick="filterBatchObat('.$row['id'].')"><i class="mdi mdi-package-variant-closed"></i></button>';
+                $cardButton = '<a class="btn btn-sm btn-primary" href="'.route('kartuStok.kartuStok', ['obat_id' => $row['id']]).'"><i class="mdi mdi-card-bulleted-outline"></i></a>';
 
-                return $batchButton . ' ' . $cardButton;
+                return $batchButton.' '.$cardButton;
             })
             ->rawColumns(['actions'])
             ->with(['summary' => $summary])
@@ -83,6 +90,8 @@ class StokController extends Controller
             ->where('qty', '>', 0)
             ->orderBy('expired_date')
             ->orderBy('no_batch');
+
+        $this->scopeStockBatchBranch($query);
 
         if ($request->filled('obat_id')) {
             $query->where('obat_id', $request->obat_id);
@@ -140,7 +149,11 @@ class StokController extends Controller
 
     public function riwayatHargaTable(Request $request)
     {
+        $branchIds = BranchAccess::userBranchIds();
         $query = RiwayatHargaModel::with(['obat.satuan', 'batch', 'changedBy'])
+            ->whereHas('batch', function ($query) use ($branchIds) {
+                $this->scopeStockBatchBranch($query, $branchIds);
+            })
             ->when($request->filled('obat_id'), fn ($query) => $query->where('obat_id', $request->obat_id))
             ->when($request->filled('stok_batch_id'), fn ($query) => $query->where('stok_batch_id', $request->stok_batch_id))
             ->latest('created_at')
@@ -195,6 +208,8 @@ class StokController extends Controller
             ->latest('tanggal_mutasi')
             ->latest('id');
 
+        $this->scopeKartuStokBranch($query);
+
         $rows = $query->get()->map(function ($mutasi) {
             return [
                 'id' => $mutasi->id,
@@ -223,7 +238,7 @@ class StokController extends Controller
             'total_masuk' => $rows->sum('qty_masuk'),
             'total_keluar' => $rows->sum('qty_keluar'),
             'total_expired' => $rows->where('jenis_mutasi', 'expired')->sum('qty_keluar'),
-            'saldo_tercatat' => (float) StokBatchModel::when($request->filled('obat_id'), fn ($query) => $query->where('obat_id', $request->obat_id))->sum('qty'),
+            'saldo_tercatat' => $this->saldoTercatat($request),
         ];
 
         return DataTables::of($rows)
@@ -234,12 +249,18 @@ class StokController extends Controller
 
     public function obatOptions(Request $request)
     {
+        $branchIds = BranchAccess::userBranchIds();
+
         if ($request->filled('id')) {
-            $obat = MasterObatModel::withSum('stokBatches as total_stok', 'qty')->find($request->id);
+            $obat = MasterObatModel::withSum([
+                'stokBatches as total_stok' => function ($query) use ($branchIds) {
+                    $this->scopeStockBatchBranch($query, $branchIds);
+                },
+            ], 'qty')->find($request->id);
 
             return response()->json($obat ? [[
                 'id' => $obat->id,
-                'text' => $obat->kode_obat . ' - ' . $obat->nama_obat,
+                'text' => $obat->kode_obat.' - '.$obat->nama_obat,
                 'kode_obat' => $obat->kode_obat,
                 'nama_obat' => $obat->nama_obat,
                 'total_stok' => (float) ($obat->total_stok ?? 0),
@@ -249,11 +270,15 @@ class StokController extends Controller
         $search = trim((string) $request->input('q', ''));
 
         $obats = MasterObatModel::query()
-            ->withSum('stokBatches as total_stok', 'qty')
+            ->withSum([
+                'stokBatches as total_stok' => function ($query) use ($branchIds) {
+                    $this->scopeStockBatchBranch($query, $branchIds);
+                },
+            ], 'qty')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
-                    $query->where('nama_obat', 'like', '%' . $search . '%')
-                        ->orWhere('kode_obat', 'like', '%' . $search . '%');
+                    $query->where('nama_obat', 'like', '%'.$search.'%')
+                        ->orWhere('kode_obat', 'like', '%'.$search.'%');
                 });
             })
             ->orderBy('nama_obat')
@@ -262,7 +287,7 @@ class StokController extends Controller
             ->map(function ($obat) {
                 return [
                     'id' => $obat->id,
-                    'text' => $obat->kode_obat . ' - ' . $obat->nama_obat,
+                    'text' => $obat->kode_obat.' - '.$obat->nama_obat,
                     'kode_obat' => $obat->kode_obat,
                     'nama_obat' => $obat->nama_obat,
                     'total_stok' => (float) ($obat->total_stok ?? 0),
@@ -277,16 +302,19 @@ class StokController extends Controller
         $batches = StokBatchModel::where('obat_id', $obatId)
             ->when(! $request->boolean('include_empty'), fn ($query) => $query->where('qty', '>', 0))
             ->orderBy('expired_date')
-            ->orderBy('no_batch')
-            ->get()
+            ->orderBy('no_batch');
+
+        $this->scopeStockBatchBranch($batches);
+
+        $batches = $batches->get()
             ->map(function ($batch) {
                 return [
                     'id' => $batch->id,
                     'text' => $batch->no_batch
-                        . ' | ED ' . (optional($batch->expired_date)->format('Y-m-d') ?: '-')
-                        . ' | Diskon ' . number_format((float) ($batch->diskon ?? 0), 2, ',', '.') . '%'
-                        . ' | PPN ' . number_format((float) ($batch->ppn ?? 0), 2, ',', '.') . '%'
-                        . ' | Stok ' . number_format((float) $batch->qty, 2, ',', '.'),
+                        .' | ED '.(optional($batch->expired_date)->format('Y-m-d') ?: '-')
+                        .' | Diskon '.number_format((float) ($batch->diskon ?? 0), 2, ',', '.').'%'
+                        .' | PPN '.number_format((float) ($batch->ppn ?? 0), 2, ',', '.').'%'
+                        .' | Stok '.number_format((float) $batch->qty, 2, ',', '.'),
                     'no_batch' => $batch->no_batch,
                     'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
                     'qty' => (float) $batch->qty,
@@ -486,6 +514,45 @@ class StokController extends Controller
             'saldo_awal' => 'Saldo Awal',
             default => ucwords(str_replace('_', ' ', $jenisMutasi)),
         };
+    }
+
+    private function saldoTercatat(Request $request): float
+    {
+        $query = StokBatchModel::query();
+
+        $this->scopeStockBatchBranch($query);
+
+        if ($request->filled('obat_id')) {
+            $query->where('obat_id', $request->obat_id);
+        }
+
+        return (float) $query->sum('qty');
+    }
+
+    private function scopeStockBatchBranch($query, ?array $branchIds = null): void
+    {
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
+
+        if (empty($branchIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('branch_id', $branchIds);
+    }
+
+    private function scopeKartuStokBranch($query, ?array $branchIds = null): void
+    {
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
+
+        if (empty($branchIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('branch_id', $branchIds);
     }
 
     private function warningDays(Request $request): int

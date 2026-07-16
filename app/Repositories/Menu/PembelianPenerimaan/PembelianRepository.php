@@ -4,36 +4,51 @@ namespace App\Repositories\Menu\PembelianPenerimaan;
 
 use App\Models\KonversiSatuanModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
-use App\Models\Menu\PembelianPenerimaan\PembelianModel as PembelianModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 
 class PembelianRepository
 {
-    public function getPembelian()
+    public function getPembelian(?array $branchIds = null)
     {
-        $dataPembelian = PembelianModel::all();
-        return $dataPembelian;
+        $query = PembelianModel::query();
+
+        $this->scopeBranch($query, $branchIds);
+
+        return $query->get();
     }
+
     public function createPembelian(array $data)
     {
         $dataPembelian = PembelianModel::create($data);
+
         return $dataPembelian;
     }
 
     public function createPembelianDetail(array $data)
     {
         $dataPembelianDetail = PembelianDetailModel::create($data);
+
         return $dataPembelianDetail;
     }
 
-    public function findByIdPembelian($id)
+    public function findByIdPembelian($id, ?array $branchIds = null)
     {
-        $Pembelian = PembelianModel::with('details', 'details.satuanKonversi.satuan')->find($id);
+        $query = PembelianModel::with('details', 'details.satuanKonversi.satuan');
+
+        $this->scopeBranch($query, $branchIds);
+
+        $Pembelian = $query->find($id);
+
         return $Pembelian;
     }
 
-    public function updateStatus($id, $status, $approvedBy = null)
+    public function updateStatus($id, $status, $approvedBy = null, ?array $branchIds = null)
     {
-        $Pembelian = PembelianModel::findOrFail($id);
+        $query = PembelianModel::query();
+
+        $this->scopeBranch($query, $branchIds);
+
+        $Pembelian = $query->findOrFail($id);
         $Pembelian->status = $status;
 
         if ($status === 'approved') {
@@ -49,14 +64,18 @@ class PembelianRepository
         return $Pembelian;
     }
 
-    public function DetailPembelian($id)
+    public function DetailPembelian($id, ?array $branchIds = null)
     {
         // Ambil header + distributor + semua detail + relasi obat
-        $pembelian = PembelianModel::with([
+        $query = PembelianModel::with([
             'distributor',
             'details.obat',
-            'details.satuanKonversi.satuan'
-        ])->findOrFail($id);
+            'details.satuanKonversi.satuan',
+        ]);
+
+        $this->scopeBranch($query, $branchIds);
+
+        $pembelian = $query->findOrFail($id);
 
         // Format data agar mudah dipakai di frontend
         $pembelian->distributor_name = $pembelian->distributor->nama ?? 'Tidak diketahui';
@@ -64,16 +83,32 @@ class PembelianRepository
         // Format detail
         $pembelian->details->transform(function ($item) {
             $item->nama_obat = $item->obat->nama_obat ?? 'Tidak diketahui';
+
             return $item;
         });
 
-        return response()->json($pembelian);
+        return $pembelian;
     }
 
     public function getKonversiSatuan($obatId)
     {
         $KonversiSatuan = KonversiSatuanModel::with('satuan')->where('obat_id', $obatId)->get();
+
         return $KonversiSatuan;
     }
 
+    private function scopeBranch($query, ?array $branchIds): void
+    {
+        if ($branchIds === null) {
+            return;
+        }
+
+        if (empty($branchIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('branch_id', $branchIds);
+    }
 }

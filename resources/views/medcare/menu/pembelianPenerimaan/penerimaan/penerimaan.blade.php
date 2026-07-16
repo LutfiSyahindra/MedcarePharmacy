@@ -249,7 +249,7 @@
 
             <div class="purchase-table-hint">
                 <i class="mdi mdi-information-outline"></i>
-                Draft belum menambah stok. Gunakan posting setelah faktur, batch, expired date, dan qty sudah benar.
+                Draft belum menambah stok. Gunakan posting setelah faktur, batch, expired date, dan qty sudah benar.    
             </div>
         </section>
     </div>

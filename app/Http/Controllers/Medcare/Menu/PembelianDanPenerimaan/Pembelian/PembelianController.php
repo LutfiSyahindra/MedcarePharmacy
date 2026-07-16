@@ -4,29 +4,34 @@ namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\PoCreatedNotification;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
 use App\Services\Settings\Master\DistributorService;
 use App\Services\Settings\Master\MasterObatService;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Yajra\DataTables\Facades\DataTables;
-use App\Notifications\PoCreatedNotification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
-
+use Yajra\DataTables\Facades\DataTables;
 
 class PembelianController extends Controller
 {
+    protected $PembelianService;
 
-    protected $PembelianService, $DistributorService, $MasterObatService;
+    protected $DistributorService;
+
+    protected $MasterObatService;
+
     public function __construct(PembelianService $PembelianService, DistributorService $DistributorService, MasterObatService $MasterObatService)
     {
         $this->PembelianService = $PembelianService;
         $this->DistributorService = $DistributorService;
         $this->MasterObatService = $MasterObatService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -34,9 +39,11 @@ class PembelianController extends Controller
     {
         return view('medcare.menu.pembelianPenerimaan.pembelian.pembelian');
     }
+
     public function table(Request $request)
     {
-        $Pembelian = $this->PembelianService->getPembelianTable();
+        $branchIds = BranchAccess::userBranchIds();
+        $Pembelian = $this->PembelianService->getPembelianTable($branchIds);
         $dateStart = $request->input('date_start');
         $dateEnd = $request->input('date_end');
 
@@ -64,79 +71,86 @@ class PembelianController extends Controller
         $draftCount = $summary->where('status', 'draft')->count();
         $waitingApprovalCount = $summary->where('status', 'waiting_approval')->count();
         $summaryData = [
-            'total'            => $summary->count(),
-            'draft'            => $draftCount,
+            'total' => $summary->count(),
+            'draft' => $draftCount,
             'waiting_approval' => $waitingApprovalCount,
-            'pending'          => $draftCount + $waitingApprovalCount,
-            'approved'         => $summary->where('status', 'approved')->count(),
-            'rejected'         => $summary->where('status', 'rejected')->count(),
-            'total_estimasi'   => $summary->sum(function ($row) {
+            'pending' => $draftCount + $waitingApprovalCount,
+            'approved' => $summary->where('status', 'approved')->count(),
+            'rejected' => $summary->where('status', 'rejected')->count(),
+            'total_estimasi' => $summary->sum(function ($row) {
                 return (float) ($row['total_estimasi'] ?? 0);
             }),
         ];
 
         return DataTables::of($Pembelian)
-        ->addIndexColumn()
-        ->addColumn('actions', function ($dataPembelian) {
-            $status = $dataPembelian['status'];
-            $approvalButton = in_array($status, ['draft', 'waiting_approval'], true)
-                ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian(' . $dataPembelian['id'] . ')">
+            ->addIndexColumn()
+            ->addColumn('actions', function ($dataPembelian) {
+                $status = $dataPembelian['status'];
+                $approvalButton = in_array($status, ['draft', 'waiting_approval'], true)
+                    ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-check-circle"></i>
                 </button>'
-                : '';
-            $rejectButton = in_array($status, ['draft', 'waiting_approval'], true)
-                ? '<button class="btn btn-sm btn-warning btn-reject-pembelian" onclick="rejectPembelian(' . $dataPembelian['id'] . ')">
+                    : '';
+                $rejectButton = in_array($status, ['draft', 'waiting_approval'], true)
+                    ? '<button class="btn btn-sm btn-warning btn-reject-pembelian" onclick="rejectPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-close-circle"></i>
                 </button>'
-                : '';
-            $reopenButton = in_array($status, ['approved', 'rejected'], true)
-                ? '<button class="btn btn-sm btn-secondary btn-reopen-pembelian" onclick="reopenPembelian(' . $dataPembelian['id'] . ')">
+                    : '';
+                $reopenButton = in_array($status, ['approved', 'rejected'], true)
+                    ? '<button class="btn btn-sm btn-secondary btn-reopen-pembelian" onclick="reopenPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-lock-open-variant"></i>
                 </button>'
-                : '';
-            $editButton = ! in_array($status, ['approved', 'diterima_sebagian', 'selesai'], true)
-                ? '<button class="btn btn-sm btn-success btn-edit-pembelian" onclick="editPembelian(' . $dataPembelian['id'] . ')">
+                    : '';
+                $editButton = ! in_array($status, ['approved', 'diterima_sebagian', 'selesai'], true)
+                    ? '<button class="btn btn-sm btn-success btn-edit-pembelian" onclick="editPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-pencil"></i>
                 </button>'
-                : '';
+                    : '';
 
-            return '
-                ' . $approvalButton . '
-                ' . $rejectButton . '
-                ' . $reopenButton . '
-                ' . $editButton . '
-                <button class="btn btn-sm btn-info" onclick="lihatPembelian(' . $dataPembelian['id'] . ')"> 
+                return '
+                '.$approvalButton.'
+                '.$rejectButton.'
+                '.$reopenButton.'
+                '.$editButton.'
+                <button class="btn btn-sm btn-info" onclick="lihatPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-eye"></i>
                 </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deletePembelian(' . $dataPembelian['id'] . ')">  
+                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deletePembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-delete"></i>
                 </button>
             ';
-        })
-
-        ->rawColumns(['actions'])
-        ->with(['summary' => $summaryData])
-        ->make(true);
+            })
+            ->rawColumns(['actions'])
+            ->with(['summary' => $summaryData])
+            ->make(true);
     }
+
     public function generateNoPO()
     {
         $Pembelian = $this->PembelianService->generatePo();
+
         return response()->json($Pembelian);
     }
 
-    public function getDistributor(){
-        $distributor = $this->DistributorService->getDistributor();    
+    public function getDistributor()
+    {
+        $distributor = $this->DistributorService->getDistributor();
+
         return response()->json($distributor);
     }
 
-    public function getObat(){
-        $obat = $this->MasterObatService->getMasterObat();    
+    public function getObat()
+    {
+        $obat = $this->MasterObatService->getMasterObat();
+
         return response()->json($obat);
     }
 
-    public function getKonversiSatuan(Request $request){
+    public function getKonversiSatuan(Request $request)
+    {
         $KonversiSatuan = $this->PembelianService->getKonversiSatuan($request->obat_id);
-        // Log::info($KonversiSatuan);    
+
+        // Log::info($KonversiSatuan);
         return response()->json($KonversiSatuan);
     }
 
@@ -154,51 +168,52 @@ class PembelianController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'no_po'            => 'required|string|max:50|unique:purchase_orders,no_po',
-            'distributor_id'   => 'required|integer',
-            'tanggal'          => 'required|string',
-            'catatan'          => 'nullable|string',
-            'total_estimasi'   => 'required|numeric',
+            'no_po' => 'required|string|max:50|unique:purchase_orders,no_po',
+            'distributor_id' => 'required|integer',
+            'tanggal' => 'required|string',
+            'catatan' => 'nullable|string',
+            'total_estimasi' => 'required|numeric',
 
-            'obat_id.*'        => 'required|integer',
-            'qty.*'            => 'required|numeric|min:1',
+            'obat_id.*' => 'required|integer',
+            'qty.*' => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
-            'subtotal.*'       => 'required|numeric|min:0',
-            'satuan_id.*'       => 'required|integer|min:1',
+            'subtotal.*' => 'required|numeric|min:0',
+            'satuan_id.*' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
 
         try {
             /** @var \App\Models\User $user */
-                $user = Auth::user();
-                $isAdmin = $user->hasAnyRole(['Admin', 'admin']);
-                Log::info('User Role: ' . ($isAdmin ? 'Admin' : 'Non-Admin'));
+            $user = Auth::user();
+            $branchId = BranchAccess::requireUserBranchId($user);
+            $isAdmin = $user->hasAnyRole(['Admin', 'admin']);
+            Log::info('User Role: '.($isAdmin ? 'Admin' : 'Non-Admin'));
 
             // Insert header
             $po = $this->PembelianService->createPembelian([
-                'no_po'          => $request->no_po,
+                'no_po' => $request->no_po,
                 'distributor_id' => $request->distributor_id,
-                'branch_id'      => $user->branches()->value('branch_id'),
-                'tanggal_po'     => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
+                'branch_id' => $branchId,
+                'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $request->total_estimasi,
-                'catatan'        => $request->catatan,
-                'created_by'     => $user->id,
+                'catatan' => $request->catatan,
+                'created_by' => $user->id,
 
                 // Tambahan otomatis jika role admin
-                'approved_by'    => $isAdmin ? $user->id : null,
-                'status'         => $isAdmin ? 'approved' : 'waiting_approval',
+                'approved_by' => $isAdmin ? $user->id : null,
+                'status' => $isAdmin ? 'approved' : 'waiting_approval',
             ]);
 
             // Insert detail
             foreach ($request->obat_id as $i => $id) {
                 $this->PembelianService->createPembelianDetail([
                     'purchase_order_id' => $po->id,
-                    'obat_id'           => $id,
-                    'qty'               => $request->qty[$i],
-                    'harga_estimasi'    => $request->harga_estimasi[$i],
-                    'subtotal'          => $request->subtotal[$i],
-                    'satuan_konversi'   => $request->satuan_id[$i],
+                    'obat_id' => $id,
+                    'qty' => $request->qty[$i],
+                    'harga_estimasi' => $request->harga_estimasi[$i],
+                    'subtotal' => $request->subtotal[$i],
+                    'satuan_konversi' => $request->satuan_id[$i],
                 ]);
             }
 
@@ -209,7 +224,12 @@ class PembelianController extends Controller
             // ======================
             $approvers = User::whereHas('roles', function ($query) {
                 $query->whereIn('name', ['Admin', 'admin']);
-            })->get();
+            })
+                ->where(function ($query) use ($branchId) {
+                    $query->where('branch_id', $branchId)
+                        ->orWhereHas('branches', fn ($branchQuery) => $branchQuery->where('branches.id', $branchId));
+                })
+                ->get();
 
             if ($approvers->count()) {
                 Notification::send(
@@ -220,7 +240,7 @@ class PembelianController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Pembelian berhasil ditambahkan'
+                'message' => 'Pembelian berhasil ditambahkan',
             ]);
 
         } catch (\Throwable $e) {
@@ -235,8 +255,9 @@ class PembelianController extends Controller
      */
     public function show(string $id)
     {
-        $Pembelian = $this->PembelianService->DetailPembelian($id);
+        $Pembelian = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
         Log::info($Pembelian);
+
         return response()->json($Pembelian);
     }
 
@@ -245,7 +266,14 @@ class PembelianController extends Controller
      */
     public function edit(string $id)
     {
-        $Pembelian = $this->PembelianService->findByIdPembelian($id);
+        $Pembelian = $this->PembelianService->findByIdPembelian($id, BranchAccess::userBranchIds());
+
+        if (! $Pembelian) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pembelian tidak ditemukan untuk branch user.',
+            ], 404);
+        }
 
         if ($Pembelian && $Pembelian->status === 'approved') {
             return response()->json([
@@ -269,7 +297,8 @@ class PembelianController extends Controller
             ], 403);
         }
 
-        $po = $this->PembelianService->findByIdPembelian($id);
+        $branchIds = BranchAccess::userBranchIds($user);
+        $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {
             return response()->json([
@@ -292,7 +321,7 @@ class PembelianController extends Controller
             ], 422);
         }
 
-        $this->PembelianService->updateStatus($id, 'approved', $user->id);
+        $this->PembelianService->updateStatus($id, 'approved', $user->id, $branchIds);
 
         return response()->json([
             'status' => 'success',
@@ -312,7 +341,8 @@ class PembelianController extends Controller
             ], 403);
         }
 
-        $po = $this->PembelianService->findByIdPembelian($id);
+        $branchIds = BranchAccess::userBranchIds($user);
+        $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {
             return response()->json([
@@ -335,7 +365,7 @@ class PembelianController extends Controller
             ]);
         }
 
-        $this->PembelianService->updateStatus($id, 'rejected');
+        $this->PembelianService->updateStatus($id, 'rejected', null, $branchIds);
 
         return response()->json([
             'status' => 'success',
@@ -355,7 +385,8 @@ class PembelianController extends Controller
             ], 403);
         }
 
-        $po = $this->PembelianService->findByIdPembelian($id);
+        $branchIds = BranchAccess::userBranchIds($user);
+        $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {
             return response()->json([
@@ -371,7 +402,7 @@ class PembelianController extends Controller
             ]);
         }
 
-        $this->PembelianService->updateStatus($id, 'waiting_approval');
+        $this->PembelianService->updateStatus($id, 'waiting_approval', null, $branchIds);
 
         return response()->json([
             'status' => 'success',
@@ -385,17 +416,17 @@ class PembelianController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'no_po'            => 'required|string|max:50|unique:purchase_orders,no_po,' . $id,
-            'distributor_id'   => 'required|integer',
-            'tanggal'          => 'required|string',
-            'catatan'          => 'nullable|string',
-            'total_estimasi'   => 'required|numeric',
+            'no_po' => 'required|string|max:50|unique:purchase_orders,no_po,'.$id,
+            'distributor_id' => 'required|integer',
+            'tanggal' => 'required|string',
+            'catatan' => 'nullable|string',
+            'total_estimasi' => 'required|numeric',
 
-            'obat_id.*'        => 'required|integer',
-            'qty.*'            => 'required|numeric|min:1',
+            'obat_id.*' => 'required|integer',
+            'qty.*' => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
-            'subtotal.*'       => 'required|numeric|min:0',
-            'satuan_id.*'       => 'required|integer|min:1',
+            'subtotal.*' => 'required|numeric|min:0',
+            'satuan_id.*' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
@@ -404,9 +435,21 @@ class PembelianController extends Controller
 
             /** @var \App\Models\User $user */
             $user = Auth::user();
-            $existingPo = $this->PembelianService->findByIdPembelian($id);
+            $branchIds = BranchAccess::userBranchIds($user);
+            $existingPo = $this->PembelianService->findByIdPembelian($id, $branchIds);
+
+            if (! $existingPo) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Pembelian tidak ditemukan untuk branch user.',
+                ], 404);
+            }
 
             if ($existingPo && $existingPo->status === 'approved') {
+                DB::rollBack();
+
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
@@ -415,15 +458,15 @@ class PembelianController extends Controller
 
             // =========================== UPDATE HEADER ============================
             $po = $this->PembelianService->updatePembelian($id, [
-                'no_po'          => $request->no_po,
+                'no_po' => $request->no_po,
                 'distributor_id' => $request->distributor_id,
-                'branch_id'      => $user->branches()->value('branch_id'),
-                'tanggal_po'     => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
+                'branch_id' => $existingPo->branch_id,
+                'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $request->total_estimasi,
-                'catatan'        => $request->catatan,
-                'approved_by'    => null,
-                'status'         => 'waiting_approval',
-            ]);
+                'catatan' => $request->catatan,
+                'approved_by' => null,
+                'status' => 'waiting_approval',
+            ], $branchIds);
 
             // =========================== RESET DETAIL ============================
             // Hapus semua detail PO lama
@@ -433,11 +476,11 @@ class PembelianController extends Controller
             foreach ($request->obat_id as $i => $obatId) {
                 $this->PembelianService->createPembelianDetail([
                     'purchase_order_id' => $id,
-                    'obat_id'           => $obatId,
-                    'qty'               => $request->qty[$i],
-                    'harga_estimasi'    => $request->harga_estimasi[$i],
-                    'subtotal'          => $request->subtotal[$i],
-                    'satuan_konversi'   => $request->satuan_id[$i],
+                    'obat_id' => $obatId,
+                    'qty' => $request->qty[$i],
+                    'harga_estimasi' => $request->harga_estimasi[$i],
+                    'subtotal' => $request->subtotal[$i],
+                    'satuan_konversi' => $request->satuan_id[$i],
                 ]);
             }
 
@@ -461,16 +504,24 @@ class PembelianController extends Controller
     public function destroy(string $id)
     {
         try {
-            $this->PembelianService->deletePembelian($id);
+            $deleted = $this->PembelianService->deletePembelian($id, BranchAccess::userBranchIds());
+
+            if (! $deleted) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PO tidak ditemukan untuk branch user.',
+                ], 404);
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'PO berhasil dihapus.'
+                'message' => 'PO berhasil dihapus.',
             ]);
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
     }
