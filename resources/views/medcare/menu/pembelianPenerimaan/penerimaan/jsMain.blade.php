@@ -5,6 +5,7 @@
         let receiveDateStart = moment().startOf('month').format('YYYY-MM-DD');
         let receiveDateEnd = moment().endOf('month').format('YYYY-MM-DD');
         let receiveDatePicker = null;
+        let paymentPreset = 'none';
 
         $.ajaxSetup({
             headers: {
@@ -15,6 +16,15 @@
         flatpickr("#receive-date", {
             dateFormat: "d-m-Y",
             defaultDate: moment().format('DD-MM-YYYY')
+        });
+
+        flatpickr("#invoice-date", {
+            dateFormat: "d-m-Y",
+            defaultDate: moment().format('DD-MM-YYYY')
+        });
+
+        flatpickr("#invoice-due-date", {
+            dateFormat: "d-m-Y"
         });
 
         $('#purchase_order_id').select2({
@@ -52,8 +62,168 @@
         }
 
         function formatDateDisplay(value) {
+            if (!value) {
+                return '-';
+            }
+
             let date = moment(value);
             return date.isValid() ? date.format('DD-MM-YYYY') : (value || '-');
+        }
+
+        function formatDateInput(value) {
+            if (!value) {
+                return '';
+            }
+
+            let date = moment(value);
+            return date.isValid() ? date.format('DD-MM-YYYY') : value;
+        }
+
+        function formatMoneyInputValue(value) {
+            let numeric = typeof value === 'string' ? parseCurrencyValue(value) : (Number(value) || 0);
+            return (Math.round(numeric * 100) / 100).toFixed(2);
+        }
+
+        function parseCurrencyValue(value) {
+            if (typeof value === 'number') {
+                return Math.max(0, Number.isFinite(value) ? value : 0);
+            }
+
+            let normalized = String(value || '')
+                .replace(/[^\d,.-]/g, '')
+                .replace(/(?!^)-/g, '')
+                .trim();
+
+            if (!normalized || normalized === '-' || normalized === ',' || normalized === '.') {
+                return 0;
+            }
+
+            let negative = normalized.startsWith('-');
+            normalized = normalized.replace(/-/g, '');
+
+            if (normalized.includes(',')) {
+                normalized = normalized.replace(/\./g, '').replace(',', '.');
+            } else {
+                let parts = normalized.split('.');
+                if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+                    normalized = parts.join('');
+                }
+            }
+
+            let parsed = Number(`${negative ? '-' : ''}${normalized}`);
+            return Math.max(0, Number.isFinite(parsed) ? parsed : 0);
+        }
+
+        function moneyEditValue(value) {
+            let numeric = parseCurrencyValue(value);
+            let fixed = formatMoneyInputValue(numeric);
+            return fixed.endsWith('.00') ? fixed.slice(0, -3) : fixed;
+        }
+
+        function invoiceMoneyInput(name) {
+            return $(`input[name="${name}"].invoice-money, input[data-invoice-field="${name}"].invoice-money`);
+        }
+
+        function setMoneyInput(name, value) {
+            setMoneyElement(invoiceMoneyInput(name), value);
+        }
+
+        function getMoneyInput(name) {
+            return parseCurrencyValue(invoiceMoneyInput(name).first().val());
+        }
+
+        function setMoneyElement(input, value) {
+            input.val(formatRupiah(value)).data('raw-value', formatMoneyInputValue(value));
+        }
+
+        function paymentStatusMeta(status) {
+            const meta = {
+                belum_dibayar: {
+                    className: 'is-unpaid',
+                    icon: 'mdi-clock-alert-outline',
+                    label: 'Belum Dibayar',
+                    hint: 'Belum ada pembayaran tercatat untuk faktur ini.'
+                },
+                sebagian: {
+                    className: 'is-partial',
+                    icon: 'mdi-progress-check',
+                    label: 'Sebagian',
+                    hint: 'Pembayaran sebagian tersimpan, sisa hutang masih aktif.'
+                },
+                lunas: {
+                    className: 'is-paid',
+                    icon: 'mdi-check-decagram-outline',
+                    label: 'Lunas',
+                    hint: 'Faktur sudah lunas dan tidak menyisakan hutang.'
+                }
+            };
+
+            return meta[status] || meta.belum_dibayar;
+        }
+
+        function updateInvoicePaymentUi(total, paid, debt, status) {
+            let paidPercent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+            let meta = paymentStatusMeta(status);
+
+            $('#invoicePaymentStatusBadge')
+                .removeClass('is-unpaid is-partial is-paid')
+                .addClass(meta.className)
+                .html(`<i class="mdi ${meta.icon}"></i> ${meta.label}`);
+            $('#invoiceBoardTotal').text(formatRupiah(total));
+            $('#invoiceBoardPaid').text(formatRupiah(paid));
+            $('#invoiceBoardDebt').text(formatRupiah(debt));
+            $('#invoicePaidPercent').text(`${paidPercent.toFixed(0)}%`);
+            $('#invoicePaidMeter').css('width', `${paidPercent}%`);
+            $('#invoiceBoardHint').text(total > 0 ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
+
+            $('.receive-payment-action').removeClass('is-active');
+            if (status === 'belum_dibayar') {
+                $('.receive-payment-action[data-payment-action="none"]').addClass('is-active');
+            } else if (status === 'sebagian' && total > 0 && Math.abs(paid - (total / 2)) < 0.01) {
+                $('.receive-payment-action[data-payment-action="half"]').addClass('is-active');
+            } else if (status === 'lunas') {
+                $('.receive-payment-action[data-payment-action="full"]').addClass('is-active');
+            }
+        }
+
+        function serializePenerimaanForm() {
+            let form = $('#penerimaanForm');
+            let originals = [];
+
+            form.find('.invoice-money, .receive-price').each(function() {
+                let input = $(this);
+                originals.push([input, input.val()]);
+                input.val(formatMoneyInputValue(parseCurrencyValue(input.val())));
+            });
+
+            let payload = form.serialize();
+
+            originals.forEach(function(item) {
+                item[0].val(item[1]);
+            });
+
+            return payload;
+        }
+
+        function paymentStatusLabel(status) {
+            const labels = {
+                belum_dibayar: 'Belum Dibayar',
+                sebagian: 'Sebagian',
+                lunas: 'Lunas'
+            };
+
+            return labels[status] || '-';
+        }
+
+        function paymentStatusFromAmounts(total, paid) {
+            total = Number(total) || 0;
+            paid = Number(paid) || 0;
+
+            if (total <= 0 || paid <= 0) {
+                return 'belum_dibayar';
+            }
+
+            return paid >= total ? 'lunas' : 'sebagian';
         }
 
         function getInitials(value) {
@@ -245,30 +415,165 @@
             step.find('small').text(text);
         }
 
+        function setStateClass(element, state) {
+            element.removeClass('is-active is-complete is-warning');
+            if (state) {
+                element.addClass(state);
+            }
+        }
+
+        function setStatusPill(selector, state, icon, label) {
+            let element = $(selector);
+            setStateClass(element, state);
+            element.html(`<i class="mdi ${icon}"></i> ${label}`);
+        }
+
+        function setRequirementState(selector, state, icon) {
+            let element = $(selector);
+            setStateClass(element, state);
+            element.find('i').attr('class', `mdi ${icon}`);
+        }
+
+        function updateReceiveGuidance(hasPo, itemStats, hasInvoice, hasValidItem) {
+            let title = 'Mulai dari PO approved';
+            let text = 'Pilih nomor PO untuk memuat supplier, sisa qty, dan detail obat.';
+            let icon = 'mdi-cursor-default-click-outline';
+            let headerIcon = 'mdi-file-clock-outline';
+            let headerLabel = 'Draft sebelum posting stok';
+            let issueCount = 0;
+
+            if (!hasPo) {
+                issueCount = 1;
+            } else if (itemStats.itemCount <= 0) {
+                title = 'Isi qty barang yang diterima';
+                text = 'Gunakan tombol Max per baris atau Terima Semua Sisa jika barang datang lengkap.';
+                icon = 'mdi-format-list-checks';
+                headerIcon = 'mdi-package-variant-closed';
+                headerLabel = 'Menunggu detail barang';
+                issueCount = 1;
+            } else if (itemStats.invalidRows > 0) {
+                title = 'Lengkapi batch atau expired date';
+                text = `${itemStats.invalidRows} item sudah punya qty, tetapi belum lengkap untuk disimpan.`;
+                icon = 'mdi-alert-circle-outline';
+                headerIcon = 'mdi-alert-circle-outline';
+                headerLabel = 'Perlu cek detail barang';
+                issueCount = itemStats.invalidRows;
+            } else if (!hasInvoice) {
+                title = 'Detail barang siap, lanjut faktur';
+                text = 'Isi nomor faktur dan tanggal faktur untuk membuka tombol simpan draft.';
+                icon = 'mdi-receipt-text-plus-outline';
+                headerIcon = 'mdi-receipt-text-outline';
+                headerLabel = 'Menunggu faktur';
+                issueCount = 1;
+            } else {
+                title = 'Penerimaan siap disimpan';
+                text = 'PO, detail barang, batch, expired date, dan faktur sudah lengkap.';
+                icon = 'mdi-check-decagram-outline';
+                headerIcon = 'mdi-check-decagram-outline';
+                headerLabel = 'Siap simpan draft';
+            }
+
+            $('#receiveGuidanceTitle').text(title);
+            $('#receiveGuidanceText').text(text);
+            $('#receiveGuidanceIcon').html(`<i class="mdi ${icon}"></i>`);
+            $('#receiveHeaderStatus').html(`<i class="mdi ${headerIcon}"></i> ${headerLabel}`);
+
+            setStateClass($('#receiveProblemCount'), issueCount > 0 ? (itemStats.invalidRows > 0 ? 'is-warning' : 'is-active') : 'is-complete');
+            $('#receiveProblemCount').html(
+                `<i class="mdi ${issueCount > 0 ? 'mdi-information-outline' : 'mdi-check-circle-outline'}"></i> ${issueCount} catatan`
+            );
+
+            setRequirementState('#receiveRequirementPo', hasPo ? 'is-complete' : 'is-active',
+                hasPo ? 'mdi-check-circle-outline' : 'mdi-file-check-outline');
+            setRequirementState('#receiveRequirementItems',
+                hasValidItem ? 'is-complete' : (itemStats.invalidRows > 0 ? 'is-warning' : (hasPo ? 'is-active' : '')),
+                hasValidItem ? 'mdi-check-circle-outline' : (itemStats.invalidRows > 0 ? 'mdi-alert-circle-outline' : 'mdi-barcode-scan'));
+            setRequirementState('#receiveRequirementInvoice',
+                hasInvoice && hasValidItem ? 'is-complete' : (hasValidItem ? 'is-active' : ''),
+                hasInvoice && hasValidItem ? 'mdi-check-circle-outline' : 'mdi-receipt-text-outline');
+
+            setStatusPill('#receiveInfoSectionStatus', hasPo ? 'is-complete' : 'is-active',
+                hasPo ? 'mdi-check-circle-outline' : 'mdi-cursor-default-click-outline',
+                hasPo ? 'PO siap' : 'Pilih PO');
+            setStatusPill('#receiveDetailSectionStatus',
+                hasValidItem ? 'is-complete' : (itemStats.invalidRows > 0 ? 'is-warning' : (hasPo ? 'is-active' : '')),
+                hasValidItem ? 'mdi-check-circle-outline' : (itemStats.invalidRows > 0 ? 'mdi-alert-circle-outline' : 'mdi-timer-sand'),
+                hasValidItem ? `${itemStats.itemCount} item siap` : (itemStats.invalidRows > 0 ? `${itemStats.invalidRows} perlu cek` : (hasPo ? 'Isi qty' : 'Menunggu PO')));
+            setStatusPill('#receiveInvoiceSectionStatus',
+                hasInvoice && hasValidItem ? 'is-complete' : (hasValidItem ? 'is-active' : ''),
+                hasInvoice && hasValidItem ? 'mdi-check-circle-outline' : (hasValidItem ? 'mdi-receipt-text-plus-outline' : 'mdi-lock-clock-outline'),
+                hasInvoice && hasValidItem ? 'Faktur siap' : (hasValidItem ? 'Lengkapi faktur' : 'Terkunci'));
+        }
+
+        function invoiceLockMessage(hasPo, itemStats) {
+            if (!hasPo) {
+                return 'Pilih PO approved terlebih dahulu.';
+            }
+
+            if (itemStats.itemCount <= 0) {
+                return 'Isi minimal satu qty barang yang diterima.';
+            }
+
+            return 'Lengkapi batch atau expired date pada item yang diterima.';
+        }
+
+        function setInvoiceLockState(locked, message) {
+            let section = $('#receiveInvoiceSection');
+            section.toggleClass('is-locked', locked);
+            $('#receiveInvoiceLockNotice')
+                .toggleClass('d-none', !locked)
+                .find('span')
+                .text(message || 'Isi detail barang terlebih dahulu.');
+
+            section
+                .find('input:not([readonly]), select, button')
+                .prop('disabled', locked);
+        }
+
         function updateFormProgress() {
             let hasPo = Boolean($('#purchase_order_id').val());
             let hasInvoice = Boolean($('input[name="nomor_faktur"]').val()?.trim()) &&
-                Boolean($('input[name="tanggal_penerimaan"]').val()?.trim());
+                Boolean($('input[name="tanggal_faktur"]').val()?.trim());
             let itemStats = collectReceiveStats();
             let hasValidItem = itemStats.itemCount > 0 && itemStats.invalidRows === 0;
+            let itemState = '';
+            let invoiceState = '';
+
+            if (hasValidItem) {
+                itemState = 'is-complete';
+            } else if (itemStats.itemCount > 0) {
+                itemState = 'is-warning';
+            } else if (hasPo) {
+                itemState = 'is-active';
+            }
+
+            if (hasValidItem && hasInvoice) {
+                invoiceState = 'is-complete';
+            } else if (hasValidItem) {
+                invoiceState = 'is-active';
+            }
 
             setProgressStep('#receiveStepPo', hasPo ? 'is-complete' : 'is-active', hasPo ? 'PO dipilih' :
                 'Belum dipilih');
-            setProgressStep('#receiveStepInvoice', hasInvoice ? 'is-complete' : (hasPo ? 'is-active' : ''),
-                hasInvoice ? 'Faktur siap' : 'Menunggu data');
-            setProgressStep('#receiveStepItems', hasValidItem ? 'is-complete' : (itemStats.itemCount > 0 ? 'is-warning' :
-                    ''),
+            setProgressStep('#receiveStepItems', itemState,
                 hasValidItem ? `${itemStats.itemCount} item lengkap` : (itemStats.itemCount > 0 ?
-                    'Lengkapi batch/expired' : 'Belum ada qty'));
+                    'Lengkapi batch/expired' : (hasPo ? 'Isi qty diterima' : 'Menunggu PO')));
+            setProgressStep('#receiveStepInvoice', invoiceState,
+                hasInvoice && hasValidItem ? 'Faktur siap' : (hasValidItem ? 'Siap diisi' : 'Menunggu detail'));
+
+            setInvoiceLockState(!hasValidItem, invoiceLockMessage(hasPo, itemStats));
+            $('#receiveInvoicePrompt').toggleClass('d-none', !hasValidItem || hasInvoice);
+            updateReceiveGuidance(hasPo, itemStats, hasInvoice, hasValidItem);
 
             $('#submitPenerimaanForm')
-                .toggleClass('btn-primary', hasValidItem)
-                .toggleClass('btn-outline-primary', !hasValidItem);
+                .toggleClass('btn-primary', hasValidItem && hasInvoice)
+                .toggleClass('btn-outline-primary', !(hasValidItem && hasInvoice));
         }
 
         function resetPenerimaanForm() {
             let form = $('#penerimaanForm');
             form.trigger('reset');
+            paymentPreset = 'none';
             $('#penerimaan_id').val('');
             $('#purchase_order_id').val('').trigger('change');
             $('#receive_supplier').val('');
@@ -276,11 +581,23 @@
             $('#receiveDetailRows').empty();
             $('#receiveDetailEditor').addClass('d-none');
             $('#receiveDetailEmpty').removeClass('d-none');
+            $('#receiveDetailLiveSummary').addClass('d-none');
             $('#receiveLineCount, #receiveModalItemCount, #receiveModalQtyCount').text('0');
+            $('#receiveReadyRows, #receiveWarningRows').text('0 item');
+            $('#receiveLiveQty').text('0');
+            $('#receiveLiveValue').text(formatRupiah(0));
             $('#summaryItemPo, #summaryOutstandingQty, #summaryFilledQty').text('0');
             $('#summaryReceivePercent').text('0%');
             $('#summaryReceiveMeter').css('width', '0%');
             $('#receiveModalSubtotal, #receiveModalDiscount, #receiveModalTax, #receiveGrandTotal').text(formatRupiah(0));
+            ['subtotal', 'diskon', 'pajak', 'biaya_lain', 'total_faktur', 'jumlah_dibayar', 'sisa_hutang'].forEach(function(field) {
+                setMoneyInput(field, 0);
+            });
+            $('input[name="tanggal_faktur"]').val(moment().format('DD-MM-YYYY'));
+            $('input[name="tanggal_jatuh_tempo"]').val('');
+            $('select[name="status_pembayaran"]').val('belum_dibayar');
+            updateInvoicePaymentUi(0, 0, 0, 'belum_dibayar');
+            $('#penerimaanModalLabel').text('Form Penerimaan Barang');
             $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Simpan Draft');
             form.find('.is-invalid').removeClass('is-invalid');
             form.find('.invalid-feedback').remove();
@@ -384,11 +701,16 @@
             return `
                 <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}">
                     <td>
-                        <input type="hidden" name="purchase_order_detail_id[]" value="${item.id}">
-                        <input type="hidden" name="obat_id[]" value="${item.obat_id}">
-                        <strong>${escapeHtml(item.nama_obat)}</strong>
-                        <small class="d-block text-muted">${escapeHtml(item.kode_obat)} - ${escapeHtml(item.satuan)}</small>
-                        ${conversion > 1 ? `<small class="d-block text-muted">1 ${escapeHtml(item.satuan)} = ${conversion.toLocaleString('id-ID')} ${escapeHtml(stockUnit)}</small>` : ''}
+                        <div class="receive-item-cell">
+                            <span class="receive-item-avatar"><i class="mdi mdi-pill"></i></span>
+                            <div class="receive-item-copy">
+                                <input type="hidden" name="purchase_order_detail_id[]" value="${item.id}">
+                                <input type="hidden" name="obat_id[]" value="${item.obat_id}">
+                                <strong>${escapeHtml(item.nama_obat)}</strong>
+                                <small class="text-muted">${escapeHtml(item.kode_obat)} - ${escapeHtml(item.satuan)}</small>
+                                ${conversion > 1 ? `<small class="text-muted">1 ${escapeHtml(item.satuan)} = ${conversion.toLocaleString('id-ID')} ${escapeHtml(stockUnit)}</small>` : ''}
+                            </div>
+                        </div>
                     </td>
                     <td>
                         <span class="receive-qty-stack">
@@ -404,6 +726,7 @@
                                 Max
                             </button>
                         </div>
+                        <small class="receive-row-hint">Maks ${maxQty.toLocaleString('id-ID')} ${escapeHtml(item.satuan || '')}</small>
                         ${conversionHint}
                     </td>
                     <td>
@@ -419,18 +742,22 @@
                     <td>
                         <input type="text" class="form-control form-control-sm receive-expired-date"
                             name="expired_date[]" value="${escapeHtml(expired)}" placeholder="YYYY-MM-DD">
+                        <small class="receive-field-note">Wajib untuk batch baru.</small>
                     </td>
                     <td>
-                        <input type="number" class="form-control form-control-sm receive-price" name="harga_beli[]"
-                            min="0" step="0.01" value="${harga}">
+                        <input type="text" class="form-control form-control-sm receive-price" name="harga_beli[]"
+                            value="${formatRupiah(harga)}" inputmode="numeric" autocomplete="off">
+                        <small class="receive-field-note">Harga per ${escapeHtml(item.satuan || 'satuan')}.</small>
                     </td>
                     <td>
                         <input type="number" class="form-control form-control-sm receive-discount" name="diskon[]"
                             min="0" max="100" step="0.01" value="${diskon}">
+                        <small class="receive-field-note">0-100%</small>
                     </td>
                     <td>
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
                             min="0" max="100" step="0.01" value="${ppn}">
+                        <small class="receive-field-note">Default 11%</small>
                     </td>
                     <td>
                         <strong class="receive-row-total">${formatRupiah(0)}</strong>
@@ -456,6 +783,9 @@
             if (!po.details || !po.details.length) {
                 $('#receiveDetailEditor').addClass('d-none');
                 $('#receiveDetailEmpty').removeClass('d-none');
+                $('#receiveDetailLiveSummary').addClass('d-none');
+                $('#receiveLineCount').text('0');
+                recalculateReceiveTotals();
                 return;
             }
 
@@ -486,11 +816,15 @@
             let grandTotal = 0;
             let invalidRows = 0;
             let totalOutstanding = 0;
+            let rowCount = 0;
+            let readyRows = 0;
+            let emptyRows = 0;
 
             $('.receive-detail-row').each(function() {
                 let row = $(this);
+                rowCount++;
                 let qty = Number(row.find('.receive-qty').val()) || 0;
-                let price = Number(row.find('.receive-price').val()) || 0;
+                let price = parseCurrencyValue(row.find('.receive-price').val());
                 let discount = Number(row.find('.receive-discount').val()) || 0;
                 let tax = Number(row.find('.receive-tax').val()) || 0;
                 let max = Number(row.data('max')) || 0;
@@ -529,10 +863,12 @@
                         check.addClass('is-warning').html(
                             '<i class="mdi mdi-alert-circle-outline"></i> Perlu batch/expired');
                     } else {
+                        readyRows++;
                         row.addClass('is-filled');
                         check.addClass('is-ok').html('<i class="mdi mdi-check-circle-outline"></i> Lengkap');
                     }
                 } else {
+                    emptyRows++;
                     row.addClass('is-empty');
                     check.addClass('is-empty').html('<i class="mdi mdi-minus-circle-outline"></i> Belum diisi');
                 }
@@ -546,29 +882,138 @@
                 totalTax,
                 grandTotal,
                 invalidRows,
-                totalOutstanding
+                totalOutstanding,
+                rowCount,
+                readyRows,
+                emptyRows
+            };
+        }
+
+        function updateReceiveDetailSummary(stats) {
+            $('#receiveDetailLiveSummary').toggleClass('d-none', stats.rowCount <= 0);
+            $('#receiveReadyRows').text(`${Number(stats.readyRows || 0).toLocaleString('id-ID')} item`);
+            $('#receiveWarningRows').text(`${Number(stats.invalidRows || 0).toLocaleString('id-ID')} item`);
+            $('#receiveLiveQty').text(Number(stats.totalQty || 0).toLocaleString('id-ID'));
+            $('#receiveLiveValue').text(formatRupiah(stats.grandTotal || 0));
+        }
+
+        function updateReceiveCockpit(stats, invoice, receivePercent) {
+            let hasPo = Boolean($('#purchase_order_id').val());
+            let poNumber = hasPo ? ($('#summaryNoPo').text() || '-') : '-';
+            let supplier = hasPo ? ($('#receive_supplier').val() || '-') : 'Pilih PO approved';
+            let rowCount = Number(stats.rowCount || 0);
+            let readyRows = Number(stats.readyRows || 0);
+            let invalidRows = Number(stats.invalidRows || 0);
+            let filledRows = Number(stats.itemCount || 0);
+            let qtyText = Number(stats.totalQty || 0).toLocaleString('id-ID');
+            let invoiceStatus = paymentStatusLabel(invoice.status);
+            let itemHint = 'Belum ada detail barang.';
+
+            if (rowCount > 0 && filledRows <= 0) {
+                itemHint = 'Isi qty pada barang yang diterima.';
+            } else if (invalidRows > 0) {
+                itemHint = `${invalidRows.toLocaleString('id-ID')} item perlu batch atau expired date.`;
+            } else if (filledRows > 0) {
+                itemHint = 'Detail barang sudah siap untuk faktur.';
+            }
+
+            $('#cockpitGrandTotal').text(formatRupiah(invoice.total || 0));
+            $('#cockpitSubtitle').text(hasPo
+                ? `${filledRows.toLocaleString('id-ID')} item diterima, total qty ${qtyText}.`
+                : 'Pilih PO approved untuk memulai penerimaan barang.');
+            $('#cockpitReceiveMeter').css('width', `${Math.max(0, Math.min(100, receivePercent || 0))}%`);
+            $('#cockpitPo').text(poNumber);
+            $('#cockpitSupplier').text(supplier);
+            $('#cockpitReadyItems').text(`${readyRows.toLocaleString('id-ID')}/${rowCount.toLocaleString('id-ID')}`);
+            $('#cockpitItemHint').text(itemHint);
+            $('#cockpitInvoiceStatus').text(invoiceStatus);
+            $('#cockpitDebt').text(`Sisa hutang ${formatRupiah(invoice.debt || 0)}`);
+        }
+
+        function syncInvoiceTotals(stats) {
+            let subtotal = Number(stats.totalSubtotal) || 0;
+            let discount = Number(stats.totalDiscount) || 0;
+            let tax = Number(stats.totalTax) || 0;
+            let otherCostInput = $('input[name="biaya_lain"]');
+            let paidInput = $('input[name="jumlah_dibayar"]');
+            let otherCost = getMoneyInput('biaya_lain');
+            let total = Math.max(0, subtotal - discount + tax + otherCost);
+            let paid = getMoneyInput('jumlah_dibayar');
+            let isEditingPaid = paidInput.is(':focus');
+
+            if (!isEditingPaid) {
+                if (paymentPreset === 'full') {
+                    paid = total;
+                } else if (paymentPreset === 'half') {
+                    paid = total / 2;
+                } else if (paymentPreset === 'none') {
+                    paid = 0;
+                }
+            }
+
+            if (paid > total) {
+                paid = total;
+            }
+
+            let debt = Math.max(0, total - paid);
+            let paymentStatus = paymentStatusFromAmounts(total, paid);
+
+            setMoneyInput('subtotal', subtotal);
+            setMoneyInput('diskon', discount);
+            setMoneyInput('pajak', tax);
+            setMoneyInput('total_faktur', total);
+            setMoneyInput('sisa_hutang', debt);
+            $('select[name="status_pembayaran"]').val(paymentStatus);
+
+            if (!otherCostInput.is(':focus')) {
+                setMoneyElement(otherCostInput, otherCost);
+            } else {
+                otherCostInput.data('raw-value', formatMoneyInputValue(otherCost));
+            }
+
+            if (!isEditingPaid || paid !== parseCurrencyValue(paidInput.val())) {
+                paidInput.val(isEditingPaid ? moneyEditValue(paid) : formatRupiah(paid));
+                paidInput.data('raw-value', formatMoneyInputValue(paid));
+            } else {
+                paidInput.data('raw-value', formatMoneyInputValue(paid));
+            }
+
+            updateInvoicePaymentUi(total, paid, debt, paymentStatus);
+
+            return {
+                total,
+                paid,
+                debt,
+                status: paymentStatus
             };
         }
 
         function recalculateReceiveTotals() {
             let stats = collectReceiveStats();
+            let invoice = syncInvoiceTotals(stats);
             let receivePercent = stats.totalOutstanding > 0 ? Math.min(100, (stats.totalQty / stats.totalOutstanding) *
                 100) : 0;
 
+            updateReceiveDetailSummary(stats);
+            updateReceiveCockpit(stats, invoice, receivePercent);
             $('#receiveModalItemCount').text(stats.itemCount.toLocaleString('id-ID'));
             $('#receiveModalQtyCount, #summaryFilledQty').text(stats.totalQty.toLocaleString('id-ID'));
             $('#receiveModalSubtotal').text(formatRupiah(stats.totalSubtotal));
             $('#receiveModalDiscount').text(formatRupiah(stats.totalDiscount));
             $('#receiveModalTax').text(formatRupiah(stats.totalTax));
-            $('#receiveGrandTotal').text(formatRupiah(stats.grandTotal));
+            $('#receiveGrandTotal').text(formatRupiah(invoice.total));
             $('#summaryReceivePercent').text(`${receivePercent.toFixed(0)}%`);
             $('#summaryReceiveMeter').css('width', `${receivePercent}%`);
             updateFormProgress();
         }
 
-        $(document).on('input', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"]', function() {
+        $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="jumlah_dibayar"]', function() {
             let input = $(this);
             let max = Number(input.closest('.receive-detail-row').data('max')) || 0;
+
+            if (input.attr('name') === 'jumlah_dibayar') {
+                paymentPreset = 'manual';
+            }
 
             if (input.hasClass('receive-qty') && Number(input.val()) > max) {
                 input.val(max);
@@ -578,6 +1023,63 @@
                 setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
             }
 
+            recalculateReceiveTotals();
+        });
+
+        $(document).on('focus', '.invoice-money:not([readonly]), .receive-price', function() {
+            let input = $(this);
+            input.val(moneyEditValue(input.val()));
+            this.select();
+        });
+
+        $(document).on('blur', '.invoice-money:not([readonly]), .receive-price', function() {
+            let input = $(this);
+            setMoneyElement(input, parseCurrencyValue(input.val()));
+            recalculateReceiveTotals();
+        });
+
+        $('select[name="status_pembayaran"]').on('change', function() {
+            let selectedStatus = $(this).val();
+            let total = getMoneyInput('total_faktur');
+            let currentPaid = getMoneyInput('jumlah_dibayar');
+
+            if (selectedStatus === 'lunas') {
+                paymentPreset = 'full';
+                setMoneyInput('jumlah_dibayar', total);
+            }
+
+            if (selectedStatus === 'belum_dibayar') {
+                paymentPreset = 'none';
+                setMoneyInput('jumlah_dibayar', 0);
+            }
+
+            if (selectedStatus === 'sebagian') {
+                if (total > 0 && (currentPaid <= 0 || currentPaid >= total)) {
+                    paymentPreset = 'half';
+                    setMoneyInput('jumlah_dibayar', total / 2);
+                } else {
+                    paymentPreset = 'manual';
+                }
+            }
+
+            recalculateReceiveTotals();
+        });
+
+        $('.receive-payment-action').on('click', function() {
+            let action = $(this).data('payment-action');
+            let total = getMoneyInput('total_faktur');
+            let paid = 0;
+            paymentPreset = action;
+
+            if (action === 'half') {
+                paid = total / 2;
+            }
+
+            if (action === 'full') {
+                paid = total;
+            }
+
+            setMoneyInput('jumlah_dibayar', paid);
             recalculateReceiveTotals();
         });
 
@@ -603,6 +1105,26 @@
             recalculateReceiveTotals();
         });
 
+        $('#goToInvoiceSection').on('click', function() {
+            document.getElementById('receiveInvoiceSection')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+            setTimeout(function() {
+                $('input[name="nomor_faktur"]').trigger('focus');
+            }, 250);
+        });
+
+        $('.receive-jump-link').on('click', function() {
+            let targetId = $(this).data('target');
+            if (!targetId) return;
+
+            document.getElementById(targetId)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        });
+
         $('#purchase_order_id').on('change', function() {
             let poId = $(this).val();
 
@@ -612,6 +1134,11 @@
                 $('#receiveDetailRows').empty();
                 $('#receiveDetailEditor').addClass('d-none');
                 $('#receiveDetailEmpty').removeClass('d-none');
+                $('#receiveDetailLiveSummary').addClass('d-none');
+                $('#receiveLineCount').text('0');
+                $('#receiveReadyRows, #receiveWarningRows').text('0 item');
+                $('#receiveLiveQty').text('0');
+                $('#receiveLiveValue').text(formatRupiah(0));
                 $('#summaryItemPo, #summaryOutstandingQty, #summaryFilledQty').text('0');
                 $('#summaryReceivePercent').text('0%');
                 $('#summaryReceiveMeter').css('width', '0%');
@@ -846,6 +1373,40 @@
 
         $('#penerimaanForm').on('submit', function(e) {
             e.preventDefault();
+            $(document.activeElement).filter('.invoice-money').trigger('blur');
+
+            let itemStats = collectReceiveStats();
+            let hasValidItem = itemStats.itemCount > 0 && itemStats.invalidRows === 0;
+
+            if (!hasValidItem) {
+                updateFormProgress();
+                document.getElementById('receiveDetailSection')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Detail barang belum lengkap',
+                    text: itemStats.itemCount > 0 ?
+                        'Lengkapi batch atau expired date pada item yang diterima.' :
+                        'Isi minimal satu qty barang yang diterima.'
+                });
+                return;
+            }
+
+            if (!$('input[name="nomor_faktur"]').val()?.trim() || !$('input[name="tanggal_faktur"]').val()?.trim()) {
+                updateFormProgress();
+                document.getElementById('receiveInvoiceSection')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Faktur belum lengkap',
+                    text: 'Isi nomor dan tanggal faktur sebelum menyimpan draft.'
+                });
+                return;
+            }
 
             let id = $('#penerimaan_id').val();
             let url = id ? '{{ route("penerimaan.update", ":id") }}'.replace(':id', id) :
@@ -855,7 +1416,7 @@
             $.ajax({
                 url: url,
                 type: method,
-                data: $(this).serialize(),
+                data: serializePenerimaanForm(),
                 success: function(response) {
                     $('#penerimaanModal').modal('hide');
                     Swal.fire({
@@ -891,11 +1452,23 @@
                 $('#penerimaanModal').one('shown.bs.modal', function() {
                     $('#penerimaanModalLabel').text('Edit Penerimaan Barang');
                     $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Perbarui Draft');
+                    paymentPreset = header.status_pembayaran === 'lunas' ? 'full' : (header.status_pembayaran ===
+                        'belum_dibayar' ? 'none' : 'manual');
                     $('#penerimaan_id').val(header.id);
                     $('#nomor_penerimaan').val(header.nomor_penerimaan);
                     $('input[name="nomor_faktur"]').val(header.nomor_faktur);
                     $('input[name="nomor_surat_jalan"]').val(header.nomor_surat_jalan);
-                    $('input[name="tanggal_penerimaan"]').val(formatDateDisplay(header.tanggal_penerimaan));
+                    $('input[name="tanggal_penerimaan"]').val(formatDateInput(header.tanggal_penerimaan));
+                    $('input[name="tanggal_faktur"]').val(formatDateInput(header.tanggal_faktur));
+                    $('input[name="tanggal_jatuh_tempo"]').val(formatDateInput(header.tanggal_jatuh_tempo));
+                    $('select[name="status_pembayaran"]').val(header.status_pembayaran || 'belum_dibayar');
+                    setMoneyInput('subtotal', header.subtotal);
+                    setMoneyInput('diskon', header.diskon ?? header.total_diskon);
+                    setMoneyInput('pajak', header.pajak ?? header.total_ppn);
+                    setMoneyInput('biaya_lain', header.biaya_lain);
+                    setMoneyInput('total_faktur', header.total_faktur ?? header.grand_total);
+                    setMoneyInput('jumlah_dibayar', header.jumlah_dibayar);
+                    setMoneyInput('sisa_hutang', header.sisa_hutang);
                     $('textarea[name="catatan"]').val(header.catatan || '');
 
                     loadApprovedPo(header.purchase_order_id, `${po.no_po} - ${po.supplier}`).then(function() {
@@ -924,10 +1497,20 @@
                 $('#detailSupplier').val(header.distributor?.nama || '-');
                 $('#detailTanggalTerima').val(formatDateDisplay(header.tanggal_penerimaan));
                 $('#detailNomorFaktur').val(header.nomor_faktur || '-');
+                $('#detailTanggalFaktur').val(formatDateDisplay(header.tanggal_faktur));
+                $('#detailTanggalJatuhTempo').val(formatDateDisplay(header.tanggal_jatuh_tempo));
+                $('#detailStatusPembayaran').val(paymentStatusLabel(header.status_pembayaran));
+                $('#detailInvoiceSubtotal').val(formatRupiah(header.subtotal));
+                $('#detailInvoiceDiskon').val(formatRupiah(header.diskon ?? header.total_diskon));
+                $('#detailInvoicePajak').val(formatRupiah(header.pajak ?? header.total_ppn));
+                $('#detailInvoiceBiayaLain').val(formatRupiah(header.biaya_lain));
+                $('#detailTotalFaktur').val(formatRupiah(header.total_faktur ?? header.grand_total));
+                $('#detailJumlahDibayar').val(formatRupiah(header.jumlah_dibayar));
+                $('#detailSisaHutang').val(formatRupiah(header.sisa_hutang));
                 $('#detailNomorSuratJalan').val(header.nomor_surat_jalan || '-');
                 $('#detailCatatan').val(header.catatan || '-');
                 $('#detailReceiveItemCount').text(Number(header.total_barang || 0).toLocaleString('id-ID'));
-                $('#detailGrandTotal').text(formatRupiah(header.grand_total));
+                $('#detailGrandTotal').text(formatRupiah(header.total_faktur ?? header.grand_total));
 
                 $('#detailReceiveTable tbody').empty();
                 (header.details || []).forEach(function(item) {

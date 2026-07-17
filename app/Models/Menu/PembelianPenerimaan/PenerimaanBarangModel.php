@@ -17,6 +17,8 @@ class PenerimaanBarangModel extends Model
 
     protected $casts = [
         'tanggal_penerimaan' => 'date',
+        'tanggal_faktur' => 'date',
+        'tanggal_jatuh_tempo' => 'date',
         'posted_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];

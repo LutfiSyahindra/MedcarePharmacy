@@ -11,6 +11,7 @@ use App\Http\Controllers\Medcare\MasterData\Pabrikan\PabrikanController;
 use App\Http\Controllers\Medcare\MasterData\Rak\RakController;
 use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
+use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
@@ -273,6 +274,13 @@ Route::middleware('auth')->group(function () {
         Route::put('/penerimaan/{id}/post', [PenerimaanController::class, 'post'])->name('penerimaan.post');
         Route::put('/penerimaan/{id}/cancel', [PenerimaanController::class, 'cancel'])->name('penerimaan.cancel');
         Route::delete('/penerimaan/{id}/destroy', [PenerimaanController::class, 'destroy'])->name('penerimaan.destroy');
+
+        Route::get('/faktur', [FakturController::class, 'faktur'])->name('faktur.faktur');
+        Route::get('/faktur/table', [FakturController::class, 'table'])->name('faktur.table');
+        Route::get('/faktur/{id}/show', [FakturController::class, 'show'])->name('faktur.show');
+        Route::put('/faktur/{id}/update', [FakturController::class, 'update'])->name('faktur.update');
+        Route::put('/faktur/{id}/mark-paid', [FakturController::class, 'markPaid'])->name('faktur.markPaid');
+        Route::put('/faktur/{id}/reset-payment', [FakturController::class, 'resetPayment'])->name('faktur.resetPayment');
 
         Route::get('/retur-pembelian', [ReturPembelianController::class, 'returPembelian'])->name('returPembelian.returPembelian');
         Route::get('/retur-pembelian/table', [ReturPembelianController::class, 'table'])->name('returPembelian.table');

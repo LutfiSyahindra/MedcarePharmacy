@@ -379,6 +379,16 @@ class PenerimaanController extends Controller
             'nomor_faktur' => ['required', 'string', 'max:100'],
             'nomor_surat_jalan' => ['nullable', 'string', 'max:100'],
             'tanggal_penerimaan' => ['required', 'string'],
+            'tanggal_faktur' => ['required', 'string'],
+            'tanggal_jatuh_tempo' => ['nullable', 'string'],
+            'subtotal' => ['nullable', 'numeric', 'min:0'],
+            'diskon' => ['nullable', 'numeric', 'min:0'],
+            'pajak' => ['nullable', 'numeric', 'min:0'],
+            'biaya_lain' => ['nullable', 'numeric', 'min:0'],
+            'total_faktur' => ['nullable', 'numeric', 'min:0'],
+            'status_pembayaran' => ['nullable', 'in:belum_dibayar,sebagian,lunas'],
+            'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],
+            'sisa_hutang' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string'],
             'purchase_order_detail_id' => ['required', 'array'],
             'purchase_order_detail_id.*' => ['required', 'integer', 'exists:purchase_order_details,id'],
@@ -534,6 +544,14 @@ class PenerimaanController extends Controller
 
     private function headerPayload(Request $request, PembelianModel $po, array $computed): array
     {
+        $subtotal = (float) $computed['subtotal'];
+        $diskon = (float) $computed['total_diskon'];
+        $pajak = (float) $computed['total_ppn'];
+        $biayaLain = $this->moneyValue($request->biaya_lain);
+        $totalFaktur = max(0, $subtotal - $diskon + $pajak + $biayaLain);
+        $jumlahDibayar = min($this->moneyValue($request->jumlah_dibayar), $totalFaktur);
+        $sisaHutang = max(0, $totalFaktur - $jumlahDibayar);
+
         return [
             'nomor_penerimaan' => $request->nomor_penerimaan,
             'purchase_order_id' => $po->id,
@@ -541,12 +559,21 @@ class PenerimaanController extends Controller
             'nomor_faktur' => $request->nomor_faktur,
             'nomor_surat_jalan' => $request->nomor_surat_jalan,
             'tanggal_penerimaan' => $this->parseDate($request->tanggal_penerimaan),
+            'tanggal_faktur' => $this->parseNullableDate($request->tanggal_faktur, 'tanggal_faktur'),
+            'tanggal_jatuh_tempo' => $this->parseNullableDate($request->tanggal_jatuh_tempo, 'tanggal_jatuh_tempo'),
             'total_barang' => $computed['total_barang'],
             'total_qty' => $computed['total_qty'],
-            'subtotal' => $computed['subtotal'],
-            'total_diskon' => $computed['total_diskon'],
-            'total_ppn' => $computed['total_ppn'],
-            'grand_total' => $computed['grand_total'],
+            'subtotal' => $subtotal,
+            'total_diskon' => $diskon,
+            'total_ppn' => $pajak,
+            'grand_total' => $totalFaktur,
+            'diskon' => $diskon,
+            'pajak' => $pajak,
+            'biaya_lain' => $biayaLain,
+            'total_faktur' => $totalFaktur,
+            'status_pembayaran' => $this->paymentStatus($totalFaktur, $jumlahDibayar),
+            'jumlah_dibayar' => $jumlahDibayar,
+            'sisa_hutang' => $sisaHutang,
             'catatan' => $request->catatan,
             'created_by' => Auth::id(),
         ];
@@ -731,6 +758,20 @@ class PenerimaanController extends Controller
     private function discountPercent($value): float
     {
         return round(min(100, max(0, (float) ($value ?: 0))), 2);
+    }
+
+    private function moneyValue($value): float
+    {
+        return round(max(0, (float) ($value ?: 0)), 2);
+    }
+
+    private function paymentStatus(float $totalFaktur, float $jumlahDibayar): string
+    {
+        if ($totalFaktur <= 0 || $jumlahDibayar <= 0) {
+            return 'belum_dibayar';
+        }
+
+        return $jumlahDibayar >= $totalFaktur ? 'lunas' : 'sebagian';
     }
 
     private function sameDiscount(float $left, float $right): bool
@@ -965,7 +1006,16 @@ class PenerimaanController extends Controller
         $query->whereIn('branch_id', $branchIds);
     }
 
-    private function parseDate($date): string
+    private function parseNullableDate($date, string $field): ?string
+    {
+        if (trim((string) $date) === '') {
+            return null;
+        }
+
+        return $this->parseDate($date, $field);
+    }
+
+    private function parseDate($date, string $field = 'tanggal_penerimaan'): string
     {
         $date = trim((string) $date);
 
@@ -977,7 +1027,7 @@ class PenerimaanController extends Controller
             return Carbon::parse($date)->format('Y-m-d');
         } catch (\Throwable) {
             throw ValidationException::withMessages([
-                'tanggal_penerimaan' => 'Format tanggal tidak valid.',
+                $field => 'Format tanggal tidak valid.',
             ]);
         }
     }

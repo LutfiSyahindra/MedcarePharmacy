@@ -47,11 +47,6 @@
                                     readonly>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small">Nomor Faktur</label>
-                                <input type="text" class="form-control form-control-sm" id="detailNomorFaktur"
-                                    readonly>
-                            </div>
-                            <div class="col-md-3">
                                 <label class="form-label small">Nomor Surat Jalan</label>
                                 <input type="text" class="form-control form-control-sm" id="detailNomorSuratJalan"
                                     readonly>
@@ -59,6 +54,78 @@
                             <div class="col-md-6">
                                 <label class="form-label small">Catatan</label>
                                 <input type="text" class="form-control form-control-sm" id="detailCatatan" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="purchase-form-section">
+                    <div class="purchase-form-section-header">
+                        <div class="purchase-form-section-title">
+                            <i class="mdi mdi-receipt-text-outline"></i>
+                            <div>
+                                <strong>Informasi Faktur</strong>
+                                <small>Nilai faktur, pembayaran, dan sisa hutang.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="purchase-form-section-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label small">Nomor Faktur</label>
+                                <input type="text" class="form-control form-control-sm" id="detailNomorFaktur"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Tanggal Faktur</label>
+                                <input type="text" class="form-control form-control-sm" id="detailTanggalFaktur"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Tanggal Jatuh Tempo</label>
+                                <input type="text" class="form-control form-control-sm" id="detailTanggalJatuhTempo"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Status Pembayaran</label>
+                                <input type="text" class="form-control form-control-sm" id="detailStatusPembayaran"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Subtotal</label>
+                                <input type="text" class="form-control form-control-sm" id="detailInvoiceSubtotal"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Diskon</label>
+                                <input type="text" class="form-control form-control-sm" id="detailInvoiceDiskon"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Pajak</label>
+                                <input type="text" class="form-control form-control-sm" id="detailInvoicePajak"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Biaya Lain</label>
+                                <input type="text" class="form-control form-control-sm" id="detailInvoiceBiayaLain"
+                                    readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Total Faktur</label>
+                                <input type="text" class="form-control form-control-sm" id="detailTotalFaktur"
+                                    readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Jumlah Dibayar</label>
+                                <input type="text" class="form-control form-control-sm" id="detailJumlahDibayar"
+                                    readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Sisa Hutang</label>
+                                <input type="text" class="form-control form-control-sm" id="detailSisaHutang"
+                                    readonly>
                             </div>
                         </div>
                     </div>
@@ -101,8 +168,8 @@
 
                 <div class="purchase-total-panel">
                     <div>
-                        <span>Grand Total Penerimaan</span>
-                        <small>Subtotal setelah diskon dan PPN.</small>
+                        <span>Total Faktur</span>
+                        <small>Subtotal setelah diskon, PPN, dan biaya lain.</small>
                     </div>
                     <strong id="detailGrandTotal">Rp 0</strong>
                 </div>

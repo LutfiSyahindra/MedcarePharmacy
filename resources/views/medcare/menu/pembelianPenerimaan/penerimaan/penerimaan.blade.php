@@ -238,7 +238,7 @@
                             <th>Surat Jalan</th>
                             <th>Tanggal</th>
                             <th>Item / Qty</th>
-                            <th>Grand Total</th>
+                            <th>Total Faktur</th>
                             <th>User</th>
                             <th>Actions</th>
                         </tr>
