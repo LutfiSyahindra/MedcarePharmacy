@@ -7,6 +7,7 @@
         let riwayatObatId = '';
         let riwayatBatchId = '';
         let expiredWarningDays = $('#expiredWarningDays').val() || 90;
+        let lastStockSummary = {};
         const batchOptionsBaseUrl = '{{ url("medcare/menu/stok/stok/batch-options") }}';
         const updateBatchHargaUrl = '{{ route("stok.batch.updateHargaJual", ":id") }}';
 
@@ -172,14 +173,67 @@
             $(selector).text(`Update ${moment().format('HH:mm')}`);
         }
 
-        function updateStockFilterSnapshot() {
-            const search = $('#stockSearch').val();
-            const edDays = $('#expiredWarningDays').val() || 90;
-            $('#stockActiveFilterText').text(alertLabels[stockAlertStatus] || 'Semua stok');
-            $('#stockActiveSearchText').text(search ? `Pencarian: ${search}` : `Warning ED ${edDays} hari`);
+        function activeStockSearch() {
+            return ($('#stockSearch').val() || '').trim();
+        }
+
+        function stockFilterInfoText(summary = {}) {
+            const search = activeStockSearch();
+            const statusLabel = summary.active_status_label || alertLabels[stockAlertStatus] || 'Semua stok';
+            const total = Number(summary.total_item) || 0;
+            const matched = Number(summary.total_search_matched ?? total) || 0;
+            const available = Number(summary.total_available ?? matched) || 0;
+
+            if (search && stockAlertStatus) {
+                return `${statusLabel}, ${formatNumber(total)} dari ${formatNumber(matched)} hasil pencarian`;
+            }
+
+            if (search) {
+                return `${formatNumber(matched)} dari ${formatNumber(available)} cocok`;
+            }
+
+            if (stockAlertStatus) {
+                return `${statusLabel}, ${formatNumber(total)} item`;
+            }
+
+            return `Semua data, ${formatNumber(total)} item`;
+        }
+
+        function updateStockFilterCounts(counts = {}) {
+            ['all', 'aman', 'menipis', 'kosong', 'expired', 'akan_expired'].forEach(function(key) {
+                $(`[data-stock-count="${key}"]`).text(formatNumber(counts[key] || 0));
+            });
+        }
+
+        function updateStockFilterSnapshot(summary = lastStockSummary) {
+            const search = activeStockSearch();
+            const edDays = summary.expired_warning_days || $('#expiredWarningDays').val() || 90;
+            const statusLabel = summary.active_status_label || alertLabels[stockAlertStatus] || 'Semua stok';
+            const total = Number(summary.total_item);
+            const matched = Number(summary.total_search_matched ?? summary.total_item ?? 0) || 0;
+            const available = Number(summary.total_available ?? matched) || 0;
+            const searchParts = [];
+
+            $('#stockActiveFilterText').text(Number.isFinite(total) ? `${statusLabel} - ${formatNumber(total)} item` : statusLabel);
+
+            if (search) {
+                searchParts.push(`Pencarian: ${search}`);
+            }
+
+            searchParts.push(`Warning ED ${edDays} hari`);
+
+            if (search) {
+                searchParts.push(`${formatNumber(matched)} dari ${formatNumber(available)} cocok`);
+            }
+
+            $('#stockActiveSearchText').text(searchParts.join(' | '));
+            $('#stockFilterInfo').text(stockFilterInfoText(summary));
         }
 
         function updateStockSummary(summary) {
+            lastStockSummary = summary || {};
+            summary = lastStockSummary;
+
             const totalItem = Number(summary.total_item) || 0;
             const lowCount = Number(summary.stok_menipis) || 0;
             const emptyCount = Number(summary.stok_kosong) || 0;
@@ -202,7 +256,8 @@
             $('#stockHealthBadge')
                 .removeClass('is-safe is-warning is-danger')
                 .addClass(safePercent >= 80 ? 'is-safe' : (safePercent >= 50 ? 'is-warning' : 'is-danger'));
-            updateStockFilterSnapshot();
+            updateStockFilterCounts(summary.status_counts || {});
+            updateStockFilterSnapshot(summary);
             updateLastSync('#stockLastSync');
         }
 
@@ -243,12 +298,14 @@
             responsive: true,
             autoWidth: false,
             pageLength: 10,
+            searching: false,
             ajax: {
                 url: '{{ route("stok.table") }}',
                 type: 'GET',
                 data: function(request) {
                     request.alert_status = stockAlertStatus;
                     request.expired_days = expiredWarningDays;
+                    request.stock_search = activeStockSearch();
                 },
                 dataSrc: function(response) {
                     updateStockSummary(response.summary || {});
@@ -262,8 +319,8 @@
                     render: data => `<span class="stock-number">${escapeHtml(data)}</span>`
                 },
                 {
-                    data: null,
-                    render: row => itemCell(row)
+                    data: 'nama_obat',
+                    render: (data, type, row) => itemCell(row)
                 },
                 {
                     data: 'total_stok',
@@ -286,8 +343,8 @@
                     render: (data, type, row) => `<span class="stock-number">${formatNumber(data)} ${escapeHtml(row.satuan)}</span>`
                 },
                 {
-                    data: null,
-                    render: row => statusBadge(row.status, row.status_label)
+                    data: 'status_label',
+                    render: (data, type, row) => statusBadge(row.status, row.status_label)
                 },
                 {
                     data: 'actions',
@@ -309,7 +366,8 @@
                 $('#tableStock .btn-info').attr('title', 'Lihat batch obat');
                 $('#tableStock .btn-primary').attr('title', 'Buka kartu stok');
                 const info = this.api().page.info();
-                $('#stockVisibleInfo').text(`${formatNumber(info.recordsDisplay)} data`);
+                const visible = Number(lastStockSummary.total_item ?? info.recordsDisplay) || 0;
+                $('#stockVisibleInfo').text(`${formatNumber(visible)} data`);
             },
             language: {
                 processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat stok...</span>',
@@ -501,7 +559,7 @@
             $(this).closest('.stock-search').toggleClass('has-value', Boolean(value));
             updateStockFilterSnapshot();
             clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => StockTable.search(value).draw(), 250);
+            searchTimer = setTimeout(() => StockTable.ajax.reload(), 250);
         });
 
         $('#clearStockSearch').on('click', function() {
@@ -592,12 +650,12 @@
             const ppnMargin = Number(row.margin_ppn) || 0;
             const hargaDasarMargin = Number(row.margin_harga_beli_include_ppn) || 0;
             const marginHasMargin = Boolean(row.margin_has_margin);
-            const marginReference = row.margin_reference || 'golongan belum tersedia';
+            const marginReference = row.margin_reference || 'prioritas margin belum tersedia';
             const marginInfoClass = marginHasMargin ? 'text-success' : 'text-warning';
             const marginCalcText = `dasar ${formatCurrency(hargaDasarMargin)} sudah termasuk PPN ${ppnMargin.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
             const marginInfoText = marginHasMargin
                 ? `Sesuai margin ${marginReference} (${marginCalcText}, faktor ${faktorMargin.toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}): ${formatCurrency(hargaMargin)}`
-                : `Belum ada margin golongan aktif, ${marginCalcText}, faktor 1.000: ${formatCurrency(hargaMargin)}`;
+                : `Belum ada margin aktif sesuai prioritas, ${marginCalcText}, faktor 1.000: ${formatCurrency(hargaMargin)}`;
 
             Swal.fire({
                 title: 'Ubah Harga Jual',

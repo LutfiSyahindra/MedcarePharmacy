@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan;
 
 use App\Http\Controllers\Controller;
-use App\Models\MarginsModel;
-use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
+use App\Services\Settings\Margins\MarginsService;
 use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,7 +24,8 @@ class PenerimaanController extends Controller
 
     public function __construct(
         private readonly StockService $stockService,
-        private readonly TransactionNotificationService $transactionNotifications
+        private readonly TransactionNotificationService $transactionNotifications,
+        private readonly MarginsService $marginsService
     ) {}
 
     public function penerimaan()
@@ -196,6 +196,8 @@ class PenerimaanController extends Controller
             'distributor',
             'details.obat.satuan',
             'details.obat.golongan',
+            'details.obat.mainGolongan',
+            'details.obat.subGolongan',
             'details.purchaseOrderDetail.satuanKonversi.satuan',
         ]);
 
@@ -260,6 +262,8 @@ class PenerimaanController extends Controller
                 'purchaseOrder',
                 'details.obat.satuan',
                 'details.obat.golongan',
+                'details.obat.mainGolongan',
+                'details.obat.subGolongan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
             ])->lockForUpdate()->findOrFail($id);
 
@@ -816,6 +820,8 @@ class PenerimaanController extends Controller
         $detail->loadMissing([
             'obat.satuan',
             'obat.golongan',
+            'obat.mainGolongan',
+            'obat.subGolongan',
             'purchaseOrderDetail.satuanKonversi.satuan',
         ]);
 
@@ -832,8 +838,9 @@ class PenerimaanController extends Controller
         $totalHargaBeli = $this->detailTotalPurchasePriceIncludingTax($detail);
         $ppn = (float) ($detail->ppn ?? 0);
         $diskon = (float) ($detail->diskon ?? 0);
-        $margin = $this->activeGolonganMargin($obat);
+        $margin = $this->marginsService->activeMarginForObat($obat);
         $faktorJual = $margin ? (float) $margin->faktor_jual : 1.0;
+        $marginReference = $this->marginsService->marginReferenceLabelForObat($obat, $margin);
 
         if ($qtySatuanTerkecil <= 0) {
             throw ValidationException::withMessages([
@@ -866,6 +873,8 @@ class PenerimaanController extends Controller
             'ppn' => $ppn,
             'faktor_jual' => $faktorJual,
             'has_margin' => (bool) $margin,
+            'margin_tingkat' => $margin?->tingkat,
+            'margin_reference' => $marginReference,
             'diskon' => $diskon,
             'nilai_diskon_beli' => round($nilaiDiskon, 2),
             'nilai_diskon_jual' => round($nilaiDiskon, 2),
@@ -873,19 +882,6 @@ class PenerimaanController extends Controller
             'total_harga_jual' => round($totalHargaJual, 2),
             'harga_jual' => $hargaJual,
         ];
-    }
-
-    private function activeGolonganMargin(MasterObatModel $obat): ?MarginsModel
-    {
-        if (! $obat->golongan_id) {
-            return null;
-        }
-
-        return MarginsModel::where('tingkat', 'golongan')
-            ->where('reference_id', $obat->golongan_id)
-            ->where('is_active', true)
-            ->latest('id')
-            ->first();
     }
 
     private function detailConversionFactor(PenerimaanBarangDetailModel $detail): float

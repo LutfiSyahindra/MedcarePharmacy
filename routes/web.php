@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
         // --- Margin
         Route::get('/margin', [MarginController::class, 'margin'])->name('margin.margin');
         Route::get('/margin/table', [MarginController::class, 'table'])->name('margin.table');
+        Route::put('/margin/priority/update', [MarginController::class, 'updatePriority'])->name('margin.priority.update');
         Route::get('/margin/{tingkat}/getReferences', [MarginController::class, 'getReferences'])->name('margin.getReferences');
         Route::post('/margin/store', [MarginController::class, 'store'])->name('margin.store');
         Route::put('/margin/updateStatus', [MarginController::class, 'updateStatus'])->name('margin.updateStatus');
@@ -232,6 +233,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/konversiSatuanObat', [KonversiSatuanObatController::class, 'konversi'])->name('konversiSatuanObat.konversiSatuanObat');
         Route::get('/konversiSatuanObat/table', [KonversiSatuanObatController::class, 'table'])->name('konversiSatuanObat.table');
         Route::post('/konversiSatuanObat/store', [KonversiSatuanObatController::class, 'store'])->name('konversiSatuanObat.store');
+        Route::put('/konversiSatuanObat/{id}/sync', [KonversiSatuanObatController::class, 'sync'])->name('konversiSatuanObat.sync');
         Route::get('/konversiSatuanObat/{id}/edit', [KonversiSatuanObatController::class, 'edit'])->name('konversiSatuanObat.edit');
         Route::get('/konversiSatuanObat/getObat', [KonversiSatuanObatController::class, 'getObat'])->name('konversiSatuanObat.getObat');
         Route::get('/konversiSatuanObat/getSatuan', [KonversiSatuanObatController::class, 'getSatuan'])->name('konversiSatuanObat.getSatuan');

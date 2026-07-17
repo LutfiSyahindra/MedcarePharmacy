@@ -1,188 +1,21 @@
 <script>
     $(document).ready(function() {
         const ui = window.MasterObatUI || {};
+        let currentStatus = 'all';
+        let latestSummary = {};
+        let satuanOptions = [];
+        let satuanRequest = null;
+        let activeObatRow = null;
+        let konversiTable = null;
 
         if ($.fn.dropify) {
             $('#myDropify').dropify();
         }
 
-        // --- Setup CSRF untuk semua AJAX request
         $.ajaxSetup({
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
-        });
-
-        // --- Template Row
-        function getKonversiRow() {
-            return `
-                    <div class="konversi-input-card input-group-item">
-                        <div class="konversi-input-card-header">
-                            <strong><i class="mdi mdi-swap-horizontal-bold"></i> Baris Konversi</strong>
-                            <button type="button" class="btn btn-sm btn-light remove-input">
-                                <i class="mdi mdi-trash-can-outline me-1"></i>Hapus
-                            </button>
-                        </div>
-                        <div class="konversi-input-card-body">
-                            <div class="obat-fields">
-                                <div class="obat-field is-wide">
-                                    <label class="form-label">Obat</label>
-                                    <div class="obat-input-shell">
-                                        <span class="obat-input-icon"><i class="mdi mdi-pill"></i></span>
-                                        <select class="js-example-basic-single form-select obatSelect" data-width="100%" name="obat_id[]" required>
-                                            <option value="">-- Pilih Obat --</option>
-                                        </select>
-                                    </div>
-                                    <div class="invalid-feedback"></div>
-                                </div>
-
-                                <div class="obat-field">
-                                    <label class="form-label">Satuan Pembelian</label>
-                                    <div class="obat-input-shell">
-                                        <span class="obat-input-icon"><i class="mdi mdi-package-variant"></i></span>
-                                        <select class="form-select satuanSelect" name="satuan_id[]" required>
-                                            <option value="">Memuat data...</option>
-                                        </select>
-                                    </div>
-                                    <div class="invalid-feedback"></div>
-                                </div>
-
-                                <div class="obat-field">
-                                    <label class="form-label">Konversi ke PCS</label>
-                                    <div class="obat-input-shell">
-                                        <span class="obat-input-icon"><i class="mdi mdi-calculator-variant-outline"></i></span>
-                                        <input class="form-control" type="number" name="konversi[]" min="1" placeholder="Contoh: 10" required>
-                                    </div>
-                                    <div class="invalid-feedback"></div>
-                                </div>
-
-                                <div class="obat-field">
-                                    <label class="form-label">Default</label>
-                                    <div class="konversi-default-box">
-                                        <input type="hidden" name="is_default[]" value="0" class="defaultHidden">
-                                        <input class="form-check-input defaultCheck" type="checkbox" value="1">
-                                        <label class="form-check-label">Jadikan default</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-        }
-
-        // --- Ambil Data Obat
-        function loadObatInto($select, selectedId = null) {
-            $.ajax({
-                url: "{{ route("konversiSatuanObat.getObat") }}",
-                type: "GET",
-                success: function(data) {
-                    $select.empty().append('<option value="">-- Pilih Obat --</option>');
-
-                    data.forEach(item => {
-                        $select.append(new Option(item.nama_obat, item.id, false, false));
-                    });
-
-                    // re-init select2
-                    $select.select2({
-                        dropdownParent: $('#konversiModal'),
-                        width: '100%',
-                        placeholder: '-- Pilih Obat --',
-                        allowClear: true
-                    });
-
-                    if (selectedId) {
-                        $select.val(selectedId).trigger('change');
-                    }
-                }
-            });
-        }
-
-        // --- Ambil Data Satuan
-        function loadSatuanInto($select, selectedId = null) {
-            $.ajax({
-                url: "{{ route("konversiSatuanObat.getSatuan") }}",
-                type: "GET",
-                success: function(data) {
-                    $select.empty().append('<option value="">-- Pilih Satuan --</option>');
-
-                    data.forEach(item => {
-                        $select.append(new Option(item.nama, item.id, false, false));
-                    });
-
-                    // re-init select2
-                    $select.select2({
-                        dropdownParent: $('#konversiModal'),
-                        width: '100%',
-                        placeholder: '-- Pilih Satuan --',
-                        allowClear: true
-                    });
-
-                    if (selectedId) {
-                        $select.val(selectedId).trigger('change');
-                    }
-                }
-            });
-        }
-
-        // --- Default Checkbox
-        $(document).on('change', '.defaultCheck', function() {
-            let hidden = $(this).closest('.form-check').find('.defaultHidden');
-
-            if ($(this).is(':checked')) {
-                hidden.val(1);
-            } else {
-                hidden.val(0);
-            }
-        });
-
-
-        // --- Reset modal ketika dibuka
-        $('#konversiModal').on('show.bs.modal', function() {
-
-            let form = $('#konversiForm');
-            $('#konversiModalLabel').text('Tambah Konversi Satuan Obat');
-            $('#konversiModalSubtitle').text('Pilih obat, satuan pembelian, dan jumlah konversi ke PCS.');
-            form.trigger('reset');
-            $('#submitForm').html('<i class="mdi mdi-content-save-outline"></i>Simpan Konversi');
-            $('#addInput').show();
-
-            form.find('.invalid-feedback').text('');
-            form.find('.form-control, .form-select').removeClass('is-invalid');
-            form.find('.obat-field').removeClass('has-error');
-            $('#konversiId').val('');
-
-            // Buat row terlebih dahulu
-            $('#input-wrapper').html(getKonversiRow());
-
-            // Setelah row ada, baru load satuan
-            loadObatInto($('#input-wrapper .obatSelect'));
-            loadSatuanInto($('#input-wrapper .satuanSelect'));
-
-        });
-
-        // --- Tambah input baru
-        $(document).on('click', '#addInput', function() {
-
-            let newRow = $(getKonversiRow());
-            $('#input-wrapper').append(newRow);
-
-            // Load satuan untuk row baru
-            loadObatInto(newRow.find('.obatSelect'));
-            loadSatuanInto(newRow.find('.satuanSelect'));
-        });
-
-        // --- Hapus input tertentu
-        $(document).on('click', '.remove-input', function() {
-            if ($('#input-wrapper .input-group-item').length === 1 && !$('#konversiId').val()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Minimal 1 baris',
-                    text: 'Sisakan satu baris konversi untuk diisi.'
-                });
-                return;
-            }
-
-            $(this).closest('.input-group-item').remove();
         });
 
         function escapeHtml(value) {
@@ -207,22 +40,138 @@
             return Number.isFinite(numeric) ? numeric.toLocaleString('id-ID') : '0';
         }
 
-        function updateKonversiStats() {
-            if (!konversiTable || !konversiTable.page) return;
+        function toast(icon, title, html = null) {
+            if (ui.toast) {
+                ui.toast(icon, title, html);
+                return;
+            }
 
-            const info = konversiTable.page.info();
-            $('#konversiTotal').text(formatNumber(info.recordsTotal || 0));
-            $('#konversiFiltered').text(formatNumber(info.recordsDisplay || 0));
-            $('#konversiSelected').text(formatNumber($('#tableKonversi tbody tr.is-selected').length));
+            Swal.fire({
+                icon: icon,
+                title: title,
+                html: html,
+                toast: true,
+                position: 'top-end',
+                timer: icon === 'error' ? 4600 : 3000,
+                timerProgressBar: true,
+                showConfirmButton: false
+            });
         }
 
-        // --- DataTable
-        let konversiTable = $('#tableKonversi').DataTable((ui.dataTableOptions || function(options) {
+        function clearValidation() {
+            if (ui.clearValidation) {
+                ui.clearValidation('#konversiForm');
+                return;
+            }
+
+            $('#konversiForm').find('.invalid-feedback').text('');
+            $('#konversiForm').find('.form-control, .form-select').removeClass('is-invalid');
+            $('#konversiForm').find('.obat-field').removeClass('has-error');
+        }
+
+        function markValidation(errors) {
+            const messages = [];
+            clearValidation();
+
+            Object.keys(errors || {}).forEach(function(key) {
+                const message = errors[key][0] || 'Field tidak valid';
+                const parts = key.split('.');
+                const field = parts[0];
+                const index = Number(parts[1]);
+                const $row = Number.isInteger(index) ? $('#input-wrapper .input-group-item').eq(index) : $('#input-wrapper .input-group-item').first();
+                const $input = $row.find(`[name="${field}[]"]`).first();
+
+                if ($input.length) {
+                    $input.addClass('is-invalid');
+                    $input.closest('.obat-field').addClass('has-error');
+                    $input.closest('.obat-field').find('.invalid-feedback').first().text(message);
+                }
+
+                messages.push(message);
+            });
+
+            if (messages.length) {
+                toast('error', 'Validasi Gagal', messages.join('<br>'));
+            }
+        }
+
+        function updateSummary(summary) {
+            latestSummary = summary || latestSummary || {};
+
+            $('#konversiTotalObat').text(formatNumber(latestSummary.total_obat || 0));
+            $('#konversiWith').text(formatNumber(latestSummary.sudah_konversi || 0));
+            $('#konversiWithout').text(formatNumber(latestSummary.belum_konversi || 0));
+
+            if (konversiTable && konversiTable.page) {
+                const info = konversiTable.page.info();
+                $('#konversiFiltered').text(formatNumber(info.recordsDisplay || 0));
+            }
+        }
+
+        function renderStatus(row) {
+            const isReady = row.has_konversi;
+            const icon = isReady ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline';
+            const className = isReady ? 'is-ready' : 'is-empty';
+            const countText = isReady ? `${formatNumber(row.conversion_count)} satuan` : 'Perlu diisi';
+
+            return `
+                <span class="konversi-status-badge ${className}">
+                    <i class="mdi ${icon}"></i>
+                    ${escapeHtml(row.status_label)}
+                    <small>${escapeHtml(countText)}</small>
+                </span>
+            `;
+        }
+
+        function renderConversions(row) {
+            if (!row.has_konversi || !Array.isArray(row.conversions) || !row.conversions.length) {
+                return `
+                    <button type="button" class="konversi-inline-empty" onclick="manageKonversiObat(${row.id})">
+                        <i class="mdi mdi-plus-circle-outline"></i>
+                        Isi konversi sekarang
+                    </button>
+                `;
+            }
+
+            const chips = row.conversions.map(function(item) {
+                return `
+                    <span class="konversi-chip ${Number(item.is_default) === 1 ? 'is-default' : ''}" title="${escapeHtml(item.label)}">
+                        <i class="mdi ${Number(item.is_default) === 1 ? 'mdi-star-outline' : 'mdi-swap-horizontal-bold'}"></i>
+                        ${escapeHtml(item.label)}
+                    </span>
+                `;
+            }).join('');
+
+            return `<div class="konversi-chip-list">${chips}</div>`;
+        }
+
+        function findTableRow(obatId) {
+            const target = String(obatId);
+            const rows = konversiTable.rows().data().toArray();
+
+            return rows.find((row) => String(row.id) === target);
+        }
+
+        function setStatusFilter(status) {
+            currentStatus = status || 'all';
+            $('.konversi-status-filter .btn').removeClass('is-active');
+            $(`.konversi-status-filter .btn[data-status="${currentStatus}"]`).addClass('is-active');
+            konversiTable.ajax.reload(null, true);
+        }
+
+        konversiTable = $('#tableKonversi').DataTable((ui.dataTableOptions || function(options) {
             return options;
         })({
             ajax: {
                 url: "{{ route("konversiSatuanObat.table") }}",
-                type: "GET"
+                type: "GET",
+                data: function(data) {
+                    data.status = currentStatus;
+                },
+                dataSrc: function(json) {
+                    updateSummary(json.summary || {});
+                    return json.data || [];
+                }
             },
             columns: [{
                     data: 'DT_RowIndex',
@@ -231,45 +180,53 @@
                     searchable: false
                 },
                 {
-                    data: 'obat_id',
-                    name: 'obat_id',
+                    data: 'search_text',
+                    name: 'search_text',
                     render: function(data, type, row) {
-                        if (type !== 'display') return data;
-
-                        const subtitle = `1 ${row.satuan_id || 'satuan'} = ${formatNumber(row.konversi)} PCS`;
-
-                        if (ui.identity) {
-                            return ui.identity(data, subtitle);
+                        if (type !== 'display') {
+                            return data || '';
                         }
 
-                        return `<strong>${escapeHtml(data || '-')}</strong><br><small>${escapeHtml(subtitle)}</small>`;
+                        const subtitle = `${row.kode_obat || '-'} - Satuan stok: ${row.satuan_stok || 'PCS'}`;
+
+                        if (ui.identity) {
+                            return ui.identity(row.nama_obat, subtitle);
+                        }
+
+                        return `<strong>${escapeHtml(row.nama_obat || '-')}</strong><br><small>${escapeHtml(subtitle)}</small>`;
                     }
                 },
                 {
-                    data: 'satuan_id',
-                    name: 'satuan_id',
+                    data: 'satuan_stok',
+                    name: 'satuan_stok',
                     render: function(data, type) {
                         if (type !== 'display') return data;
 
                         if (ui.tagBadge) {
-                            return ui.tagBadge(data, 'mdi-package-variant-closed');
+                            return ui.tagBadge(data || 'PCS', 'mdi-scale-balance');
                         }
 
-                        return `<span class="badge bg-light text-dark">${escapeHtml(data || '-')}</span>`;
+                        return `<span class="badge bg-light text-dark">${escapeHtml(data || 'PCS')}</span>`;
                     }
                 },
                 {
-                    data: 'konversi',
-                    name: 'konversi',
+                    data: 'status_label',
+                    name: 'status_label',
+                    render: function(data, type, row) {
+                        if (type !== 'display') {
+                            return `${data || ''} ${row.status_key || ''}`;
+                        }
+
+                        return renderStatus(row);
+                    }
+                },
+                {
+                    data: 'conversion_summary',
+                    name: 'conversion_summary',
                     render: function(data, type, row) {
                         if (type !== 'display') return data;
 
-                        return `
-                            <span class="konversi-rule">
-                                <i class="mdi mdi-swap-horizontal-bold"></i>
-                                1 ${escapeHtml(row.satuan_id || 'satuan')} = ${formatNumber(data)} PCS
-                            </span>
-                        `;
+                        return renderConversions(row);
                     }
                 },
                 {
@@ -281,10 +238,8 @@
             ]
         }));
 
-        // --- Hilangkan search default bawaan DataTables
         $('.dataTables_filter').hide();
 
-        // --- Hubungkan search custom dengan DataTables
         let searchTimer = null;
         $('#searchKonversi').on('input', function() {
             const value = this.value;
@@ -292,6 +247,18 @@
             searchTimer = setTimeout(function() {
                 konversiTable.search(value).draw();
             }, 220);
+        });
+
+        $('.konversi-status-filter .btn').on('click', function() {
+            setStatusFilter($(this).data('status'));
+        });
+
+        $('.konversi-hero-filter').on('click', function() {
+            setStatusFilter($(this).data('status'));
+            document.querySelector('.obat-table-section')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
         });
 
         $('.obat-refresh-table').on('click', function() {
@@ -308,275 +275,378 @@
             }
 
             $(this).toggleClass('is-selected');
-            updateKonversiStats();
         });
 
         konversiTable.on('draw', function() {
-            updateKonversiStats();
+            updateSummary(latestSummary);
 
             if (ui.initTooltips) {
                 ui.initTooltips();
             }
         });
 
-        updateKonversiStats();
+        function loadSatuanOptions() {
+            if (satuanOptions.length) {
+                return $.Deferred().resolve(satuanOptions).promise();
+            }
 
-        // --- Submit form
+            if (satuanRequest) {
+                return satuanRequest;
+            }
+
+            satuanRequest = $.ajax({
+                url: "{{ route("konversiSatuanObat.getSatuan") }}",
+                type: "GET"
+            }).then(function(data) {
+                satuanOptions = data || [];
+                return satuanOptions;
+            }).always(function() {
+                satuanRequest = null;
+            });
+
+            return satuanRequest;
+        }
+
+        function satuanOptionsHtml(selectedId = null) {
+            const selectedValue = String(selectedId || '');
+            let html = '<option value="">-- Pilih Satuan --</option>';
+
+            satuanOptions.forEach(function(item) {
+                const selected = String(item.id) === selectedValue ? 'selected' : '';
+                html += `<option value="${escapeHtml(item.id)}" ${selected}>${escapeHtml(item.nama)}</option>`;
+            });
+
+            return html;
+        }
+
+        function initSatuanSelect($select, selectedId = null) {
+            loadSatuanOptions().then(function() {
+                if ($select.data('select2')) {
+                    $select.select2('destroy');
+                }
+
+                $select.html(satuanOptionsHtml(selectedId));
+
+                if ($.fn.select2) {
+                    $select.select2({
+                        dropdownParent: $('#konversiModal'),
+                        width: '100%',
+                        placeholder: '-- Pilih Satuan --',
+                        allowClear: true
+                    });
+                }
+
+                $select.val(selectedId || '').trigger('change.select2');
+                updateLivePreview();
+            });
+        }
+
+        function getKonversiRow(data = {}) {
+            const id = data.id || '';
+            const konversi = data.konversi || '';
+            const isDefault = Number(data.is_default || 0) === 1;
+
+            return `
+                <div class="konversi-input-card input-group-item mb-3">
+                    <input type="hidden" name="conversion_id[]" value="${escapeHtml(id)}">
+                    <div class="konversi-input-card-header">
+                        <strong><i class="mdi mdi-swap-horizontal-bold"></i> Satuan Konversi</strong>
+                        <button type="button" class="btn btn-sm btn-light remove-input" title="Hapus baris">
+                            <i class="mdi mdi-trash-can-outline me-1"></i>Hapus
+                        </button>
+                    </div>
+                    <div class="konversi-input-card-body">
+                        <div class="obat-fields">
+                            <div class="obat-field is-satuan">
+                                <label class="form-label">Satuan Pembelian</label>
+                                <div class="obat-input-shell">
+                                    <span class="obat-input-icon"><i class="mdi mdi-package-variant"></i></span>
+                                    <select class="form-select satuanSelect" name="satuan_id[]" required>
+                                        <option value="">Memuat data...</option>
+                                    </select>
+                                </div>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="obat-field is-konversi">
+                                <label class="form-label">Isi Konversi</label>
+                                <div class="obat-input-shell">
+                                    <span class="obat-input-icon"><i class="mdi mdi-calculator-variant-outline"></i></span>
+                                    <input class="form-control konversiValue" type="number" name="konversi[]" value="${escapeHtml(konversi)}" min="1" placeholder="Contoh: 10" required>
+                                </div>
+                                <div class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="obat-field is-default">
+                                <label class="form-label">Default</label>
+                                <div class="konversi-default-box">
+                                    <input type="hidden" name="is_default[]" value="${isDefault ? '1' : '0'}" class="defaultHidden">
+                                    <input class="form-check-input defaultCheck" type="checkbox" value="1" ${isDefault ? 'checked' : ''}>
+                                    <label class="form-check-label">Utama</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function appendKonversiRow(data = {}) {
+            const $row = $(getKonversiRow(data));
+            $('#input-wrapper').append($row);
+            initSatuanSelect($row.find('.satuanSelect'), data.satuan_id || null);
+            updateLivePreview();
+        }
+
+        function ensureOneRow() {
+            if ($('#input-wrapper .input-group-item').length === 0) {
+                appendKonversiRow();
+            }
+        }
+
+        function updateDefaultHidden() {
+            $('#input-wrapper .defaultCheck').each(function() {
+                $(this).closest('.konversi-default-box').find('.defaultHidden').val($(this).is(':checked') ? '1' : '0');
+            });
+        }
+
+        function updateLivePreview() {
+            updateDefaultHidden();
+
+            const satuanStok = activeObatRow?.satuan_stok || 'satuan stok';
+            const previews = [];
+
+            $('#input-wrapper .input-group-item').each(function() {
+                const $row = $(this);
+                const satuan = $row.find('.satuanSelect option:selected').text();
+                const satuanId = $row.find('.satuanSelect').val();
+                const konversi = $row.find('.konversiValue').val();
+                const isDefault = $row.find('.defaultCheck').is(':checked');
+
+                if (!satuanId || !konversi) {
+                    return;
+                }
+
+                previews.push(`
+                    <span class="konversi-chip ${isDefault ? 'is-default' : ''}">
+                        <i class="mdi ${isDefault ? 'mdi-star-outline' : 'mdi-swap-horizontal-bold'}"></i>
+                        1 ${escapeHtml(satuan)} = ${formatNumber(konversi)} ${escapeHtml(satuanStok)}
+                    </span>
+                `);
+            });
+
+            $('#konversiLivePreview').html(previews.length
+                ? `<div class="konversi-chip-list">${previews.join('')}</div>`
+                : 'Belum ada baris konversi yang siap disimpan.'
+            );
+        }
+
+        function openEditor(row) {
+            activeObatRow = row;
+            clearValidation();
+
+            $('#activeObatId').val(row.id);
+            $('#konversiModalLabel').text(`Kelola Konversi Satuan`);
+            $('#konversiModalSubtitle').text('Tambah atau perbarui satuan pembelian untuk obat terpilih.');
+            $('#konversiObatName').text(row.nama_obat || '-');
+            $('#konversiObatMeta').text(`${row.kode_obat || '-'} - Satuan stok: ${row.satuan_stok || 'PCS'}`);
+            $('#konversiModalNote').text(`Contoh: 1 Box = 100 ${row.satuan_stok || 'satuan stok'}, 1 Strip = 10 ${row.satuan_stok || 'satuan stok'}.`);
+            $('#konversiObatStatus')
+                .removeClass('konversi-empty-badge konversi-status-badge is-ready is-empty')
+                .addClass(row.has_konversi ? 'konversi-status-badge is-ready' : 'konversi-empty-badge')
+                .html(`
+                    <i class="mdi ${row.has_konversi ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline'}"></i>
+                    ${escapeHtml(row.status_label || 'Belum Ada')}
+                `);
+
+            $('#input-wrapper').empty();
+
+            if (Array.isArray(row.conversions) && row.conversions.length) {
+                row.conversions.forEach(function(item) {
+                    appendKonversiRow(item);
+                });
+            } else {
+                appendKonversiRow();
+            }
+
+            $('#submitForm').html('<i class="mdi mdi-content-save-outline"></i>Simpan Konversi');
+            $('#konversiModal').modal('show');
+            updateLivePreview();
+        }
+
+        window.manageKonversiObat = function(obatId) {
+            const row = findTableRow(obatId);
+
+            if (!row) {
+                toast('warning', 'Data obat belum siap', 'Silakan refresh tabel lalu coba kembali.');
+                return;
+            }
+
+            openEditor(row);
+        };
+
+        $(document).on('click', '#addInput', function() {
+            appendKonversiRow();
+        });
+
+        $(document).on('change', '.defaultCheck', function() {
+            if ($(this).is(':checked')) {
+                $('#input-wrapper .defaultCheck').not(this).prop('checked', false);
+            }
+
+            updateLivePreview();
+        });
+
+        $(document).on('change input', '.satuanSelect, .konversiValue', function() {
+            updateLivePreview();
+        });
+
+        $(document).on('click', '.remove-input', function() {
+            const $row = $(this).closest('.input-group-item');
+            const conversionId = $row.find('input[name="conversion_id[]"]').val();
+
+            if (!conversionId) {
+                if ($('#input-wrapper .input-group-item').length === 1) {
+                    $row.find('select').val('').trigger('change');
+                    $row.find('input[type="number"]').val('');
+                    $row.find('.defaultCheck').prop('checked', false);
+                    updateLivePreview();
+                    return;
+                }
+
+                $row.remove();
+                updateLivePreview();
+                return;
+            }
+
+            deleteConversion(conversionId, $row);
+        });
+
+        function deleteConversion(id, $row = null) {
+            Swal.fire({
+                title: 'Hapus konversi?',
+                text: 'Satuan konversi ini akan dihapus dari obat terkait.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, hapus',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (!result.isConfirmed) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route("konversiSatuanObat.destroy", ":id") }}".replace(':id', id),
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (!response.success) {
+                            toast('error', 'Gagal menghapus', response.message || 'Konversi tidak dapat dihapus.');
+                            return;
+                        }
+
+                        if ($row && $row.length) {
+                            $row.remove();
+                            ensureOneRow();
+                            updateLivePreview();
+                        }
+
+                        konversiTable.ajax.reload(null, false);
+                        toast('success', 'Konversi dihapus');
+                    },
+                    error: function(xhr) {
+                        const message = xhr.responseJSON?.message || 'Konversi tidak dapat dihapus. Pastikan data ini belum dipakai transaksi.';
+                        toast('error', 'Gagal menghapus', message);
+                    }
+                });
+            });
+        }
+
+        window.deleteKonversiSatuanObat = function(id) {
+            deleteConversion(id);
+        };
+
         $('#konversiForm').on('submit', function(e) {
             e.preventDefault();
 
-            let formData = $(this).serialize();
-            let konversiId = $('#konversiId').val();
+            const obatId = $('#activeObatId').val();
 
-            let url = konversiId ?
-                "{{ route("konversiSatuanObat.update", ":id") }}".replace(':id', konversiId) :
-                "{{ route("konversiSatuanObat.store") }}";
+            if (!obatId) {
+                toast('warning', 'Pilih obat dulu', 'Klik tombol kelola pada salah satu obat di tabel.');
+                return;
+            }
 
-            let method = konversiId ? 'PUT' : 'POST';
+            updateDefaultHidden();
+            clearValidation();
+
+            const $button = $('#submitForm');
+            const normalHtml = $button.data('normal-html') || $button.html();
+
+            if (ui.setButtonLoading) {
+                ui.setButtonLoading($button, true, 'Menyimpan...', normalHtml);
+            } else {
+                $button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Menyimpan...');
+            }
 
             $.ajax({
-                url: url,
-                method: method,
-                data: formData,
+                url: "{{ route("konversiSatuanObat.sync", ":id") }}".replace(':id', obatId),
+                method: 'PUT',
+                data: $(this).serialize(),
                 success: function(response) {
-                    if (response.status === 'success') {
-                        $('#konversiModal').modal('hide');
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: response.message,
-                            toast: true,
-                            position: 'top-end',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-
-                        $('#konversiForm')[0].reset();
-                        $('#konversiId').val('');
-                        konversiTable.ajax.reload();
-                    }
+                    $('#konversiModal').modal('hide');
+                    konversiTable.ajax.reload(null, false);
+                    toast('success', response.message || 'Konversi berhasil disimpan');
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
-                        let errors = xhr.responseJSON.errors;
-                        let errorMessages = [];
+                        markValidation(xhr.responseJSON.errors || {});
+                        return;
+                    }
 
-                        $('#konversiForm').find('.invalid-feedback').text('');
-                        $('#konversiForm').find('.form-control, .form-select').removeClass('is-invalid');
-                        $('#konversiForm').find('.obat-field').removeClass('has-error');
-
-                        for (let key in errors) {
-                            // contoh key: "code.0", "name.1"
-                            let messages = errors[key];
-                            errorMessages.push(messages[0]);
-
-                            // cari input sesuai index
-                            let parts = key.split('.');
-                            let field = parts[0]; // code / name
-                            let index = parts[1]; // index array
-
-                            // ambil row ke-index lalu kasih error
-                            let row = $('#input-wrapper .input-group-item').eq(index);
-                            row.find(`input[name="${field}[]"]`).addClass('is-invalid');
-                            row.find(`select[name="${field}[]"]`).addClass('is-invalid');
-                            row.find(`input[name="${field}[]"], select[name="${field}[]"]`).closest('.obat-field').addClass('has-error');
-                            row.find('.invalid-feedback').first().text(messages[0]);
-                        }
-
-                        // tampilkan semua error di toast juga
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validasi Gagal',
-                            html: errorMessages.join('<br>'),
-                            toast: true,
-                            position: 'top-end',
-                            timer: 4000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
+                    toast('error', 'Gagal menyimpan', xhr.responseJSON?.message || 'Terjadi kesalahan saat menyimpan konversi.');
+                },
+                complete: function() {
+                    if (ui.setButtonLoading) {
+                        ui.setButtonLoading($button, false, 'Menyimpan...', normalHtml);
+                    } else {
+                        $button.prop('disabled', false).html(normalHtml);
                     }
                 }
             });
         });
 
-        // --- EDIT KONVERSI SATUAN
-        window.editKonversiSatuanObat = function(id) {
-
-            $.ajax({
-                url: "{{ route("konversiSatuanObat.edit", ":id") }}".replace(":id", id),
-                type: "GET",
-                success: function(res) {
-
-                    console.log(res);
-
-                    // Show modal
-                    $('#konversiModal').modal('show');
-                    $('#konversiModalLabel').text('Edit Konversi Satuan Obat');
-                    $('#konversiModalSubtitle').text('Perbarui relasi satuan pembelian untuk obat ini.');
-                    $('#submitForm').html('<i class="mdi mdi-content-save-outline"></i>Update Konversi');
-
-                    // Nonaktifkan tombol tambah row (edit hanya 1 row)
-                    $('#addInput').hide();
-
-                    // Set hidden ID
-                    $('#konversiId').val(res.id);
-
-                    // Render row isi data
-                    $('#input-wrapper').html(`
-                            <div class="konversi-input-card input-group-item">
-                                <div class="konversi-input-card-header">
-                                    <strong><i class="mdi mdi-swap-horizontal-bold"></i> Baris Konversi</strong>
-                                </div>
-                                <div class="konversi-input-card-body">
-                                    <div class="obat-fields">
-                                        <div class="obat-field is-wide">
-                                            <label class="form-label">Obat</label>
-                                            <div class="obat-input-shell">
-                                                <span class="obat-input-icon"><i class="mdi mdi-pill"></i></span>
-                                                <select class="form-select obatSelect" name="obat_id" required>
-                                                    <option value="">Loading...</option>
-                                                </select>
-                                            </div>
-                                            <div class="invalid-feedback"></div>
-                                        </div>
-
-                                        <div class="obat-field">
-                                            <label class="form-label">Satuan Pembelian</label>
-                                            <div class="obat-input-shell">
-                                                <span class="obat-input-icon"><i class="mdi mdi-package-variant"></i></span>
-                                                <select class="form-select satuanSelect" name="satuan_id" required>
-                                                    <option value="">Loading...</option>
-                                                </select>
-                                            </div>
-                                            <div class="invalid-feedback"></div>
-                                        </div>
-
-                                        <div class="obat-field">
-                                            <label class="form-label">Konversi ke PCS</label>
-                                            <div class="obat-input-shell">
-                                                <span class="obat-input-icon"><i class="mdi mdi-calculator-variant-outline"></i></span>
-                                                <input class="form-control" type="number" name="konversi" value="${res.konversi}" min="1" required>
-                                            </div>
-                                            <div class="invalid-feedback"></div>
-                                        </div>
-
-                                        <div class="obat-field">
-                                            <label class="form-label">Default</label>
-                                            <div class="konversi-default-box">
-                                                <input type="hidden" name="is_default" value="${res.is_default == 1 ? '1' : '0'}" class="defaultHidden">
-                                                <input class="form-check-input defaultCheck" type="checkbox" value="1" ${res.is_default == 1 ? 'checked' : ''}>
-                                                <label class="form-check-label">Jadikan default</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `);
-
-                    // ===================================================
-                    // LOAD OBAT & SELECT VALUE
-                    // ===================================================
-                    loadObatInto($('.obatSelect'), res.obat_id);
-
-                    // ===================================================
-                    // LOAD SATUAN & SELECT VALUE
-                    // ===================================================
-                    loadSatuanInto($('.satuanSelect'), res.satuan_id);
-                }
-            });
-        };
-
-        // --- Hapus
-        window.deleteKonversiSatuanObat = function(id) {
-            // Tampilkan konfirmasi hapus
-            Swal.fire({
-                title: 'Apakah Anda yakin?',
-                text: 'Konversi ini akan dihapus secara permanen!',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, hapus!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Kirim request DELETE menggunakan AJAX
-                    $.ajax({
-                        url: "{{ route("konversiSatuanObat.destroy", ":id") }}".replace(
-                            ':id',
-                            id),
-                        type: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire(
-                                    'Dihapus!',
-                                    response.message,
-                                    'success'
-                                );
-                                konversiTable.ajax.reload(); // Reload DataTables
-                                updateKonversiStats();
-                            } else {
-                                Swal.fire(
-                                    'Gagal!',
-                                    response.message,
-                                    'error'
-                                );
-                            }
-                        },
-                        error: function(xhr) {
-                            Swal.fire(
-                                'Gagal!',
-                                'Terjadi kesalahan saat menghapus Konversi.',
-                                'error'
-                            );
-                        }
-                    });
-                }
-            });
-        }
-
-        // --- Download Template
         $('#downloadTemplateBtn').on('click', function() {
             window.location.href = "{{ route("konversiSatuanObat.exportTemplate") }}";
-        })
+        });
 
-        // --- submitFormExcell
         $('#submitFormExcell').on('click', function() {
             let fileInput = $('#myDropify')[0];
             let file = fileInput.files[0];
 
-            // Jika file belum dipilih
             if (!file) {
-                // Tambahkan efek getar (shake)
                 $('#myDropify').addClass('shake border-danger');
 
-                // Hilangkan efek setelah 600ms
                 setTimeout(() => {
                     $('#myDropify').removeClass('shake border-danger');
                 }, 600);
 
-                // Tampilkan alert
                 Swal.fire({
                     icon: 'warning',
                     title: 'Peringatan',
                     text: 'Silakan pilih file Excel terlebih dahulu!',
                 });
 
-                return; // hentikan eksekusi selanjutnya
+                return;
             }
 
             let formData = new FormData();
             formData.append('file', file);
 
-            // Alert progress
             Swal.fire({
                 title: 'Mengupload File...',
                 html: `
                     <div class="progress" style="height: 20px;">
-                        <div id="uploadProgressBar" 
-                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                        <div id="uploadProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                             role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <p class="mt-2 mb-0 text-muted">Mohon tunggu, proses import sedang berlangsung.</p>
@@ -588,14 +658,12 @@
                 }
             });
 
-            // Kirim AJAX
             $.ajax({
                 xhr: function() {
                     let xhr = new window.XMLHttpRequest();
                     xhr.upload.addEventListener("progress", function(evt) {
                         if (evt.lengthComputable) {
-                            let percentComplete = Math.round((evt.loaded / evt
-                                .total) * 100);
+                            let percentComplete = Math.round((evt.loaded / evt.total) * 100);
                             $('#uploadProgressBar')
                                 .css('width', percentComplete + '%')
                                 .text(percentComplete + '%');
@@ -610,6 +678,7 @@
                 contentType: false,
                 success: function(response) {
                     Swal.close();
+
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
@@ -621,25 +690,18 @@
                             timer: 2500,
                             showConfirmButton: false,
                             willClose: () => {
-                                // Tutup modal
                                 $('#konversiModalExcell').modal('hide');
-
-                                // Reload DataTable jika sudah diinisialisasi
-                                if (typeof konversiTable !== 'undefined') {
-                                    konversiTable.ajax.reload(null,
-                                        false
-                                    ); // false = tetap di halaman sekarang
-                                }
+                                konversiTable.ajax.reload(null, false);
                             }
                         });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: response.message ||
-                                'Terjadi kesalahan saat import data.',
-                        });
+                        return;
                     }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: response.message || 'Terjadi kesalahan saat import data.',
+                    });
                 },
                 error: function(xhr) {
                     Swal.close();
@@ -651,7 +713,5 @@
                 }
             });
         });
-
-
     });
 </script>

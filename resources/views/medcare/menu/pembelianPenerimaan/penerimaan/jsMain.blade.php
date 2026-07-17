@@ -964,9 +964,16 @@
             let header = preview.header || {};
             let details = preview.details || [];
             let missingMargin = Number(preview.summary?.missing_margin_count || 0);
+            const marginLevelLabels = {
+                sub_golongan: 'Sub Golongan',
+                main_golongan: 'Main Golongan',
+                golongan: 'Golongan'
+            };
             let rows = details.map(function(item) {
+                const marginLevel = marginLevelLabels[item.margin_tingkat] || 'Margin';
+                const marginReference = item.margin_reference || '';
                 let marginBadge = item.has_margin
-                    ? '<span class="badge bg-success bg-opacity-10 text-success">Aktif</span>'
+                    ? `<span class="badge bg-success bg-opacity-10 text-success">${escapeHtml(marginLevel)}</span>`
                     : '<span class="badge bg-warning bg-opacity-10 text-warning">Faktor 1</span>';
 
                 return `
@@ -993,6 +1000,7 @@
                         <td class="text-center">
                             <span class="d-block">${formatDecimal(item.faktor_jual, 3, 3)}</span>
                             ${marginBadge}
+                            ${marginReference ? `<small class="d-block text-muted">${escapeHtml(marginReference)}</small>` : ''}
                         </td>
                         <td class="text-end">
                             <span class="d-block">${formatDecimal(item.diskon, 0, 2)}%</span>
@@ -1027,7 +1035,7 @@
                     </div>
                     ${missingMargin > 0 ? `
                         <div class="alert alert-warning py-2 mb-3">
-                            ${missingMargin} item belum memiliki margin golongan aktif, sehingga faktor 1.000 dipakai.
+                            ${missingMargin} item belum memiliki margin aktif sesuai prioritas, sehingga faktor 1.000 dipakai.
                         </div>
                     ` : ''}
                     <div class="table-responsive" style="max-height: 420px; overflow: auto;">

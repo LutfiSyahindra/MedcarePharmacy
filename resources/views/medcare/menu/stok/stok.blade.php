@@ -110,11 +110,30 @@
 
         <section class="stock-filter-bar">
             <div class="stock-chip-group" aria-label="Filter status stok">
-                <button type="button" class="stock-chip is-active" data-alert="">Semua</button>
-                <button type="button" class="stock-chip" data-alert="menipis">Menipis</button>
-                <button type="button" class="stock-chip" data-alert="kosong">Kosong</button>
-                <button type="button" class="stock-chip" data-alert="expired">Expired</button>
-                <button type="button" class="stock-chip" data-alert="akan_expired">Akan Expired</button>
+                <button type="button" class="stock-chip is-active" data-alert="">
+                    <span>Semua</span>
+                    <strong data-stock-count="all">0</strong>
+                </button>
+                <button type="button" class="stock-chip" data-alert="aman">
+                    <span>Aman</span>
+                    <strong data-stock-count="aman">0</strong>
+                </button>
+                <button type="button" class="stock-chip" data-alert="menipis">
+                    <span>Menipis</span>
+                    <strong data-stock-count="menipis">0</strong>
+                </button>
+                <button type="button" class="stock-chip" data-alert="kosong">
+                    <span>Kosong</span>
+                    <strong data-stock-count="kosong">0</strong>
+                </button>
+                <button type="button" class="stock-chip" data-alert="expired">
+                    <span>Expired</span>
+                    <strong data-stock-count="expired">0</strong>
+                </button>
+                <button type="button" class="stock-chip" data-alert="akan_expired">
+                    <span>Akan Expired</span>
+                    <strong data-stock-count="akan_expired">0</strong>
+                </button>
             </div>
             <div class="stock-filter-controls">
                 <div class="stock-search">
@@ -150,6 +169,10 @@
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-eye-check-outline"></i>
                         Ditampilkan: <strong id="stockVisibleInfo">0 data</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-filter-check-outline"></i>
+                        Filter: <strong id="stockFilterInfo">Semua data</strong>
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-multiple"></i>

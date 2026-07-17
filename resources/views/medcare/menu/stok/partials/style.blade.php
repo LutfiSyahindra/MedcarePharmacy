@@ -338,6 +338,9 @@
     }
 
     .stock-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
         border: 1px solid #cbd5e1;
         background: #fff;
         color: #334155;
@@ -349,12 +352,32 @@
         transition: .16s ease;
     }
 
+    .stock-chip strong {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.55rem;
+        height: 1.25rem;
+        border-radius: 999px;
+        padding: 0 .35rem;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: .7rem;
+        font-weight: 800;
+    }
+
     .stock-chip:hover,
     .stock-chip.is-active {
         border-color: #0f766e;
         background: #ecfdf5;
         color: #0f766e;
         box-shadow: 0 8px 18px rgba(15, 118, 110, .12);
+    }
+
+    .stock-chip:hover strong,
+    .stock-chip.is-active strong {
+        background: #fff;
+        color: #0f766e;
     }
 
     .stock-search {

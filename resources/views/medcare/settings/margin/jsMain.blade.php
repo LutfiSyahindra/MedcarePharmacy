@@ -2,6 +2,9 @@
     $(document).ready(function() {
         const marginSubmitDefault = '<i class="mdi mdi-content-save-outline"></i>Simpan Margin';
         const marginSubmitUpdate = '<i class="mdi mdi-content-save-edit-outline"></i>Update Margin';
+        const marginPrioritySubmitDefault = '<i class="mdi mdi-content-save-outline"></i>Simpan Prioritas';
+        const marginPriorityDefault = ['sub_golongan', 'main_golongan', 'golongan'];
+        const marginPriorityOptions = @json($marginPriorityOptions ?? []);
         let isEditMode = false;
 
         function updateMarginPreview() {
@@ -14,6 +17,63 @@
             const value = $('#reference_idSelect').val();
             const count = Array.isArray(value) ? value.length : (value ? 1 : 0);
             $('#referenceSelectionCount').text(Number(count).toLocaleString('id-ID'));
+        }
+
+        function marginPriorityLabel(value) {
+            return marginPriorityOptions[value] || MarginUI.tierLabel(value);
+        }
+
+        function currentMarginPriority() {
+            return $('.margin-priority-select').map(function() {
+                return this.value;
+            }).get().filter(Boolean);
+        }
+
+        function rememberMarginPriorityValues() {
+            $('.margin-priority-select').each(function() {
+                $(this).data('previous-value', this.value);
+            });
+        }
+
+        function syncMarginPriorityUi() {
+            const selected = currentMarginPriority();
+
+            $('.margin-priority-item').each(function(index) {
+                $(this).find('.margin-priority-number').text(index + 1);
+                $(this).find('.margin-priority-move[data-direction="up"]').prop('disabled', index === 0);
+                $(this).find('.margin-priority-move[data-direction="down"]').prop('disabled', index === $('.margin-priority-item').length - 1);
+            });
+
+            $('#marginPrioritySummary').text(`Urutan aktif: ${selected.map(marginPriorityLabel).join(' -> ')}`);
+            rememberMarginPriorityValues();
+        }
+
+        function setMarginPriority(priority) {
+            $('.margin-priority-select').each(function(index) {
+                $(this).val(priority[index] || marginPriorityDefault[index]);
+            });
+            syncMarginPriorityUi();
+        }
+
+        function swapMarginPriorityValue(changedSelect) {
+            const previousValue = $(changedSelect).data('previous-value');
+            const currentValue = changedSelect.value;
+
+            if (!previousValue || !currentValue || previousValue === currentValue) {
+                syncMarginPriorityUi();
+                return;
+            }
+
+            $('.margin-priority-select').not(changedSelect).each(function() {
+                if (this.value === currentValue) {
+                    $(this).val(previousValue);
+                    return false;
+                }
+
+                return true;
+            });
+
+            syncMarginPriorityUi();
         }
 
         function initReferenceSelect(isMultiple = true) {
@@ -129,6 +189,89 @@
 
         $('#clearReferences').on('click', function() {
             $('#reference_idSelect').val(null).trigger('change');
+        });
+
+        $('.margin-priority-select')
+            .on('focusin', function() {
+                $(this).data('previous-value', this.value);
+            })
+            .on('change', function() {
+                swapMarginPriorityValue(this);
+            });
+        syncMarginPriorityUi();
+
+        $('.margin-priority-move').on('click', function() {
+            const direction = $(this).data('direction');
+            const priority = currentMarginPriority();
+            const index = $('.margin-priority-item').index($(this).closest('.margin-priority-item'));
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+            if (targetIndex < 0 || targetIndex >= priority.length) {
+                return;
+            }
+
+            [priority[index], priority[targetIndex]] = [priority[targetIndex], priority[index]];
+            setMarginPriority(priority);
+        });
+
+        $('#resetMarginPriority').on('click', function() {
+            setMarginPriority(marginPriorityDefault);
+            Swal.fire({
+                icon: 'info',
+                title: 'Prioritas default disiapkan',
+                text: 'Klik Simpan Prioritas untuk menyimpan perubahan.',
+                timer: 1800,
+                showConfirmButton: false
+            });
+        });
+
+        $('#marginPriorityForm').on('submit', function(e) {
+            e.preventDefault();
+
+            const priority = currentMarginPriority();
+            const uniquePriority = [...new Set(priority)];
+
+            if (priority.length !== marginPriorityDefault.length || uniquePriority.length !== priority.length) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Prioritas belum valid',
+                    text: 'Pilih Sub Golongan, Main Golongan, dan Golongan tanpa duplikasi.'
+                });
+                return;
+            }
+
+            MarginUI.setButtonLoading('#saveMarginPriority', true, 'Menyimpan...', marginPrioritySubmitDefault);
+
+            $.ajax({
+                url: "{{ route("margin.priority.update") }}",
+                method: 'PUT',
+                data: $(this).serialize(),
+                success: function(response) {
+                    setMarginPriority(response.priority || priority);
+                    Swal.fire({
+                        icon: 'success',
+                        title: response.message || 'Prioritas margin berhasil diperbarui.',
+                        toast: true,
+                        position: 'top-end',
+                        timer: 2500,
+                        timerProgressBar: true,
+                        showConfirmButton: false,
+                    });
+                },
+                error: function(xhr) {
+                    const errors = xhr.responseJSON?.errors || {};
+                    const message = Object.values(errors).flat()[0] || 'Terjadi kesalahan saat menyimpan prioritas margin.';
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: message
+                    });
+                },
+                complete: function() {
+                    MarginUI.setButtonLoading('#saveMarginPriority', false, 'Menyimpan...', marginPrioritySubmitDefault);
+                }
+            });
         });
 
         let marginTable = $('#tableMargin').DataTable(MarginUI.dataTableOptions({

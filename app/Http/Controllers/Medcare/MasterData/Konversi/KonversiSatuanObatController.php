@@ -29,28 +29,26 @@ class KonversiSatuanObatController extends Controller
         return view('medcare.masterData.konversi.konversi');
     }
 
-    public function table()
+    public function table(Request $request)
     {
-        $KonversiSatuanObat = $this->KonversiSatuanObatService->getKonversi();
+        $status = $request->get('status', 'all');
+        $KonversiSatuanObat = $this->KonversiSatuanObatService->getObatKonversiTable($status);
 
         return DataTables::of($KonversiSatuanObat)
         ->addIndexColumn()
         ->addColumn('actions', function ($dataKonversiSatuanObat) {
             return '
                 <div class="obat-action-group">
-                    <button type="button" class="btn obat-action-btn obat-action-edit" title="Edit"
-                        onclick="editKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')">
-                        <i class="mdi mdi-pencil-outline"></i>
-                    </button>
-                    <button type="button" class="btn obat-action-btn obat-action-delete" title="Hapus"
-                        onclick="deleteKonversiSatuanObat(' . $dataKonversiSatuanObat['id'] . ')">
-                        <i class="mdi mdi-trash-can-outline"></i>
+                    <button type="button" class="btn obat-action-btn obat-action-edit" title="Kelola konversi"
+                        onclick="manageKonversiObat(' . $dataKonversiSatuanObat['id'] . ')">
+                        <i class="mdi mdi-tune-variant"></i>
                     </button>
                 </div>
             ';
         })
 
         ->rawColumns(['actions'])
+        ->with('summary', $this->KonversiSatuanObatService->getKonversiSummary())
         ->make(true);
     }
 
@@ -81,9 +79,9 @@ class KonversiSatuanObatController extends Controller
     {
         Log::info($request);
         $validated = $request->validate([
-            'obat_id.*' => 'required|string|max:10|unique:obat_satuan_conversions,obat_id',
-            'satuan_id.*' => 'required|string|max:100',
-            'konversi.*' => 'required|string|max:100',
+            'obat_id.*' => 'required|integer|exists:master_obats,id',
+            'satuan_id.*' => 'required|integer|exists:satuans,id',
+            'konversi.*' => 'required|integer|min:1',
             'is_default.*' => 'nullable|boolean'
         ]);
 
@@ -116,6 +114,28 @@ class KonversiSatuanObatController extends Controller
         return $KonversiSatuanObat;
     }
 
+    public function sync(Request $request, string $obatId)
+    {
+        $validated = $request->validate([
+            'conversion_id' => 'nullable|array',
+            'conversion_id.*' => 'nullable|integer|exists:obat_satuan_conversions,id',
+            'satuan_id' => 'required|array|min:1',
+            'satuan_id.*' => 'required|integer|exists:satuans,id',
+            'konversi' => 'required|array|min:1',
+            'konversi.*' => 'required|integer|min:1',
+            'is_default' => 'nullable|array',
+            'is_default.*' => 'nullable|boolean',
+        ]);
+
+        $data = $this->KonversiSatuanObatService->syncKonversiForObat($obatId, $validated);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data,
+            'message' => 'Konversi satuan obat berhasil disimpan',
+        ]);
+    }
+
     /**
      * Update the specified resource in storage.
      */
@@ -125,17 +145,22 @@ class KonversiSatuanObatController extends Controller
         $validated = $request->validate([
             'obat_id' => [
                 'required',
-                Rule::unique('obat_satuan_conversions', 'obat_id')
-                    ->ignore($id) 
-                    ->where('satuan_id', $request->satuan_id),
+                'integer',
+                'exists:master_obats,id',
             ],
-            'satuan_id' => 'required|string|max:100',
+            'satuan_id' => [
+                'required',
+                'integer',
+                'exists:satuans,id',
+                Rule::unique('obat_satuan_conversions', 'satuan_id')
+                    ->ignore($id) 
+                    ->where('obat_id', $request->obat_id),
+            ],
             'konversi'  => 'required|integer|min:1',
             'is_default' => 'nullable|in:0,1',
         ]);
 
-        
-        $validated['is_default'] = $request->is_default[0] ?? 0;
+        $validated['is_default'] = (int) $request->input('is_default', 0);
 
         $KonversiSatuanObat = $this->KonversiSatuanObatService->updateKonversi($id, $validated);
 

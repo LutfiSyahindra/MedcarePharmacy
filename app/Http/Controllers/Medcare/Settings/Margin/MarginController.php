@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Settings\Margins\MarginsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
 class MarginController extends Controller
@@ -20,7 +21,10 @@ class MarginController extends Controller
      */
     public function margin()
     {
-        return view('medcare.settings.margin.margin');
+        return view('medcare.settings.margin.margin', [
+            'marginPriority' => $this->MarginsService->marginPriority(),
+            'marginPriorityOptions' => MarginsService::priorityOptions(),
+        ]);
     }
 
     public function table()
@@ -54,6 +58,26 @@ class MarginController extends Controller
 
     public function updateStatus(Request $request){
         return $this->MarginsService->updateStatus($request->id, $request->status);
+    }
+
+    public function updatePriority(Request $request)
+    {
+        $validated = $request->validate([
+            'priority' => ['required', 'array', 'size:3'],
+            'priority.*' => ['required', 'string', 'distinct', Rule::in(array_keys(MarginsService::priorityOptions()))],
+        ], [
+            'priority.required' => 'Prioritas margin wajib diisi.',
+            'priority.size' => 'Prioritas margin harus memuat Sub Golongan, Main Golongan, dan Golongan.',
+            'priority.*.distinct' => 'Setiap tingkat margin hanya boleh dipilih satu kali.',
+        ]);
+
+        $priority = $this->MarginsService->updateMarginPriority($validated['priority']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Prioritas margin berhasil diperbarui.',
+            'priority' => $priority,
+        ]);
     }
 
     /**

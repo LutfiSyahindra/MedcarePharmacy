@@ -2,7 +2,6 @@
 
 namespace App\Services\Menu\Stok;
 
-use App\Models\MarginsModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
@@ -11,6 +10,7 @@ use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
+use App\Services\Settings\Margins\MarginsService;
 use App\Support\BranchAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +18,8 @@ use Illuminate\Validation\ValidationException;
 
 class StockService
 {
+    public function __construct(private readonly MarginsService $marginsService) {}
+
     public function recordReceipt(
         PenerimaanBarangModel $penerimaan,
         PenerimaanBarangDetailModel $detail,
@@ -195,7 +197,7 @@ class StockService
 
     public function updateBatchSellingPriceFromMargin(int $batchId, string $alasan, ?int $changedBy = null): array
     {
-        $batch = BranchAccess::scope(StokBatchModel::with(['obat.golongan']))
+        $batch = BranchAccess::scope(StokBatchModel::with(['obat.golongan', 'obat.mainGolongan', 'obat.subGolongan']))
             ->lockForUpdate()
             ->findOrFail($batchId);
         $marginPrice = $this->batchSellingPriceMarginPreview($batch);
@@ -207,7 +209,7 @@ class StockService
 
     public function batchSellingPriceMarginPreview(StokBatchModel $batch): array
     {
-        $batch->loadMissing(['obat.golongan']);
+        $batch->loadMissing(['obat.golongan', 'obat.mainGolongan', 'obat.subGolongan']);
 
         return $this->calculateBatchSellingPriceFromMargin($batch);
     }
@@ -461,8 +463,9 @@ class StockService
             ]);
         }
 
-        $margin = $this->activeGolonganMargin($obat);
+        $margin = $this->marginsService->activeMarginForObat($obat);
         $faktorJual = $margin ? (float) $margin->faktor_jual : 1.0;
+        $marginReference = $this->marginsService->marginReferenceLabelForObat($obat, $margin);
         $diskon = $this->discountPercent($batch->diskon ?? 0);
         $ppn = $this->percent($batch->ppn ?? 0);
         $hargaBeli = max(0, (float) ($batch->harga_beli ?? 0));
@@ -477,21 +480,8 @@ class StockService
             'ppn' => $ppn,
             'has_margin' => (bool) $margin,
             'margin_tingkat' => $margin?->tingkat,
-            'margin_reference' => $margin ? ($obat->golongan->nama ?? null) : null,
+            'margin_reference' => $marginReference,
         ];
-    }
-
-    private function activeGolonganMargin(MasterObatModel $obat): ?MarginsModel
-    {
-        if (! $obat->golongan_id) {
-            return null;
-        }
-
-        return MarginsModel::where('tingkat', 'golongan')
-            ->where('reference_id', $obat->golongan_id)
-            ->where('is_active', true)
-            ->latest('id')
-            ->first();
     }
 
     private function priceHistoryReason(array $payload): string

@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -53,18 +54,35 @@ class StokController extends Controller
                 ->map(fn ($obat) => $this->stockRow($obat, $today, $warningDate));
         }
 
-        if ($request->filled('alert_status')) {
-            $rows = $rows->where('status', $request->alert_status)->values();
+        $search = $this->stockSearchTerm($request);
+        $totalAvailable = $rows->count();
+
+        if ($search !== '') {
+            $rows = $this->filterStockRows($rows, $search);
+        }
+
+        $totalSearchMatched = $rows->count();
+        $statusCounts = $this->stockStatusCounts($rows);
+        $alertStatus = $this->stockStatusFilter($request);
+
+        if ($alertStatus !== '') {
+            $rows = $rows->where('status', $alertStatus)->values();
         }
 
         $summary = [
             'total_item' => $rows->count(),
+            'total_available' => $totalAvailable,
+            'total_search_matched' => $totalSearchMatched,
             'total_stok' => $rows->sum('total_stok'),
             'nilai_stok' => $rows->sum('nilai_stok'),
             'stok_menipis' => $rows->where('is_low_stock', true)->count(),
             'expired' => $rows->where('expired_count', '>', 0)->count(),
             'akan_expired' => $rows->where('near_expired_count', '>', 0)->count(),
             'stok_kosong' => $rows->where('total_stok', '<=', 0)->count(),
+            'status_counts' => $statusCounts,
+            'active_search' => $search,
+            'active_status' => $alertStatus,
+            'active_status_label' => $alertStatus !== '' ? $this->statusLabel($alertStatus) : 'Semua stok',
             'expired_warning_days' => $warningDays,
         ];
 
@@ -426,6 +444,7 @@ class StokController extends Controller
             'kode_obat' => $obat->kode_obat,
             'nama_obat' => $obat->nama_obat,
             'satuan' => $obat->satuan->nama ?? '-',
+            'batch_numbers' => $activeBatches->pluck('no_batch')->filter()->implode(', '),
             'total_stok' => $totalStock,
             'stok_minimum' => $minimumStock,
             'batch_count' => $activeBatches->count(),
@@ -487,6 +506,61 @@ class StokController extends Controller
             'akan_expired' => 'Akan Expired',
             default => 'Aman',
         };
+    }
+
+    private function stockSearchTerm(Request $request): string
+    {
+        $search = trim((string) $request->input('stock_search', ''));
+
+        if ($search !== '') {
+            return $search;
+        }
+
+        return trim((string) $request->input('search.value', ''));
+    }
+
+    private function stockStatusFilter(Request $request): string
+    {
+        $status = (string) $request->input('alert_status', '');
+
+        return in_array($status, ['aman', 'menipis', 'kosong', 'expired', 'akan_expired'], true)
+            ? $status
+            : '';
+    }
+
+    private function filterStockRows($rows, string $search)
+    {
+        $terms = collect(preg_split('/\s+/', Str::lower($search), -1, PREG_SPLIT_NO_EMPTY));
+
+        if ($terms->isEmpty()) {
+            return $rows->values();
+        }
+
+        return $rows->filter(function (array $row) use ($terms) {
+            $haystack = Str::lower(implode(' ', array_filter([
+                $row['kode_obat'] ?? '',
+                $row['nama_obat'] ?? '',
+                $row['satuan'] ?? '',
+                $row['status'] ?? '',
+                $row['status_label'] ?? '',
+                $row['nearest_expired_date'] ?? '',
+                $row['batch_numbers'] ?? '',
+            ], fn ($value) => $value !== null && $value !== '')));
+
+            return $terms->every(fn ($term) => Str::contains($haystack, $term));
+        })->values();
+    }
+
+    private function stockStatusCounts($rows): array
+    {
+        return [
+            'all' => $rows->count(),
+            'aman' => $rows->where('status', 'aman')->count(),
+            'menipis' => $rows->where('status', 'menipis')->count(),
+            'kosong' => $rows->where('status', 'kosong')->count(),
+            'expired' => $rows->where('status', 'expired')->count(),
+            'akan_expired' => $rows->where('status', 'akan_expired')->count(),
+        ];
     }
 
     private function formatDateValue($date): ?string
