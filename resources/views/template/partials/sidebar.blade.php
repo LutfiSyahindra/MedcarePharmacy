@@ -286,6 +286,25 @@
             </li>
 
             <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="collapse" href="#penjualan" role="button"
+                    aria-expanded="false" aria-controls="penjualan">
+                    <i class="link-icon" data-feather="shopping-cart"></i>
+                    <span class="link-title">Penjualan</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse" id="penjualan">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item">
+                            <a href="{{ route("penjualan.pos") }}" class="nav-link">Kasir / POS</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("penjualan.pos.history") }}" class="nav-link">Riwayat Transaksi Kasir</a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#pembelian" role="button"
                     aria-expanded="false" aria-controls="pembelian">
                     <i class="link-icon" data-feather="shopping-bag"></i>

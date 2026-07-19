@@ -15,6 +15,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturContro
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
+use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
@@ -295,6 +296,19 @@ Route::middleware('auth')->group(function () {
         Route::put('/retur-pembelian/{id}/cancel', [ReturPembelianController::class, 'cancel'])->name('returPembelian.cancel');
         Route::delete('/retur-pembelian/{id}/destroy', [ReturPembelianController::class, 'destroy'])->name('returPembelian.destroy');
 
+    });
+
+    Route::prefix('medcare/menu/penjualan')->group(function () {
+        Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');
+        Route::get('/pos/riwayat', [PenjualanPosController::class, 'history'])->name('penjualan.pos.history');
+        Route::get('/pos/products', [PenjualanPosController::class, 'products'])->name('penjualan.pos.products');
+        Route::get('/pos/quote', [PenjualanPosController::class, 'quote'])->name('penjualan.pos.quote');
+        Route::post('/pos/draft', [PenjualanPosController::class, 'storeDraft'])->name('penjualan.pos.draft');
+        Route::post('/pos/complete', [PenjualanPosController::class, 'complete'])->name('penjualan.pos.complete');
+        Route::get('/pos/table', [PenjualanPosController::class, 'table'])->name('penjualan.pos.table');
+        Route::get('/pos/{id}/show', [PenjualanPosController::class, 'show'])->name('penjualan.pos.show');
+        Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
+        Route::put('/pos/{id}/cancel', [PenjualanPosController::class, 'cancel'])->name('penjualan.pos.cancel');
     });
 
     Route::prefix('medcare/menu/stok')->group(function () {

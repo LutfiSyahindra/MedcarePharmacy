@@ -7,6 +7,8 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
+use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
+use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
@@ -184,6 +186,63 @@ class StockService
         }
 
         return $this->recordMovement($payload);
+    }
+
+    public function recordSaleOutbound(
+        int $branchId,
+        PenjualanTransactionDetailModel $detail,
+        int $batchId,
+        float $qtyStock,
+        string $nomorTransaksi,
+        ?int $createdBy = null
+    ): KartuStokModel {
+        $detail->loadMissing(['transaction', 'obat.satuan']);
+
+        return $this->recordMovement([
+            'branch_id' => $branchId,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $batchId,
+            'qty' => $qtyStock,
+            'jenis_mutasi' => 'penjualan',
+            'tanggal_mutasi' => $detail->transaction?->tanggal_transaksi ?: now(),
+            'reference_type' => PenjualanTransactionModel::class,
+            'reference_id' => $detail->penjualan_transaction_id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $nomorTransaksi,
+            'keterangan' => 'Penjualan POS '.$nomorTransaksi.' - '.$detail->nama_obat.' ('
+                .number_format((float) $detail->qty_jual, 2, ',', '.').' '
+                .($detail->satuan_jual ?: $detail->obat?->satuan?->nama ?: 'satuan').')',
+            'created_by' => $createdBy ?: Auth::id(),
+        ]);
+    }
+
+    public function recordSaleCancellation(
+        int $branchId,
+        PenjualanTransactionDetailModel $detail,
+        int $batchId,
+        float $qtyStock,
+        string $nomorTransaksi,
+        ?int $createdBy = null
+    ): KartuStokModel {
+        $detail->loadMissing(['transaction', 'obat.satuan']);
+
+        return $this->recordMovement([
+            'branch_id' => $branchId,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $batchId,
+            'qty' => $qtyStock,
+            'preserve_batch_cost' => true,
+            'jenis_mutasi' => 'pembatalan_penjualan',
+            'tanggal_mutasi' => now(),
+            'reference_type' => PenjualanTransactionModel::class,
+            'reference_id' => $detail->penjualan_transaction_id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $nomorTransaksi,
+            'keterangan' => 'Pembatalan penjualan POS '.$nomorTransaksi.' - '.$detail->nama_obat.' ('
+                .number_format($qtyStock, 2, ',', '.').' '
+                .($detail->satuan_stok ?: $detail->obat?->satuan?->nama ?: 'satuan stok').')',
+            'created_by' => $createdBy ?: Auth::id(),
+        ]);
     }
 
     public function updateBatchSellingPrice(int $batchId, float $hargaJualBaru, string $alasan, ?int $changedBy = null): array
@@ -578,6 +637,7 @@ class StockService
             'masuk',
             'penyesuaian_masuk',
             'pembatalan_retur_pembelian',
+            'pembatalan_penjualan',
         ], true);
     }
 
