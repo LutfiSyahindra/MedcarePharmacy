@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BranchModel extends Model
 {
     use HasFactory;
 
     protected $table = 'branches';
+
     protected $fillable = [
         'code',
         'name',
@@ -32,5 +34,8 @@ class BranchModel extends Model
         );
     }
 
-
+    public function apotekProfile(): HasOne
+    {
+        return $this->hasOne(ApotekProfile::class, 'branch_id');
+    }
 }

@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\ApotekProfile;
 use App\Models\BranchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class PenjualanPosHistoryTest extends TestCase
@@ -21,6 +24,8 @@ class PenjualanPosHistoryTest extends TestCase
     {
         parent::setUp();
 
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $this->user = User::factory()->create();
         $this->branch = BranchModel::create([
             'code' => 'CB-HISTORY',
@@ -28,6 +33,64 @@ class PenjualanPosHistoryTest extends TestCase
             'is_active' => true,
         ]);
         $this->user->branches()->attach($this->branch->id);
+    }
+
+    public function test_admin_must_choose_from_active_branches_when_opening_pos(): void
+    {
+        $this->user->assignRole(Role::findOrCreate('Admin', 'web'));
+        $activeBranch = BranchModel::create([
+            'code' => 'CB-ACTIVE',
+            'name' => 'Cabang Aktif Pilihan',
+            'is_active' => true,
+        ]);
+        $inactiveBranch = BranchModel::create([
+            'code' => 'CB-INACTIVE',
+            'name' => 'Cabang Nonaktif',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('penjualan.pos'))
+            ->assertOk()
+            ->assertSee('posBranchModal', false)
+            ->assertSee('posReceiptModal', false)
+            ->assertDontSee('window.open', false)
+            ->assertSee('Pilih cabang POS')
+            ->assertSee($this->branch->name)
+            ->assertSee($activeBranch->name)
+            ->assertDontSee($inactiveBranch->name);
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['branch_id']);
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products', ['branch_id' => $activeBranch->id]))
+            ->assertOk();
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products', ['branch_id' => $inactiveBranch->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['branch_id']);
+    }
+
+    public function test_non_admin_cannot_use_an_unassigned_pos_branch(): void
+    {
+        $foreignBranch = BranchModel::create([
+            'code' => 'CB-POS-FOREIGN',
+            'name' => 'Cabang POS Asing',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products', ['branch_id' => $foreignBranch->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['branch_id']);
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products', ['branch_id' => $this->branch->id]))
+            ->assertOk();
     }
 
     public function test_history_page_renders_the_new_workspace(): void
@@ -157,6 +220,102 @@ class PenjualanPosHistoryTest extends TestCase
         $this->actingAs($this->user)
             ->getJson(route('penjualan.pos.show', $transaction->id))
             ->assertNotFound();
+    }
+
+    public function test_receipt_uses_the_transaction_branch_apotek_profile(): void
+    {
+        $this->branch->update([
+            'name' => 'Nama Cabang Lama',
+            'address' => 'Alamat cabang lama',
+            'phone' => '0210000000',
+            'email' => 'kontak-cabang-lama@example.test',
+        ]);
+
+        $transaction = $this->createTransaction([
+            'nomor_transaksi' => 'POS-PROFILE-001',
+            'status' => 'completed',
+            'payment_status' => 'paid',
+        ]);
+
+        ApotekProfile::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Apotek Profil Utama',
+            'slogan' => 'Sehat dekat bersama kami',
+            'logo_path' => 'apotek-logos/logo-profil.png',
+            'phone' => '0217654321',
+            'whatsapp' => '6281234567890',
+            'email' => 'kasir@profil-apotek.test',
+            'website' => 'https://profil-apotek.test',
+            'instagram' => '@profil_apotek',
+            'address' => 'Jl. Profil Apotek No. 10',
+            'village' => 'Gambir',
+            'district' => 'Gambir',
+            'city' => 'Jakarta Pusat',
+            'province' => 'DKI Jakarta',
+            'postal_code' => '10110',
+            'latitude' => -6.2,
+            'longitude' => 106.8166667,
+            'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
+            'pharmacist_license_number' => 'SIPA-PROFILE-001',
+            'pharmacy_license_number' => 'SIA-PROFILE-001',
+            'tax_id' => '00.000.000.0-000.001',
+            'receipt_footer' => 'Pesan khusus dari profil apotek.',
+        ]);
+
+        $foreignBranch = BranchModel::create([
+            'code' => 'CB-RECEIPT-FOREIGN',
+            'name' => 'Cabang Struk Lain',
+            'is_active' => true,
+        ]);
+        ApotekProfile::create([
+            'branch_id' => $foreignBranch->id,
+            'name' => 'Apotek Profil Cabang Lain',
+            'address' => 'Alamat cabang lain',
+            'latitude' => -7.0,
+            'longitude' => 107.0,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('penjualan.pos.receipt', [
+                'id' => $transaction->id,
+                'embedded' => 1,
+                'autoprint' => 1,
+            ]))
+            ->assertOk()
+            ->assertSee('class="is-embedded"', false)
+            ->assertDontSee('class="print-button"', false)
+            ->assertSee('window.print()', false)
+            ->assertSee('Apotek Profil Utama')
+            ->assertSee('Sehat dekat bersama kami')
+            ->assertSee('storage/apotek-logos/logo-profil.png', false)
+            ->assertSee('Jl. Profil Apotek No. 10')
+            ->assertDontSee('Kel. Gambir')
+            ->assertDontSee('Kec. Gambir')
+            ->assertDontSee('Jakarta Pusat, DKI Jakarta, 10110')
+            ->assertSee('0217654321')
+            ->assertSee('6281234567890')
+            ->assertSee('kasir@profil-apotek.test')
+            ->assertSee('https://profil-apotek.test')
+            ->assertSee('@profil_apotek')
+            ->assertSee('Pesan khusus dari profil apotek.')
+            ->assertSee('apt. Siti Sehat, S.Farm.')
+            ->assertSee('SIPA-PROFILE-001')
+            ->assertSee('SIA-PROFILE-001')
+            ->assertSee('00.000.000.0-000.001')
+            ->assertDontSee('Apotek Profil Cabang Lain')
+            ->assertDontSee('Nama Cabang Lama')
+            ->assertDontSee('Alamat cabang lama')
+            ->assertDontSee('0210000000')
+            ->assertDontSee('kontak-cabang-lama@example.test');
+
+        $this->actingAs($this->user)
+            ->get(route('penjualan.pos.receipt', [
+                'id' => $transaction->id,
+                'embedded' => 1,
+                'autoprint' => 0,
+            ]))
+            ->assertOk()
+            ->assertDontSee('window.print()', false);
     }
 
     public function test_compound_prescription_metadata_is_returned_in_transaction_detail(): void

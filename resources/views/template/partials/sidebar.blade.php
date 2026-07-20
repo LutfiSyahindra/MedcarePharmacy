@@ -23,6 +23,15 @@
 
             {{-- Settings --}}
             <li class="nav-item nav-category">Settings</li>
+            @if (auth()->user()->can("MEDCARE.SETTINGS.PROFILE_APOTEK") || auth()->user()->hasAnyRole(["Admin", "admin", "Apoteker", "apoteker"]))
+                <li class="nav-item">
+                    <a href="{{ route("settings.apotek-profile.index") }}"
+                        class="nav-link {{ request()->routeIs("settings.apotek-profile.*") ? "active" : "" }}">
+                        <i class="link-icon" data-feather="home"></i>
+                        <span class="link-title">Profile Apotek</span>
+                    </a>
+                </li>
+            @endif
             @can("MEDCARE.SETTINGS.AUTH")
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#users" role="button" aria-expanded="false"
@@ -295,7 +304,8 @@
                 <div class="collapse" id="penjualan">
                     <ul class="nav sub-menu">
                         <li class="nav-item">
-                            <a href="{{ route("penjualan.pos") }}" class="nav-link">Kasir / POS</a>
+                            <a href="{{ route("penjualan.pos") }}" class="nav-link" target="_blank"
+                                rel="noopener noreferrer">Kasir / POS</a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route("penjualan.pos.history") }}" class="nav-link">Riwayat Transaksi Kasir</a>

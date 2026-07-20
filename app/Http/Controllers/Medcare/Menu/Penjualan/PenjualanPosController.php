@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\BranchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Services\Menu\Penjualan\PenjualanPosService;
-use App\Support\BranchAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
@@ -15,11 +14,17 @@ class PenjualanPosController extends Controller
 {
     public function __construct(private readonly PenjualanPosService $posService) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $isAdmin = $this->posService->isAdmin($request->user());
+        $branches = $this->posService->activeBranches($request->user());
+
         return view('medcare.menu.penjualan.pos.pos', [
             'transactionTypes' => PenjualanPosService::TRANSACTION_TYPES,
             'paymentMethods' => PenjualanPosService::PAYMENT_METHODS,
+            'isAdminPos' => $isAdmin,
+            'posBranches' => $branches,
+            'selectedPosBranchId' => $isAdmin ? null : $branches->first()?->id,
         ]);
     }
 
@@ -28,7 +33,7 @@ class PenjualanPosController extends Controller
         return view('medcare.menu.penjualan.pos.history', [
             'transactionTypes' => PenjualanPosService::TRANSACTION_TYPES,
             'branches' => BranchModel::query()
-                ->whereIn('id', BranchAccess::userBranchIds())
+                ->whereIn('id', $this->posService->transactionBranchIds())
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -36,9 +41,14 @@ class PenjualanPosController extends Controller
 
     public function products(Request $request)
     {
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'integer'],
+        ]);
+
         return response()->json($this->posService->searchProducts(
             (string) $request->input('q', ''),
-            (int) $request->input('limit', 30)
+            (int) $request->input('limit', 30),
+            isset($validated['branch_id']) ? (int) $validated['branch_id'] : null
         ));
     }
 
@@ -48,12 +58,14 @@ class PenjualanPosController extends Controller
             'obat_id' => ['required', 'integer', 'exists:master_obats,id'],
             'satuan_id' => ['nullable', 'integer', 'exists:satuans,id'],
             'qty' => ['required', 'numeric', 'min:0.01'],
+            'branch_id' => ['nullable', 'integer'],
         ]);
 
         return response()->json($this->posService->productQuote(
             (int) $validated['obat_id'],
             isset($validated['satuan_id']) ? (int) $validated['satuan_id'] : null,
-            (float) $validated['qty']
+            (float) $validated['qty'],
+            isset($validated['branch_id']) ? (int) $validated['branch_id'] : null
         ));
     }
 
@@ -97,7 +109,7 @@ class PenjualanPosController extends Controller
         ]);
 
         $query = PenjualanTransactionModel::query()
-            ->whereIn('branch_id', BranchAccess::userBranchIds())
+            ->whereIn('branch_id', $this->posService->transactionBranchIds())
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
             ->when($request->filled('payment_status'), fn ($query) => $query->where('payment_status', $request->payment_status))
             ->when($request->filled('jenis_transaksi'), fn ($query) => $query->where('jenis_transaksi', $request->jenis_transaksi))
@@ -190,10 +202,10 @@ class PenjualanPosController extends Controller
         return response()->json($this->transactionPayload($transaction));
     }
 
-    public function receipt($id)
+    public function receipt(Request $request, $id)
     {
         $transaction = $this->findScopedTransaction($id)->load([
-            'branch',
+            'branch.apotekProfile',
             'details.batchAllocations',
             'payments',
             'createdBy',
@@ -202,8 +214,11 @@ class PenjualanPosController extends Controller
 
         return view('medcare.menu.penjualan.pos.receipt', [
             'transaction' => $transaction,
+            'apotekProfile' => $transaction->branch?->apotekProfile,
             'transactionTypes' => PenjualanPosService::TRANSACTION_TYPES,
             'paymentMethods' => PenjualanPosService::PAYMENT_METHODS,
+            'embedded' => $request->boolean('embedded'),
+            'autoPrint' => $request->boolean('autoprint', ! $request->boolean('embedded')),
         ]);
     }
 
@@ -234,7 +249,8 @@ class PenjualanPosController extends Controller
         $requiredPrescription = Rule::requiredIf(! $draft && $isPrescription);
         $requiredCompound = Rule::requiredIf(! $draft && $isCompoundPrescription);
 
-        return $request->validate([
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'integer'],
             'draft_id' => ['nullable', 'integer', 'exists:penjualan_transactions,id'],
             'tanggal_transaksi' => ['nullable', 'date'],
             'jenis_transaksi' => ['required', Rule::in($typeKeys)],
@@ -277,11 +293,18 @@ class PenjualanPosController extends Controller
             'details.*.racikan_group.required' => 'Kelompok R/ wajib diisi untuk setiap komponen racikan.',
             'details.*.dosis_komponen.required' => 'Dosis komponen wajib diisi untuk setiap obat racikan.',
         ]);
+
+        $validated['branch_id'] = $this->posService->resolveBranchId(
+            isset($validated['branch_id']) ? (int) $validated['branch_id'] : null,
+            $request->user()
+        );
+
+        return $validated;
     }
 
     private function findScopedTransaction($id): PenjualanTransactionModel
     {
-        return PenjualanTransactionModel::whereIn('branch_id', BranchAccess::userBranchIds())
+        return PenjualanTransactionModel::whereIn('branch_id', $this->posService->transactionBranchIds())
             ->findOrFail($id);
     }
 

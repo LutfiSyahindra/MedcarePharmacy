@@ -7,18 +7,19 @@
     @include("template.AddOn.select2")
     @include("template.AddOn.datePicker")
     @include("medcare.menu.penjualan.pos.partials.style")
+    @include("medcare.menu.penjualan.pos.partials.simpleStyle")
 @endpush
 
 @section("content")
-    <main class="pos-page pos-page--cashier" aria-label="Kasir point of sale">
+    <main class="pos-page pos-page--cashier pos-simple" aria-label="Kasir point of sale">
         <header class="pos-appbar">
             <div class="pos-brand">
                 <span class="pos-brand-mark"><i class="mdi mdi-storefront-outline"></i></span>
                 <div class="pos-brand-copy">
                     <div class="pos-eyebrow">MEDCARE · POINT OF SALE</div>
                     <div class="pos-brand-title">
-                        <h1>Kasir</h1>
-                        <span>Smart pharmacy checkout</span>
+                        <h1>Kasir POS</h1>
+                        <span>Penjualan apotek</span>
                     </div>
                 </div>
             </div>
@@ -33,6 +34,14 @@
             </div>
 
             <div class="pos-appbar-actions">
+                @if ($isAdminPos)
+                    <button type="button" class="btn pos-btn-quiet pos-branch-button" id="posBranchButton"
+                        title="Pilih cabang transaksi">
+                        <i class="mdi mdi-source-branch"></i>
+                        <span><small>Cabang aktif</small><strong id="activePosBranchName">Pilih cabang</strong></span>
+                        <i class="mdi mdi-chevron-down"></i>
+                    </button>
+                @endif
                 <button type="button" class="btn pos-btn-quiet" id="newTransactionBtn" title="Transaksi baru (F8)">
                     <i class="mdi mdi-plus-circle-outline"></i><span>Transaksi baru</span><kbd>F8</kbd>
                 </button>
@@ -71,11 +80,11 @@
                 <section class="pos-surface pos-product-panel">
                     <header class="pos-catalog-hero">
                         <div class="pos-catalog-hero-main">
-                            <span class="pos-catalog-step">01</span>
+                            <span class="pos-catalog-step">1</span>
                             <div>
-                                <span class="pos-section-kicker">TAMBAH ITEM</span>
-                                <h2>Pilih produk penjualan</h2>
-                                <p>Cari obat, tentukan satuan, lalu periksa ketersediaan stok.</p>
+                                <span class="pos-section-kicker">PRODUK</span>
+                                <h2>Cari produk</h2>
+                                <p>Cari obat atau scan barcode, lalu tentukan jumlah.</p>
                             </div>
                         </div>
                         <span class="pos-catalog-ready"><i class="mdi mdi-access-point"></i> Scanner aktif</span>
@@ -105,8 +114,8 @@
                         </div>
 
                         <label class="pos-search-title" for="productSearch">
-                            Cari produk yang akan dijual
-                            <small>Nama obat, kode produk, kandungan, indikasi, atau barcode</small>
+                            Cari obat atau scan barcode
+                            <small>Ketik nama obat, kode produk, atau barcode</small>
                         </label>
 
                         <div class="pos-search-control">
@@ -176,14 +185,14 @@
                             </div>
                             <button type="button" class="btn pos-add-button" id="addToCartBtn" disabled>
                                 <span class="pos-add-button-icon"><i class="mdi mdi-cart-plus"></i></span>
-                                <span><small>Masukkan produk</small>Tambahkan ke keranjang</span>
+                                <span>Tambah ke keranjang</span>
                                 <i class="mdi mdi-arrow-right"></i>
                             </button>
                         </div>
                     </section>
 
-                    <section class="pos-catalog-block pos-stock-block" aria-labelledby="stockInfoTitle">
-                        <div class="pos-catalog-block-head">
+                    <details class="pos-catalog-block pos-stock-block" aria-labelledby="stockInfoTitle">
+                        <summary class="pos-catalog-block-head">
                             <div>
                                 <span class="pos-catalog-block-icon is-emerald"><i class="mdi mdi-shield-check-outline"></i></span>
                                 <span>
@@ -192,7 +201,7 @@
                                 </span>
                             </div>
                             <span class="pos-fefo-badge"><i class="mdi mdi-autorenew"></i> Otomatis</span>
-                        </div>
+                        </summary>
 
                         <div class="pos-quote-box" id="quoteBox">
                             <div>
@@ -214,7 +223,7 @@
                                 <span class="pos-fefo-placeholder">Alokasi batch akan tampil setelah produk dan jumlah dipilih.</span>
                             </div>
                         </div>
-                    </section>
+                    </details>
                 </section>
 
                 <section class="pos-shortcut-card" aria-label="Bantuan keyboard">
@@ -229,11 +238,11 @@
                         <span class="pos-transaction-orbit" aria-hidden="true"></span>
                         <div class="pos-transaction-head">
                             <div class="pos-panel-heading pos-transaction-heading">
-                                <span class="pos-transaction-number">02</span>
+                                <span class="pos-transaction-number">2</span>
                                 <div>
-                                    <span class="pos-section-kicker"><i class="mdi mdi-circle"></i> TRANSAKSI AKTIF</span>
-                                    <h2>Keranjang penjualan</h2>
-                                    <p>Review item, ketersediaan stok, dan nilai transaksi dalam satu tampilan.</p>
+                                    <span class="pos-section-kicker"><i class="mdi mdi-circle"></i> TRANSAKSI</span>
+                                    <h2>Keranjang</h2>
+                                    <p>Periksa item dan total sebelum melanjutkan pembayaran.</p>
                                 </div>
                             </div>
                             <span class="pos-draft-pill" id="transactionState" aria-live="polite">
@@ -318,7 +327,7 @@
                                     <label for="transactionDate"><i class="mdi mdi-calendar-clock-outline"></i> Tanggal transaksi</label>
                                     <input type="datetime-local" id="transactionDate" class="form-control">
                                 </div>
-                                <div class="pos-field">
+                                <div class="pos-field pos-transaction-type-selector-field">
                                     <label for="jenisTransaksi"><i class="mdi mdi-swap-horizontal-bold"></i> Jenis transaksi</label>
                                     <select id="jenisTransaksi" class="form-select">
                                         @foreach ($transactionTypes as $value => $label)
@@ -446,12 +455,18 @@
                         <div class="pos-cart-title">
                             <span class="pos-cart-title-icon"><i class="mdi mdi-format-list-bulleted-square"></i></span>
                             <span>
-                                <strong>Daftar item transaksi</strong>
-                                <small id="cartEditorCopy">Ubah jumlah atau diskon langsung pada setiap baris.</small>
+                                <strong>Item yang dijual</strong>
+                                <small id="cartEditorCopy">Jumlah dan diskon dapat diubah langsung.</small>
                             </span>
                         </div>
                         <div class="pos-cart-actions">
                             <span class="pos-live-label"><i class="mdi mdi-access-point"></i> STOK LIVE</span>
+                            <button type="button" class="btn pos-prescription-toolbar-pay" id="prescriptionToolbarPayBtn" title="Lengkapi resep untuk membayar">
+                                <i class="mdi mdi-credit-card-check-outline"></i> Bayar
+                            </button>
+                            <button type="button" class="btn pos-go-payment-button" id="goToPaymentBtn" disabled>
+                                <i class="mdi mdi-credit-card-outline"></i> Lanjut bayar
+                            </button>
                             <button type="button" class="btn pos-clear-button" id="clearCartBtn">
                                 <i class="mdi mdi-trash-can-outline"></i> Kosongkan
                             </button>
@@ -505,11 +520,11 @@
                 <section class="pos-checkout-stage" id="posPaymentLayout" aria-labelledby="posPaymentTitle">
                     <header class="pos-checkout-hero">
                         <div class="pos-checkout-title">
-                            <span class="pos-checkout-step" aria-hidden="true">03</span>
+                            <span class="pos-checkout-step" aria-hidden="true">3</span>
                             <div>
                                 <span class="pos-section-kicker">PEMBAYARAN</span>
-                                <h2 id="posPaymentTitle">Terima pembayaran</h2>
-                                <p>Pilih metode, masukkan nominal yang diterima, lalu periksa kembali total transaksi.</p>
+                                <h2 id="posPaymentTitle">Pembayaran</h2>
+                                <p>Pilih metode dan masukkan nominal yang diterima.</p>
                             </div>
                         </div>
                         <div class="pos-checkout-hero-side">
@@ -592,36 +607,38 @@
                                 </div>
                             </div>
 
-                            <div class="pos-adjustment-card">
-                                <div class="pos-adjustment-card-head">
+                            <details class="pos-adjustment-card">
+                                <summary class="pos-adjustment-card-head">
                                     <span><i class="mdi mdi-tune-variant"></i> Penyesuaian transaksi</span>
-                                    <small>Opsional</small>
-                                </div>
-                                <div class="pos-total-row pos-adjustment-row">
-                                    <div>
-                                        <label for="transactionDiscountPercent">Diskon tambahan</label>
-                                        <div class="pos-adjustment-fields">
-                                            <label><span>%</span><input type="number" id="transactionDiscountPercent" class="form-control" min="0" max="100" step="0.01" value="0" aria-label="Diskon transaksi persen" placeholder="0"></label>
-                                            <label class="is-rupiah"><span>Rp</span><input type="number" id="transactionDiscountNominal" class="form-control" min="0" step="0.01" value="0" aria-label="Diskon transaksi nominal" placeholder="0"></label>
+                                    <small>Diskon & pajak <i class="mdi mdi-chevron-down"></i></small>
+                                </summary>
+                                <div class="pos-adjustment-card-body">
+                                    <div class="pos-total-row pos-adjustment-row">
+                                        <div>
+                                            <label for="transactionDiscountPercent">Diskon tambahan</label>
+                                            <div class="pos-adjustment-fields">
+                                                <label><span>%</span><input type="number" id="transactionDiscountPercent" class="form-control" min="0" max="100" step="0.01" value="0" aria-label="Diskon transaksi persen" placeholder="0"></label>
+                                                <label class="is-rupiah"><span>Rp</span><input type="number" id="transactionDiscountNominal" class="form-control" min="0" step="0.01" value="0" aria-label="Diskon transaksi nominal" placeholder="0"></label>
+                                            </div>
+                                        </div>
+                                        <strong id="transactionDiscountText">Rp 0</strong>
+                                    </div>
+                                    <div class="pos-total-row pos-tax-row">
+                                        <label class="pos-tax-switch" for="useTax">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="useTax">
+                                            <span><b>Tambahkan pajak</b><small>Aktifkan bila transaksi dikenakan pajak.</small></span>
+                                        </label>
+                                        <div class="pos-tax-value">
+                                            <label><input type="number" id="taxPercent" class="form-control" min="0" max="100" step="0.01" value="0" disabled aria-label="Persen pajak" placeholder="0"><span>%</span></label>
+                                            <strong id="taxTotalText">Rp 0</strong>
                                         </div>
                                     </div>
-                                    <strong id="transactionDiscountText">Rp 0</strong>
-                                </div>
-                                <div class="pos-total-row pos-tax-row">
-                                    <label class="pos-tax-switch" for="useTax">
-                                        <input class="form-check-input" type="checkbox" role="switch" id="useTax">
-                                        <span><b>Tambahkan pajak</b><small>Aktifkan bila transaksi dikenakan pajak.</small></span>
-                                    </label>
-                                    <div class="pos-tax-value">
-                                        <label><input type="number" id="taxPercent" class="form-control" min="0" max="100" step="0.01" value="0" disabled aria-label="Persen pajak" placeholder="0"><span>%</span></label>
-                                        <strong id="taxTotalText">Rp 0</strong>
+                                    <div class="pos-total-row pos-embalase-total d-none" id="embalaseTotalRow">
+                                        <span><i class="mdi mdi-package-variant-closed"></i> Embalase racikan</span>
+                                        <strong id="embalaseTotalText">Rp 0</strong>
                                     </div>
                                 </div>
-                                <div class="pos-total-row pos-embalase-total d-none" id="embalaseTotalRow">
-                                    <span><i class="mdi mdi-package-variant-closed"></i> Embalase racikan</span>
-                                    <strong id="embalaseTotalText">Rp 0</strong>
-                                </div>
-                            </div>
+                            </details>
 
                             <div class="pos-total-row is-grand">
                                 <span><small>TOTAL AKHIR</small>Total tagihan</span><strong id="grandTotalText">Rp 0</strong>
@@ -646,7 +663,7 @@
                                 <i class="mdi mdi-content-save-outline"></i><span>Simpan draft</span>
                             </button>
                             <button type="button" class="btn pos-complete-button" id="completeTransactionBtn">
-                                <span><small>Transaksi sudah benar</small>Selesaikan pembayaran</span><i class="mdi mdi-arrow-right"></i><kbd>F9</kbd>
+                                <span><small>Transaksi sudah benar</small>Selesaikan transaksi</span><i class="mdi mdi-arrow-right"></i><kbd>F9</kbd>
                             </button>
                         </div>
                     </footer>
@@ -655,7 +672,86 @@
         </div>
     </main>
 
-    <div class="modal fade pos-prescription-type-modal" id="prescriptionTypeModal" tabindex="-1" aria-labelledby="prescriptionTypeModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    @if ($isAdminPos)
+        <div class="modal fade pos-branch-modal" id="posBranchModal" tabindex="-1"
+            aria-labelledby="posBranchModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <span class="pos-branch-modal-icon"><i class="mdi mdi-store-marker-outline"></i></span>
+                        <div>
+                            <small>SESI TRANSAKSI ADMIN</small>
+                            <h2 class="modal-title" id="posBranchModalTitle">Pilih cabang POS</h2>
+                            <p>Stok, harga, nomor transaksi, dan struk akan mengikuti cabang ini.</p>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        @if ($posBranches->isNotEmpty())
+                            <label for="posBranchSelector" class="form-label">Cabang aktif</label>
+                            <select id="posBranchSelector" class="form-select">
+                                <option value="">Pilih cabang untuk memulai transaksi</option>
+                                @foreach ($posBranches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->code }} — {{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="pos-branch-modal-help"><i class="mdi mdi-shield-check-outline"></i> Hanya cabang berstatus aktif yang dapat digunakan.</p>
+                        @else
+                            <div class="pos-branch-empty">
+                                <i class="mdi mdi-store-alert-outline"></i>
+                                <strong>Belum ada cabang aktif</strong>
+                                <span>Aktifkan minimal satu cabang sebelum menjalankan transaksi POS.</span>
+                            </div>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        @if ($posBranches->isNotEmpty())
+                            <button type="button" class="btn pos-confirm-branch" id="confirmPosBranchBtn" disabled>
+                                Gunakan cabang ini <i class="mdi mdi-arrow-right"></i>
+                            </button>
+                        @else
+                            <a href="{{ route("branch.index") }}" class="btn pos-confirm-branch">
+                                Kelola cabang <i class="mdi mdi-arrow-right"></i>
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <div class="modal fade pos-receipt-modal" id="posReceiptModal" tabindex="-1"
+        aria-labelledby="posReceiptModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="pos-receipt-modal-icon"><i class="mdi mdi-receipt-text-check-outline"></i></span>
+                    <div>
+                        <small>BUKTI PEMBAYARAN</small>
+                        <h2 class="modal-title" id="posReceiptModalTitle">Preview struk</h2>
+                        <p>Struk siap dicetak tanpa membuka tab browser baru.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="pos-receipt-frame-shell">
+                        <div class="pos-receipt-loading" id="posReceiptLoading">
+                            <i class="mdi mdi-loading mdi-spin"></i>
+                            <span>Menyiapkan struk...</span>
+                        </div>
+                        <iframe id="posReceiptFrame" title="Preview struk transaksi" src="about:blank"></iframe>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn pos-receipt-close" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn pos-receipt-print" id="printReceiptModalBtn" disabled>
+                        <i class="mdi mdi-printer-outline"></i> Cetak struk
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade pos-prescription-type-modal rx-simple" id="prescriptionTypeModal" tabindex="-1" aria-labelledby="prescriptionTypeModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <section class="pos-prescription-type-step" id="prescriptionTypeStep">
@@ -664,9 +760,9 @@
                             <div class="pos-prescription-modal-heading">
                                 <span><i class="mdi mdi-prescription"></i></span>
                                 <div>
-                                    <small>LANGKAH AWAL LAYANAN RESEP</small>
+                                    <small>WORKSPACE RESEP</small>
                                     <h2 class="modal-title" id="prescriptionTypeModalTitle">Pilih jenis resep</h2>
-                                    <p>Tentukan cara obat disiapkan. Setelah dipilih, seluruh proses resep dilanjutkan di workspace yang luas.</p>
+                                    <p>Pilih alur sesuai cara obat disiapkan.</p>
                                 </div>
                             </div>
                             <button type="button" class="btn-close btn-close-white" id="closePrescriptionTypeBtn" aria-label="Tutup"></button>
@@ -684,9 +780,9 @@
                                 <button type="button" class="pos-prescription-type-option" data-prescription-type="penjualan_resep" aria-pressed="false">
                                     <span class="pos-prescription-type-icon"><i class="mdi mdi-pill-multiple"></i></span>
                                     <span class="pos-prescription-type-copy">
-                                        <small>ETIKET PER OBAT</small>
+                                        <small>OBAT TERPISAH</small>
                                         <strong>Resep Non Racikan</strong>
-                                        <span>Setiap obat diberikan secara terpisah dan mempunyai aturan pakainya sendiri.</span>
+                                        <span>Setiap obat memiliki etiket dan aturan pakai sendiri.</span>
                                         <span class="pos-prescription-type-points">
                                             <b><i class="mdi mdi-check"></i> Signa per obat</b>
                                             <b><i class="mdi mdi-check"></i> Tanpa kelompok R/</b>
@@ -697,9 +793,9 @@
                                 <button type="button" class="pos-prescription-type-option" data-prescription-type="penjualan_racikan" aria-pressed="false">
                                     <span class="pos-prescription-type-icon"><i class="mdi mdi-mortar-pestle-plus"></i></span>
                                     <span class="pos-prescription-type-copy">
-                                        <small>KOMPONEN DIGABUNG</small>
+                                        <small>OBAT DIGABUNG</small>
                                         <strong>Resep Racikan</strong>
-                                        <span>Beberapa obat disatukan ke dalam satu atau beberapa kelompok racikan.</span>
+                                        <span>Beberapa obat disiapkan dalam kelompok racikan.</span>
                                         <span class="pos-prescription-type-points">
                                             <b><i class="mdi mdi-check"></i> Kelompok R/</b>
                                             <b><i class="mdi mdi-check"></i> Dosis tiap komponen</b>
@@ -728,7 +824,7 @@
                             <div>
                                 <small>WORKSPACE RESEP</small>
                                 <strong id="prescriptionFlowTitle">Resep Non Racikan</strong>
-                                <p>Lengkapi data resep, obat, etiket, dan stok sebelum kembali ke pembayaran.</p>
+                                <p>Lengkapi pasien, detail resep, obat, dan etiket.</p>
                             </div>
                         </div>
                         <div class="pos-prescription-flow-steps" aria-label="Tahapan proses resep">
@@ -769,9 +865,9 @@
                             <button type="button" class="btn pos-prescription-draft-button" id="savePrescriptionDraftBtn" title="Simpan proses resep sebagai draft">
                                 <i class="mdi mdi-content-save-outline"></i> Draft
                             </button>
-                            <button type="button" class="btn pos-finish-prescription-button" id="finishPrescriptionFlowBtn">
-                                <span><small>Simpan proses resep</small>Selesai & lanjut pembayaran</span>
-                                <i class="mdi mdi-arrow-right"></i>
+                            <button type="button" class="btn pos-finish-prescription-button" id="finishPrescriptionFlowBtn" aria-label="Bayar transaksi resep">
+                                <span><small>Simpan resep & lanjut</small>Bayar</span>
+                                <i class="mdi mdi-credit-card-check-outline"></i>
                             </button>
                         </div>
                     </footer>

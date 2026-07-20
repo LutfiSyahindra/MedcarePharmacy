@@ -18,6 +18,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\Retu
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
+use App\Http\Controllers\Medcare\Settings\ApotekProfile\ApotekProfileController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
 use App\Http\Controllers\Medcare\Settings\Auth\RoleController;
 use App\Http\Controllers\Medcare\Settings\Auth\UsersController;
@@ -50,6 +51,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('medcare/settings')->group(function () {
+        // Profile Apotek
+        Route::get('/profile-apotek', [ApotekProfileController::class, 'index'])->name('settings.apotek-profile.index');
+        Route::put('/profile-apotek', [ApotekProfileController::class, 'update'])->name('settings.apotek-profile.update');
+
         // Users
         Route::get('/users', [UsersController::class, 'index'])->name('users.index');
         Route::get('/users/tableUsers', [UsersController::class, 'table'])->name('users.table');

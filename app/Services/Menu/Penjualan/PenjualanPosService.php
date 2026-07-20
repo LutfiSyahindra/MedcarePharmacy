@@ -9,9 +9,11 @@ use App\Models\Menu\Penjualan\PenjualanTransactionBatchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Stok\StokBatchModel;
+use App\Models\User;
 use App\Services\Menu\Stok\StockService;
 use App\Support\BranchAccess;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -42,13 +44,66 @@ class PenjualanPosService
 
     public function __construct(private readonly StockService $stockService) {}
 
-    public function searchProducts(string $search = '', int $limit = 30): array
+    public function isAdmin(?User $user = null): bool
     {
-        $branchIds = BranchAccess::userBranchIds();
+        $user = $user ?: Auth::user();
 
-        if (empty($branchIds)) {
-            return [];
+        return (bool) $user?->hasAnyRole(['Admin', 'admin']);
+    }
+
+    public function activeBranches(?User $user = null): Collection
+    {
+        $user = $user ?: Auth::user();
+        $query = BranchModel::query()
+            ->where('is_active', true)
+            ->orderBy('name');
+
+        if (! $this->isAdmin($user)) {
+            $query->whereIn('id', BranchAccess::userBranchIds($user));
         }
+
+        return $query->get(['id', 'code', 'name']);
+    }
+
+    public function transactionBranchIds(?User $user = null): array
+    {
+        $user = $user ?: Auth::user();
+
+        if ($this->isAdmin($user)) {
+            return BranchModel::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        return BranchAccess::userBranchIds($user);
+    }
+
+    public function resolveBranchId(?int $requestedBranchId = null, ?User $user = null): int
+    {
+        $user = $user ?: Auth::user();
+        $activeBranchIds = $this->activeBranches($user)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($this->isAdmin($user) && ! $requestedBranchId) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'Pilih cabang aktif sebelum memulai transaksi POS.',
+            ]);
+        }
+
+        $branchId = $requestedBranchId ?: ($activeBranchIds[0] ?? null);
+
+        if (! $branchId || ! in_array($branchId, $activeBranchIds, true)) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'Cabang POS tidak aktif atau tidak dapat diakses.',
+            ]);
+        }
+
+        return $branchId;
+    }
+
+    public function searchProducts(string $search = '', int $limit = 30, ?int $requestedBranchId = null): array
+    {
+        $branchId = $this->resolveBranchId($requestedBranchId);
 
         $search = trim($search);
 
@@ -63,8 +118,8 @@ class PenjualanPosService
             'distributor',
             'rakPenyimpanan',
             'konversiSatuan.satuan',
-            'stokBatches' => function ($query) use ($branchIds) {
-                $query->whereIn('branch_id', $branchIds)
+            'stokBatches' => function ($query) use ($branchId) {
+                $query->where('branch_id', $branchId)
                     ->where('qty', '>', 0)
                     ->where(fn ($query) => $query->whereNull('expired_date')->orWhereDate('expired_date', '>=', today()))
                     ->orderByRaw('CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END')
@@ -73,8 +128,8 @@ class PenjualanPosService
             },
         ])
             ->withSum([
-                'stokBatches as total_stok' => function ($query) use ($branchIds) {
-                    $query->whereIn('branch_id', $branchIds)
+                'stokBatches as total_stok' => function ($query) use ($branchId) {
+                    $query->where('branch_id', $branchId)
                         ->where(fn ($query) => $query->whereNull('expired_date')->orWhereDate('expired_date', '>=', today()));
                 },
             ], 'qty')
@@ -112,9 +167,9 @@ class PenjualanPosService
             ->all();
     }
 
-    public function productQuote(int $obatId, ?int $satuanId, float $qtyJual = 1): array
+    public function productQuote(int $obatId, ?int $satuanId, float $qtyJual = 1, ?int $requestedBranchId = null): array
     {
-        $branchId = BranchAccess::requireUserBranchId();
+        $branchId = $this->resolveBranchId($requestedBranchId);
         $obat = $this->loadProduct($obatId);
         $unit = $this->resolveUnit($obat, $satuanId);
         $qtyJual = $this->quantity($qtyJual);
@@ -146,7 +201,7 @@ class PenjualanPosService
     public function saveDraft(array $payload): PenjualanTransactionModel
     {
         return DB::transaction(function () use ($payload) {
-            $branchId = BranchAccess::requireUserBranchId();
+            $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
             $transaction = $this->transactionForWrite($payload, $branchId, true);
             $this->clearDraftLines($transaction);
             $this->fillBaseHeader($transaction, $payload, $branchId, 'draft');
@@ -172,7 +227,7 @@ class PenjualanPosService
     public function completeTransaction(array $payload): PenjualanTransactionModel
     {
         return DB::transaction(function () use ($payload) {
-            $branchId = BranchAccess::requireUserBranchId();
+            $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
             $transaction = $this->transactionForWrite($payload, $branchId, false);
             $this->clearDraftLines($transaction);
             $this->fillBaseHeader($transaction, $payload, $branchId, 'completed');
@@ -202,7 +257,7 @@ class PenjualanPosService
     public function cancelTransaction(PenjualanTransactionModel $transaction, string $reason): PenjualanTransactionModel
     {
         return DB::transaction(function () use ($transaction, $reason) {
-            $branchIds = BranchAccess::userBranchIds();
+            $branchIds = $this->transactionBranchIds();
 
             $transaction = PenjualanTransactionModel::with(['details.batchAllocations'])
                 ->whereKey($transaction->id)

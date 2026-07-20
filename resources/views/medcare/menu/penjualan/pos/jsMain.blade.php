@@ -4,6 +4,8 @@
 
         const transactionTypes = @json($transactionTypes);
         const paymentMethods = @json($paymentMethods);
+        const isAdminPos = @json((bool) $isAdminPos);
+        const posBranches = @json($posBranches->values());
         const urls = {
             products: '{{ route("penjualan.pos.products") }}',
             quote: '{{ route("penjualan.pos.quote") }}',
@@ -18,6 +20,7 @@
         let cart = [];
         let quoteTimer = null;
         let lastReceiptId = null;
+        let activeBranchId = @json($selectedPosBranchId);
         let activeCompoundGroup = 'R/ 1';
         let committedTransactionType = 'penjualan_bebas';
         let prescriptionModalReturnType = null;
@@ -36,6 +39,154 @@
             headers: {
                 "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content")
             }
+        });
+
+        function activePosBranch() {
+            return posBranches.find(branch => Number(branch.id) === Number(activeBranchId)) || null;
+        }
+
+        function posBranchModalInstance() {
+            const element = document.getElementById('posBranchModal');
+
+            return element && window.bootstrap?.Modal
+                ? bootstrap.Modal.getOrCreateInstance(element)
+                : null;
+        }
+
+        function updatePosBranchUi() {
+            const branch = activePosBranch();
+            const ready = Boolean(branch);
+
+            $('#activePosBranchName').text(branch?.name || 'Pilih cabang');
+            $('#posBranchSelector').val(branch?.id || '');
+            $('#confirmPosBranchBtn').prop('disabled', !$('#posBranchSelector').val());
+            $('#posWorkspace').toggleClass('is-branch-locked', isAdminPos && !ready);
+            $('#productSearch').prop('disabled', !ready).trigger('change.select2');
+        }
+
+        function openPosBranchModal() {
+            updatePosBranchUi();
+            posBranchModalInstance()?.show();
+        }
+
+        function applyPosBranch(branchId, notify = true) {
+            const branch = posBranches.find(item => Number(item.id) === Number(branchId));
+
+            if (!branch) {
+                Swal.fire('Cabang tidak tersedia', 'Pilih cabang aktif yang tersedia.', 'warning');
+                return;
+            }
+
+            activeBranchId = Number(branch.id);
+            updatePosBranchUi();
+            newTransaction(false);
+            posBranchModalInstance()?.hide();
+
+            if (notify) {
+                Swal.fire({
+                    icon: 'success',
+                    title: `Cabang ${branch.name} aktif`,
+                    toast: true,
+                    position: 'top-end',
+                    timer: 1800,
+                    showConfirmButton: false
+                });
+            }
+        }
+
+        $('#posBranchSelector').on('change', function() {
+            $('#confirmPosBranchBtn').prop('disabled', !$(this).val());
+        });
+
+        $('#posBranchButton').on('click', openPosBranchModal);
+
+        $('#confirmPosBranchBtn').on('click', function() {
+            const branchId = Number($('#posBranchSelector').val());
+
+            if (Number(activeBranchId) === branchId) {
+                posBranchModalInstance()?.hide();
+                return;
+            }
+
+            if (Number(activeBranchId) !== branchId && cart.length > 0) {
+                Swal.fire({
+                    title: 'Ganti cabang POS?',
+                    text: 'Keranjang dan data transaksi saat ini akan dikosongkan.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, ganti cabang',
+                    cancelButtonText: 'Batalkan'
+                }).then(result => {
+                    if (result.isConfirmed) applyPosBranch(branchId);
+                });
+                return;
+            }
+
+            applyPosBranch(branchId);
+        });
+
+        function posReceiptModalInstance() {
+            const element = document.getElementById('posReceiptModal');
+
+            return element && window.bootstrap?.Modal
+                ? bootstrap.Modal.getOrCreateInstance(element)
+                : null;
+        }
+
+        function receiptPreviewUrl(id, autoPrint = false) {
+            const receiptUrl = urls.receipt.replace(':id', id);
+            const separator = receiptUrl.includes('?') ? '&' : '?';
+
+            return `${receiptUrl}${separator}embedded=1&autoprint=${autoPrint ? 1 : 0}`;
+        }
+
+        function showReceiptModal(id, autoPrint = false) {
+            const modalElement = document.getElementById('posReceiptModal');
+            const modal = posReceiptModalInstance();
+
+            if (!id || !modalElement || !modal) return;
+
+            lastReceiptId = Number(id);
+            $('#printLastReceiptBtn').prop('disabled', false);
+            $('#printReceiptModalBtn').prop('disabled', true);
+            $('#posReceiptLoading').removeClass('is-hidden');
+
+            const loadReceipt = () => {
+                $('#posReceiptFrame').attr('src', receiptPreviewUrl(id, autoPrint));
+            };
+
+            if ($(modalElement).hasClass('show')) {
+                loadReceipt();
+                return;
+            }
+
+            modalElement.addEventListener('shown.bs.modal', loadReceipt, { once: true });
+            modal.show();
+        }
+
+        $('#posReceiptFrame').on('load', function() {
+            if ($(this).attr('src') !== 'about:blank') {
+                $('#posReceiptLoading').addClass('is-hidden');
+                $('#printReceiptModalBtn').prop('disabled', false);
+            }
+        });
+
+        $('#posReceiptModal').on('hidden.bs.modal', function() {
+            $('#posReceiptFrame').attr('src', 'about:blank');
+            $('#posReceiptLoading').removeClass('is-hidden');
+            $('#printReceiptModalBtn').prop('disabled', true);
+        });
+
+        $('#printReceiptModalBtn').on('click', function() {
+            const receiptWindow = document.getElementById('posReceiptFrame')?.contentWindow;
+
+            if (!receiptWindow) {
+                Swal.fire('Struk belum siap', 'Tunggu sampai preview struk selesai dimuat.', 'warning');
+                return;
+            }
+
+            receiptWindow.focus();
+            receiptWindow.print();
         });
 
         function escapeHtml(value) {
@@ -267,7 +418,7 @@
                 .toggleClass('is-active', hasQuote && !Boolean(currentQuote?.is_available))
                 .toggleClass('is-complete', hasQuote && Boolean(currentQuote?.is_available));
 
-            $('.pos-selection-block').toggleClass('has-selection', hasSelection);
+            $('.pos-selection-block, .pos-config-block, .pos-stock-block').toggleClass('has-selection', hasSelection);
             $('#selectedProductState')
                 .toggleClass('is-ready', hasSelection)
                 .html(hasSelection
@@ -341,7 +492,8 @@
                     delay: 250,
                     cache: true,
                     data: params => ({
-                        q: params.term || ''
+                        q: params.term || '',
+                        branch_id: activeBranchId || ''
                     }),
                     processResults: data => {
                         const products = data || [];
@@ -452,19 +604,24 @@
                     </div>
                     <span class="badge bg-primary">${formatNumber(selectedProduct.total_stok)} ${escapeHtml(selectedProduct.satuan_stok)}</span>
                 </div>
-                <div class="pos-product-meta">
-                    <span><small>Kategori</small>${escapeHtml(selectedProduct.kategori)}</span>
-                    <span><small>Golongan</small>${escapeHtml(selectedProduct.golongan)}</span>
-                    <span><small>Main/Sub</small>${escapeHtml(selectedProduct.main_golongan)} / ${escapeHtml(selectedProduct.sub_golongan)}</span>
-                    <span><small>Sediaan</small>${escapeHtml(selectedProduct.sediaan)}</span>
-                    <span><small>Pabrikan</small>${escapeHtml(selectedProduct.pabrikan)}</span>
-                    <span><small>Batch FEFO</small>${batch ? escapeHtml(batch.no_batch) + ' | ED ' + escapeHtml(batch.expired_date || '-') : '-'}</span>
+                <div class="pos-product-summary">
+                    <span>${escapeHtml(selectedProduct.kategori || 'Tanpa kategori')}</span>
+                    <span>${escapeHtml(selectedProduct.sediaan || 'Sediaan belum diisi')}</span>
                 </div>
-                <div class="mt-3 small text-muted">
-                    <strong>Indikasi:</strong> ${escapeHtml(selectedProduct.indikasi || '-')}<br>
-                    <strong>Kandungan:</strong> ${escapeHtml(selectedProduct.komposisi || '-')}<br>
-                    <strong>Dosis referensi:</strong> ${escapeHtml(selectedProduct.dosis || '-')}
-                </div>
+                <details class="pos-product-more">
+                    <summary><i class="mdi mdi-information-outline"></i> Lihat detail obat <i class="mdi mdi-chevron-down"></i></summary>
+                    <div class="pos-product-meta">
+                        <span><small>Golongan</small>${escapeHtml(selectedProduct.golongan)}</span>
+                        <span><small>Main/Sub</small>${escapeHtml(selectedProduct.main_golongan)} / ${escapeHtml(selectedProduct.sub_golongan)}</span>
+                        <span><small>Pabrikan</small>${escapeHtml(selectedProduct.pabrikan)}</span>
+                        <span><small>Batch FEFO</small>${batch ? escapeHtml(batch.no_batch) + ' | ED ' + escapeHtml(batch.expired_date || '-') : '-'}</span>
+                    </div>
+                    <div class="pos-product-clinical">
+                        <strong>Indikasi:</strong> ${escapeHtml(selectedProduct.indikasi || '-')}<br>
+                        <strong>Kandungan:</strong> ${escapeHtml(selectedProduct.komposisi || '-')}<br>
+                        <strong>Dosis referensi:</strong> ${escapeHtml(selectedProduct.dosis || '-')}
+                    </div>
+                </details>
             `);
 
             requestAnimationFrame(function() {
@@ -522,7 +679,8 @@
             $.get(urls.quote, {
                 obat_id: selectedProduct.id,
                 satuan_id: $('#unitSelect').val(),
-                qty: $('#qtyInput').val() || 1
+                qty: $('#qtyInput').val() || 1,
+                branch_id: activeBranchId || ''
             }).done(function(response) {
                 currentQuote = response;
                 renderQuote(response);
@@ -825,6 +983,10 @@
                                     <span>Konversi ${formatNumber(item.konversi)}×</span>
                                     ${compound ? `<span class="pos-item-group-badge">${escapeHtml(group)} &middot; Komponen ${componentPosition}/${groupItems.length}</span>` : ''}
                                 </span>
+                                <span class="pos-item-quick-meta">
+                                    <span>${formatCurrency(item.harga_jual)} / ${escapeHtml(item.satuan)}</span>
+                                    <span class="${item.is_available ? '' : 'is-warning'}"><i class="mdi ${item.is_available ? 'mdi-autorenew' : 'mdi-alert-circle-outline'}"></i> ${item.is_available ? 'FEFO otomatis' : 'Stok tidak cukup'}</span>
+                                </span>
                             </span>
                         </div>
                     </td>
@@ -913,6 +1075,14 @@
 
         $(document).on('click', '#focusProductSearchBtn', function() {
             $('#productSearch').select2('open');
+        });
+
+        $('#goToPaymentBtn').on('click', function() {
+            document.getElementById('posPaymentLayout')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+            window.setTimeout(() => $('.payment-amount').first().trigger('focus').select(), 350);
         });
 
         $(document).on('input', '.cart-discount-percent, .cart-discount-nominal', function() {
@@ -1036,7 +1206,8 @@
             $.get(urls.quote, {
                 obat_id: item.obat_id,
                 satuan_id: item.satuan_id,
-                qty: item.qty
+                qty: item.qty,
+                branch_id: activeBranchId || ''
             }).done(function(response) {
                 item.qty = Number(response.qty_jual) || item.qty;
                 item.qty_stok = Number(response.qty_stok) || item.qty_stok;
@@ -1143,7 +1314,10 @@
                 checkoutStatusIcon = 'mdi-file-document-check-outline';
             }
 
-            checkoutStage.toggleClass('is-short', paymentShort).toggleClass('is-ready', paymentReady);
+            checkoutStage
+                .toggleClass('has-items', cart.length > 0)
+                .toggleClass('is-short', paymentShort)
+                .toggleClass('is-ready', paymentReady);
             totalPanel.toggleClass('is-short', paymentShort).toggleClass('is-ready', paymentReady);
             paymentCoverage.toggleClass('is-ready', paymentReady);
             $('#paymentCoverageTitle').text(coverageTitle);
@@ -1182,6 +1356,7 @@
             $('#completeTransactionBtn')
                 .prop('disabled', !canComplete)
                 .attr('title', canComplete ? 'Selesaikan pembayaran (F9)' : 'Lengkapi keranjang dan pembayaran terlebih dahulu');
+            $('#goToPaymentBtn').prop('disabled', cart.length === 0);
 
             submitBar.removeClass('is-ready is-warning');
 
@@ -1614,6 +1789,10 @@
             prescriptionModalInstance().hide();
         });
 
+        $('#prescriptionToolbarPayBtn').on('click', function() {
+            $('#finishPrescriptionFlowBtn').trigger('click');
+        });
+
         $('#savePrescriptionDraftBtn').on('click', function() {
             $('#saveDraftBtn').trigger('click');
         });
@@ -1630,13 +1809,13 @@
 
             if (prescriptionFlowCloseReason === 'finish') {
                 setPrescriptionPaymentMode(true);
-                window.setTimeout(() => {
+                window.requestAnimationFrame(() => {
                     document.getElementById('posPaymentLayout')?.scrollIntoView({
-                        behavior: 'smooth',
+                        behavior: 'auto',
                         block: 'start'
                     });
-                    $('.payment-amount').first().trigger('focus');
-                }, 180);
+                    window.requestAnimationFrame(() => $('.payment-amount').first().trigger('focus'));
+                });
             } else if (prescriptionFlowCloseReason === 'cancel') {
                 setPrescriptionPaymentMode(false);
                 restorePrescriptionReturnType();
@@ -1740,7 +1919,10 @@
             $('#prescriptionFlowReadinessText').text(message);
             $('#finishPrescriptionFlowBtn')
                 .toggleClass('is-ready', ready)
-                .attr('title', ready ? 'Selesai dan lanjut ke pembayaran' : message);
+                .attr('title', ready ? 'Bayar transaksi resep' : message);
+            $('#prescriptionToolbarPayBtn')
+                .toggleClass('is-ready', ready)
+                .attr('title', ready ? 'Bayar transaksi resep' : message);
             $('#prescriptionModalItemCount').text(`${cart.length} ${isCompoundPrescription() ? 'komponen' : 'obat'}`);
 
             const flowSteps = $('.pos-prescription-flow-steps span');
@@ -1757,6 +1939,7 @@
 
         function transactionPayload(includePayments = true) {
             return {
+                branch_id: activeBranchId || null,
                 draft_id: $('#draftId').val() || null,
                 tanggal_transaksi: $('#transactionDate').val(),
                 jenis_transaksi: currentTransactionType(),
@@ -1791,6 +1974,12 @@
         }
 
         function validateCart(requireCompletePrescription = false) {
+            if (!activePosBranch()) {
+                openPosBranchModal();
+                Swal.fire('Pilih cabang', 'Tentukan cabang aktif sebelum memproses transaksi.', 'warning');
+                return false;
+            }
+
             if (cart.length === 0) {
                 Swal.fire('Keranjang kosong', 'Tambahkan minimal satu obat ke transaksi.', 'warning');
                 return false;
@@ -1880,6 +2069,7 @@
                         lastReceiptId = transaction.id;
                         $('#printLastReceiptBtn').prop('disabled', false);
                         newTransaction();
+                        showReceiptModal(transaction.id, true);
                     }
 
                 },
@@ -1957,12 +2147,23 @@
         });
 
         function printReceipt(id) {
-            window.open(urls.receipt.replace(':id', id), '_blank');
+            showReceiptModal(id, false);
         }
 
         window.printReceipt = printReceipt;
 
         function loadDraft(transaction) {
+            const draftBranch = posBranches.find(branch => Number(branch.id) === Number(transaction.branch_id));
+
+            if (!draftBranch) {
+                Swal.fire('Draft tidak dapat dilanjutkan', 'Cabang pada draft sudah tidak aktif atau tidak dapat diakses.', 'error');
+                if (isAdminPos) openPosBranchModal();
+                return;
+            }
+
+            activeBranchId = Number(draftBranch.id);
+            updatePosBranchUi();
+            posBranchModalInstance()?.hide();
             newTransaction(false);
             $('#draftId').val(transaction.id);
             $('#transactionDate').val((transaction.tanggal_transaksi || '').replace(' ', 'T'));
@@ -2029,20 +2230,25 @@
         }
 
         function resumeDraft(id) {
-            $.get(urls.show.replace(':id', id), function(transaction) {
+            return $.get(urls.show.replace(':id', id), function(transaction) {
                 loadDraft(transaction);
-            }).fail(xhr => showAjaxError(xhr, 'Draft gagal dimuat.'));
+            }).fail(xhr => {
+                showAjaxError(xhr, 'Draft gagal dimuat.');
+                if (isAdminPos && !activePosBranch()) openPosBranchModal();
+            });
         }
 
         function loadDraftFromQuery() {
             const draftId = new URLSearchParams(window.location.search).get('draft_id');
 
             if (!draftId) {
-                return;
+                return false;
             }
 
             resumeDraft(draftId);
             window.history.replaceState({}, document.title, window.location.pathname);
+
+            return true;
         }
 
         window.resumeDraft = resumeDraft;
@@ -2086,6 +2292,11 @@
         });
 
         newTransaction(false);
-        loadDraftFromQuery();
+        updatePosBranchUi();
+        const loadingDraft = loadDraftFromQuery();
+
+        if (isAdminPos && !loadingDraft) {
+            openPosBranchModal();
+        }
     });
 </script>
