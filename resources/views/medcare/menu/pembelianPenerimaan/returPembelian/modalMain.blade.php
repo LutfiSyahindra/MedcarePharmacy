@@ -91,6 +91,43 @@
                         </div>
                     </section>
 
+                    <section class="purchase-form-section">
+                        <div class="purchase-form-section-header">
+                            <div class="purchase-form-section-title">
+                                <i class="mdi mdi-hand-coin-outline"></i>
+                                <div>
+                                    <strong>Rencana Ganti Rugi Supplier</strong>
+                                    <small>Tentukan sejak awal apakah nilai retur ini harus ditagihkan kembali ke supplier.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="purchase-form-section-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-lg-4">
+                                    <label class="form-label">Apakah Akan Diganti Rugi?</label>
+                                    <select class="form-select" name="expects_compensation" id="expects_compensation">
+                                        <option value="1" selected>Ya, tagihkan senilai total retur</option>
+                                        <option value="0">Tidak ada ganti rugi</option>
+                                    </select>
+                                </div>
+                                <div class="col-lg-3 compensation-plan-field">
+                                    <label class="form-label">Batas Waktu</label>
+                                    <input type="date" class="form-control" name="compensation_due_date"
+                                        id="compensation_due_date">
+                                </div>
+                                <div class="col-lg-5">
+                                    <label class="form-label">Catatan Kesepakatan / Alasan</label>
+                                    <input type="text" class="form-control" name="compensation_notes"
+                                        placeholder="Wajib diisi bila retur tidak ditagihkan">
+                                </div>
+                            </div>
+                            <div class="compensation-plan-alert mt-3" id="compensationPlanHint">
+                                <i class="mdi mdi-shield-alert-outline"></i>
+                                <span>Setelah retur diposting, status akan tetap <strong>Menunggu</strong> sampai realisasi supplier dicatat penuh.</span>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="purchase-form-section receive-po-summary d-none" id="returnReceiptSummary">
                         <div class="purchase-form-section-header">
                             <div class="purchase-form-section-title">
@@ -121,7 +158,7 @@
                                 <i class="mdi mdi-pill-multiple"></i>
                                 <div>
                                     <strong>Detail Barang Retur</strong>
-                                    <small>Qty retur memakai satuan pembelian, stok keluar memakai konversi batch.</small>
+                                    <small>Pilih satuan retur per item; stok keluar otomatis mengikuti konversi satuan stok.</small>
                                 </div>
                             </div>
                             <div class="receive-detail-actions">

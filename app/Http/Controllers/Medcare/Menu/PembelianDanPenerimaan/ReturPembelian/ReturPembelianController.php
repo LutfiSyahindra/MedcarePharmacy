@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelia
 use App\Http\Controllers\Controller;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
+use App\Models\Menu\PembelianPenerimaan\ReturPembelianCompensationModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\StokBatchModel;
@@ -32,11 +33,15 @@ class ReturPembelianController extends Controller
 
     public function table(Request $request)
     {
-        $query = ReturPembelianModel::with(['penerimaanBarang', 'purchaseOrder', 'distributor', 'createdBy'])
+        $query = ReturPembelianModel::with(['penerimaanBarang', 'purchaseOrder', 'distributor', 'createdBy', 'compensations'])
             ->latest('tanggal_retur')
             ->latest('id');
 
         $this->scopeReturBranch($query);
+
+        $allPostedRetur = (clone $query)
+            ->where('status', 'posted')
+            ->get();
 
         if ($request->filled('date_start')) {
             $query->whereDate('tanggal_retur', '>=', $request->date_start);
@@ -47,6 +52,15 @@ class ReturPembelianController extends Controller
         }
 
         $retur = $query->get();
+
+        $retur = (match ($request->input('compensation_filter')) {
+            'open' => $retur->whereIn('compensation_status', ['waiting', 'partial', 'overdue']),
+            'overdue' => $retur->where('compensation_status', 'overdue'),
+            'settled' => $retur->where('compensation_status', 'settled'),
+            'not_required' => $retur->where('compensation_status', 'not_required'),
+            default => $retur,
+        })->values();
+
         $activeRetur = $retur->where('status', '!=', 'cancelled');
 
         $summary = [
@@ -56,6 +70,20 @@ class ReturPembelianController extends Controller
             'cancelled' => $retur->where('status', 'cancelled')->count(),
             'total_qty' => $activeRetur->sum('total_qty'),
             'grand_total' => $activeRetur->sum('grand_total'),
+            'compensation_waiting' => $allPostedRetur
+                ->whereIn('compensation_status', ['waiting', 'partial', 'overdue'])
+                ->count(),
+            'compensation_overdue' => $allPostedRetur
+                ->where('compensation_status', 'overdue')
+                ->count(),
+            'compensation_settled' => $allPostedRetur
+                ->where('compensation_status', 'settled')
+                ->count(),
+            'compensation_not_required' => $allPostedRetur
+                ->where('compensation_status', 'not_required')
+                ->count(),
+            'compensation_outstanding' => $allPostedRetur
+                ->sum('compensation_outstanding_value'),
         ];
         $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
 
@@ -74,6 +102,9 @@ class ReturPembelianController extends Controller
                 };
 
                 $detailButton = $actionButton('detail', 'mdi-eye-outline', 'Lihat detail', 'lihatReturPembelian');
+                $compensationButton = $row->status === 'posted'
+                    ? $actionButton('compensation', 'mdi-hand-coin-outline', 'Catat ganti rugi supplier', 'kelolaGantiRugi')
+                    : '';
                 $editButton = $row->status === 'draft'
                     ? $actionButton('edit', 'mdi-pencil-outline', 'Edit draft', 'editReturPembelian')
                     : '';
@@ -89,6 +120,7 @@ class ReturPembelianController extends Controller
 
                 return '<div class="return-action-group" role="group" aria-label="Aksi retur pembelian">'
                     .$detailButton
+                    .$compensationButton
                     .$postButton
                     .$editButton
                     .$cancelButton
@@ -303,6 +335,13 @@ class ReturPembelianController extends Controller
                 ]);
             }
 
+            if ($retur->activeCompensations()->exists()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Retur tidak dapat dibatalkan karena sudah memiliki realisasi ganti rugi supplier. Batalkan realisasi tersebut terlebih dahulu.',
+                ], 422);
+            }
+
             $retur->cancelled_by = Auth::id();
             $retur->cancelled_at = now();
 
@@ -343,6 +382,161 @@ class ReturPembelianController extends Controller
         ]);
     }
 
+    public function updateCompensationPlan(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'expects_compensation' => ['required', 'boolean'],
+            'compensation_due_date' => ['nullable', 'string'],
+            'compensation_notes' => ['nullable', 'required_if:expects_compensation,0', 'string', 'max:2000'],
+        ]);
+
+        return DB::transaction(function () use ($validated, $id) {
+            $retur = $this->returQueryForBranch(['compensations'])
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($retur->status !== 'posted') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Rencana ganti rugi hanya dapat diperbarui setelah retur diposting.',
+                ], 422);
+            }
+
+            $expectsCompensation = (bool) $validated['expects_compensation'];
+
+            if (! $expectsCompensation && $retur->activeCompensations()->exists()) {
+                throw ValidationException::withMessages([
+                    'expects_compensation' => 'Batalkan seluruh realisasi sebelum menandai retur tanpa ganti rugi.',
+                ]);
+            }
+
+            $retur->update([
+                'expects_compensation' => $expectsCompensation,
+                'compensation_due_date' => $expectsCompensation
+                    ? $this->parseOptionalDate($validated['compensation_due_date'] ?? null, 'compensation_due_date', 'batas waktu ganti rugi')
+                    : null,
+                'compensation_notes' => $validated['compensation_notes'] ?? null,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $expectsCompensation
+                    ? 'Rencana ganti rugi supplier berhasil diperbarui.'
+                    : 'Retur ditandai tidak memerlukan ganti rugi supplier.',
+                'compensation' => $this->compensationSummary($retur->fresh('compensations')),
+            ]);
+        });
+    }
+
+    public function storeCompensation(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'tanggal_realisasi' => ['required', 'string'],
+            'jenis' => ['required', 'in:barang_pengganti,potongan_faktur,refund_tunai,transfer_bank,nota_kredit,lainnya'],
+            'nominal' => ['required', 'numeric', 'min:0.01'],
+            'nomor_referensi' => ['nullable', 'string', 'max:120'],
+            'nomor_faktur' => ['nullable', 'string', 'max:120'],
+            'keterangan' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        return DB::transaction(function () use ($validated, $id) {
+            $retur = $this->returQueryForBranch(['compensations'])
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($retur->status !== 'posted') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ganti rugi hanya dapat dicatat untuk retur yang sudah diposting.',
+                ], 422);
+            }
+
+            if (! $retur->expects_compensation) {
+                throw ValidationException::withMessages([
+                    'expects_compensation' => 'Aktifkan rencana ganti rugi supplier terlebih dahulu.',
+                ]);
+            }
+
+            $nominal = round((float) $validated['nominal'], 2);
+            $outstanding = $retur->compensation_outstanding_value;
+
+            if ($nominal > $outstanding + 0.009) {
+                throw ValidationException::withMessages([
+                    'nominal' => 'Nominal realisasi melebihi sisa ganti rugi sebesar Rp '.number_format($outstanding, 0, ',', '.').'.',
+                ]);
+            }
+
+            $tanggalRealisasi = $this->parseOptionalDate(
+                $validated['tanggal_realisasi'],
+                'tanggal_realisasi',
+                'tanggal realisasi'
+            );
+
+            if (Carbon::parse($tanggalRealisasi)->isAfter(now()->endOfDay())) {
+                throw ValidationException::withMessages([
+                    'tanggal_realisasi' => 'Tanggal realisasi tidak boleh melewati hari ini.',
+                ]);
+            }
+
+            $retur->compensations()->create([
+                'tanggal_realisasi' => $tanggalRealisasi,
+                'jenis' => $validated['jenis'],
+                'nominal' => $nominal,
+                'nomor_referensi' => $validated['nomor_referensi'] ?? null,
+                'nomor_faktur' => $validated['nomor_faktur'] ?? null,
+                'keterangan' => $validated['keterangan'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Realisasi ganti rugi supplier berhasil dicatat.',
+                'compensation' => $this->compensationSummary($retur->fresh('compensations')),
+            ]);
+        });
+    }
+
+    public function cancelCompensation(Request $request, $id, $compensationId)
+    {
+        $validated = $request->validate([
+            'cancellation_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        return DB::transaction(function () use ($validated, $id, $compensationId) {
+            $retur = $this->returQueryForBranch()->lockForUpdate()->findOrFail($id);
+
+            $compensation = ReturPembelianCompensationModel::where('retur_pembelian_id', $retur->id)
+                ->lockForUpdate()
+                ->findOrFail($compensationId);
+
+            if ($compensation->cancelled_at) {
+                return response()->json([
+                    'status' => 'info',
+                    'message' => 'Realisasi ganti rugi tersebut sudah dibatalkan.',
+                ]);
+            }
+
+            if ($compensation->penerimaan_barang_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Realisasi ini berasal dari potongan faktur penerimaan. Batalkan penerimaan terkait agar nilai faktur dan saldo ganti rugi tetap konsisten.',
+                ], 422);
+            }
+
+            $compensation->update([
+                'cancelled_by' => Auth::id(),
+                'cancelled_at' => now(),
+                'cancellation_reason' => $validated['cancellation_reason'],
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Realisasi ganti rugi berhasil dibatalkan dan tetap tersimpan dalam riwayat audit.',
+                'compensation' => $this->compensationSummary($retur->fresh('compensations')),
+            ]);
+        });
+    }
+
     private function rules(?int $ignoreId = null): array
     {
         $unique = 'unique:retur_pembelian,nomor_retur';
@@ -356,12 +550,17 @@ class ReturPembelianController extends Controller
             'penerimaan_barang_id' => ['required', 'integer', 'exists:penerimaan_barang,id'],
             'tanggal_retur' => ['required', 'string'],
             'nomor_referensi_supplier' => ['nullable', 'string', 'max:100'],
+            'expects_compensation' => ['sometimes', 'boolean'],
+            'compensation_due_date' => ['nullable', 'string'],
+            'compensation_notes' => ['nullable', 'required_if:expects_compensation,0', 'string', 'max:2000'],
             'alasan' => ['nullable', 'string'],
             'catatan' => ['nullable', 'string'],
             'penerimaan_barang_detail_id' => ['required', 'array'],
             'penerimaan_barang_detail_id.*' => ['required', 'integer', 'exists:penerimaan_barang_detail,id'],
             'qty_retur' => ['required', 'array'],
             'qty_retur.*' => ['required', 'numeric', 'min:0'],
+            'satuan_retur_id' => ['nullable', 'array'],
+            'satuan_retur_id.*' => ['nullable', 'integer', 'exists:satuans,id'],
             'alasan_item' => ['nullable', 'array'],
             'alasan_item.*' => ['nullable', 'string'],
         ];
@@ -374,6 +573,7 @@ class ReturPembelianController extends Controller
             'purchaseOrder.distributor',
             'distributor',
             'details.obat.satuan',
+            'details.obat.konversiSatuan.satuan',
             'details.purchaseOrderDetail.satuanKonversi.satuan',
             'details.stokBatch',
         ]);
@@ -420,26 +620,33 @@ class ReturPembelianController extends Controller
                 continue;
             }
 
-            $available = $this->returnableQtyForReceiptDetail($receiptDetail, $ignoreReturId);
+            $returnUnit = $this->resolveReturnUnit(
+                $receiptDetail,
+                $request->input('satuan_retur_id.'.$index),
+                $index
+            );
+            $availableStock = $this->returnableStockQtyForReceiptDetail($receiptDetail, $ignoreReturId);
+            $conversion = (float) $returnUnit['konversi'];
+            $qtyStock = $qty * $conversion;
 
-            if ($qty > $available) {
+            if ($qtyStock > $availableStock + 0.00001) {
                 throw ValidationException::withMessages([
-                    'qty_retur.'.$index => 'Qty retur melebihi sisa retur penerimaan ('.$available.').',
+                    'qty_retur.'.$index => 'Qty retur melebihi sisa retur penerimaan ('.$availableStock.' '.$this->stockUnitLabel($receiptDetail).').',
                 ]);
             }
 
             $batch = $this->stockBatchForReceiptDetail($receiptDetail, $index, $branchId);
-            $conversion = $this->detailConversionFactor($receiptDetail);
-            $qtyStock = $qty * $conversion;
 
-            if ($qtyStock > (float) $batch->qty) {
+            if ($qtyStock > (float) $batch->qty + 0.00001) {
                 throw ValidationException::withMessages([
                     'qty_retur.'.$index => 'Qty retur melebihi stok batch tersedia ('.$batch->qty.' '.$this->stockUnitLabel($receiptDetail).').',
                 ]);
             }
 
-            $harga = (float) $receiptDetail->harga_beli;
-            $hargaStock = (float) ($receiptDetail->harga_beli_stok ?: ($conversion > 0 ? $harga / $conversion : $harga));
+            $purchaseConversion = $this->detailConversionFactor($receiptDetail);
+            $hargaStock = (float) ($receiptDetail->harga_beli_stok
+                ?: ($purchaseConversion > 0 ? (float) $receiptDetail->harga_beli / $purchaseConversion : $receiptDetail->harga_beli));
+            $harga = $hargaStock * $conversion;
             $diskon = $this->percent($receiptDetail->diskon ?? 0);
             $ppn = $this->percent($receiptDetail->ppn ?? 0);
             $subtotal = $qty * $harga;
@@ -457,7 +664,8 @@ class ReturPembelianController extends Controller
                 'qty_retur' => $qty,
                 'qty_retur_stok' => $qtyStock,
                 'konversi_satuan' => $conversion,
-                'satuan_beli' => $this->purchaseUnitLabel($receiptDetail),
+                'satuan_retur_id' => $returnUnit['satuan_id'],
+                'satuan_beli' => $returnUnit['nama'],
                 'satuan_stok' => $this->stockUnitLabel($receiptDetail),
                 'no_batch' => $receiptDetail->no_batch,
                 'expired_date' => $receiptDetail->expired_date,
@@ -504,6 +712,13 @@ class ReturPembelianController extends Controller
             'total_diskon' => $computed['total_diskon'],
             'total_ppn' => $computed['total_ppn'],
             'grand_total' => $computed['grand_total'],
+            'expects_compensation' => $request->has('expects_compensation')
+                ? $request->boolean('expects_compensation')
+                : true,
+            'compensation_due_date' => $request->boolean('expects_compensation', true)
+                ? $this->parseOptionalDate($request->compensation_due_date, 'compensation_due_date', 'batas waktu ganti rugi')
+                : null,
+            'compensation_notes' => $request->compensation_notes,
             'alasan' => $request->alasan,
             'catatan' => $request->catatan,
             'created_by' => Auth::id(),
@@ -518,14 +733,22 @@ class ReturPembelianController extends Controller
             'purchaseOrder',
             'distributor',
             'details.obat.satuan',
+            'details.obat.konversiSatuan.satuan',
             'details.purchaseOrderDetail.satuanKonversi.satuan',
             'createdBy',
             'postedBy',
             'cancelledBy',
+            'compensations.createdBy',
+            'compensations.cancelledBy',
+            'compensations.penerimaanBarang',
         ])->findOrFail($id);
+
+        $compensation = $this->compensationSummary($retur);
+        $retur->makeHidden('compensations');
 
         return [
             'header' => $retur,
+            'compensation' => $compensation,
             'penerimaan_payload' => $this->receiptPayload(
                 $retur->penerimaan_barang_id,
                 $retur->id,
@@ -541,6 +764,7 @@ class ReturPembelianController extends Controller
             'purchaseOrder.distributor',
             'distributor',
             'details.obat.satuan',
+            'details.obat.konversiSatuan.satuan',
             'details.purchaseOrderDetail.satuanKonversi.satuan',
             'details.stokBatch',
         ]);
@@ -558,8 +782,11 @@ class ReturPembelianController extends Controller
         $details = $penerimaan->details
             ->map(function (PenerimaanBarangDetailModel $detail) use ($ignoreReturId) {
                 $conversion = $this->detailConversionFactor($detail);
-                $returnedQty = $this->returnedQtyForReceiptDetail($detail->id, $ignoreReturId);
-                $returnableQty = max(0, (float) $detail->qty_diterima - $returnedQty);
+                $returnedQtyStock = $this->returnedStockQtyForReceiptDetail($detail->id, $ignoreReturId);
+                $receivedQtyStock = $this->receivedStockQty($detail);
+                $returnableQtyStock = max(0, $receivedQtyStock - $returnedQtyStock);
+                $returnedQty = $conversion > 0 ? $returnedQtyStock / $conversion : 0;
+                $returnableQty = $conversion > 0 ? $returnableQtyStock / $conversion : 0;
 
                 return [
                     'id' => $detail->id,
@@ -569,14 +796,17 @@ class ReturPembelianController extends Controller
                     'kode_obat' => $detail->obat->kode_obat ?? '-',
                     'nama_obat' => $detail->obat->nama_obat ?? '-',
                     'satuan' => $this->purchaseUnitLabel($detail),
+                    'purchase_satuan_id' => $detail->purchaseOrderDetail?->satuanKonversi?->satuan_id
+                        ?: $detail->obat?->satuan_id,
                     'satuan_stok' => $this->stockUnitLabel($detail),
                     'konversi' => $conversion,
+                    'units' => $this->returnUnitsForReceiptDetail($detail),
                     'qty_diterima' => (float) $detail->qty_diterima,
                     'qty_diterima_stok' => (float) ($detail->qty_diterima_stok ?: ((float) $detail->qty_diterima * $conversion)),
                     'returned_qty' => $returnedQty,
                     'returnable_qty' => $returnableQty,
-                    'returned_qty_stok' => $returnedQty * $conversion,
-                    'returnable_qty_stok' => $returnableQty * $conversion,
+                    'returned_qty_stok' => $returnedQtyStock,
+                    'returnable_qty_stok' => $returnableQtyStock,
                     'no_batch' => $detail->no_batch,
                     'expired_date' => optional($detail->expired_date)->format('Y-m-d'),
                     'harga_beli' => (float) $detail->harga_beli,
@@ -621,11 +851,12 @@ class ReturPembelianController extends Controller
                 ]);
             }
 
-            $available = max(0, (float) $receiptDetail->qty_diterima - $this->returnedQtyForReceiptDetail($receiptDetail->id, $retur->id));
+            $availableStock = $this->returnableStockQtyForReceiptDetail($receiptDetail, $retur->id);
+            $qtyStock = $this->returnDetailStockQuantity($detail);
 
-            if ((float) $detail->qty_retur > $available) {
+            if ($qtyStock > $availableStock + 0.00001) {
                 throw ValidationException::withMessages([
-                    'qty_retur.'.$index => 'Qty retur melebihi sisa retur penerimaan ('.$available.').',
+                    'qty_retur.'.$index => 'Qty retur melebihi sisa retur penerimaan ('.$availableStock.' '.$this->stockUnitLabel($receiptDetail).').',
                 ]);
             }
 
@@ -641,9 +872,7 @@ class ReturPembelianController extends Controller
                 ]);
             }
 
-            $qtyStock = $this->returnDetailStockQuantity($detail);
-
-            if ($qtyStock > (float) $batch->qty) {
+            if ($qtyStock > (float) $batch->qty + 0.00001) {
                 throw ValidationException::withMessages([
                     'qty_retur.'.$index => 'Qty retur melebihi stok batch tersedia ('.$batch->qty.' '.$detail->satuan_stok.').',
                 ]);
@@ -675,10 +904,19 @@ class ReturPembelianController extends Controller
 
     private function returnableQtyForReceiptDetail(PenerimaanBarangDetailModel $detail, ?int $ignoreReturId = null): float
     {
-        return max(0, (float) $detail->qty_diterima - $this->returnedQtyForReceiptDetail($detail->id, $ignoreReturId));
+        $conversion = $this->detailConversionFactor($detail);
+
+        return $conversion > 0
+            ? $this->returnableStockQtyForReceiptDetail($detail, $ignoreReturId) / $conversion
+            : 0;
     }
 
-    private function returnedQtyForReceiptDetail($receiptDetailId, ?int $ignoreReturId = null): float
+    private function returnableStockQtyForReceiptDetail(PenerimaanBarangDetailModel $detail, ?int $ignoreReturId = null): float
+    {
+        return max(0, $this->receivedStockQty($detail) - $this->returnedStockQtyForReceiptDetail($detail->id, $ignoreReturId));
+    }
+
+    private function returnedStockQtyForReceiptDetail($receiptDetailId, ?int $ignoreReturId = null): float
     {
         return (float) ReturPembelianDetailModel::where('penerimaan_barang_detail_id', $receiptDetailId)
             ->whereHas('returPembelian', function ($query) use ($ignoreReturId) {
@@ -688,7 +926,91 @@ class ReturPembelianController extends Controller
                     $query->where('id', '!=', $ignoreReturId);
                 }
             })
-            ->sum('qty_retur');
+            ->sum('qty_retur_stok');
+    }
+
+    private function receivedStockQty(PenerimaanBarangDetailModel $detail): float
+    {
+        $storedQty = (float) ($detail->qty_diterima_stok ?? 0);
+
+        if ($storedQty > 0) {
+            return $storedQty;
+        }
+
+        return (float) $detail->qty_diterima * $this->detailConversionFactor($detail);
+    }
+
+    private function returnUnitsForReceiptDetail(PenerimaanBarangDetailModel $detail): array
+    {
+        $units = collect();
+        $stockUnit = $detail->obat?->satuan;
+
+        if ($detail->obat?->satuan_id && $stockUnit) {
+            $units->put((int) $detail->obat->satuan_id, [
+                'satuan_id' => (int) $detail->obat->satuan_id,
+                'nama' => $stockUnit->nama,
+                'konversi' => 1.0,
+            ]);
+        }
+
+        foreach ($detail->obat?->konversiSatuan ?? [] as $conversion) {
+            if (! $conversion->satuan_id || ! $conversion->satuan || (float) $conversion->konversi <= 0) {
+                continue;
+            }
+
+            $units->put((int) $conversion->satuan_id, [
+                'satuan_id' => (int) $conversion->satuan_id,
+                'nama' => $conversion->satuan->nama,
+                'konversi' => (float) $conversion->konversi,
+            ]);
+        }
+
+        $purchaseConversion = $detail->purchaseOrderDetail?->satuanKonversi;
+
+        if ($purchaseConversion?->satuan_id && $purchaseConversion->satuan && (float) $purchaseConversion->konversi > 0) {
+            $units->put((int) $purchaseConversion->satuan_id, [
+                'satuan_id' => (int) $purchaseConversion->satuan_id,
+                'nama' => $purchaseConversion->satuan->nama,
+                'konversi' => (float) $purchaseConversion->konversi,
+            ]);
+        }
+
+        $purchaseUnitId = (int) ($purchaseConversion?->satuan_id ?: $detail->obat?->satuan_id);
+
+        return $units
+            ->map(function (array $unit) use ($purchaseUnitId) {
+                $unit['is_purchase'] = (int) $unit['satuan_id'] === $purchaseUnitId;
+
+                return $unit;
+            })
+            ->sortBy(fn (array $unit) => ($unit['is_purchase'] ? '0-' : '1-').str_pad((string) $unit['konversi'], 20, '0', STR_PAD_LEFT))
+            ->values()
+            ->all();
+    }
+
+    private function resolveReturnUnit(PenerimaanBarangDetailModel $detail, $satuanId, int $index): array
+    {
+        $units = collect($this->returnUnitsForReceiptDetail($detail));
+
+        if ($units->isEmpty()) {
+            throw ValidationException::withMessages([
+                'satuan_retur_id.'.$index => 'Satuan retur untuk obat ini belum tersedia.',
+            ]);
+        }
+
+        if ($satuanId !== null && $satuanId !== '') {
+            $selected = $units->first(fn (array $unit) => (int) $unit['satuan_id'] === (int) $satuanId);
+
+            if (! $selected) {
+                throw ValidationException::withMessages([
+                    'satuan_retur_id.'.$index => 'Satuan retur tidak terdaftar untuk obat ini.',
+                ]);
+            }
+
+            return $selected;
+        }
+
+        return $units->firstWhere('is_purchase', true) ?: $units->first();
     }
 
     private function returQueryForBranch(array $with = [])
@@ -746,6 +1068,70 @@ class ReturPembelianController extends Controller
                 'tanggal_retur' => 'Format tanggal retur tidak valid.',
             ]);
         }
+    }
+
+    private function parseOptionalDate($date, string $field, string $label): ?string
+    {
+        $date = trim((string) $date);
+
+        if ($date === '') {
+            return null;
+        }
+
+        try {
+            if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
+                return Carbon::createFromFormat('d-m-Y', $date)->format('Y-m-d');
+            }
+
+            return Carbon::parse($date)->format('Y-m-d');
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                $field => 'Format '.$label.' tidak valid.',
+            ]);
+        }
+    }
+
+    private function compensationSummary(ReturPembelianModel $retur): array
+    {
+        if (! $retur->relationLoaded('compensations')) {
+            $retur->load(['compensations.createdBy', 'compensations.cancelledBy']);
+        }
+
+        return [
+            'expects_compensation' => (bool) $retur->expects_compensation,
+            'due_date' => optional($retur->compensation_due_date)->format('Y-m-d'),
+            'notes' => $retur->compensation_notes,
+            'expected_value' => $retur->compensation_expected_value,
+            'received_value' => $retur->compensation_received_value,
+            'outstanding_value' => $retur->compensation_outstanding_value,
+            'status' => $retur->compensation_status,
+            'entries' => $retur->compensations
+                ->sortByDesc(fn (ReturPembelianCompensationModel $entry) => optional($entry->tanggal_realisasi)->format('Y-m-d').'-'.str_pad((string) $entry->id, 20, '0', STR_PAD_LEFT)
+                )
+                ->map(fn (ReturPembelianCompensationModel $entry) => [
+                    'id' => $entry->id,
+                    'tanggal_realisasi' => optional($entry->tanggal_realisasi)->format('Y-m-d'),
+                    'jenis' => $entry->jenis,
+                    'nominal' => (float) $entry->nominal,
+                    'nomor_referensi' => $entry->nomor_referensi,
+                    'nomor_faktur' => $entry->nomor_faktur,
+                    'keterangan' => $entry->keterangan,
+                    'created_by' => ['name' => $entry->createdBy?->name ?? '-'],
+                    'penerimaan_barang' => $entry->penerimaanBarang
+                        ? [
+                            'id' => $entry->penerimaanBarang->id,
+                            'nomor_penerimaan' => $entry->penerimaanBarang->nomor_penerimaan,
+                        ]
+                        : null,
+                    'cancelled_at' => optional($entry->cancelled_at)->toISOString(),
+                    'cancelled_by' => $entry->cancelled_at
+                        ? ['name' => $entry->cancelledBy?->name ?? '-']
+                        : null,
+                    'cancellation_reason' => $entry->cancellation_reason,
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     private function detailConversionFactor(PenerimaanBarangDetailModel|ReturPembelianDetailModel $detail): float

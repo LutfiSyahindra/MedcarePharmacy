@@ -2361,6 +2361,254 @@
         gap: .45rem;
     }
 
+    .supplier-compensation-alert {
+        overflow: hidden;
+        margin-bottom: 1rem;
+        border: 1px solid #fcd34d;
+        border-radius: 12px;
+        background: #fffbeb;
+        box-shadow: 0 12px 28px rgba(217, 119, 6, .08);
+    }
+
+    .supplier-compensation-alert.is-overdue {
+        border-color: #fca5a5;
+        background: #fff7f7;
+        box-shadow: 0 12px 28px rgba(220, 38, 38, .08);
+    }
+
+    .supplier-compensation-alert-header {
+        display: flex;
+        align-items: center;
+        gap: .85rem;
+        padding: 1rem;
+        border-bottom: 1px solid rgba(217, 119, 6, .18);
+    }
+
+    .supplier-compensation-alert.is-overdue .supplier-compensation-alert-header {
+        border-bottom-color: rgba(220, 38, 38, .16);
+    }
+
+    .supplier-compensation-alert-icon {
+        display: inline-grid;
+        flex: 0 0 42px;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 12px;
+        color: #a16207;
+        background: #fef3c7;
+    }
+
+    .supplier-compensation-alert.is-overdue .supplier-compensation-alert-icon {
+        color: #b91c1c;
+        background: #fee2e2;
+    }
+
+    .supplier-compensation-alert-icon i {
+        font-size: 1.35rem;
+    }
+
+    .supplier-compensation-alert-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .supplier-compensation-alert-copy strong {
+        display: block;
+        color: #78350f;
+        font-size: .92rem;
+        font-weight: 900;
+    }
+
+    .supplier-compensation-alert.is-overdue .supplier-compensation-alert-copy strong {
+        color: #991b1b;
+    }
+
+    .supplier-compensation-alert-copy p {
+        margin-top: .15rem;
+        color: #92400e;
+        font-size: .78rem;
+    }
+
+    .supplier-compensation-alert.is-overdue .supplier-compensation-alert-copy p {
+        color: #b91c1c;
+    }
+
+    .supplier-compensation-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .7rem;
+        padding: .85rem 1rem;
+    }
+
+    .supplier-compensation-metrics > div {
+        padding: .7rem .8rem;
+        border: 1px solid rgba(217, 119, 6, .16);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, .72);
+    }
+
+    .supplier-compensation-metrics span,
+    .supplier-compensation-metrics strong {
+        display: block;
+    }
+
+    .supplier-compensation-metrics span {
+        color: #92400e;
+        font-size: .68rem;
+        font-weight: 800;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+    }
+
+    .supplier-compensation-metrics strong {
+        margin-top: .18rem;
+        color: #78350f;
+        font-size: 1rem;
+        font-weight: 900;
+    }
+
+    .supplier-compensation-table {
+        border-top: 1px solid rgba(217, 119, 6, .14);
+        background: rgba(255, 255, 255, .66);
+    }
+
+    .supplier-compensation-table th {
+        color: #7c2d12;
+        background: rgba(254, 243, 199, .7);
+        font-size: .68rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .supplier-compensation-table td {
+        color: var(--purchase-text);
+        font-size: .77rem;
+    }
+
+    .supplier-compensation-status {
+        display: inline-flex;
+        align-items: center;
+        gap: .28rem;
+        padding: .35rem .55rem;
+        border-radius: 999px;
+        font-size: .7rem;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .supplier-compensation-status.is-waiting {
+        color: #a16207;
+        background: #fef3c7;
+    }
+
+    .supplier-compensation-status.is-partial {
+        color: #0369a1;
+        background: #e0f2fe;
+    }
+
+    .supplier-compensation-status.is-overdue {
+        color: #b91c1c;
+        background: #fee2e2;
+    }
+
+    .supplier-compensation-more {
+        display: block;
+        padding: .75rem 1rem;
+        color: #92400e;
+        border-top: 1px solid rgba(217, 119, 6, .14);
+        font-weight: 700;
+    }
+
+    .supplier-compensation-apply {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(210px, .42fr);
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: .9rem 1rem;
+        border: 1px solid rgba(124, 58, 237, .2);
+        border-radius: 10px;
+        background: linear-gradient(135deg, rgba(124, 58, 237, .07), rgba(37, 99, 235, .05));
+    }
+
+    .supplier-compensation-apply-copy {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        min-width: 0;
+    }
+
+    .supplier-compensation-apply-icon {
+        display: inline-grid;
+        flex: 0 0 38px;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 10px;
+        color: #6d28d9;
+        background: #ede9fe;
+    }
+
+    .supplier-compensation-apply-copy strong,
+    .supplier-compensation-apply-copy small {
+        display: block;
+    }
+
+    .supplier-compensation-apply-copy strong {
+        color: #4c1d95;
+        font-size: .84rem;
+        font-weight: 900;
+    }
+
+    .supplier-compensation-apply-copy small {
+        margin-top: .15rem;
+        color: #6b7280;
+        font-size: .72rem;
+    }
+
+    .supplier-compensation-switch {
+        padding: .55rem .7rem .55rem 2.7rem;
+        border: 1px solid rgba(124, 58, 237, .16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .7);
+        white-space: nowrap;
+    }
+
+    .supplier-compensation-switch .form-check-input:checked {
+        border-color: #7c3aed;
+        background-color: #7c3aed;
+    }
+
+    .supplier-compensation-switch .form-check-label {
+        color: #4c1d95;
+        font-size: .76rem;
+        font-weight: 800;
+    }
+
+    .supplier-compensation-amount label,
+    .supplier-compensation-amount small {
+        display: block;
+    }
+
+    .supplier-compensation-amount label {
+        margin-bottom: .3rem;
+        color: #4c1d95;
+        font-size: .7rem;
+        font-weight: 900;
+    }
+
+    .supplier-compensation-amount small {
+        margin-top: .25rem;
+        color: #6b7280;
+        font-size: .68rem;
+    }
+
+    .supplier-compensation-amount .form-control:disabled {
+        color: #94a3b8;
+        background: #f8fafc;
+    }
+
     @keyframes purchase-spin {
         to {
             transform: rotate(360deg);
@@ -2390,6 +2638,15 @@
 
         .receive-invoice-board {
             grid-template-columns: 1fr;
+        }
+
+        .supplier-compensation-apply {
+            grid-template-columns: 1fr;
+            align-items: stretch;
+        }
+
+        .supplier-compensation-switch {
+            width: max-content;
         }
 
         .receive-payment-actions {
@@ -2469,6 +2726,20 @@
 
         .purchase-page-size {
             justify-content: space-between;
+        }
+
+        .supplier-compensation-alert-header {
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .supplier-compensation-alert-header .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .supplier-compensation-metrics {
+            grid-template-columns: 1fr;
         }
     }
 

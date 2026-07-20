@@ -112,17 +112,22 @@
                                 <input type="text" class="form-control form-control-sm" id="detailInvoiceBiayaLain"
                                     readonly>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <label class="form-label small">Potongan Ganti Rugi</label>
+                                <input type="text" class="form-control form-control-sm" id="detailSupplierCompensationDiscount"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label small">Total Faktur</label>
                                 <input type="text" class="form-control form-control-sm" id="detailTotalFaktur"
                                     readonly>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Jumlah Dibayar</label>
                                 <input type="text" class="form-control form-control-sm" id="detailJumlahDibayar"
                                     readonly>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Sisa Hutang</label>
                                 <input type="text" class="form-control form-control-sm" id="detailSisaHutang"
                                     readonly>

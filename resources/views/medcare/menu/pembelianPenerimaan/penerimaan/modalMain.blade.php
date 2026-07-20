@@ -210,6 +210,57 @@
                         </div>
                     </section>
 
+                    <section class="supplier-compensation-alert d-none" id="supplierCompensationAlert"
+                        aria-live="polite">
+                        <div class="supplier-compensation-alert-header">
+                            <span class="supplier-compensation-alert-icon">
+                                <i class="mdi mdi-hand-coin-outline"></i>
+                            </span>
+                            <div class="supplier-compensation-alert-copy">
+                                <strong>Supplier Masih Memiliki Ganti Rugi yang Belum Direalisasikan</strong>
+                                <p class="mb-0">
+                                    Konfirmasikan dengan supplier saat barang datang agar retur sebelumnya tidak terlewat.
+                                </p>
+                            </div>
+                            <a href="{{ route('returPembelian.returPembelian') }}" target="_blank"
+                                class="btn btn-sm btn-outline-danger">
+                                <i class="mdi mdi-open-in-new"></i> Buka Retur
+                            </a>
+                        </div>
+
+                        <div class="supplier-compensation-metrics">
+                            <div>
+                                <span>Retur Belum Selesai</span>
+                                <strong id="supplierCompensationReturnCount">0</strong>
+                            </div>
+                            <div>
+                                <span>Total Belum Diganti</span>
+                                <strong id="supplierCompensationOutstanding">Rp 0</strong>
+                            </div>
+                            <div>
+                                <span>Jatuh Tempo</span>
+                                <strong id="supplierCompensationOverdue">0</strong>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table supplier-compensation-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Retur</th>
+                                        <th>Branch</th>
+                                        <th>Tanggal / Batas Waktu</th>
+                                        <th>Status</th>
+                                        <th>Sudah Diganti</th>
+                                        <th>Sisa</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="supplierCompensationRows"></tbody>
+                            </table>
+                        </div>
+                        <small class="supplier-compensation-more d-none" id="supplierCompensationMore"></small>
+                    </section>
+
                     <section class="purchase-form-section receive-po-summary d-none" id="receivePoSummary">
                         <div class="purchase-form-section-header">
                             <div class="purchase-form-section-title">
@@ -393,6 +444,36 @@
                                 </small>
                             </div>
 
+                            <div class="supplier-compensation-apply d-none" id="supplierCompensationApplyPanel">
+                                <div class="supplier-compensation-apply-copy">
+                                    <span class="supplier-compensation-apply-icon">
+                                        <i class="mdi mdi-cash-minus"></i>
+                                    </span>
+                                    <div>
+                                        <strong>Potong Ganti Rugi dari Faktur Ini</strong>
+                                        <small>
+                                            Saldo tersedia <b id="supplierCompensationAvailable">Rp 0</b>.
+                                            Potongan dialokasikan ke retur jatuh tempo atau terlama terlebih dahulu.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch supplier-compensation-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                        id="applySupplierCompensation">
+                                    <label class="form-check-label" for="applySupplierCompensation">Gunakan potongan</label>
+                                </div>
+                                <div class="supplier-compensation-amount">
+                                    <label for="supplierCompensationDiscount">Nominal Potongan</label>
+                                    <div class="receive-money-field">
+                                        <i class="mdi mdi-hand-coin-outline"></i>
+                                        <input type="text" class="form-control invoice-money"
+                                            name="supplier_compensation_discount" id="supplierCompensationDiscount"
+                                            value="Rp 0" inputmode="numeric" autocomplete="off" disabled>
+                                    </div>
+                                    <small>Maksimal <span id="supplierCompensationMax">Rp 0</span></small>
+                                </div>
+                            </div>
+
                             <div class="row g-3">
                                 <div class="col-lg-4 col-md-6">
                                     <label class="form-label">Nomor Faktur</label>
@@ -489,6 +570,7 @@
                             <span>Subtotal <strong id="receiveModalSubtotal">Rp 0</strong></span>
                             <span>Diskon <strong id="receiveModalDiscount">Rp 0</strong></span>
                             <span>PPN <strong id="receiveModalTax">Rp 0</strong></span>
+                            <span>Ganti Rugi <strong id="receiveModalCompensationDiscount">Rp 0</strong></span>
                         </div>
                         <strong id="receiveGrandTotal">Rp 0</strong>
                     </div>

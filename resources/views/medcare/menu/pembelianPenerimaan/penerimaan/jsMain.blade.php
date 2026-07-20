@@ -6,6 +6,7 @@
         let receiveDateEnd = moment().endOf('month').format('YYYY-MM-DD');
         let receiveDatePicker = null;
         let paymentPreset = 'none';
+        let supplierCompensationAvailable = 0;
 
         $.ajaxSetup({
             headers: {
@@ -162,7 +163,7 @@
         }
 
         function updateInvoicePaymentUi(total, paid, debt, status) {
-            let paidPercent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+            let paidPercent = total > 0 ? Math.min(100, (paid / total) * 100) : (status === 'lunas' ? 100 : 0);
             let meta = paymentStatusMeta(status);
 
             $('#invoicePaymentStatusBadge')
@@ -174,7 +175,7 @@
             $('#invoiceBoardDebt').text(formatRupiah(debt));
             $('#invoicePaidPercent').text(`${paidPercent.toFixed(0)}%`);
             $('#invoicePaidMeter').css('width', `${paidPercent}%`);
-            $('#invoiceBoardHint').text(total > 0 ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
+            $('#invoiceBoardHint').text(total > 0 || status === 'lunas' ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
 
             $('.receive-payment-action').removeClass('is-active');
             if (status === 'belum_dibayar') {
@@ -562,6 +563,12 @@
                 hasInvoice && hasValidItem ? 'Faktur siap' : (hasValidItem ? 'Siap diisi' : 'Menunggu detail'));
 
             setInvoiceLockState(!hasValidItem, invoiceLockMessage(hasPo, itemStats));
+            let canUseCompensation = hasValidItem && supplierCompensationAvailable > 0;
+            $('#applySupplierCompensation').prop('disabled', !canUseCompensation);
+            $('#supplierCompensationDiscount').prop(
+                'disabled',
+                !canUseCompensation || !$('#applySupplierCompensation').is(':checked')
+            );
             $('#receiveInvoicePrompt').toggleClass('d-none', !hasValidItem || hasInvoice);
             updateReceiveGuidance(hasPo, itemStats, hasInvoice, hasValidItem);
 
@@ -577,6 +584,7 @@
             $('#penerimaan_id').val('');
             $('#purchase_order_id').val('').trigger('change');
             $('#receive_supplier').val('');
+            hideSupplierCompensationAlert();
             $('#receivePoSummary').addClass('d-none');
             $('#receiveDetailRows').empty();
             $('#receiveDetailEditor').addClass('d-none');
@@ -590,7 +598,7 @@
             $('#summaryReceivePercent').text('0%');
             $('#summaryReceiveMeter').css('width', '0%');
             $('#receiveModalSubtotal, #receiveModalDiscount, #receiveModalTax, #receiveGrandTotal').text(formatRupiah(0));
-            ['subtotal', 'diskon', 'pajak', 'biaya_lain', 'total_faktur', 'jumlah_dibayar', 'sisa_hutang'].forEach(function(field) {
+            ['subtotal', 'diskon', 'pajak', 'biaya_lain', 'supplier_compensation_discount', 'total_faktur', 'jumlah_dibayar', 'sisa_hutang'].forEach(function(field) {
                 setMoneyInput(field, 0);
             });
             $('input[name="tanggal_faktur"]').val(moment().format('DD-MM-YYYY'));
@@ -666,7 +674,103 @@
             $('#summaryFilledQty').text('0');
             $('#summaryReceivePercent').text('0%');
             $('#summaryReceiveMeter').css('width', '0%');
+            renderSupplierCompensationAlert(po.supplier_compensation_alert || {});
             updateFormProgress();
+        }
+
+        function hideSupplierCompensationAlert() {
+            supplierCompensationAvailable = 0;
+            $('#supplierCompensationAlert').addClass('d-none').removeClass('is-overdue');
+            $('#supplierCompensationRows').empty();
+            $('#supplierCompensationReturnCount, #supplierCompensationOverdue').text('0');
+            $('#supplierCompensationOutstanding').text(formatRupiah(0));
+            $('#supplierCompensationMore').addClass('d-none').text('');
+            $('#supplierCompensationApplyPanel').addClass('d-none');
+            $('#applySupplierCompensation').prop('checked', false);
+            $('#supplierCompensationDiscount').prop('disabled', true);
+            setMoneyInput('supplier_compensation_discount', 0);
+            $('#supplierCompensationAvailable, #supplierCompensationMax').text(formatRupiah(0));
+            $('#receiveModalCompensationDiscount').text(formatRupiah(0));
+        }
+
+        function supplierCompensationStatus(status) {
+            const statuses = {
+                waiting: {
+                    label: 'Menunggu',
+                    className: 'is-waiting',
+                    icon: 'mdi-clock-alert-outline'
+                },
+                partial: {
+                    label: 'Diganti sebagian',
+                    className: 'is-partial',
+                    icon: 'mdi-progress-clock'
+                },
+                overdue: {
+                    label: 'Jatuh tempo',
+                    className: 'is-overdue',
+                    icon: 'mdi-alert-circle-outline'
+                }
+            };
+
+            return statuses[String(status || '').toLowerCase()] || statuses.waiting;
+        }
+
+        function renderSupplierCompensationAlert(alert) {
+            hideSupplierCompensationAlert();
+
+            if (!alert.has_outstanding || !Array.isArray(alert.returns) || !alert.returns.length) {
+                return;
+            }
+
+            let returnCount = Number(alert.return_count || alert.returns.length);
+            let overdueCount = Number(alert.overdue_count || 0);
+            supplierCompensationAvailable = Number(alert.outstanding_value || 0);
+            let rows = alert.returns.map(function(item) {
+                let status = supplierCompensationStatus(item.status);
+                let dueDate = item.due_date ? formatDateDisplay(item.due_date) : 'Belum ditentukan';
+                let notes = item.notes
+                    ? `<small class="d-block text-muted">${escapeHtml(item.notes)}</small>`
+                    : '';
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${escapeHtml(item.nomor_retur || '-')}</strong>
+                            ${notes}
+                        </td>
+                        <td>${escapeHtml(item.branch || '-')}</td>
+                        <td>
+                            <strong>${formatDateDisplay(item.tanggal_retur)}</strong>
+                            <small class="d-block ${item.status === 'overdue' ? 'text-danger' : 'text-muted'}">Batas ${escapeHtml(dueDate)}</small>
+                        </td>
+                        <td>
+                            <span class="supplier-compensation-status ${status.className}">
+                                <i class="mdi ${status.icon}"></i> ${status.label}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>${formatRupiah(item.received_value)}</strong>
+                            <small class="d-block text-muted">dari ${formatRupiah(item.expected_value)}</small>
+                        </td>
+                        <td><strong class="text-danger">${formatRupiah(item.outstanding_value)}</strong></td>
+                    </tr>
+                `;
+            }).join('');
+
+            $('#supplierCompensationRows').html(rows);
+            $('#supplierCompensationReturnCount').text(returnCount.toLocaleString('id-ID'));
+            $('#supplierCompensationOutstanding').text(formatRupiah(alert.outstanding_value));
+            $('#supplierCompensationOverdue').text(overdueCount.toLocaleString('id-ID'));
+            $('#supplierCompensationAlert')
+                .removeClass('d-none')
+                .toggleClass('is-overdue', overdueCount > 0);
+            $('#supplierCompensationApplyPanel').removeClass('d-none');
+            $('#supplierCompensationAvailable').text(formatRupiah(supplierCompensationAvailable));
+
+            let hiddenCount = Math.max(0, returnCount - alert.returns.length);
+            $('#supplierCompensationMore')
+                .toggleClass('d-none', hiddenCount === 0)
+                .text(hiddenCount > 0 ? `Masih ada ${hiddenCount.toLocaleString('id-ID')} retur lain. Buka halaman Retur Pembelian untuk melihat semuanya.` : '');
         }
 
         function detailRowTemplate(item, existing = null) {
@@ -937,7 +1041,13 @@
             let otherCostInput = $('input[name="biaya_lain"]');
             let paidInput = $('input[name="jumlah_dibayar"]');
             let otherCost = getMoneyInput('biaya_lain');
-            let total = Math.max(0, subtotal - discount + tax + otherCost);
+            let grossTotal = Math.max(0, subtotal - discount + tax + otherCost);
+            let compensationEnabled = $('#applySupplierCompensation').is(':checked') && supplierCompensationAvailable > 0;
+            let compensationInput = $('#supplierCompensationDiscount');
+            let maxCompensationDiscount = Math.min(grossTotal, supplierCompensationAvailable);
+            let compensationDiscount = compensationEnabled ? parseCurrencyValue(compensationInput.val()) : 0;
+            compensationDiscount = Math.min(maxCompensationDiscount, compensationDiscount);
+            let total = Math.max(0, grossTotal - compensationDiscount);
             let paid = getMoneyInput('jumlah_dibayar');
             let isEditingPaid = paidInput.is(':focus');
 
@@ -958,9 +1068,18 @@
             let debt = Math.max(0, total - paid);
             let paymentStatus = paymentStatusFromAmounts(total, paid);
 
+            if (grossTotal > 0 && total <= 0) {
+                paymentStatus = 'lunas';
+            }
+
             setMoneyInput('subtotal', subtotal);
             setMoneyInput('diskon', discount);
             setMoneyInput('pajak', tax);
+            if (!compensationInput.is(':focus')) {
+                setMoneyInput('supplier_compensation_discount', compensationDiscount);
+            } else {
+                compensationInput.data('raw-value', formatMoneyInputValue(compensationDiscount));
+            }
             setMoneyInput('total_faktur', total);
             setMoneyInput('sisa_hutang', debt);
             $('select[name="status_pembayaran"]').val(paymentStatus);
@@ -979,12 +1098,18 @@
             }
 
             updateInvoicePaymentUi(total, paid, debt, paymentStatus);
+            $('#supplierCompensationMax').text(formatRupiah(maxCompensationDiscount));
+            $('#receiveModalCompensationDiscount').text(formatRupiah(compensationDiscount));
+            $('#invoiceBoardFormula').text(compensationDiscount > 0
+                ? 'Subtotal - diskon + PPN + biaya lain - ganti rugi supplier'
+                : 'Subtotal - diskon + PPN + biaya lain');
 
             return {
                 total,
                 paid,
                 debt,
-                status: paymentStatus
+                status: paymentStatus,
+                compensationDiscount
             };
         }
 
@@ -1007,7 +1132,7 @@
             updateFormProgress();
         }
 
-        $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="jumlah_dibayar"]', function() {
+        $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
             let input = $(this);
             let max = Number(input.closest('.receive-detail-row').data('max')) || 0;
 
@@ -1021,6 +1146,30 @@
 
             if (input.hasClass('receive-discount') || input.hasClass('receive-tax')) {
                 setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
+            }
+
+            recalculateReceiveTotals();
+        });
+
+        $('#applySupplierCompensation').on('change', function() {
+            let enabled = $(this).is(':checked');
+            let input = $('#supplierCompensationDiscount');
+            input.prop('disabled', !enabled);
+
+            if (enabled) {
+                let grossTotal = Math.max(
+                    0,
+                    getMoneyInput('subtotal')
+                        - getMoneyInput('diskon')
+                        + getMoneyInput('pajak')
+                        + getMoneyInput('biaya_lain')
+                );
+                setMoneyInput(
+                    'supplier_compensation_discount',
+                    Math.min(grossTotal, supplierCompensationAvailable)
+                );
+            } else {
+                setMoneyInput('supplier_compensation_discount', 0);
             }
 
             recalculateReceiveTotals();
@@ -1130,6 +1279,7 @@
 
             if (!poId) {
                 $('#receive_supplier').val('');
+                hideSupplierCompensationAlert();
                 $('#receivePoSummary').addClass('d-none');
                 $('#receiveDetailRows').empty();
                 $('#receiveDetailEditor').addClass('d-none');
@@ -1473,6 +1623,10 @@
 
                     loadApprovedPo(header.purchase_order_id, `${po.no_po} - ${po.supplier}`).then(function() {
                         renderPoSummary(po);
+                        let compensationDiscount = Number(header.supplier_compensation_discount || 0);
+                        $('#applySupplierCompensation').prop('checked', compensationDiscount > 0);
+                        $('#supplierCompensationDiscount').prop('disabled', compensationDiscount <= 0);
+                        setMoneyInput('supplier_compensation_discount', compensationDiscount);
                         renderPoDetails(po, header.details || []);
                     });
                 });
@@ -1504,6 +1658,7 @@
                 $('#detailInvoiceDiskon').val(formatRupiah(header.diskon ?? header.total_diskon));
                 $('#detailInvoicePajak').val(formatRupiah(header.pajak ?? header.total_ppn));
                 $('#detailInvoiceBiayaLain').val(formatRupiah(header.biaya_lain));
+                $('#detailSupplierCompensationDiscount').val(formatRupiah(header.supplier_compensation_discount));
                 $('#detailTotalFaktur').val(formatRupiah(header.total_faktur ?? header.grand_total));
                 $('#detailJumlahDibayar').val(formatRupiah(header.jumlah_dibayar));
                 $('#detailSisaHutang').val(formatRupiah(header.sisa_hutang));

@@ -19,6 +19,7 @@ class PenerimaanBarangModel extends Model
         'tanggal_penerimaan' => 'date',
         'tanggal_faktur' => 'date',
         'tanggal_jatuh_tempo' => 'date',
+        'supplier_compensation_discount' => 'decimal:2',
         'posted_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
@@ -31,6 +32,14 @@ class PenerimaanBarangModel extends Model
     public function purchaseOrder()
     {
         return $this->belongsTo(PembelianModel::class, 'purchase_order_id');
+    }
+
+    public function supplierCompensationAllocations()
+    {
+        return $this->hasMany(
+            PenerimaanSupplierCompensationAllocationModel::class,
+            'penerimaan_barang_id'
+        );
     }
 
     public function distributor()

@@ -4,6 +4,7 @@ namespace App\Models\Menu\PembelianPenerimaan;
 
 use App\Models\MasterObatModel;
 use App\Models\Menu\Stok\StokBatchModel;
+use App\Models\SatuansModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -42,5 +43,10 @@ class ReturPembelianDetailModel extends Model
     public function stokBatch()
     {
         return $this->belongsTo(StokBatchModel::class, 'stok_batch_id');
+    }
+
+    public function satuanRetur()
+    {
+        return $this->belongsTo(SatuansModel::class, 'satuan_retur_id');
     }
 }

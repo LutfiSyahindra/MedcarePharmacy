@@ -294,6 +294,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/retur-pembelian/{id}/update', [ReturPembelianController::class, 'update'])->name('returPembelian.update');
         Route::put('/retur-pembelian/{id}/post', [ReturPembelianController::class, 'post'])->name('returPembelian.post');
         Route::put('/retur-pembelian/{id}/cancel', [ReturPembelianController::class, 'cancel'])->name('returPembelian.cancel');
+        Route::put('/retur-pembelian/{id}/rencana-ganti-rugi', [ReturPembelianController::class, 'updateCompensationPlan'])->name('returPembelian.updateCompensationPlan');
+        Route::post('/retur-pembelian/{id}/ganti-rugi', [ReturPembelianController::class, 'storeCompensation'])->name('returPembelian.storeCompensation');
+        Route::delete('/retur-pembelian/{id}/ganti-rugi/{compensationId}', [ReturPembelianController::class, 'cancelCompensation'])->name('returPembelian.cancelCompensation');
         Route::delete('/retur-pembelian/{id}/destroy', [ReturPembelianController::class, 'destroy'])->name('returPembelian.destroy');
 
     });

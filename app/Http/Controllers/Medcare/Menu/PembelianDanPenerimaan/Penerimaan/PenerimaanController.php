@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
+use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
@@ -153,11 +154,21 @@ class PenerimaanController extends Controller
         return DB::transaction(function () use ($request) {
             $po = $this->approvedPo($request->purchase_order_id);
             $computed = $this->buildComputedDetails($request, $po);
+            $compensationPlan = $this->buildSupplierCompensationPlan($request, $po, $computed);
 
-            $penerimaan = PenerimaanBarangModel::create($this->headerPayload($request, $po, $computed));
+            $penerimaan = PenerimaanBarangModel::create($this->headerPayload(
+                $request,
+                $po,
+                $computed,
+                $compensationPlan['total']
+            ));
 
             foreach ($computed['details'] as $detail) {
                 $penerimaan->details()->create($detail);
+            }
+
+            foreach ($compensationPlan['allocations'] as $allocation) {
+                $penerimaan->supplierCompensationAllocations()->create($allocation);
             }
 
             $creator = Auth::user();
@@ -220,7 +231,10 @@ class PenerimaanController extends Controller
         $request->validate($this->rules($id));
 
         return DB::transaction(function () use ($request, $id) {
-            $penerimaan = $this->penerimaanQueryForBranch(['details'])->findOrFail($id);
+            $penerimaan = $this->penerimaanQueryForBranch([
+                'details',
+                'supplierCompensationAllocations',
+            ])->findOrFail($id);
 
             if ($penerimaan->status !== 'draft') {
                 throw ValidationException::withMessages([
@@ -230,15 +244,26 @@ class PenerimaanController extends Controller
 
             $po = $this->approvedPo($request->purchase_order_id);
             $computed = $this->buildComputedDetails($request, $po, $penerimaan->id);
+            $compensationPlan = $this->buildSupplierCompensationPlan($request, $po, $computed);
 
-            $payload = $this->headerPayload($request, $po, $computed);
+            $payload = $this->headerPayload(
+                $request,
+                $po,
+                $computed,
+                $compensationPlan['total']
+            );
             unset($payload['created_by']);
 
             $penerimaan->update($payload);
             $penerimaan->details()->delete();
+            $penerimaan->supplierCompensationAllocations()->delete();
 
             foreach ($computed['details'] as $detail) {
                 $penerimaan->details()->create($detail);
+            }
+
+            foreach ($compensationPlan['allocations'] as $allocation) {
+                $penerimaan->supplierCompensationAllocations()->create($allocation);
             }
 
             return response()->json([
@@ -265,6 +290,7 @@ class PenerimaanController extends Controller
                 'details.obat.mainGolongan',
                 'details.obat.subGolongan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
+                'supplierCompensationAllocations.returPembelian.compensations',
             ])->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status !== 'draft') {
@@ -273,6 +299,8 @@ class PenerimaanController extends Controller
                     'message' => 'Hanya draft penerimaan yang bisa diposting.',
                 ], 422);
             }
+
+            $this->finalizeSupplierCompensationDiscount($penerimaan);
 
             $sellingPricesByDetailId = $this->sellingPriceRowsByDetailId($penerimaan);
 
@@ -298,7 +326,9 @@ class PenerimaanController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.',
+                'message' => (float) $penerimaan->supplier_compensation_discount > 0
+                    ? 'Penerimaan berhasil diposting, stok diperbarui, dan potongan ganti rugi supplier direalisasikan.'
+                    : 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.',
                 'selling_prices' => $sellingPrices,
             ]);
         });
@@ -314,7 +344,10 @@ class PenerimaanController extends Controller
         }
 
         return DB::transaction(function () use ($id) {
-            $penerimaan = $this->penerimaanQueryForBranch(['details.obat'])->lockForUpdate()->findOrFail($id);
+            $penerimaan = $this->penerimaanQueryForBranch([
+                'details.obat',
+                'supplierCompensationAllocations.compensation',
+            ])->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status === 'cancelled') {
                 return response()->json([
@@ -327,6 +360,8 @@ class PenerimaanController extends Controller
                 foreach ($penerimaan->details as $detail) {
                     $this->stockService->reverseReceipt($penerimaan, $detail);
                 }
+
+                $this->reverseSupplierCompensationDiscount($penerimaan);
             }
 
             $penerimaan->update([
@@ -389,6 +424,7 @@ class PenerimaanController extends Controller
             'status_pembayaran' => ['nullable', 'in:belum_dibayar,sebagian,lunas'],
             'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],
             'sisa_hutang' => ['nullable', 'numeric', 'min:0'],
+            'supplier_compensation_discount' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string'],
             'purchase_order_detail_id' => ['required', 'array'],
             'purchase_order_detail_id.*' => ['required', 'integer', 'exists:purchase_order_details,id'],
@@ -542,13 +578,170 @@ class PenerimaanController extends Controller
         return ['details' => $rows] + $summary;
     }
 
-    private function headerPayload(Request $request, PembelianModel $po, array $computed): array
+    private function buildSupplierCompensationPlan(
+        Request $request,
+        PembelianModel $po,
+        array $computed
+    ): array {
+        $requestedDiscount = $this->moneyValue($request->supplier_compensation_discount);
+
+        if ($requestedDiscount <= 0) {
+            return ['total' => 0, 'allocations' => []];
+        }
+
+        $grossTotalFaktur = max(
+            0,
+            (float) $computed['subtotal']
+                - (float) $computed['total_diskon']
+                + (float) $computed['total_ppn']
+                + $this->moneyValue($request->biaya_lain)
+        );
+
+        if ($requestedDiscount > $grossTotalFaktur + 0.009) {
+            throw ValidationException::withMessages([
+                'supplier_compensation_discount' => 'Potongan ganti rugi tidak boleh melebihi total tagihan sebelum potongan.',
+            ]);
+        }
+
+        $openReturns = $this->openSupplierCompensationReturns((int) $po->distributor_id);
+        $available = round((float) $openReturns->sum('compensation_outstanding_value'), 2);
+
+        if ($requestedDiscount > $available + 0.009) {
+            throw ValidationException::withMessages([
+                'supplier_compensation_discount' => 'Potongan melebihi saldo ganti rugi supplier sebesar Rp '.number_format($available, 0, ',', '.').'.',
+            ]);
+        }
+
+        $remaining = $requestedDiscount;
+        $allocations = [];
+
+        foreach ($openReturns as $retur) {
+            if ($remaining <= 0.009) {
+                break;
+            }
+
+            $nominal = min($remaining, (float) $retur->compensation_outstanding_value);
+
+            if ($nominal <= 0) {
+                continue;
+            }
+
+            $allocations[] = [
+                'retur_pembelian_id' => $retur->id,
+                'nominal' => round($nominal, 2),
+            ];
+            $remaining = round($remaining - $nominal, 2);
+        }
+
+        if ($remaining > 0.009) {
+            throw ValidationException::withMessages([
+                'supplier_compensation_discount' => 'Saldo ganti rugi supplier berubah. Muat ulang PO dan periksa kembali nominal potongan.',
+            ]);
+        }
+
+        return [
+            'total' => $requestedDiscount,
+            'allocations' => $allocations,
+        ];
+    }
+
+    private function finalizeSupplierCompensationDiscount(PenerimaanBarangModel $penerimaan): void
     {
+        $discount = (float) $penerimaan->supplier_compensation_discount;
+
+        if ($discount <= 0) {
+            return;
+        }
+
+        $allocations = $penerimaan->supplierCompensationAllocations
+            ->sortBy('retur_pembelian_id')
+            ->values();
+        $allocatedTotal = round((float) $allocations->sum('nominal'), 2);
+
+        if (abs($allocatedTotal - $discount) > 0.009) {
+            throw ValidationException::withMessages([
+                'supplier_compensation_discount' => 'Alokasi potongan ganti rugi tidak sesuai dengan total potongan penerimaan.',
+            ]);
+        }
+
+        $branchIds = BranchAccess::userBranchIds();
+
+        foreach ($allocations as $allocation) {
+            $retur = ReturPembelianModel::with('compensations')
+                ->where('id', $allocation->retur_pembelian_id)
+                ->where('distributor_id', $penerimaan->distributor_id)
+                ->where('status', 'posted')
+                ->where('expects_compensation', true)
+                ->whereHas('purchaseOrder', function ($query) use ($branchIds) {
+                    $this->scopePurchaseOrderBranch($query, $branchIds);
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if (! $retur) {
+                throw ValidationException::withMessages([
+                    'supplier_compensation_discount' => 'Retur sumber potongan tidak lagi tersedia atau tidak dapat diakses.',
+                ]);
+            }
+
+            $nominal = (float) $allocation->nominal;
+
+            if ($nominal > $retur->compensation_outstanding_value + 0.009) {
+                throw ValidationException::withMessages([
+                    'supplier_compensation_discount' => 'Saldo ganti rugi '.$retur->nomor_retur.' berubah. Perbarui draft penerimaan sebelum posting.',
+                ]);
+            }
+
+            $compensation = $retur->compensations()->create([
+                'penerimaan_barang_id' => $penerimaan->id,
+                'tanggal_realisasi' => optional($penerimaan->tanggal_faktur ?: $penerimaan->tanggal_penerimaan)->format('Y-m-d'),
+                'jenis' => 'potongan_faktur',
+                'nominal' => $nominal,
+                'nomor_referensi' => $penerimaan->nomor_penerimaan,
+                'nomor_faktur' => $penerimaan->nomor_faktur,
+                'keterangan' => 'Potongan langsung pada faktur penerimaan '.$penerimaan->nomor_penerimaan.'.',
+                'created_by' => Auth::id(),
+            ]);
+
+            $allocation->update([
+                'retur_pembelian_compensation_id' => $compensation->id,
+            ]);
+        }
+    }
+
+    private function reverseSupplierCompensationDiscount(PenerimaanBarangModel $penerimaan): void
+    {
+        foreach ($penerimaan->supplierCompensationAllocations as $allocation) {
+            $compensation = $allocation->compensation;
+
+            if (! $compensation || $compensation->cancelled_at) {
+                continue;
+            }
+
+            $compensation->update([
+                'cancelled_by' => Auth::id(),
+                'cancelled_at' => now(),
+                'cancellation_reason' => 'Dibatalkan otomatis karena penerimaan '.$penerimaan->nomor_penerimaan.' dibatalkan.',
+            ]);
+        }
+    }
+
+    private function headerPayload(
+        Request $request,
+        PembelianModel $po,
+        array $computed,
+        float $supplierCompensationDiscount = 0
+    ): array {
         $subtotal = (float) $computed['subtotal'];
         $diskon = (float) $computed['total_diskon'];
         $pajak = (float) $computed['total_ppn'];
         $biayaLain = $this->moneyValue($request->biaya_lain);
-        $totalFaktur = max(0, $subtotal - $diskon + $pajak + $biayaLain);
+        $grossTotalFaktur = max(0, $subtotal - $diskon + $pajak + $biayaLain);
+        $supplierCompensationDiscount = min(
+            $this->moneyValue($supplierCompensationDiscount),
+            $grossTotalFaktur
+        );
+        $totalFaktur = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
         $jumlahDibayar = min($this->moneyValue($request->jumlah_dibayar), $totalFaktur);
         $sisaHutang = max(0, $totalFaktur - $jumlahDibayar);
 
@@ -570,6 +763,7 @@ class PenerimaanController extends Controller
             'diskon' => $diskon,
             'pajak' => $pajak,
             'biaya_lain' => $biayaLain,
+            'supplier_compensation_discount' => $supplierCompensationDiscount,
             'total_faktur' => $totalFaktur,
             'status_pembayaran' => $this->paymentStatus($totalFaktur, $jumlahDibayar),
             'jumlah_dibayar' => $jumlahDibayar,
@@ -661,8 +855,78 @@ class PenerimaanController extends Controller
             'tanggal_po' => $po->tanggal_po,
             'total_estimasi' => $po->total_estimasi,
             'catatan' => $po->catatan,
+            'supplier_compensation_alert' => $this->supplierCompensationAlert((int) $po->distributor_id),
             'details' => $details,
         ];
+    }
+
+    private function supplierCompensationAlert(int $distributorId): array
+    {
+        $branchIds = BranchAccess::userBranchIds();
+
+        if ($distributorId <= 0 || empty($branchIds)) {
+            return [
+                'has_outstanding' => false,
+                'return_count' => 0,
+                'overdue_count' => 0,
+                'outstanding_value' => 0,
+                'returns' => [],
+            ];
+        }
+
+        $sortedReturns = $this->openSupplierCompensationReturns($distributorId, $branchIds);
+
+        return [
+            'has_outstanding' => $sortedReturns->isNotEmpty(),
+            'return_count' => $sortedReturns->count(),
+            'overdue_count' => $sortedReturns->where('compensation_status', 'overdue')->count(),
+            'outstanding_value' => round((float) $sortedReturns->sum('compensation_outstanding_value'), 2),
+            'returns' => $sortedReturns
+                ->take(10)
+                ->map(fn (ReturPembelianModel $retur) => [
+                    'id' => $retur->id,
+                    'nomor_retur' => $retur->nomor_retur,
+                    'tanggal_retur' => optional($retur->tanggal_retur)->format('Y-m-d'),
+                    'due_date' => optional($retur->compensation_due_date)->format('Y-m-d'),
+                    'expected_value' => $retur->compensation_expected_value,
+                    'received_value' => $retur->compensation_received_value,
+                    'outstanding_value' => $retur->compensation_outstanding_value,
+                    'status' => $retur->compensation_status,
+                    'branch' => $retur->purchaseOrder?->branch?->name ?? '-',
+                    'notes' => $retur->compensation_notes,
+                ])
+                ->all(),
+        ];
+    }
+
+    private function openSupplierCompensationReturns(int $distributorId, ?array $branchIds = null)
+    {
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
+
+        if ($distributorId <= 0 || empty($branchIds)) {
+            return collect();
+        }
+
+        return ReturPembelianModel::with(['compensations', 'purchaseOrder.branch'])
+            ->where('distributor_id', $distributorId)
+            ->where('status', 'posted')
+            ->where('expects_compensation', true)
+            ->whereHas('purchaseOrder', function ($query) use ($branchIds) {
+                $this->scopePurchaseOrderBranch($query, $branchIds);
+            })
+            ->get()
+            ->filter(fn (ReturPembelianModel $retur) => in_array(
+                $retur->compensation_status,
+                ['waiting', 'partial', 'overdue'],
+                true
+            ))
+            ->sortBy(fn (ReturPembelianModel $retur) => implode('-', [
+                $retur->compensation_status === 'overdue' ? '0' : '1',
+                optional($retur->compensation_due_date)->format('Ymd') ?: '99999999',
+                optional($retur->tanggal_retur)->format('Ymd') ?: '99999999',
+                str_pad((string) $retur->id, 20, '0', STR_PAD_LEFT),
+            ]))
+            ->values();
     }
 
     private function receivedQtyForPoDetail($poDetailId, ?int $ignorePenerimaanId = null): float
@@ -767,7 +1031,11 @@ class PenerimaanController extends Controller
 
     private function paymentStatus(float $totalFaktur, float $jumlahDibayar): string
     {
-        if ($totalFaktur <= 0 || $jumlahDibayar <= 0) {
+        if ($totalFaktur <= 0) {
+            return 'lunas';
+        }
+
+        if ($jumlahDibayar <= 0) {
             return 'belum_dibayar';
         }
 

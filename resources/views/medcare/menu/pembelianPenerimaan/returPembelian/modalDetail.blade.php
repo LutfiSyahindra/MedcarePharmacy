@@ -84,6 +84,28 @@
                 <section class="purchase-form-section">
                     <div class="purchase-form-section-header">
                         <div class="purchase-form-section-title">
+                            <i class="mdi mdi-hand-coin-outline"></i>
+                            <div>
+                                <strong>Ganti Rugi Supplier</strong>
+                                <small>Status ini terpisah dari status posting retur.</small>
+                            </div>
+                        </div>
+                        <span class="compensation-status is-waiting" id="detailCompensationStatus">Menunggu</span>
+                    </div>
+                    <div class="purchase-form-section-body">
+                        <div class="compensation-summary-grid">
+                            <div><span>Nilai yang Ditagihkan</span><strong id="detailCompensationExpected">Rp 0</strong></div>
+                            <div><span>Sudah Direalisasikan</span><strong id="detailCompensationReceived">Rp 0</strong></div>
+                            <div><span>Sisa yang Belum Diganti</span><strong id="detailCompensationOutstanding">Rp 0</strong></div>
+                            <div><span>Batas Waktu</span><strong id="detailCompensationDueDate">-</strong></div>
+                        </div>
+                        <p class="compensation-note mb-0 mt-3" id="detailCompensationNotes">-</p>
+                    </div>
+                </section>
+
+                <section class="purchase-form-section">
+                    <div class="purchase-form-section-header">
+                        <div class="purchase-form-section-title">
                             <i class="mdi mdi-pill-multiple"></i>
                             <div>
                                 <strong>Detail Barang</strong>

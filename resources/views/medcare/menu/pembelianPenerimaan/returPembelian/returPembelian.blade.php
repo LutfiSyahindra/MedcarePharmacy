@@ -14,6 +14,7 @@
     <div class="purchase-page">
         @include("medcare.menu.pembelianPenerimaan.returPembelian.modalMain")
         @include("medcare.menu.pembelianPenerimaan.returPembelian.modalDetail")
+        @include("medcare.menu.pembelianPenerimaan.returPembelian.modalCompensation")
 
         <nav class="page-breadcrumb">
             <ol class="breadcrumb">
@@ -68,6 +69,14 @@
                     </div>
                     <i class="mdi mdi-check-circle-outline purchase-flow-arrow"></i>
                 </div>
+                <div class="purchase-flow-item">
+                    <span class="purchase-flow-icon"><i class="mdi mdi-hand-coin-outline"></i></span>
+                    <div>
+                        <strong>4. Pantau Ganti Rugi</strong>
+                        <small>Retur tetap terbuka sampai penggantian supplier lengkap.</small>
+                    </div>
+                    <i class="mdi mdi-shield-check-outline purchase-flow-arrow"></i>
+                </div>
             </div>
         </section>
 
@@ -80,7 +89,8 @@
                     <small>Semua dokumen retur.</small>
                 </div>
             </article>
-            <article class="purchase-stat is-draft">
+            <article class="purchase-stat is-draft is-clickable" id="openOutstandingCompensations" role="button"
+                tabindex="0" title="Tampilkan seluruh retur yang belum diganti, lintas periode">
                 <span class="purchase-stat-icon"><i class="mdi mdi-file-clock-outline"></i></span>
                 <div class="purchase-stat-copy">
                     <strong id="returnDraftCount">0</strong>
@@ -102,6 +112,22 @@
                     <strong id="returnTotalValue">Rp 0</strong>
                     <span>Total Nilai</span>
                     <small>Akumulasi nilai retur aktif.</small>
+                </div>
+            </article>
+            <article class="purchase-stat is-draft">
+                <span class="purchase-stat-icon"><i class="mdi mdi-clock-alert-outline"></i></span>
+                <div class="purchase-stat-copy">
+                    <strong id="returnCompensationWaiting">0</strong>
+                    <span>Belum Diganti</span>
+                    <small>Menunggu atau baru diganti sebagian.</small>
+                </div>
+            </article>
+            <article class="purchase-stat is-value">
+                <span class="purchase-stat-icon"><i class="mdi mdi-cash-clock"></i></span>
+                <div class="purchase-stat-copy">
+                    <strong id="returnCompensationOutstanding">Rp 0</strong>
+                    <span>Sisa Ganti Rugi</span>
+                    <small><span id="returnCompensationOverdue">0</span> retur melewati batas waktu.</small>
                 </div>
             </article>
         </div>
@@ -158,6 +184,22 @@
                         Cancelled <span class="purchase-filter-count" id="returnCancelledFilterCount">0</span>
                     </button>
                 </div>
+                <div class="purchase-filter-group compensation-filter-group" aria-label="Filter ganti rugi supplier">
+                    <span class="purchase-filter-label">
+                        <i class="mdi mdi-hand-coin-outline"></i>
+                        Ganti Rugi
+                    </span>
+                    <button type="button" class="purchase-filter-chip compensation-filter-chip is-active"
+                        data-compensation="" aria-pressed="true">Semua</button>
+                    <button type="button" class="purchase-filter-chip compensation-filter-chip"
+                        data-compensation="open" aria-pressed="false">Belum Diganti</button>
+                    <button type="button" class="purchase-filter-chip compensation-filter-chip"
+                        data-compensation="overdue" aria-pressed="false">Jatuh Tempo</button>
+                    <button type="button" class="purchase-filter-chip compensation-filter-chip"
+                        data-compensation="settled" aria-pressed="false">Sudah Diganti</button>
+                    <button type="button" class="purchase-filter-chip compensation-filter-chip"
+                        data-compensation="not_required" aria-pressed="false">Tidak Ditagihkan</button>
+                </div>
                 <div class="purchase-filter-controls">
                     <div class="purchase-date-filter">
                         <label for="returnDateRange">
@@ -202,6 +244,7 @@
                             <th>Tanggal</th>
                             <th>Item / Qty</th>
                             <th>Grand Total</th>
+                            <th>Ganti Rugi Supplier</th>
                             <th>User</th>
                             <th>Actions</th>
                         </tr>

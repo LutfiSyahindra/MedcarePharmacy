@@ -5,6 +5,7 @@
         let returnDateStart = moment().startOf('month').format('YYYY-MM-DD');
         let returnDateEnd = moment().endOf('month').format('YYYY-MM-DD');
         let returnDatePicker = null;
+        let compensationFilter = '';
 
         $.ajaxSetup({
             headers: {
@@ -92,18 +93,60 @@
             `;
         }
 
+        function compensationStatusMeta(status) {
+            const statuses = {
+                not_required: { className: 'is-neutral', label: 'Tidak ditagihkan', icon: 'mdi-minus-circle-outline' },
+                not_started: { className: 'is-neutral', label: 'Belum diposting', icon: 'mdi-file-clock-outline' },
+                waiting: { className: 'is-waiting', label: 'Menunggu', icon: 'mdi-clock-alert-outline' },
+                partial: { className: 'is-partial', label: 'Diganti sebagian', icon: 'mdi-progress-clock' },
+                settled: { className: 'is-settled', label: 'Sudah diganti', icon: 'mdi-shield-check-outline' },
+                overdue: { className: 'is-overdue', label: 'Jatuh tempo', icon: 'mdi-alert-circle-outline' },
+                cancelled: { className: 'is-neutral', label: 'Retur batal', icon: 'mdi-cancel' }
+            };
+
+            return statuses[String(status || '').toLowerCase()] || statuses.waiting;
+        }
+
+        function compensationStatusBadge(status, outstandingValue = 0) {
+            let meta = compensationStatusMeta(status);
+            let outstanding = Number(outstandingValue || 0);
+            let value = outstanding > 0
+                ? `<small>${formatRupiah(outstanding)} tersisa</small>`
+                : '';
+
+            return `
+                <span class="compensation-status ${meta.className}">
+                    <span><i class="mdi ${meta.icon}"></i> ${meta.label}</span>
+                    ${value}
+                </span>
+            `;
+        }
+
         function conversionText(qty, conversion, purchaseUnit, stockUnit) {
             let stockQty = (Number(qty) || 0) * (Number(conversion) || 1);
             return `${formatDecimal(qty, 0, 2)} ${purchaseUnit || 'satuan'} = ${formatDecimal(stockQty, 0, 2)} ${stockUnit || 'satuan stok'}`;
         }
 
-        function itemMaxReturnQty(item, existingQty = 0) {
-            let conversion = Number(item.konversi || 1) || 1;
-            let returnableQty = Number(item.returnable_qty || 0);
-            let batchStockAsPurchaseUnit = conversion > 0 ? (Number(item.batch_stock || 0) / conversion) : 0;
-            let maxQty = Math.min(returnableQty, batchStockAsPurchaseUnit);
+        function itemMaxReturnQty(item, conversion, existingQty = 0) {
+            conversion = Number(conversion || 1) || 1;
+            let returnableStock = Number(item.returnable_qty_stok || 0);
+            let availableStock = Math.min(returnableStock, Number(item.batch_stock || 0));
+            let maxQty = conversion > 0 ? Math.floor((availableStock / conversion) * 100) / 100 : 0;
 
             return Math.max(0, maxQty, Number(existingQty || 0));
+        }
+
+        function itemReturnUnits(item) {
+            if (Array.isArray(item.units) && item.units.length) {
+                return item.units;
+            }
+
+            return [{
+                satuan_id: item.purchase_satuan_id,
+                nama: item.satuan || 'satuan',
+                konversi: Number(item.konversi || 1) || 1,
+                is_purchase: true
+            }];
         }
 
         function setReturnDate(value) {
@@ -124,6 +167,9 @@
             $('#retur_pembelian_id').val('');
             $('#penerimaan_barang_id').val('').trigger('change.select2');
             $('#return_supplier, #return_no_po, #return_nomor_faktur').val('');
+            $('#expects_compensation').val('1').trigger('change');
+            $('#compensation_due_date').val('');
+            $('input[name="compensation_notes"]').val('');
             $('#returnReceiptSummary').addClass('d-none');
             $('#returnDetailRows').empty();
             $('#returnDetailEditor').addClass('d-none');
@@ -157,6 +203,24 @@
 
         $('#openReturModal, #openReturModalToolbar').on('click', function() {
             editMode = false;
+        });
+
+        function syncCompensationPlanFields(select) {
+            let expects = String($(select).val()) === '1';
+            let scope = $(select).closest('form, .modal-body');
+            scope.find('.compensation-plan-field input').prop('disabled', !expects);
+
+            if ($(select).attr('id') === 'expects_compensation') {
+                $('#compensationPlanHint')
+                    .toggleClass('is-neutral', !expects)
+                    .html(expects
+                        ? '<i class="mdi mdi-shield-alert-outline"></i><span>Setelah retur diposting, status akan tetap <strong>Menunggu</strong> sampai realisasi supplier dicatat penuh.</span>'
+                        : '<i class="mdi mdi-information-outline"></i><span>Retur akan ditandai <strong>Tidak ditagihkan</strong> dan tidak masuk daftar kewajiban supplier.</span>');
+            }
+        }
+
+        $('#expects_compensation, #planExpectsCompensation').on('change', function() {
+            syncCompensationPlanFields(this);
         });
 
         function loadPostedReceipts(selectedId, selectedText) {
@@ -205,20 +269,43 @@
 
         function detailRowTemplate(item, existing = null) {
             let existingQty = Number(existing?.qty_retur || 0);
-            let maxQty = itemMaxReturnQty(item, existingQty);
             let qtyValue = existing ? existingQty : 0;
-            let conversion = Number(item.konversi || existing?.konversi_satuan || 1) || 1;
+            let units = itemReturnUnits(item);
+            let selectedUnit = units.find(unit => String(unit.satuan_id) === String(existing?.satuan_retur_id));
+
+            if (!selectedUnit && existing) {
+                selectedUnit = units.find(unit =>
+                    String(unit.nama || '').toLowerCase() === String(existing.satuan_beli || '').toLowerCase() &&
+                    Number(unit.konversi || 1) === Number(existing.konversi_satuan || 1)
+                );
+            }
+
+            selectedUnit = selectedUnit || units.find(unit => unit.is_purchase) || units[0];
+
+            let conversion = Number(selectedUnit?.konversi || item.konversi || 1) || 1;
             let stockUnit = item.satuan_stok || existing?.satuan_stok || 'satuan stok';
-            let purchaseUnit = item.satuan || existing?.satuan_beli || 'satuan';
-            let price = Number(item.harga_beli || existing?.harga_beli || 0);
+            let purchaseUnit = item.satuan || 'satuan';
+            let returnUnit = selectedUnit?.nama || existing?.satuan_beli || purchaseUnit;
+            let purchaseConversion = Number(item.konversi || 1) || 1;
+            let priceStock = Number(item.harga_beli_stok || 0) || (Number(item.harga_beli || 0) / purchaseConversion);
+            let price = priceStock * conversion;
             let diskon = Number(item.diskon || existing?.diskon || 0);
             let ppn = Number(item.ppn || existing?.ppn || 0);
             let alasan = existing?.alasan_item || '';
             let batchStock = Number(item.batch_stock || 0);
+            let maxQty = itemMaxReturnQty(item, conversion, existingQty);
+            let unitOptions = units.map(function(unit) {
+                let unitConversion = Number(unit.konversi || 1) || 1;
+                let conversionLabel = unitConversion === 1 ? '' : ` (${formatDecimal(unitConversion, 0, 2)} ${escapeHtml(stockUnit)})`;
+                let selected = String(unit.satuan_id) === String(selectedUnit?.satuan_id) ? ' selected' : '';
+
+                return `<option value="${unit.satuan_id}" data-konversi="${unitConversion}" data-satuan="${escapeHtml(unit.nama)}"${selected}>${escapeHtml(unit.nama)}${conversionLabel}</option>`;
+            }).join('');
 
             return `
                 <tr class="return-detail-row" data-max="${maxQty}" data-price="${price}" data-diskon="${diskon}" data-ppn="${ppn}"
-                    data-konversi="${conversion}" data-satuan="${escapeHtml(purchaseUnit)}" data-satuan-stok="${escapeHtml(stockUnit)}">
+                    data-price-stock="${priceStock}" data-returnable-stock="${Number(item.returnable_qty_stok || 0)}" data-batch-stock="${batchStock}"
+                    data-konversi="${conversion}" data-satuan="${escapeHtml(returnUnit)}" data-satuan-stok="${escapeHtml(stockUnit)}">
                     <td>
                         <input type="hidden" name="penerimaan_barang_detail_id[]" value="${item.id}">
                         <strong>${escapeHtml(item.nama_obat)}</strong>
@@ -238,17 +325,20 @@
                     </td>
                     <td>
                         <strong>${formatDecimal(batchStock, 0, 2)} ${escapeHtml(stockUnit)}</strong>
-                        <small class="d-block text-muted">Max ${formatDecimal(maxQty, 0, 2)} ${escapeHtml(purchaseUnit)}</small>
+                        <small class="d-block text-muted return-max-hint">Max ${formatDecimal(maxQty, 0, 2)} ${escapeHtml(returnUnit)}</small>
                     </td>
                     <td>
-                        <div class="receive-qty-control">
+                        <div class="return-qty-control">
                             <input type="number" class="form-control form-control-sm return-qty" name="qty_retur[]"
                                 min="0" max="${maxQty}" step="0.01" value="${qtyValue}">
+                            <select class="form-select form-select-sm return-unit" name="satuan_retur_id[]" aria-label="Satuan retur ${escapeHtml(item.nama_obat)}">
+                                ${unitOptions}
+                            </select>
                             <button type="button" class="btn btn-sm btn-light return-fill-max" title="Isi sisa retur">
                                 Max
                             </button>
                         </div>
-                        <small class="d-block text-muted return-conversion-hint">${conversionText(qtyValue, conversion, purchaseUnit, stockUnit)}</small>
+                        <small class="d-block text-muted return-conversion-hint">${conversionText(qtyValue, conversion, returnUnit, stockUnit)}</small>
                     </td>
                     <td>
                         <input type="text" class="form-control form-control-sm" name="alasan_item[]"
@@ -363,6 +453,25 @@
 
         $('#returnDetailRows').on('input', '.return-qty', updateReturnTotals);
 
+        $('#returnDetailRows').on('change', '.return-unit', function() {
+            let select = $(this);
+            let row = select.closest('.return-detail-row');
+            let option = select.find('option:selected');
+            let conversion = Number(option.data('konversi')) || 1;
+            let returnUnit = option.data('satuan') || 'satuan';
+            let availableStock = Math.min(Number(row.data('returnable-stock')) || 0, Number(row.data('batch-stock')) || 0);
+            let maxQty = conversion > 0 ? Math.floor((availableStock / conversion) * 100) / 100 : 0;
+            let price = (Number(row.data('price-stock')) || 0) * conversion;
+
+            row.data('konversi', conversion);
+            row.data('satuan', returnUnit);
+            row.data('max', maxQty);
+            row.data('price', price);
+            row.find('.return-qty').attr('max', maxQty);
+            row.find('.return-max-hint').text(`Max ${formatDecimal(maxQty, 0, 2)} ${returnUnit}`);
+            updateReturnTotals();
+        });
+
         $('#returnDetailRows').on('click', '.return-fill-max', function() {
             let row = $(this).closest('.return-detail-row');
             row.find('.return-qty').val(Number(row.data('max')) || 0).trigger('input');
@@ -386,6 +495,9 @@
             $('#returnPostedCount, #returnPostedFilterCount').text(Number(summary.posted || 0).toLocaleString('id-ID'));
             $('#returnCancelledFilterCount').text(Number(summary.cancelled || 0).toLocaleString('id-ID'));
             $('#returnTotalValue').text(formatRupiah(summary.grand_total || 0));
+            $('#returnCompensationWaiting').text(Number(summary.compensation_waiting || 0).toLocaleString('id-ID'));
+            $('#returnCompensationOverdue').text(Number(summary.compensation_overdue || 0).toLocaleString('id-ID'));
+            $('#returnCompensationOutstanding').text(formatRupiah(summary.compensation_outstanding || 0));
         }
 
         function initReturnActionTooltips() {
@@ -408,6 +520,7 @@
                 data: function(data) {
                     data.date_start = returnDateStart;
                     data.date_end = returnDateEnd;
+                    data.compensation_filter = compensationFilter;
                 },
                 dataSrc: function(json) {
                     updateReturnSummary(json.summary || {});
@@ -468,6 +581,14 @@
                     render: data => formatRupiah(data)
                 },
                 {
+                    data: 'compensation_status',
+                    name: 'compensation_status',
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+                        return compensationStatusBadge(data, row.compensation_outstanding_value);
+                    }
+                },
+                {
                     data: 'user',
                     name: 'user'
                 },
@@ -514,10 +635,38 @@
             $('#searchReturPembelian').val('').trigger('input').focus();
         });
 
-        $('.purchase-filter-chip').on('click', function() {
-            $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
+        $('.purchase-filter-group:not(.compensation-filter-group) .purchase-filter-chip').on('click', function() {
+            $('.purchase-filter-group:not(.compensation-filter-group) .purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
             $(this).addClass('is-active').attr('aria-pressed', 'true');
             ReturPembelianTable.column(1).search($(this).data('status') || '').draw();
+        });
+
+        function selectCompensationFilter(value) {
+            compensationFilter = value || '';
+            $('.compensation-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
+            $(`.compensation-filter-chip[data-compensation="${compensationFilter}"]`)
+                .addClass('is-active')
+                .attr('aria-pressed', 'true');
+
+            if (compensationFilter === 'open' || compensationFilter === 'overdue') {
+                returnDateStart = '';
+                returnDateEnd = '';
+                returnDatePicker?.clear();
+                $('#returnDateRange').closest('.purchase-date-input').removeClass('has-value');
+            }
+
+            ReturPembelianTable.ajax.reload();
+        }
+
+        $('.compensation-filter-chip').on('click', function() {
+            selectCompensationFilter($(this).data('compensation'));
+        });
+
+        $('#openOutstandingCompensations').on('click keydown', function(event) {
+            if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectCompensationFilter('open');
+            document.getElementById('returnTableSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
         function formatDateParameter(date) {
@@ -630,6 +779,9 @@
                     setReturnDate(formatDateDisplay(header.tanggal_retur));
                     $('textarea[name="alasan"]').val(header.alasan || '');
                     $('textarea[name="catatan"]').val(header.catatan || '');
+                    $('#expects_compensation').val(header.expects_compensation ? '1' : '0').trigger('change');
+                    $('#compensation_due_date').val(header.compensation_due_date ? moment(header.compensation_due_date).format('YYYY-MM-DD') : '');
+                    $('input[name="compensation_notes"]').val(header.compensation_notes || '');
 
                     loadPostedReceipts(header.penerimaan_barang_id, `${penerimaan.nomor_penerimaan} - ${penerimaan.no_po}`).then(function() {
                         renderReceiptSummary(penerimaan);
@@ -664,6 +816,8 @@
                 $('#detailReturnNote').val(header.catatan || '-');
                 $('#detailReturnGrandTotal').text(formatRupiah(header.grand_total));
 
+                renderDetailCompensation(response.compensation || {});
+
                 $('#detailReturnTable tbody').empty();
                 (header.details || []).forEach(function(item) {
                     let conversion = Number(item.konversi_satuan || item.purchase_order_detail?.satuan_konversi?.konversi || 1) || 1;
@@ -693,6 +847,198 @@
                 });
 
                 $('#returPembelianModalDetail').modal('show');
+            });
+        };
+
+        function renderDetailCompensation(compensation) {
+            let meta = compensationStatusMeta(compensation.status);
+            $('#detailCompensationStatus')
+                .attr('class', `compensation-status ${meta.className}`)
+                .html(`<span><i class="mdi ${meta.icon}"></i> ${meta.label}</span>`);
+            $('#detailCompensationExpected').text(formatRupiah(compensation.expected_value));
+            $('#detailCompensationReceived').text(formatRupiah(compensation.received_value));
+            $('#detailCompensationOutstanding').text(formatRupiah(compensation.outstanding_value));
+            $('#detailCompensationDueDate').text(compensation.due_date ? formatDateDisplay(compensation.due_date) : '-');
+            $('#detailCompensationNotes').text(compensation.notes || 'Tidak ada catatan kesepakatan.');
+        }
+
+        function compensationTypeLabel(type) {
+            return {
+                barang_pengganti: 'Barang pengganti',
+                potongan_faktur: 'Potongan faktur',
+                refund_tunai: 'Refund tunai',
+                transfer_bank: 'Transfer bank',
+                nota_kredit: 'Nota kredit',
+                lainnya: 'Lainnya'
+            }[type] || type || '-';
+        }
+
+        function renderCompensationModal(header, compensation) {
+            let meta = compensationStatusMeta(compensation.status);
+            $('#compensationReturnId').val(header.id);
+            $('#compensationDocumentLabel').text(`${header.nomor_retur} · ${header.distributor?.nama || '-'}`);
+            $('#compensationModalStatus')
+                .attr('class', `compensation-status ${meta.className}`)
+                .html(`<span><i class="mdi ${meta.icon}"></i> ${meta.label}</span>`);
+            $('#compensationExpectedValue').text(formatRupiah(compensation.expected_value));
+            $('#compensationReceivedValue').text(formatRupiah(compensation.received_value));
+            $('#compensationOutstandingValue').text(formatRupiah(compensation.outstanding_value));
+            $('#compensationDueDateLabel').text(compensation.due_date ? formatDateDisplay(compensation.due_date) : '-');
+            $('#planExpectsCompensation').val(compensation.expects_compensation ? '1' : '0').trigger('change');
+            $('#planCompensationDueDate').val(compensation.due_date || '');
+            $('#planCompensationNotes').val(compensation.notes || '');
+            $('#compensationNominal').attr('max', Number(compensation.outstanding_value || 0)).val('');
+            $('#compensationNominalMax').text(formatRupiah(compensation.outstanding_value));
+            $('#compensationRealizationDate').val(moment().format('YYYY-MM-DD'));
+
+            let canRecord = compensation.expects_compensation && Number(compensation.outstanding_value || 0) > 0;
+            $('#compensationEntryForm :input').prop('disabled', !canRecord);
+            $('#compensationEntrySection').toggleClass('is-disabled-section', !canRecord);
+
+            let entries = compensation.entries || [];
+            $('#compensationHistoryRows').empty();
+
+            entries.forEach(function(entry) {
+                let isCancelled = Boolean(entry.cancelled_at);
+                let isReceiptDiscount = Boolean(entry.penerimaan_barang?.id);
+                let reference = [entry.nomor_referensi, entry.nomor_faktur].filter(Boolean).join(' · ') || '-';
+                let actor = entry.created_by?.name || '-';
+                let cancelCopy = isCancelled
+                    ? `<small class="d-block text-danger">${escapeHtml(entry.cancellation_reason || 'Dibatalkan')}</small>`
+                    : '';
+
+                $('#compensationHistoryRows').append(`
+                    <tr class="${isCancelled ? 'is-cancelled-entry' : ''}">
+                        <td>${formatDateDisplay(entry.tanggal_realisasi)}</td>
+                        <td><strong>${escapeHtml(compensationTypeLabel(entry.jenis))}</strong>${entry.keterangan ? `<small class="d-block text-muted">${escapeHtml(entry.keterangan)}</small>` : ''}</td>
+                        <td>${escapeHtml(reference)}</td>
+                        <td><strong>${formatRupiah(entry.nominal)}</strong></td>
+                        <td>${escapeHtml(actor)}</td>
+                        <td>${isCancelled ? '<span class="badge bg-danger bg-opacity-10 text-danger">Dibatalkan</span>' : (isReceiptDiscount ? '<span class="badge bg-primary bg-opacity-10 text-primary">Potongan penerimaan</span>' : '<span class="badge bg-success bg-opacity-10 text-success">Aktif</span>')}${cancelCopy}</td>
+                        <td>${isCancelled || isReceiptDiscount ? '' : `<button type="button" class="btn btn-sm btn-outline-danger" onclick="batalkanRealisasiGantiRugi(${header.id}, ${entry.id})" title="Batalkan realisasi"><i class="mdi mdi-close-circle-outline"></i></button>`}</td>
+                    </tr>
+                `);
+            });
+
+            $('#compensationHistoryEmpty').toggleClass('d-none', entries.length > 0);
+            $('#compensationHistoryWrap').toggleClass('d-none', entries.length === 0);
+        }
+
+        function loadCompensation(id, openModal = false) {
+            return $.get('{{ route("returPembelian.show", ":id") }}'.replace(':id', id), function(response) {
+                renderCompensationModal(response.header, response.compensation || {});
+                if (openModal) $('#returCompensationModal').modal('show');
+            }).fail(function(xhr) {
+                Swal.fire('Gagal memuat ganti rugi', xhr.responseJSON?.message || 'Data ganti rugi supplier tidak bisa dimuat.', 'error');
+            });
+        }
+
+        window.kelolaGantiRugi = function(id) {
+            loadCompensation(id, true);
+        };
+
+        $('#compensationPlanForm').on('submit', function(e) {
+            e.preventDefault();
+            let id = $('#compensationReturnId').val();
+
+            $.ajax({
+                url: '{{ route("returPembelian.updateCompensationPlan", ":id") }}'.replace(':id', id),
+                type: 'PUT',
+                data: $(this).serialize(),
+                success: function(response) {
+                    Swal.fire({ icon: 'success', title: response.message, toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
+                    loadCompensation(id);
+                    ReturPembelianTable.ajax.reload(null, false);
+                },
+                error: function(xhr) {
+                    Swal.fire('Gagal menyimpan rencana', Object.values(xhr.responseJSON?.errors || {})[0]?.[0] || xhr.responseJSON?.message || 'Rencana belum bisa disimpan.', 'error');
+                }
+            });
+        });
+
+        $('#compensationEntryForm').on('submit', function(e) {
+            e.preventDefault();
+            let id = $('#compensationReturnId').val();
+
+            $.ajax({
+                url: '{{ route("returPembelian.storeCompensation", ":id") }}'.replace(':id', id),
+                type: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    Swal.fire({ icon: 'success', title: response.message, toast: true, position: 'top-end', timer: 2500, showConfirmButton: false });
+                    $('#compensationEntryForm')[0].reset();
+                    loadCompensation(id);
+                    ReturPembelianTable.ajax.reload(null, false);
+                },
+                error: function(xhr) {
+                    Swal.fire('Gagal mencatat realisasi', Object.values(xhr.responseJSON?.errors || {})[0]?.[0] || xhr.responseJSON?.message || 'Realisasi belum bisa dicatat.', 'error');
+                }
+            });
+        });
+
+        function toggleCompensationModalFocusTrap(activate) {
+            if (!window.bootstrap || !bootstrap.Modal) return;
+
+            let modalElement = document.getElementById('returCompensationModal');
+            let modalInstance = modalElement ? bootstrap.Modal.getInstance(modalElement) : null;
+            let focusTrap = modalInstance?._focustrap;
+
+            if (!focusTrap) return;
+
+            if (activate && modalElement.classList.contains('show')) {
+                focusTrap.activate();
+                return;
+            }
+
+            focusTrap.deactivate();
+        }
+
+        window.batalkanRealisasiGantiRugi = function(returnId, compensationId) {
+            toggleCompensationModalFocusTrap(false);
+
+            Swal.fire({
+                title: 'Batalkan realisasi ganti rugi?',
+                input: 'textarea',
+                inputLabel: 'Alasan pembatalan',
+                inputPlaceholder: 'Jelaskan alasan koreksi data...',
+                inputValidator: value => !String(value || '').trim() ? 'Alasan pembatalan wajib diisi.' : undefined,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Batalkan realisasi',
+                cancelButtonText: 'Tutup',
+                didOpen: function() {
+                    let input = Swal.getInput();
+                    if (input) {
+                        input.removeAttribute('readonly');
+                        input.removeAttribute('disabled');
+                        input.focus();
+                    }
+                }
+            }).then(function(result) {
+                if (!result.isConfirmed) {
+                    toggleCompensationModalFocusTrap(true);
+                    return;
+                }
+
+                $.ajax({
+                    url: '{{ route("returPembelian.cancelCompensation", [":id", ":compensationId"]) }}'
+                        .replace(':id', returnId)
+                        .replace(':compensationId', compensationId),
+                    type: 'DELETE',
+                    data: { cancellation_reason: String(result.value || '').trim() },
+                    success: function(response) {
+                        loadCompensation(returnId);
+                        ReturPembelianTable.ajax.reload(null, false);
+                        Swal.fire('Berhasil', response.message, 'success').then(function() {
+                            toggleCompensationModalFocusTrap(true);
+                        });
+                    },
+                    error: function(xhr) {
+                        Swal.fire('Gagal', xhr.responseJSON?.message || 'Realisasi belum bisa dibatalkan.', 'error').then(function() {
+                            toggleCompensationModalFocusTrap(true);
+                        });
+                    }
+                });
             });
         };
 
