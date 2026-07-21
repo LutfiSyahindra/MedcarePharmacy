@@ -1,0 +1,668 @@
+:root {
+  --medcare-sidebar-width: 284px;
+  --medcare-sidebar-folded-width: 82px;
+  --medcare-sidebar-ink: #172033;
+  --medcare-sidebar-muted: #718096;
+  --medcare-sidebar-line: #e7edf5;
+  --medcare-sidebar-primary: #2563eb;
+  --medcare-sidebar-cyan: #06b6d4;
+  --medcare-sidebar-mint: #10b981;
+}
+
+.medcare-sidebar {
+  width: var(--medcare-sidebar-width);
+  color: var(--medcare-sidebar-ink);
+  font-family: "Plus Jakarta Sans", "Roboto", sans-serif;
+  filter: drop-shadow(12px 0 28px rgba(45, 69, 104, 0.08));
+  transition: width 0.24s ease, margin 0.24s ease-in-out, visibility 0.24s ease;
+}
+
+.medcare-sidebar::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  content: "";
+  background: linear-gradient(180deg, #b9d5ff 0%, #e3ebf5 20%, #edf2f7 76%, transparent 100%);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.medcare-sidebar .sidebar-header {
+  width: var(--medcare-sidebar-width);
+  height: 78px;
+  padding: 0 17px;
+  gap: 12px;
+  border: 0;
+  border-right: 1px solid var(--medcare-sidebar-line);
+  border-bottom: 1px solid var(--medcare-sidebar-line);
+  background:
+    radial-gradient(circle at 12% -20%, rgba(59, 130, 246, 0.13), transparent 43%),
+    linear-gradient(135deg, #ffffff 0%, #fbfdff 54%, #f5faff 100%);
+  box-shadow: 0 8px 24px rgba(40, 70, 112, 0.045);
+  transition: width 0.24s ease;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 11px;
+  color: var(--medcare-sidebar-ink);
+  text-decoration: none;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand-mark {
+  position: relative;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 15px;
+  background: linear-gradient(145deg, #3b82f6 0%, #20b9e6 52%, #19c89b 100%);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand-mark::after {
+  position: absolute;
+  top: -14px;
+  right: -12px;
+  width: 34px;
+  height: 34px;
+  content: "";
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand-mark.has-official-logo {
+  border-color: #e3ebf5;
+  background: #fff;
+  box-shadow: 0 9px 22px rgba(33, 58, 95, 0.11), 0 0 0 4px rgba(37, 99, 235, 0.045);
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand-mark.has-official-logo::after {
+  display: none;
+}
+
+.medcare-sidebar .sidebar-brand-logo {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  border-radius: 13px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.medcare-sidebar .sidebar-brand-cross,
+.medcare-sidebar .sidebar-brand-cross::after {
+  display: block;
+  width: 21px;
+  height: 6px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(15, 74, 113, 0.15);
+}
+
+.medcare-sidebar .sidebar-brand-cross {
+  position: relative;
+  z-index: 1;
+}
+
+.medcare-sidebar .sidebar-brand-cross::after {
+  content: "";
+  transform: rotate(90deg);
+}
+
+.medcare-sidebar .has-official-logo .sidebar-brand-cross {
+  display: none;
+}
+
+.medcare-sidebar .sidebar-brand-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand .sidebar-brand-name {
+  overflow: hidden;
+  color: #17233a;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.35px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-brand .sidebar-brand-tagline {
+  margin-top: 6px;
+  overflow: hidden;
+  color: #4381de;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-toggler {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid #dce7f4;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 5px 14px rgba(42, 72, 112, 0.07);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.medcare-sidebar .sidebar-header .sidebar-toggler:hover,
+.medcare-sidebar .sidebar-header .sidebar-toggler:focus-visible {
+  border-color: #b8d2fa;
+  outline: none;
+  background: #f1f7ff;
+  box-shadow: 0 7px 18px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.medcare-sidebar .sidebar-header .sidebar-toggler span {
+  height: 1.5px;
+  background: #4d6e9e;
+}
+
+.medcare-sidebar .sidebar-body {
+  max-height: calc(100% - 78px);
+  height: calc(100% - 78px);
+  overflow-x: hidden;
+  border: 0;
+  border-right: 1px solid var(--medcare-sidebar-line);
+  background:
+    radial-gradient(circle at -12% 11%, rgba(59, 130, 246, 0.075), transparent 26%),
+    radial-gradient(circle at 112% 44%, rgba(6, 182, 212, 0.055), transparent 27%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 48%, #f8fbff 100%);
+  box-shadow: none;
+}
+
+.medcare-sidebar .sidebar-profile {
+  position: relative;
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 14px 5px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid #dbe8fa;
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(6, 182, 212, 0.12), transparent 38%),
+    linear-gradient(135deg, #f3f8ff 0%, #f6fcff 58%, #f2fffb 100%);
+  box-shadow: 0 10px 26px rgba(45, 83, 131, 0.075), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.medcare-sidebar .sidebar-profile::before {
+  position: absolute;
+  right: -25px;
+  bottom: -35px;
+  width: 78px;
+  height: 78px;
+  content: "";
+  border: 13px solid rgba(37, 99, 235, 0.035);
+  border-radius: 50%;
+}
+
+.medcare-sidebar .sidebar-profile-avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #3b82f6, #17a8d2 58%, #13b98b);
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.2);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+}
+
+.medcare-sidebar .sidebar-profile-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.medcare-sidebar .sidebar-profile-label {
+  color: #6b8ab6;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+}
+
+.medcare-sidebar .sidebar-profile-name {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #1b2b45;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medcare-sidebar .sidebar-profile-role {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #74859d;
+  font-size: 8.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medcare-sidebar .sidebar-profile-status {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #16c784;
+  box-shadow: 0 0 0 3px rgba(22, 199, 132, 0.11), 0 3px 9px rgba(16, 185, 129, 0.24);
+}
+
+.medcare-sidebar .sidebar-body .sidebar-menu {
+  padding: 9px 14px 38px;
+}
+
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item {
+  width: 100%;
+  margin: 2px 0;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link {
+  min-width: 0;
+  height: 45px;
+  padding: 5px 9px;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: #64748b;
+  font-weight: 600;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link .link-icon {
+  position: relative;
+  display: block;
+  width: 33px;
+  height: 33px;
+  flex: 0 0 33px;
+  padding: 8px;
+  border: 1px solid #e4ebf4;
+  border-radius: 10px;
+  fill: none;
+  color: #6f86a6;
+  background: #f8fafc;
+  box-shadow: inset 0 1px 0 #fff;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link .link-title {
+  min-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.05px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: none;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link .link-arrow {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  color: #9aabc1;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link:hover,
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link:focus-visible {
+  border-color: #e0eaf7;
+  outline: none;
+  color: #285cae;
+  background: #f5f9ff;
+  box-shadow: 0 7px 16px rgba(44, 86, 142, 0.055);
+  transform: translateX(2px);
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link:hover .link-title {
+  margin-left: 0;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link:hover .link-icon,
+.medcare-sidebar .sidebar-body .nav .nav-item > .nav-link:focus-visible .link-icon {
+  border-color: #cddffd;
+  color: #2563eb;
+  background: #eaf3ff;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.1);
+}
+
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item.active > .nav-link,
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item > .nav-link.active,
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item > .nav-link[aria-expanded="true"] {
+  border-color: #cfe0fb;
+  color: #1f56b5;
+  background:
+    radial-gradient(circle at 100% 0, rgba(6, 182, 212, 0.12), transparent 35%),
+    linear-gradient(105deg, #eaf3ff 0%, #f0f8ff 56%, #effcfb 100%);
+  box-shadow: 0 9px 20px rgba(37, 99, 235, 0.095), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item.active > .nav-link::before,
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item > .nav-link.active::before {
+  left: -15px;
+  width: 4px;
+  height: 25px;
+  border-radius: 0 5px 5px 0;
+  background: linear-gradient(180deg, #2563eb, #06b6d4);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.3);
+}
+
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item.active > .nav-link .link-icon,
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item > .nav-link.active .link-icon,
+.medcare-sidebar .sidebar-body .sidebar-menu > .nav-item > .nav-link[aria-expanded="true"] .link-icon {
+  border-color: #bdd7ff;
+  color: #fff;
+  background: linear-gradient(145deg, #3b82f6, #248cd7 56%, #16b7ad);
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.21), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item.nav-category {
+  display: flex;
+  height: 23px;
+  align-items: center;
+  gap: 9px;
+  margin: 17px 8px 5px;
+  color: #7d95b4;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1.35px;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item.nav-category:first-child {
+  margin-top: 4px;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item.nav-category:not(:first-child) {
+  margin-top: 17px;
+}
+
+.medcare-sidebar .sidebar-body .nav .nav-item.nav-category::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: linear-gradient(90deg, #d9e5f3, transparent);
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu {
+  position: relative;
+  margin: 5px 0 8px 20px;
+  padding: 3px 7px 5px 29px;
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu::before {
+  position: absolute;
+  top: 2px;
+  bottom: 9px;
+  left: 13px;
+  width: 1px;
+  content: "";
+  background: linear-gradient(180deg, #a7c8f8, #dce8f5);
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item {
+  margin: 1px 0;
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link {
+  position: relative;
+  height: 32px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #718198;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link::before {
+  top: 13px;
+  left: -19px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #aabbd1;
+  background: #fff;
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link:hover,
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link:focus-visible,
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link.active {
+  margin-left: 0;
+  color: #1f5dc5;
+  background: linear-gradient(90deg, #edf5ff, rgba(239, 251, 252, 0.6));
+  box-shadow: none;
+  transform: translateX(2px);
+}
+
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link:hover::before,
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link:focus-visible::before,
+.medcare-sidebar .sidebar-body .nav.sub-menu .nav-item > .nav-link.active::before {
+  border-color: #2f7de8;
+  background: linear-gradient(145deg, #3b82f6, #06b6d4);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.medcare-sidebar #notif-count {
+  min-width: 18px;
+  padding: 3px 5px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b7d, #ee3f67) !important;
+  box-shadow: 0 4px 10px rgba(238, 63, 103, 0.23);
+  font-size: 8px;
+  line-height: 1;
+  vertical-align: 1px;
+}
+
+.medcare-sidebar .is-search-hidden {
+  display: none !important;
+}
+
+.medcare-sidebar .ps__rail-y {
+  width: 5px;
+  background: transparent !important;
+}
+
+.medcare-sidebar .ps__thumb-y {
+  right: 1px;
+  width: 3px;
+  border-radius: 8px;
+  background: #b7c9df;
+}
+
+.main-wrapper > .page-wrapper {
+  width: calc(100% - var(--medcare-sidebar-width));
+  margin-left: var(--medcare-sidebar-width);
+  transition: margin 0.24s ease, width 0.24s ease;
+}
+
+.main-wrapper > .page-wrapper > .navbar {
+  width: calc(100% - var(--medcare-sidebar-width));
+  left: var(--medcare-sidebar-width);
+  transition: width 0.24s ease, left 0.24s ease;
+}
+
+.sidebar-folded .sidebar .sidebar-header,
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar,
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header {
+  width: var(--medcare-sidebar-folded-width);
+}
+
+.sidebar-folded .main-wrapper > .page-wrapper {
+  width: calc(100% - var(--medcare-sidebar-folded-width));
+  margin-left: var(--medcare-sidebar-folded-width);
+}
+
+.sidebar-folded .main-wrapper > .page-wrapper > .navbar {
+  width: calc(100% - var(--medcare-sidebar-folded-width));
+  left: var(--medcare-sidebar-folded-width);
+}
+
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-profile {
+  display: none;
+}
+
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .sidebar-menu {
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item > .nav-link {
+  justify-content: center;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item.nav-category::before {
+  top: 8px;
+  left: 23px;
+  width: 6px;
+  height: 6px;
+  background: linear-gradient(145deg, #3b82f6, #06b6d4);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.sidebar-folded.open-sidebar-folded .medcare-sidebar {
+  width: var(--medcare-sidebar-width);
+}
+
+@media (max-width: 991px) {
+  .medcare-sidebar,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar,
+  .sidebar-folded.open-sidebar-folded .medcare-sidebar {
+    width: min(var(--medcare-sidebar-width), calc(100vw - 34px));
+    margin-left: calc(0px - min(var(--medcare-sidebar-width), calc(100vw - 34px)));
+    filter: drop-shadow(18px 0 36px rgba(38, 65, 104, 0.17));
+  }
+
+  .sidebar-open .medcare-sidebar,
+  .sidebar-open.sidebar-folded .medcare-sidebar {
+    margin-left: 0;
+  }
+
+  .medcare-sidebar .sidebar-header,
+  .sidebar-folded .medcare-sidebar .sidebar-header,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0 17px;
+  }
+
+  .sidebar-folded .medcare-sidebar .sidebar-header .sidebar-brand {
+    display: flex;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-profile {
+    display: flex;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .sidebar-menu {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item > .nav-link {
+    justify-content: flex-start;
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item .link-title,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item .link-arrow,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item.nav-category {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item.nav-category::before {
+    display: none;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav.sub-menu {
+    display: flex;
+  }
+
+  .main-wrapper > .page-wrapper,
+  .sidebar-folded .main-wrapper > .page-wrapper {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .main-wrapper > .page-wrapper > .navbar,
+  .sidebar-folded .main-wrapper > .page-wrapper > .navbar {
+    width: 100%;
+    left: 0;
+  }
+
+  .sidebar-open .main-wrapper::before {
+    background: rgba(38, 54, 79, 0.28);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@media (max-width: 420px) {
+  .medcare-sidebar .sidebar-header .sidebar-brand-mark {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+    border-radius: 13px;
+  }
+
+  .medcare-sidebar .sidebar-header .sidebar-brand .sidebar-brand-name {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medcare-sidebar,
+  .medcare-sidebar *,
+  .main-wrapper > .page-wrapper,
+  .main-wrapper > .page-wrapper > .navbar {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

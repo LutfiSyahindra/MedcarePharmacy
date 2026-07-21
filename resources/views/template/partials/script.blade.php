@@ -21,6 +21,19 @@
         const storageKey = 'medcare_open_page_tabs_v1';
         const maxTabs = 10;
         let scrollControlsReady = false;
+        let tabResizeObserver = null;
+        let tabResizeFrame = null;
+
+        function queueTabMeasurement() {
+            if (tabResizeFrame) {
+                window.cancelAnimationFrame(tabResizeFrame);
+            }
+
+            tabResizeFrame = window.requestAnimationFrame(function() {
+                tabResizeFrame = null;
+                updateScrollState();
+            });
+        }
 
         function normalizeUrl(url) {
             try {
@@ -379,6 +392,7 @@
                 return;
             }
 
+            const shell = document.querySelector('.medcare-tab-shell');
             const wrapper = document.getElementById('medcarePageTabs');
             const prevButton = document.getElementById('medcarePageTabPrev');
             const nextButton = document.getElementById('medcarePageTabNext');
@@ -391,7 +405,7 @@
             nextButton?.addEventListener('click', () => scrollTabs(1));
 
             wrapper.addEventListener('scroll', function() {
-                window.requestAnimationFrame(updateScrollState);
+                queueTabMeasurement();
             }, {
                 passive: true
             });
@@ -409,7 +423,22 @@
             });
 
             wrapper.addEventListener('keydown', handleTabKeyboard);
-            window.addEventListener('resize', () => window.requestAnimationFrame(updateScrollState));
+            window.addEventListener('resize', queueTabMeasurement);
+
+            shell?.addEventListener('transitionend', function(event) {
+                if (!['left', 'width'].includes(event.propertyName)) {
+                    return;
+                }
+
+                queueTabMeasurement();
+                revealActiveTab();
+            });
+
+            if ('ResizeObserver' in window) {
+                tabResizeObserver = new ResizeObserver(queueTabMeasurement);
+                tabResizeObserver.observe(wrapper);
+                if (shell) tabResizeObserver.observe(shell);
+            }
 
             scrollControlsReady = true;
         }

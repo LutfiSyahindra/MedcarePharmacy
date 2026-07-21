@@ -8,12 +8,13 @@
         content="nobleui, bootstrap, bootstrap 5, bootstrap5, admin, dashboard, template, responsive, css, sass, html, theme, front-end, ui kit, web">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>NobleUI - HTML Bootstrap 5 Admin Dashboard Template</title>
+    <title>Medcare Phar - Pharmacy Management</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&display=swap"
+        rel="stylesheet">
     <!-- End fonts -->
 
     <!-- core:css -->
@@ -35,4 +36,8 @@
 
     <link rel="shortcut icon" href="{{ asset("assets/images/favicon.png") }}" />
     @vite(['resources/js/app.js'])
+
+    {{-- Page assets are loaded first so the shared shell stays consistent on every menu. --}}
+    @stack("style")
+    <link rel="stylesheet" href="{{ asset("assets/css/medcare-sidebar.css") }}">
 </head>

@@ -11,7 +11,6 @@ License: For each use you must have a valid license purchased only from above li
 <html lang="en">
 
     @include("template.partials.head")
-    @stack("style")
 
     <body>
         <div class="main-wrapper">

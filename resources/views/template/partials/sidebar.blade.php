@@ -1,28 +1,91 @@
+@php
+    $sidebarUser = auth()->user();
+    $sidebarUserName = $sidebarUser?->name ?: "Pengguna Medcare";
+    $sidebarUserRole = $sidebarUser?->getRoleNames()->first() ?: "Team Member";
+    $sidebarUserInitials = collect(preg_split('/\s+/', trim($sidebarUserName)))
+        ->filter()
+        ->take(2)
+        ->map(fn($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+        ->implode("");
+
+    $sidebarBranch = null;
+    if ($sidebarUser) {
+        $sidebarBranchIds = \App\Support\BranchAccess::userBranchIds($sidebarUser);
+        $sessionBranchId = (int) session("active_branch_id", 0);
+        $isSidebarAdmin = $sidebarUser->hasAnyRole(["Admin", "admin"]);
+
+        if ($sessionBranchId && ($isSidebarAdmin || in_array($sessionBranchId, $sidebarBranchIds, true))) {
+            $sidebarBranch = \App\Models\BranchModel::with("apotekProfile")->find($sessionBranchId);
+        }
+
+        if (!$sidebarBranch && !empty($sidebarBranchIds)) {
+            $sidebarBranch = \App\Models\BranchModel::with("apotekProfile")->find($sidebarBranchIds[0]);
+        }
+
+        if (!$sidebarBranch && $isSidebarAdmin) {
+            $sidebarBranch = \App\Models\BranchModel::with("apotekProfile")
+                ->where("is_active", true)
+                ->orderBy("name")
+                ->first();
+        }
+    }
+
+    $sidebarApotekProfile = $sidebarBranch?->apotekProfile;
+    $sidebarLogoUrl = $sidebarApotekProfile?->logo_url;
+    $sidebarBrandName = $sidebarApotekProfile?->name ?: ($sidebarBranch?->name ?: "Medcare Phar");
+    $sidebarBrandTagline = $sidebarBranch?->code
+        ? "Cabang {$sidebarBranch->code}"
+        : "Pharmacy Management";
+    $sidebarProfileMeta = trim($sidebarUserRole . ($sidebarBranch?->code ? " - {$sidebarBranch->code}" : ""));
+@endphp
+
 <!-- partial:partials/_sidebar.html -->
-<nav class="sidebar">
+<nav class="sidebar medcare-sidebar" aria-label="Navigasi utama">
     <div class="sidebar-header">
-        <a href="#" class="sidebar-brand">
-            Medcare<span>Phar</span>
+        <a href="{{ route("dashboard") }}" class="sidebar-brand" aria-label="{{ $sidebarBrandName }} - Dashboard"
+            title="{{ $sidebarBrandName }}">
+            <span class="sidebar-brand-mark {{ $sidebarLogoUrl ? "has-official-logo" : "" }}" aria-hidden="true">
+                @if ($sidebarLogoUrl)
+                    <img src="{{ $sidebarLogoUrl }}" alt="" class="sidebar-brand-logo">
+                @endif
+                <span class="sidebar-brand-cross"></span>
+            </span>
+            <span class="sidebar-brand-copy">
+                <span class="sidebar-brand-name">{{ $sidebarBrandName }}</span>
+                <span class="sidebar-brand-tagline">{{ $sidebarBrandTagline }}</span>
+            </span>
         </a>
-        <div class="sidebar-toggler not-active">
+        <button type="button" class="sidebar-toggler not-active" aria-label="Ciutkan sidebar"
+            title="Ciutkan sidebar">
             <span></span>
             <span></span>
             <span></span>
-        </div>
+        </button>
     </div>
     <div class="sidebar-body">
-        <ul class="nav">
+        <div class="sidebar-profile" aria-label="Pengguna aktif">
+            <span class="sidebar-profile-avatar" aria-hidden="true">{{ $sidebarUserInitials ?: "MP" }}</span>
+            <span class="sidebar-profile-copy">
+                <span class="sidebar-profile-label">Akun aktif</span>
+                <strong class="sidebar-profile-name">{{ $sidebarUserName }}</strong>
+                <span class="sidebar-profile-role">{{ $sidebarProfileMeta }}</span>
+            </span>
+            <span class="sidebar-profile-status" title="Sistem aktif" aria-label="Sistem aktif"></span>
+        </div>
+
+        <ul class="nav sidebar-menu">
             {{-- Main --}}
-            <li class="nav-item nav-category">Main</li>
+            <li class="nav-item nav-category">Overview</li>
             <li class="nav-item">
-                <a href="dashboard.html" class="nav-link">
-                    <i class="link-icon" data-feather="box"></i>
+                <a href="{{ route("dashboard") }}"
+                    class="nav-link {{ request()->routeIs("dashboard") ? "active" : "" }}">
+                    <i class="link-icon" data-feather="grid"></i>
                     <span class="link-title">Dashboard</span>
                 </a>
             </li>
 
             {{-- Settings --}}
-            <li class="nav-item nav-category">Settings</li>
+            <li class="nav-item nav-category">Pengaturan</li>
             @if (auth()->user()->can("MEDCARE.SETTINGS.PROFILE_APOTEK") || auth()->user()->hasAnyRole(["Admin", "admin", "Apoteker", "apoteker"]))
                 <li class="nav-item">
                     <a href="{{ route("settings.apotek-profile.index") }}"
@@ -184,7 +247,7 @@
                 <a class="nav-link" data-bs-toggle="collapse" href="#pabrikan" role="button" aria-expanded="false"
                     aria-controls="pabrikan">
                     <i class="link-icon" data-feather="settings"></i>
-                    <span class="link-title">Pabrikan / Peoduksi</span>
+                    <span class="link-title">Pabrikan / Produksi</span>
                     <i class="link-arrow" data-feather="chevron-down"></i>
                 </a>
                 <div class="collapse" id="pabrikan">
@@ -262,7 +325,7 @@
             </li>
 
             {{-- Menu --}}
-            <li class="nav-item nav-category">Menu</li>
+            <li class="nav-item nav-category">Operasional</li>
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#notifikasi" role="button"
                     aria-expanded="false" aria-controls="notifikasi">
@@ -286,9 +349,7 @@
                 <div class="collapse" id="notifikasi">
                     <ul class="nav sub-menu">
                         <li class="nav-item">
-                            <a href="{{ route("notifikasi.SemuaNotifikasi") }}" class="nav-link">
-                                📩 Semua Notifikasi
-                            </a>
+                            <a href="{{ route("notifikasi.SemuaNotifikasi") }}" class="nav-link">Semua Notifikasi</a>
                         </li>
                     </ul>
                 </div>
@@ -364,40 +425,112 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        let searchInput = document.getElementById("navbarForm");
-        if (!searchInput) return; // kalau elemen ga ada, hentikan
+        const sidebar = document.querySelector(".medcare-sidebar");
+        const searchInput = document.getElementById("navbarForm");
 
-        searchInput.addEventListener("keyup", function() {
-            let query = this.value.toLowerCase().trim();
-            let menuItems = document.querySelectorAll(".sidebar-body .nav-item");
+        if (!sidebar) return;
 
-            menuItems.forEach(function(item) {
-                let text = item.innerText.toLowerCase();
+        const officialLogo = sidebar.querySelector(".sidebar-brand-logo");
+        if (officialLogo) {
+            const useFallbackLogo = function() {
+                officialLogo.hidden = true;
+                officialLogo.closest(".sidebar-brand-mark")?.classList.remove("has-official-logo");
+            };
 
-                if (item.classList.contains("nav-category")) {
-                    if (query === "") {
-                        item.style.display = "";
-                    } else {
-                        let nextMenu = item.nextElementSibling;
-                        if (nextMenu && nextMenu.style.display !== "none") {
-                            item.style.display = "";
-                        } else {
-                            item.style.display = "none";
-                        }
-                    }
-                } else {
-                    if (query === "") {
-                        item.style.display = "";
-                    } else if (text.includes(query)) {
-                        item.style.display = "";
-                        let parentCollapse = item.closest(".collapse");
-                        if (parentCollapse) {
-                            parentCollapse.classList.add("show");
-                        }
-                    } else {
-                        item.style.display = "none";
+            officialLogo.addEventListener("error", useFallbackLogo, { once: true });
+            if (officialLogo.complete && !officialLogo.naturalWidth) useFallbackLogo();
+        }
+
+        const normalizePath = function(value) {
+            try {
+                const path = new URL(value, window.location.origin).pathname.replace(/\/+$/, "");
+                return path || "/";
+            } catch (error) {
+                return value;
+            }
+        };
+
+        const currentPath = normalizePath(window.location.href);
+        const navigableLinks = Array.from(sidebar.querySelectorAll("a.nav-link[href]"))
+            .filter(link => !link.hasAttribute("data-bs-toggle"));
+
+        navigableLinks.forEach(function(link) {
+            if (normalizePath(link.href) !== currentPath) return;
+
+            link.classList.add("active");
+            const item = link.closest(".nav-item");
+            item?.classList.add("active");
+
+            const collapse = link.closest(".collapse");
+            if (collapse) {
+                collapse.classList.add("show");
+                const parentToggle = collapse.previousElementSibling;
+                parentToggle?.setAttribute("aria-expanded", "true");
+                parentToggle?.closest(".nav-item")?.classList.add("active");
+            }
+        });
+
+        const syncTogglerLabel = function() {
+            const folded = document.body.classList.contains("sidebar-folded");
+            sidebar.querySelectorAll(".sidebar-toggler").forEach(function(toggler) {
+                toggler.setAttribute("aria-label", folded ? "Perluas sidebar" : "Ciutkan sidebar");
+                toggler.setAttribute("title", folded ? "Perluas sidebar" : "Ciutkan sidebar");
+            });
+        };
+
+        sidebar.querySelector(".sidebar-toggler")?.addEventListener("click", function() {
+            window.setTimeout(syncTogglerLabel, 0);
+        });
+        syncTogglerLabel();
+
+        if (!searchInput) return;
+
+        const rootItems = Array.from(sidebar.querySelectorAll(".sidebar-menu > .nav-item"));
+        const categories = rootItems.filter(item => item.classList.contains("nav-category"));
+
+        searchInput.addEventListener("input", function() {
+            const query = this.value.toLocaleLowerCase("id-ID").trim();
+
+            rootItems.forEach(function(item) {
+                if (item.classList.contains("nav-category")) return;
+
+                const ownTitle = item.querySelector(":scope > .nav-link > .link-title")?.textContent || "";
+                const ownMatch = ownTitle.toLocaleLowerCase("id-ID").includes(query);
+                const subItems = Array.from(item.querySelectorAll(".sub-menu > .nav-item"));
+                let childMatch = false;
+
+                subItems.forEach(function(subItem) {
+                    const matches = !query || ownMatch || subItem.textContent.toLocaleLowerCase("id-ID").includes(query);
+                    subItem.classList.toggle("is-search-hidden", !matches);
+                    childMatch = childMatch || matches;
+                });
+
+                const matches = !query || ownMatch || childMatch;
+                item.classList.toggle("is-search-hidden", !matches);
+
+                const collapse = item.querySelector(":scope > .collapse");
+                if (collapse && query && matches) {
+                    collapse.classList.add("show", "is-search-open");
+                    item.querySelector(":scope > .nav-link")?.setAttribute("aria-expanded", "true");
+                } else if (collapse && !query && collapse.classList.contains("is-search-open")) {
+                    collapse.classList.remove("is-search-open");
+                    if (!collapse.querySelector(".nav-link.active")) {
+                        collapse.classList.remove("show");
+                        item.querySelector(":scope > .nav-link")?.setAttribute("aria-expanded", "false");
                     }
                 }
+            });
+
+            categories.forEach(function(category) {
+                let sibling = category.nextElementSibling;
+                let hasVisibleItem = false;
+
+                while (sibling && !sibling.classList.contains("nav-category")) {
+                    hasVisibleItem = hasVisibleItem || !sibling.classList.contains("is-search-hidden");
+                    sibling = sibling.nextElementSibling;
+                }
+
+                category.classList.toggle("is-search-hidden", Boolean(query) && !hasVisibleItem);
             });
         });
     });
