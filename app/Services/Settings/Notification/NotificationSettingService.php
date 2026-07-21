@@ -7,6 +7,7 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\NotificationSetting;
 use App\Models\User;
+use App\Services\Settings\Auth\RoleSettingService;
 use Illuminate\Support\Arr;
 
 class NotificationSettingService
@@ -18,6 +19,8 @@ class NotificationSettingService
         'penerimaan' => 'Penerimaan',
         'retur_pembelian' => 'Retur Pembelian',
     ];
+
+    public function __construct(private readonly RoleSettingService $roleSettings) {}
 
     public function defaults(): array
     {
@@ -68,12 +71,8 @@ class NotificationSettingService
 
     public function approverRoleKeys(): array
     {
-        $roles = Arr::get($this->settings(), 'roles', []);
-
-        return collect($roles)
-            ->filter(fn ($enabled) => (bool) $enabled)
-            ->keys()
-            ->map(fn ($role) => strtolower((string) $role))
+        return collect($this->roleSettings->approverRoleNames())
+            ->map(fn ($role) => strtolower($role))
             ->values()
             ->all();
     }
@@ -117,7 +116,7 @@ class NotificationSettingService
 
     public function userCanManage(?User $user): bool
     {
-        return $this->userIsApprover($user);
+        return $this->roleSettings->userCanManage($user) || $this->userIsApprover($user);
     }
 
     public function userIsApprover(?User $user): bool
@@ -126,13 +125,7 @@ class NotificationSettingService
             return false;
         }
 
-        $roleNames = $this->approverRoleNames();
-
-        if (empty($roleNames)) {
-            return false;
-        }
-
-        return $user->hasAnyRole($roleNames);
+        return $this->roleSettings->userIsApprover($user);
     }
 
     public function stats(): array

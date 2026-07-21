@@ -22,7 +22,7 @@
             <div>
                 <span class="notification-kicker">Notification command center</span>
                 <h4>Semua Notifikasi</h4>
-                <p>Pantau request pembelian, penerimaan, retur pembelian, dan hasil aksi admin/apoteker.</p>
+                <p>Pantau request pembelian, penerimaan, retur pembelian, dan hasil aksi role approval.</p>
             </div>
             <div class="notification-command-actions">
                 <button type="button" class="notification-icon-button" id="refreshNotificationTable" title="Refresh">

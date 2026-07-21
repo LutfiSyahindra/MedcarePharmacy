@@ -26,6 +26,8 @@ class NotificationSettingController extends Controller
     {
         abort_unless($this->settings->userCanManage(Auth::user()), 403);
 
+        $currentSettings = $this->settings->settings();
+
         $request->validate([
             'navbar_limit' => ['nullable', 'integer', 'min:3', 'max:20'],
         ]);
@@ -36,14 +38,11 @@ class NotificationSettingController extends Controller
                 'penerimaan' => ['enabled' => $request->boolean('modules.penerimaan.enabled')],
                 'retur_pembelian' => ['enabled' => $request->boolean('modules.retur_pembelian.enabled')],
             ],
-            'roles' => [
-                'admin' => $request->boolean('roles.admin'),
-                'apoteker' => $request->boolean('roles.apoteker'),
-            ],
+            'roles' => $currentSettings['roles'] ?? [],
             'notify_creator' => $request->boolean('notify_creator'),
             'broadcast' => $request->boolean('broadcast'),
             'sound' => $request->boolean('sound'),
-            'same_branch_only' => $request->boolean('same_branch_only'),
+            'same_branch_only' => $currentSettings['same_branch_only'] ?? true,
             'navbar_limit' => $request->integer('navbar_limit', 8),
         ]);
 

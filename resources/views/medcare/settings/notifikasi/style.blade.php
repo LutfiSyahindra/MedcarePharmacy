@@ -142,6 +142,44 @@
         gap: 16px;
     }
 
+    .notif-role-setting-callout {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: #eff6ff;
+    }
+
+    .notif-role-setting-callout > span {
+        display: grid;
+        place-items: center;
+        flex: 0 0 42px;
+        height: 42px;
+        border-radius: 8px;
+        color: #1d4ed8;
+        background: #dbeafe;
+        font-size: 22px;
+    }
+
+    .notif-role-setting-callout > div { flex: 1; }
+    .notif-role-setting-callout strong { display: block; color: #1e293b; }
+    .notif-role-setting-callout small { display: block; margin-top: 2px; color: #64748b; }
+    .notif-role-setting-callout a {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #1d4ed8;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 767.98px) {
+        .notif-role-setting-callout { align-items: flex-start; flex-wrap: wrap; }
+        .notif-role-setting-callout a { width: 100%; padding-left: 54px; }
+    }
+
     .notif-config-panel {
         padding: 18px;
     }

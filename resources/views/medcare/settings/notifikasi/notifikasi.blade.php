@@ -9,7 +9,6 @@
 @section("content")
     @php
         $moduleSettings = $settings["modules"] ?? [];
-        $roleSettings = $settings["roles"] ?? [];
         $pending = $stats["pending"] ?? [];
     @endphp
 
@@ -78,24 +77,18 @@
                 <div class="notif-panel-title">
                     <span><i class="mdi mdi-account-key-outline"></i></span>
                     <div>
-                        <h5>Target Approver</h5>
-                        <p>Role yang menerima request dan dapat menjalankan aksi.</p>
+                        <h5>Role dan Scope Branch</h5>
+                        <p>Target approver dan penerima notifikasi kini mengikuti konfigurasi setiap role.</p>
                     </div>
                 </div>
 
-                <div class="notif-role-grid">
-                    <label class="notif-role-option">
-                        <input type="checkbox" class="notif-toggle-source" name="roles[admin]" value="1"
-                            @checked($roleSettings["admin"] ?? false)>
-                        <span><i class="mdi mdi-shield-account-outline"></i></span>
-                        <strong>Admin</strong>
-                    </label>
-                    <label class="notif-role-option">
-                        <input type="checkbox" class="notif-toggle-source" name="roles[apoteker]" value="1"
-                            @checked($roleSettings["apoteker"] ?? false)>
-                        <span><i class="mdi mdi-pill"></i></span>
-                        <strong>Apoteker</strong>
-                    </label>
+                <div class="notif-role-setting-callout">
+                    <span><i class="mdi mdi-shield-key-outline"></i></span>
+                    <div>
+                        <strong>Kelola melalui Role Setting</strong>
+                        <small>Tentukan role approval, scope semua branch atau branch user, serta penerima notifikasi balasan.</small>
+                    </div>
+                    <a href="{{ route("settings.role-setting.index") }}">Buka Role Setting <i class="mdi mdi-arrow-right"></i></a>
                 </div>
             </section>
 
@@ -104,7 +97,7 @@
                     <span><i class="mdi mdi-access-point-network"></i></span>
                     <div>
                         <h5>Channel dan Perilaku</h5>
-                        <p>Kontrol balasan, realtime, suara, scope branch, dan jumlah item dropdown.</p>
+                        <p>Kontrol balasan ke pembuat, realtime, suara, dan jumlah item dropdown.</p>
                     </div>
                 </div>
 
@@ -139,15 +132,6 @@
                         <i></i>
                     </label>
 
-                    <label class="notif-behavior-row">
-                        <span>
-                            <strong>Scope branch sama</strong>
-                            <small>Kirim request hanya ke approver di branch dokumen.</small>
-                        </span>
-                        <input type="checkbox" class="notif-toggle-source" name="same_branch_only" value="1"
-                            @checked($settings["same_branch_only"] ?? true)>
-                        <i></i>
-                    </label>
                 </div>
 
                 <div class="notif-limit-control">

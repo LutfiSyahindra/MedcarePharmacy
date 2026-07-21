@@ -21,6 +21,7 @@ use App\Http\Controllers\Medcare\Notifikasi\MainController;
 use App\Http\Controllers\Medcare\Settings\ApotekProfile\ApotekProfileController;
 use App\Http\Controllers\Medcare\Settings\Auth\PermissionsController;
 use App\Http\Controllers\Medcare\Settings\Auth\RoleController;
+use App\Http\Controllers\Medcare\Settings\Auth\RoleSettingController;
 use App\Http\Controllers\Medcare\Settings\Auth\UsersController;
 use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
@@ -78,6 +79,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/roles/dataPermissions', [RoleController::class, 'dataPermissions'])->name('roles.dataPermissions');
         Route::post('/roles/assignPermissions', [RoleController::class, 'assignPermissions'])->name('roles.assignPermissions');
         Route::get('/roles/{id}/getRolePermissions', [RoleController::class, 'getRolePermissions'])->name('roles.getRolePermissions');
+
+        // Role access, approval, and notification scope
+        Route::get('/role-setting', [RoleSettingController::class, 'index'])->name('settings.role-setting.index');
+        Route::put('/role-setting', [RoleSettingController::class, 'update'])->name('settings.role-setting.update');
 
         // Permission
         Route::get('/permissions', [PermissionsController::class, 'Permissions'])->name('permissions.permissions');

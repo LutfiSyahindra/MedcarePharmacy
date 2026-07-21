@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\BranchModel;
 use App\Models\User;
+use App\Services\Settings\Auth\RoleSettingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -10,6 +12,24 @@ use Illuminate\Validation\ValidationException;
 class BranchAccess
 {
     public static function userBranchIds(?User $user = null): array
+    {
+        $user = $user ?: Auth::user();
+
+        if (! $user) {
+            return [];
+        }
+
+        if (app(RoleSettingService::class)->userCanViewAllBranches($user)) {
+            return BranchModel::query()
+                ->pluck('id')
+                ->map(fn ($branchId) => (int) $branchId)
+                ->all();
+        }
+
+        return self::assignedUserBranchIds($user);
+    }
+
+    public static function assignedUserBranchIds(?User $user = null): array
     {
         $user = $user ?: Auth::user();
 
@@ -29,6 +49,13 @@ class BranchAccess
             ->unique()
             ->values()
             ->all();
+    }
+
+    public static function approvalBranchIds(?User $user = null): array
+    {
+        $user = $user ?: Auth::user();
+
+        return app(RoleSettingService::class)->approvalBranchIds($user);
     }
 
     public static function userBranchId(?User $user = null): ?int

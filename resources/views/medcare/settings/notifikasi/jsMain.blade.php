@@ -7,22 +7,8 @@
             $('#navbarLimitValue').text(this.value);
         });
 
-        function activeRoleCount() {
-            return $('input[name="roles[admin]"]:checked, input[name="roles[apoteker]"]:checked').length;
-        }
-
         $('#notificationSettingsForm').on('submit', function(event) {
             event.preventDefault();
-
-            if (activeRoleCount() === 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Role approver belum dipilih',
-                    text: 'Aktifkan minimal Admin atau Apoteker.',
-                    confirmButtonText: 'Mengerti'
-                });
-                return;
-            }
 
             saveButton
                 .prop('disabled', true)

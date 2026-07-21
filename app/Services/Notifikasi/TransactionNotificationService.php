@@ -11,19 +11,27 @@ use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Notifikasi;
 use App\Models\User;
 use App\Notifications\TransactionWorkflowNotification;
+use App\Services\Settings\Auth\RoleSettingService;
 use App\Services\Settings\Notification\NotificationSettingService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
 
 class TransactionNotificationService
 {
-    public function __construct(private readonly NotificationSettingService $settings) {}
+    public function __construct(
+        private readonly NotificationSettingService $settings,
+        private readonly RoleSettingService $roleSettings
+    ) {}
 
     public function isApprovalRole(?User $user): bool
     {
-        return $this->settings->userIsApprover($user);
+        return $this->roleSettings->userIsApprover($user);
+    }
+
+    public function canApproveBranch(?User $user, ?int $branchId): bool
+    {
+        return $this->roleSettings->canApproveBranch($user, $branchId);
     }
 
     public function notifyApprovalRequest(string $module, Model $document, ?User $creator = null): void
@@ -49,7 +57,7 @@ class TransactionNotificationService
             'workflow' => 'transaction_approval',
             'notification_kind' => 'approval_request',
             'title' => $snapshot['module_label'].' Menunggu Aksi',
-            'message' => $snapshot['document_no'].' dibuat oleh '.$snapshot['creator_name'].' dan menunggu aksi admin/apoteker.',
+            'message' => $snapshot['document_no'].' dibuat oleh '.$snapshot['creator_name'].' dan menunggu aksi role approval.',
             'requires_action' => true,
             'sound_enabled' => $this->settings->soundEnabled(),
         ]);
@@ -68,16 +76,7 @@ class TransactionNotificationService
 
         $this->markApprovalRequestsHandled($module, (int) $document->getKey());
 
-        if (! $this->settings->notifyCreatorEnabled()) {
-            return;
-        }
-
         $creator = $this->documentCreator($document);
-
-        if (! $creator || $this->isApprovalRole($creator)) {
-            return;
-        }
-
         $actor = $actor ?: Auth::user();
         $snapshot = $this->documentSnapshot($module, $document);
         $actionMeta = $this->actionMeta($module, $action);
@@ -86,7 +85,7 @@ class TransactionNotificationService
             'workflow' => 'transaction_approval',
             'notification_kind' => 'approval_result',
             'title' => $snapshot['module_label'].' '.$actionMeta['label'],
-            'message' => $snapshot['document_no'].' '.$actionMeta['message'].' oleh '.($actor->name ?? 'Admin/Apoteker').'.',
+            'message' => $snapshot['document_no'].' '.$actionMeta['message'].' oleh '.($actor->name ?? 'Approver').'.',
             'requires_action' => false,
             'action_key' => $action,
             'action_label' => $actionMeta['label'],
@@ -96,7 +95,25 @@ class TransactionNotificationService
             'sound_enabled' => $this->settings->soundEnabled(),
         ]);
 
-        $creator->notify(new TransactionWorkflowNotification($payload, $this->channels()));
+        $recipients = $this->roleSettings->notificationRecipients($snapshot['branch_id'] ?? null);
+
+        if ($this->settings->notifyCreatorEnabled() && $creator && ! $this->isApprovalRole($creator)) {
+            $recipients->push($creator);
+        }
+
+        $recipients = $recipients
+            ->when($actor, fn ($users) => $users->reject(fn (User $user) => $user->is($actor)))
+            ->unique('id')
+            ->values();
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        Notification::send(
+            $recipients,
+            new TransactionWorkflowNotification($payload, $this->channels())
+        );
     }
 
     public function currentState(array $data): array
@@ -150,6 +167,7 @@ class TransactionNotificationService
 
         if (
             ! $this->isApprovalRole($user)
+            || ! $this->canApproveBranch($user, isset($data['branch_id']) ? (int) $data['branch_id'] : null)
             || ($data['notification_kind'] ?? null) !== 'approval_request'
             || ! $state['action_open']
         ) {
@@ -161,37 +179,7 @@ class TransactionNotificationService
 
     private function approversForBranch(?int $branchId)
     {
-        $roleKeys = $this->settings->approverRoleKeys();
-
-        if (empty($roleKeys)) {
-            return collect();
-        }
-
-        $query = User::whereHas('roles', function ($roleQuery) use ($roleKeys) {
-            $roleQuery->where(function ($nested) use ($roleKeys) {
-                foreach ($roleKeys as $role) {
-                    $nested->orWhereRaw('LOWER(name) = ?', [$role]);
-                }
-            });
-        });
-
-        if ($branchId && $this->settings->sameBranchOnly()) {
-            $usersTable = (new User)->getTable();
-            $hasDirectBranchColumn = Schema::hasColumn($usersTable, 'branch_id');
-
-            $query->where(function ($userQuery) use ($branchId, $hasDirectBranchColumn, $usersTable) {
-                if ($hasDirectBranchColumn) {
-                    $userQuery->where($usersTable.'.branch_id', $branchId)
-                        ->orWhereHas('branches', fn ($branchQuery) => $branchQuery->where('branches.id', $branchId));
-
-                    return;
-                }
-
-                $userQuery->whereHas('branches', fn ($branchQuery) => $branchQuery->where('branches.id', $branchId));
-            });
-        }
-
-        return $query->get();
+        return $this->roleSettings->approvalRecipients($branchId);
     }
 
     private function markApprovalRequestsHandled(string $module, int $documentId): void

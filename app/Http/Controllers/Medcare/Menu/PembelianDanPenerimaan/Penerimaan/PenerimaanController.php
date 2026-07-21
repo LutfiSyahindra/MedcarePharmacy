@@ -61,7 +61,7 @@ class PenerimaanController extends Controller
             'total_qty' => $activePenerimaan->sum('total_qty'),
             'grand_total' => $activePenerimaan->sum('grand_total'),
         ];
-        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
+        $approvalUser = Auth::user();
 
         return DataTables::of($penerimaan)
             ->addIndexColumn()
@@ -69,7 +69,11 @@ class PenerimaanController extends Controller
             ->addColumn('supplier', fn ($row) => $row->distributor->nama ?? '-')
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_penerimaan)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
-            ->addColumn('actions', function ($row) use ($canApprove) {
+            ->addColumn('actions', function ($row) use ($approvalUser) {
+                $canApprove = $this->transactionNotifications->canApproveBranch(
+                    $approvalUser,
+                    $row->purchaseOrder?->branch_id ? (int) $row->purchaseOrder->branch_id : null
+                );
                 $detailButton = '<button class="btn btn-sm btn-info" onclick="lihatPenerimaan('.$row->id.')"><i class="mdi mdi-eye"></i></button>';
                 $editButton = $row->status === 'draft'
                     ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan('.$row->id.')"><i class="mdi mdi-pencil"></i></button>'
@@ -278,7 +282,7 @@ class PenerimaanController extends Controller
         if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat memposting penerimaan.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk penerimaan.',
             ], 403);
         }
 
@@ -291,7 +295,7 @@ class PenerimaanController extends Controller
                 'details.obat.subGolongan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
                 'supplierCompensationAllocations.returPembelian.compensations',
-            ])->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status !== 'draft') {
                 return response()->json([
@@ -339,7 +343,7 @@ class PenerimaanController extends Controller
         if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat membatalkan penerimaan.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk penerimaan.',
             ], 403);
         }
 
@@ -347,7 +351,7 @@ class PenerimaanController extends Controller
             $penerimaan = $this->penerimaanQueryForBranch([
                 'details.obat',
                 'supplierCompensationAllocations.compensation',
-            ])->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status === 'cancelled') {
                 return response()->json([
@@ -1243,18 +1247,18 @@ class PenerimaanController extends Controller
         return $subtotal > 0 ? $subtotal * ($diskon / 100) : $totalHargaBeli * ($diskon / 100);
     }
 
-    private function penerimaanQueryForBranch(array $with = [])
+    private function penerimaanQueryForBranch(array $with = [], ?array $branchIds = null)
     {
         $query = PenerimaanBarangModel::with($with);
 
-        $this->scopePenerimaanBranch($query);
+        $this->scopePenerimaanBranch($query, $branchIds);
 
         return $query;
     }
 
-    private function scopePenerimaanBranch($query): void
+    private function scopePenerimaanBranch($query, ?array $branchIds = null): void
     {
-        $branchIds = BranchAccess::userBranchIds();
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
 
         $query->whereHas('purchaseOrder', function ($purchaseOrderQuery) use ($branchIds) {
             $this->scopePurchaseOrderBranch($purchaseOrderQuery, $branchIds);

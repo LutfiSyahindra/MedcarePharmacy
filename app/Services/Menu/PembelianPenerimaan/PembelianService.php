@@ -52,6 +52,7 @@ class PembelianService
             $dataPembelian[] = [
                 'id' => $r->id,
                 'no_po' => $r->no_po,
+                'branch_key' => (int) $r->branch_id,
                 'branch_id' => $r->branch->name ?? '-',
                 'distributor_id' => $r->distributor->nama ?? '-',
                 'tanggal_po' => $r->tanggal_po ?? '-',

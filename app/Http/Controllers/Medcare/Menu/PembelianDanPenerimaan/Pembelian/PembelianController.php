@@ -83,12 +83,16 @@ class PembelianController extends Controller
                 return (float) ($row['total_estimasi'] ?? 0);
             }),
         ];
-        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
+        $approvalUser = Auth::user();
 
         return DataTables::of($Pembelian)
             ->addIndexColumn()
-            ->addColumn('actions', function ($dataPembelian) use ($canApprove) {
+            ->addColumn('actions', function ($dataPembelian) use ($approvalUser) {
                 $status = $dataPembelian['status'];
+                $canApprove = $this->transactionNotifications->canApproveBranch(
+                    $approvalUser,
+                    isset($dataPembelian['branch_key']) ? (int) $dataPembelian['branch_key'] : null
+                );
                 $approvalButton = $canApprove && in_array($status, ['draft', 'waiting_approval'], true)
                     ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-check-circle"></i>
@@ -244,7 +248,6 @@ class PembelianController extends Controller
     public function show(string $id)
     {
         $Pembelian = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
-        Log::info($Pembelian);
 
         return response()->json($Pembelian);
     }
@@ -281,11 +284,11 @@ class PembelianController extends Controller
         if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat menyetujui pembelian.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk pembelian.',
             ], 403);
         }
 
-        $branchIds = BranchAccess::userBranchIds($user);
+        $branchIds = BranchAccess::approvalBranchIds($user);
         $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {
@@ -326,11 +329,11 @@ class PembelianController extends Controller
         if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat menolak pembelian.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk pembelian.',
             ], 403);
         }
 
-        $branchIds = BranchAccess::userBranchIds($user);
+        $branchIds = BranchAccess::approvalBranchIds($user);
         $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {
@@ -371,11 +374,11 @@ class PembelianController extends Controller
         if (! $this->transactionNotifications->isApprovalRole($user)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat membuka approval pembelian.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk pembelian.',
             ], 403);
         }
 
-        $branchIds = BranchAccess::userBranchIds($user);
+        $branchIds = BranchAccess::approvalBranchIds($user);
         $po = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
         if (! $po) {

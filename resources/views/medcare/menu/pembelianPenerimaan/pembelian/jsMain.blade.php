@@ -1119,15 +1119,23 @@
                 url: "{{ route("pembelian.show", ":id") }}".replace(':id', id),
                 type: "GET",
                 success: function(res) {
-                    console.log(res);
+                    const po = res?.data ?? res?.original ?? res;
 
-                    let po = res.original; // <--- KUNCI PENTING
-                    let detail = po.details;
+                    if (!po || typeof po !== 'object' || !Array.isArray(po.details)) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Detail PO tidak dapat ditampilkan',
+                            text: 'Respons detail purchase order tidak valid. Silakan muat ulang halaman.'
+                        });
+                        return;
+                    }
+
+                    const detail = po.details;
 
                     // Header
                     $('#detail_no_po').val(po.no_po);
                     $('#detail_distributor').val(po.distributor_name ?? 'Tidak diketahui');
-                    $('#detail_tanggal_po').val(moment(po.tanggal_po).format('DD-MM-YYYY'));
+                    $('#detail_tanggal_po').val(po.tanggal_po ? moment(po.tanggal_po).format('DD-MM-YYYY') : '-');
                     $('#detail_catatan').val(po.catatan ?? '-');
 
                     // Kosongkan tabel
@@ -1138,13 +1146,15 @@
 
                     // Detail obat
                     detail.forEach(item => {
+                        const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
+
                         $('#detailObatTable tbody').append(`
                     <tr>
-                        <td>${item.nama_obat}</td>
-                        <td>${item.satuan_konversi.satuan.nama}</td>
-                        <td>${item.qty}</td>
-                        <td>Rp ${Number(item.harga_estimasi).toLocaleString('id-ID')}</td>
-                        <td>Rp ${Number(item.subtotal).toLocaleString('id-ID')}</td>
+                        <td>${escapeHtml(item.nama_obat ?? '-')}</td>
+                        <td>${escapeHtml(unitName)}</td>
+                        <td>${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
+                        <td>Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>
+                        <td>Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
                     </tr>
                 `);
                     });
@@ -1156,9 +1166,19 @@
 
                     // Tampilkan modal
                     $('#pembelianModalDetail').modal('show');
+                },
+                error: function(xhr) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Detail PO tidak dapat ditampilkan',
+                        text: xhr.responseJSON?.message ||
+                            (xhr.status === 404
+                                ? 'Purchase order tidak ditemukan atau tidak dapat diakses dari branch Anda.'
+                                : 'Terjadi kesalahan saat memuat detail purchase order.')
+                    });
                 }
             });
-        }
+        };
 
         // --- Hapus
         window.deletePembelian = function(id) {

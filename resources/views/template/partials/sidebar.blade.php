@@ -118,6 +118,15 @@
                     </div>
                 </li>
             @endcan
+            @if (auth()->user()->can("MEDCARE.SETTINGS.AUTH") || auth()->user()->hasAnyRole(["Admin", "admin", "Super Admin", "super admin"]))
+                <li class="nav-item">
+                    <a href="{{ route("settings.role-setting.index") }}"
+                        class="nav-link {{ request()->routeIs("settings.role-setting.*") ? "active" : "" }}">
+                        <i class="link-icon" data-feather="shield"></i>
+                        <span class="link-title">Role Setting</span>
+                    </a>
+                </li>
+            @endif
             @can("MEDCARE.SETTINGS.BRANCH")
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#branch" role="button" aria-expanded="false"

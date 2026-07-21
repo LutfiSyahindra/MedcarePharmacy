@@ -85,7 +85,7 @@ class ReturPembelianController extends Controller
             'compensation_outstanding' => $allPostedRetur
                 ->sum('compensation_outstanding_value'),
         ];
-        $canApprove = $this->transactionNotifications->isApprovalRole(Auth::user());
+        $approvalUser = Auth::user();
 
         return DataTables::of($retur)
             ->addIndexColumn()
@@ -94,7 +94,11 @@ class ReturPembelianController extends Controller
             ->addColumn('supplier', fn ($row) => $row->distributor->nama ?? '-')
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_retur)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
-            ->addColumn('actions', function ($row) use ($canApprove) {
+            ->addColumn('actions', function ($row) use ($approvalUser) {
+                $canApprove = $this->transactionNotifications->canApproveBranch(
+                    $approvalUser,
+                    $row->purchaseOrder?->branch_id ? (int) $row->purchaseOrder->branch_id : null
+                );
                 $actionButton = function (string $type, string $icon, string $label, string $handler) use ($row): string {
                     return '<button type="button" class="return-action-btn is-'.$type.'" onclick="'.$handler.'('.$row->id.')" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$label.'" aria-label="'.$label.'">
                         <i class="mdi '.$icon.'"></i>
@@ -270,7 +274,7 @@ class ReturPembelianController extends Controller
         if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat memposting retur pembelian.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk retur pembelian.',
             ], 403);
         }
 
@@ -281,7 +285,7 @@ class ReturPembelianController extends Controller
                 'details.obat.satuan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
                 'details.penerimaanBarangDetail',
-            ])->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
 
             if ($retur->status !== 'draft') {
                 return response()->json([
@@ -316,7 +320,7 @@ class ReturPembelianController extends Controller
         if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Hanya admin/apoteker yang dapat membatalkan retur pembelian.',
+                'message' => 'Role Anda tidak memiliki akses approval untuk retur pembelian.',
             ], 403);
         }
 
@@ -326,7 +330,7 @@ class ReturPembelianController extends Controller
                 'purchaseOrder',
                 'details.obat.satuan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
-            ])->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
 
             if ($retur->status === 'cancelled') {
                 return response()->json([
@@ -1013,18 +1017,18 @@ class ReturPembelianController extends Controller
         return $units->firstWhere('is_purchase', true) ?: $units->first();
     }
 
-    private function returQueryForBranch(array $with = [])
+    private function returQueryForBranch(array $with = [], ?array $branchIds = null)
     {
         $query = ReturPembelianModel::with($with);
 
-        $this->scopeReturBranch($query);
+        $this->scopeReturBranch($query, $branchIds);
 
         return $query;
     }
 
-    private function scopeReturBranch($query): void
+    private function scopeReturBranch($query, ?array $branchIds = null): void
     {
-        $branchIds = BranchAccess::userBranchIds();
+        $branchIds = $branchIds ?? BranchAccess::userBranchIds();
 
         $query->whereHas('purchaseOrder', function ($purchaseOrderQuery) use ($branchIds) {
             $this->scopePurchaseOrderBranch($purchaseOrderQuery, $branchIds);
