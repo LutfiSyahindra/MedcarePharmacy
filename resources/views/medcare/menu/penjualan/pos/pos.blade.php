@@ -34,7 +34,7 @@
             </div>
 
             <div class="pos-appbar-actions">
-                @if ($isAdminPos)
+                @if ($canSwitchPosBranch)
                     <button type="button" class="btn pos-btn-quiet pos-branch-button" id="posBranchButton"
                         title="Pilih cabang transaksi">
                         <i class="mdi mdi-source-branch"></i>
@@ -672,7 +672,7 @@
         </div>
     </main>
 
-    @if ($isAdminPos)
+    @if ($canSwitchPosBranch)
         <div class="modal fade pos-branch-modal" id="posBranchModal" tabindex="-1"
             aria-labelledby="posBranchModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered">
@@ -680,7 +680,7 @@
                     <div class="modal-header">
                         <span class="pos-branch-modal-icon"><i class="mdi mdi-store-marker-outline"></i></span>
                         <div>
-                            <small>SESI TRANSAKSI ADMIN</small>
+                            <small>SESI TRANSAKSI MULTI BRANCH</small>
                             <h2 class="modal-title" id="posBranchModalTitle">Pilih cabang POS</h2>
                             <p>Stok, harga, nomor transaksi, dan struk akan mengikuti cabang ini.</p>
                         </div>

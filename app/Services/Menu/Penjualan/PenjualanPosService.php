@@ -11,7 +11,7 @@ use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Models\User;
 use App\Services\Menu\Stok\StockService;
-use App\Support\BranchAccess;
+use App\Services\Settings\Auth\RoleSettingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -42,13 +42,16 @@ class PenjualanPosService
 
     private const STOCK_EPSILON = 0.00001;
 
-    public function __construct(private readonly StockService $stockService) {}
+    public function __construct(
+        private readonly StockService $stockService,
+        private readonly RoleSettingService $roleSettings
+    ) {}
 
-    public function isAdmin(?User $user = null): bool
+    public function canAccessAllBranches(?User $user = null): bool
     {
         $user = $user ?: Auth::user();
 
-        return (bool) $user?->hasAnyRole(['Admin', 'admin']);
+        return $this->roleSettings->userCanAccessAllPosBranches($user);
     }
 
     public function activeBranches(?User $user = null): Collection
@@ -58,9 +61,7 @@ class PenjualanPosService
             ->where('is_active', true)
             ->orderBy('name');
 
-        if (! $this->isAdmin($user)) {
-            $query->whereIn('id', BranchAccess::userBranchIds($user));
-        }
+        $query->whereIn('id', $this->roleSettings->posBranchIds($user, true));
 
         return $query->get(['id', 'code', 'name']);
     }
@@ -69,11 +70,7 @@ class PenjualanPosService
     {
         $user = $user ?: Auth::user();
 
-        if ($this->isAdmin($user)) {
-            return BranchModel::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
-        }
-
-        return BranchAccess::userBranchIds($user);
+        return $this->roleSettings->posBranchIds($user);
     }
 
     public function resolveBranchId(?int $requestedBranchId = null, ?User $user = null): int
@@ -84,7 +81,7 @@ class PenjualanPosService
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        if ($this->isAdmin($user) && ! $requestedBranchId) {
+        if (count($activeBranchIds) > 1 && ! $requestedBranchId) {
             throw ValidationException::withMessages([
                 'branch_id' => 'Pilih cabang aktif sebelum memulai transaksi POS.',
             ]);

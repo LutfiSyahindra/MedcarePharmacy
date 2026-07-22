@@ -4,7 +4,7 @@
 
         const transactionTypes = @json($transactionTypes);
         const paymentMethods = @json($paymentMethods);
-        const isAdminPos = @json((bool) $isAdminPos);
+        const canSwitchPosBranch = @json((bool) $canSwitchPosBranch);
         const posBranches = @json($posBranches->values());
         const urls = {
             products: '{{ route("penjualan.pos.products") }}',
@@ -60,7 +60,7 @@
             $('#activePosBranchName').text(branch?.name || 'Pilih cabang');
             $('#posBranchSelector').val(branch?.id || '');
             $('#confirmPosBranchBtn').prop('disabled', !$('#posBranchSelector').val());
-            $('#posWorkspace').toggleClass('is-branch-locked', isAdminPos && !ready);
+            $('#posWorkspace').toggleClass('is-branch-locked', canSwitchPosBranch && !ready);
             $('#productSearch').prop('disabled', !ready).trigger('change.select2');
         }
 
@@ -2157,7 +2157,7 @@
 
             if (!draftBranch) {
                 Swal.fire('Draft tidak dapat dilanjutkan', 'Cabang pada draft sudah tidak aktif atau tidak dapat diakses.', 'error');
-                if (isAdminPos) openPosBranchModal();
+                if (canSwitchPosBranch) openPosBranchModal();
                 return;
             }
 
@@ -2234,7 +2234,7 @@
                 loadDraft(transaction);
             }).fail(xhr => {
                 showAjaxError(xhr, 'Draft gagal dimuat.');
-                if (isAdminPos && !activePosBranch()) openPosBranchModal();
+                if (canSwitchPosBranch && !activePosBranch()) openPosBranchModal();
             });
         }
 
@@ -2295,7 +2295,7 @@
         updatePosBranchUi();
         const loadingDraft = loadDraftFromQuery();
 
-        if (isAdminPos && !loadingDraft) {
+        if (canSwitchPosBranch && !loadingDraft) {
             openPosBranchModal();
         }
     });

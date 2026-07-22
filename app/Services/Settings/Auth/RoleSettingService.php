@@ -49,6 +49,7 @@ class RoleSettingService
                     ['role_id' => (int) $setting['role_id']],
                     [
                         'can_view_all_branches' => (bool) ($setting['can_view_all_branches'] ?? false),
+                        'pos_scope' => $this->scope($setting['pos_scope'] ?? null),
                         'is_approver' => (bool) ($setting['is_approver'] ?? false),
                         'approval_scope' => $this->scope($setting['approval_scope'] ?? null),
                         'receives_notifications' => (bool) ($setting['receives_notifications'] ?? false),
@@ -79,6 +80,31 @@ class RoleSettingService
     {
         return $this->userSettings($user)
             ->contains(fn (array $setting) => $setting['is_approver']);
+    }
+
+    public function userCanAccessAllPosBranches(?User $user): bool
+    {
+        return $this->userSettings($user)
+            ->contains(fn (array $setting) => $setting['pos_scope'] === self::ALL_BRANCHES);
+    }
+
+    public function posBranchIds(?User $user, bool $activeOnly = false): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $query = BranchModel::query();
+
+        if (! $this->userCanAccessAllPosBranches($user)) {
+            $query->whereIn('id', BranchAccess::assignedUserBranchIds($user));
+        }
+
+        if ($activeOnly) {
+            $query->where('is_active', true);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     public function userCanApproveAllBranches(?User $user): bool
@@ -215,6 +241,7 @@ class RoleSettingService
 
         return [
             'can_view_all_branches' => (bool) $setting->can_view_all_branches,
+            'pos_scope' => $this->scope($setting->pos_scope),
             'is_approver' => (bool) $setting->is_approver,
             'approval_scope' => $this->scope($setting->approval_scope),
             'receives_notifications' => (bool) $setting->receives_notifications,
@@ -229,6 +256,9 @@ class RoleSettingService
 
         return [
             'can_view_all_branches' => in_array($key, ['admin', 'super admin'], true),
+            'pos_scope' => in_array($key, ['admin', 'super admin'], true)
+                ? self::ALL_BRANCHES
+                : self::SAME_BRANCH,
             'is_approver' => $isDefaultApprover,
             'approval_scope' => self::SAME_BRANCH,
             'receives_notifications' => false,

@@ -16,15 +16,15 @@ class PenjualanPosController extends Controller
 
     public function index(Request $request)
     {
-        $isAdmin = $this->posService->isAdmin($request->user());
         $branches = $this->posService->activeBranches($request->user());
+        $canSwitchBranch = $branches->count() > 1;
 
         return view('medcare.menu.penjualan.pos.pos', [
             'transactionTypes' => PenjualanPosService::TRANSACTION_TYPES,
             'paymentMethods' => PenjualanPosService::PAYMENT_METHODS,
-            'isAdminPos' => $isAdmin,
+            'canSwitchPosBranch' => $canSwitchBranch,
             'posBranches' => $branches,
-            'selectedPosBranchId' => $isAdmin ? null : $branches->first()?->id,
+            'selectedPosBranchId' => $canSwitchBranch ? null : $branches->first()?->id,
         ]);
     }
 

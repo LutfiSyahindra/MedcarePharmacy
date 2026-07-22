@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BranchModel;
 use App\Models\RoleSetting;
 use App\Models\User;
+use App\Services\Menu\Penjualan\PenjualanPosService;
 use App\Services\Settings\Auth\RoleSettingService;
 use App\Support\BranchAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +43,7 @@ class RoleSettingTest extends TestCase
                     [
                         'role_id' => $adminRole->id,
                         'can_view_all_branches' => true,
+                        'pos_scope' => 'all_branches',
                         'is_approver' => true,
                         'approval_scope' => 'all_branches',
                         'receives_notifications' => false,
@@ -50,6 +52,7 @@ class RoleSettingTest extends TestCase
                     [
                         'role_id' => $userRole->id,
                         'can_view_all_branches' => false,
+                        'pos_scope' => 'same_branch',
                         'is_approver' => false,
                         'approval_scope' => 'same_branch',
                         'receives_notifications' => true,
@@ -59,11 +62,13 @@ class RoleSettingTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('status', 'success')
+            ->assertJsonPath('summary.pos_all_branch', 1)
             ->assertJsonPath('summary.approver', 1)
             ->assertJsonPath('summary.notification', 1);
 
         $this->assertDatabaseHas('role_settings', [
             'role_id' => $userRole->id,
+            'pos_scope' => 'same_branch',
             'receives_notifications' => true,
             'notification_scope' => 'same_branch',
         ]);
@@ -81,6 +86,7 @@ class RoleSettingTest extends TestCase
         RoleSetting::create([
             'role_id' => $role->id,
             'can_view_all_branches' => true,
+            'pos_scope' => 'all_branches',
             'is_approver' => true,
             'approval_scope' => 'all_branches',
             'receives_notifications' => false,
@@ -107,6 +113,7 @@ class RoleSettingTest extends TestCase
         RoleSetting::create([
             'role_id' => $role->id,
             'can_view_all_branches' => false,
+            'pos_scope' => 'same_branch',
             'is_approver' => false,
             'approval_scope' => 'same_branch',
             'receives_notifications' => true,
@@ -120,5 +127,34 @@ class RoleSettingTest extends TestCase
 
         $this->assertContains($userA->id, $recipientIds);
         $this->assertNotContains($userB->id, $recipientIds);
+    }
+
+    public function test_pos_scope_is_independent_from_general_branch_access(): void
+    {
+        $branchA = BranchModel::create(['code' => 'A', 'name' => 'Branch A']);
+        $branchB = BranchModel::create(['code' => 'B', 'name' => 'Branch B']);
+        $role = Role::create(['name' => 'Kasir', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->forceFill(['branch_id' => $branchA->id])->save();
+        $user->assignRole($role);
+
+        $setting = RoleSetting::create([
+            'role_id' => $role->id,
+            'can_view_all_branches' => true,
+            'pos_scope' => 'same_branch',
+            'is_approver' => false,
+            'approval_scope' => 'same_branch',
+            'receives_notifications' => false,
+            'notification_scope' => 'same_branch',
+        ]);
+
+        $posService = app(PenjualanPosService::class);
+
+        $this->assertEqualsCanonicalizing([$branchA->id, $branchB->id], BranchAccess::userBranchIds($user));
+        $this->assertSame([$branchA->id], $posService->transactionBranchIds($user));
+
+        $setting->update(['pos_scope' => 'all_branches']);
+
+        $this->assertEqualsCanonicalizing([$branchA->id, $branchB->id], $posService->transactionBranchIds($user));
     }
 }

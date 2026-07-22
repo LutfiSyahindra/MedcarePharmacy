@@ -11,6 +11,7 @@ class RoleSetting extends Model
     protected $fillable = [
         'role_id',
         'can_view_all_branches',
+        'pos_scope',
         'is_approver',
         'approval_scope',
         'receives_notifications',

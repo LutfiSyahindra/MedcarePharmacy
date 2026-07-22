@@ -28,6 +28,7 @@ class RoleSettingController extends Controller
             'settings' => ['required', 'array'],
             'settings.*.role_id' => ['required', 'integer', 'distinct', 'exists:roles,id'],
             'settings.*.can_view_all_branches' => ['nullable', 'boolean'],
+            'settings.*.pos_scope' => ['nullable', 'in:same_branch,all_branches'],
             'settings.*.is_approver' => ['nullable', 'boolean'],
             'settings.*.approval_scope' => ['nullable', 'in:same_branch,all_branches'],
             'settings.*.receives_notifications' => ['nullable', 'boolean'],
@@ -41,6 +42,7 @@ class RoleSettingController extends Controller
             'message' => 'Konfigurasi role berhasil disimpan.',
             'summary' => [
                 'all_branch' => $roles->where('can_view_all_branches', true)->count(),
+                'pos_all_branch' => $roles->where('pos_scope', RoleSettingService::ALL_BRANCHES)->count(),
                 'approver' => $roles->where('is_approver', true)->count(),
                 'notification' => $roles->where('receives_notifications', true)->count(),
             ],
