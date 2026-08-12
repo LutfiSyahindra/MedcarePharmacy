@@ -29,6 +29,10 @@ class PenjualanTransactionDetailModel extends Model
         'total_line' => 'decimal:2',
         'batch_summary' => 'array',
         'durasi_hari' => 'integer',
+        'jumlah_racikan' => 'decimal:2',
+        'jumlah_ambil_resep' => 'decimal:2',
+        'embalase_racikan' => 'decimal:2',
+        'jumlah_resep' => 'decimal:2',
     ];
 
     public function transaction()

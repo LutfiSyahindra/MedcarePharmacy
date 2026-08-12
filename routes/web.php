@@ -321,6 +321,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/table', [PenjualanPosController::class, 'table'])->name('penjualan.pos.table');
         Route::get('/pos/{id}/show', [PenjualanPosController::class, 'show'])->name('penjualan.pos.show');
         Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
+        Route::get('/pos/{id}/labels', [PenjualanPosController::class, 'labels'])->name('penjualan.pos.labels');
         Route::put('/pos/{id}/cancel', [PenjualanPosController::class, 'cancel'])->name('penjualan.pos.cancel');
     });
 

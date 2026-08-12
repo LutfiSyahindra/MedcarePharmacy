@@ -17,6 +17,11 @@ class PenjualanPosController extends Controller
     public function index(Request $request)
     {
         $branches = $this->posService->activeBranches($request->user());
+        $branches->load('apotekProfile:id,branch_id,name,logo_path');
+        $branches->each(function (BranchModel $branch) {
+            $branch->setAttribute('display_name', $branch->apotekProfile?->name ?: $branch->name);
+            $branch->setAttribute('logo_url', $branch->apotekProfile?->logo_url ?: asset('assets/apotek/LogoResmi.png'));
+        });
         $canSwitchBranch = $branches->count() > 1;
 
         return view('medcare.menu.penjualan.pos.pos', [
@@ -183,6 +188,7 @@ class PenjualanPosController extends Controller
             ->addColumn('item_count', fn ($transaction) => (int) ($transaction->details_count ?? 0))
             ->addColumn('can_resume', fn ($transaction) => $transaction->status === 'draft')
             ->addColumn('can_print', fn ($transaction) => $transaction->status === 'completed')
+            ->addColumn('can_print_labels', fn ($transaction) => $this->canPrintLabels($transaction))
             ->addColumn('can_cancel', fn ($transaction) => in_array($transaction->status, ['draft', 'completed'], true))
             ->with(['summary' => $summary])
             ->make(true);
@@ -222,6 +228,25 @@ class PenjualanPosController extends Controller
         ]);
     }
 
+    public function labels(Request $request, $id)
+    {
+        $transaction = $this->findScopedTransaction($id)->load([
+            'branch.apotekProfile',
+            'details',
+            'createdBy',
+            'completedBy',
+        ]);
+
+        abort_unless($this->canPrintLabels($transaction), 404);
+
+        return view('medcare.menu.penjualan.pos.labels', [
+            'transaction' => $transaction,
+            'apotekProfile' => $transaction->branch?->apotekProfile,
+            'embedded' => $request->boolean('embedded'),
+            'autoPrint' => $request->boolean('autoprint', ! $request->boolean('embedded')),
+        ]);
+    }
+
     public function cancel(Request $request, $id)
     {
         $validated = $request->validate([
@@ -246,6 +271,7 @@ class PenjualanPosController extends Controller
         $paymentKeys = array_keys(PenjualanPosService::PAYMENT_METHODS);
         $isPrescription = in_array($request->input('jenis_transaksi'), ['penjualan_resep', 'penjualan_racikan'], true);
         $isCompoundPrescription = $request->input('jenis_transaksi') === 'penjualan_racikan';
+        $requiredCustomer = Rule::requiredIf(! $draft);
         $requiredPrescription = Rule::requiredIf(! $draft && $isPrescription);
         $requiredCompound = Rule::requiredIf(! $draft && $isCompoundPrescription);
 
@@ -254,8 +280,8 @@ class PenjualanPosController extends Controller
             'draft_id' => ['nullable', 'integer', 'exists:penjualan_transactions,id'],
             'tanggal_transaksi' => ['nullable', 'date'],
             'jenis_transaksi' => ['required', Rule::in($typeKeys)],
-            'customer_name' => [$requiredPrescription, 'nullable', 'string', 'max:150'],
-            'customer_phone' => ['nullable', 'string', 'max:50'],
+            'customer_name' => [$requiredCustomer, 'nullable', 'string', 'max:150'],
+            'customer_phone' => [$requiredCustomer, 'nullable', 'string', 'max:50'],
             'nomor_resep' => [$requiredPrescription, 'nullable', 'string', 'max:100'],
             'tanggal_resep' => [$requiredPrescription, 'nullable', 'date'],
             'dokter_name' => [$requiredPrescription, 'nullable', 'string', 'max:150'],
@@ -276,22 +302,38 @@ class PenjualanPosController extends Controller
             'details.*.keterangan' => ['nullable', 'string'],
             'details.*.aturan_pakai' => [$requiredPrescription, 'nullable', 'string', 'max:255'],
             'details.*.waktu_konsumsi' => ['nullable', 'string', 'max:80'],
-            'details.*.durasi_hari' => ['nullable', 'integer', 'min:1', 'max:3650'],
+            'details.*.durasi_hari' => [$requiredCompound, 'nullable', 'integer', 'min:1', 'max:3650'],
             'details.*.racikan_group' => [$requiredCompound, 'nullable', 'string', 'max:80'],
+            'details.*.bentuk_racikan' => [$requiredCompound, 'nullable', 'string', 'max:80'],
+            'details.*.jumlah_racikan' => [$requiredCompound, 'nullable', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'details.*.jumlah_ambil_resep' => [$requiredCompound, 'nullable', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'details.*.signa_1' => [$requiredCompound, 'nullable', 'string', 'max:50'],
+            'details.*.signa_2' => [$requiredCompound, 'nullable', 'string', 'max:50'],
+            'details.*.embalase_racikan' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
             'details.*.dosis_komponen' => [$requiredCompound, 'nullable', 'string', 'max:100'],
+            'details.*.kekuatan_obat' => ['nullable', 'string', 'max:100'],
+            'details.*.jumlah_resep' => [$requiredCompound, 'nullable', 'numeric', 'min:0.01', 'max:9999999999.99'],
             'payments' => [$draft ? 'nullable' : 'required', 'array'],
             'payments.*.metode' => ['nullable', Rule::in($paymentKeys)],
             'payments.*.amount' => ['nullable', 'numeric', 'min:0'],
             'payments.*.reference_no' => ['nullable', 'string', 'max:120'],
             'payments.*.catatan' => ['nullable', 'string'],
         ], [
-            'customer_name.required' => 'Nama pasien wajib diisi untuk transaksi resep.',
+            'customer_name.required' => 'Nama pembeli wajib diisi sebelum transaksi diselesaikan.',
+            'customer_phone.required' => 'Nomor HP pembeli wajib diisi sebelum transaksi diselesaikan.',
             'nomor_resep.required' => 'Nomor resep wajib diisi.',
             'tanggal_resep.required' => 'Tanggal resep wajib diisi.',
             'dokter_name.required' => 'Nama dokter penulis resep wajib diisi.',
             'details.*.aturan_pakai.required' => 'Aturan pakai wajib diisi untuk setiap obat resep.',
+            'details.*.durasi_hari.required' => 'JHO wajib diisi untuk setiap racikan.',
             'details.*.racikan_group.required' => 'Kelompok R/ wajib diisi untuk setiap komponen racikan.',
+            'details.*.bentuk_racikan.required' => 'Bentuk racikan wajib dipilih.',
+            'details.*.jumlah_racikan.required' => 'Jumlah racikan wajib diisi.',
+            'details.*.jumlah_ambil_resep.required' => 'Jumlah ambil resep wajib diisi.',
+            'details.*.signa_1.required' => 'Signa 1 wajib diisi.',
+            'details.*.signa_2.required' => 'Signa 2 wajib diisi.',
             'details.*.dosis_komponen.required' => 'Dosis komponen wajib diisi untuk setiap obat racikan.',
+            'details.*.jumlah_resep.required' => 'Jumlah resep wajib diisi untuk setiap obat racikan.',
         ]);
 
         $validated['branch_id'] = $this->posService->resolveBranchId(
@@ -308,8 +350,19 @@ class PenjualanPosController extends Controller
             ->findOrFail($id);
     }
 
+    private function canPrintLabels(PenjualanTransactionModel $transaction): bool
+    {
+        return $transaction->status === 'completed'
+            && in_array($transaction->jenis_transaksi, ['penjualan_resep', 'penjualan_racikan'], true);
+    }
+
     private function transactionPayload(PenjualanTransactionModel $transaction): array
     {
+        $transaction->loadMissing([
+            'details.obat.satuan',
+            'details.obat.konversiSatuan.satuan',
+        ]);
+
         return [
             'id' => $transaction->id,
             'branch_id' => $transaction->branch_id,
@@ -320,6 +373,10 @@ class PenjualanPosController extends Controller
             'jenis_label' => PenjualanPosService::TRANSACTION_TYPES[$transaction->jenis_transaksi] ?? $transaction->jenis_transaksi,
             'status' => $transaction->status,
             'payment_status' => $transaction->payment_status,
+            'can_print_labels' => $this->canPrintLabels($transaction),
+            'labels_url' => $this->canPrintLabels($transaction)
+                ? route('penjualan.pos.labels', $transaction->id)
+                : null,
             'customer_name' => $transaction->customer_name,
             'customer_phone' => $transaction->customer_phone,
             'nomor_resep' => $transaction->nomor_resep,
@@ -354,6 +411,9 @@ class PenjualanPosController extends Controller
                 'satuan_jual' => $detail->satuan_jual,
                 'satuan_stok' => $detail->satuan_stok,
                 'konversi' => (float) $detail->konversi,
+                'units' => $detail->obat
+                    ? $this->posService->unitsForProduct($detail->obat)
+                    : [],
                 'qty_jual' => (float) $detail->qty_jual,
                 'qty_stok' => (float) $detail->qty_stok,
                 'harga_jual' => (float) $detail->harga_jual,
@@ -375,7 +435,15 @@ class PenjualanPosController extends Controller
                 'waktu_konsumsi' => $detail->waktu_konsumsi,
                 'durasi_hari' => $detail->durasi_hari,
                 'racikan_group' => $detail->racikan_group,
+                'bentuk_racikan' => $detail->bentuk_racikan,
+                'jumlah_racikan' => $detail->jumlah_racikan !== null ? (float) $detail->jumlah_racikan : null,
+                'jumlah_ambil_resep' => $detail->jumlah_ambil_resep !== null ? (float) $detail->jumlah_ambil_resep : null,
+                'signa_1' => $detail->signa_1,
+                'signa_2' => $detail->signa_2,
+                'embalase_racikan' => (float) $detail->embalase_racikan,
                 'dosis_komponen' => $detail->dosis_komponen,
+                'kekuatan_obat' => $detail->kekuatan_obat,
+                'jumlah_resep' => $detail->jumlah_resep !== null ? (float) $detail->jumlah_resep : null,
             ])->values()->all(),
             'payments' => $transaction->payments->map(fn ($payment) => [
                 'id' => $payment->id,

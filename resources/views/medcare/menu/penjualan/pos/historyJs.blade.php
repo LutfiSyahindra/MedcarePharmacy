@@ -7,6 +7,7 @@
             table: '{{ route("penjualan.pos.table") }}',
             show: '{{ route("penjualan.pos.show", ":id") }}',
             receipt: '{{ route("penjualan.pos.receipt", ":id") }}',
+            labels: '{{ route("penjualan.pos.labels", ":id") }}',
             cancel: '{{ route("penjualan.pos.cancel", ":id") }}'
         };
         const statusLabels = {
@@ -190,6 +191,15 @@
                     <button type="button" class="history-row-action" data-history-action="print" data-id="${Number(row.id)}"
                         title="Cetak struk" aria-label="Cetak struk ${escapeHtml(row.nomor_transaksi)}">
                         <i class="mdi mdi-printer-outline"></i>
+                    </button>
+                `);
+            }
+
+            if (row.can_print_labels) {
+                actions.push(`
+                    <button type="button" class="history-row-action is-primary" data-history-action="labels" data-id="${Number(row.id)}"
+                        title="Cetak etiket resep" aria-label="Cetak etiket ${escapeHtml(row.nomor_transaksi)}">
+                        <i class="mdi mdi-label-multiple-outline"></i>
                     </button>
                 `);
             }
@@ -453,6 +463,7 @@
             if (action === 'detail') showTransaction(id, this);
             if (action === 'resume') window.location.href = `${urls.pos}?draft_id=${encodeURIComponent(id)}`;
             if (action === 'print') window.open(urls.receipt.replace(':id', id), '_blank', 'noopener');
+            if (action === 'labels') window.open(urls.labels.replace(':id', id), '_blank', 'noopener');
             if (action === 'cancel') cancelTransaction(id);
         });
 
@@ -557,7 +568,8 @@
                             <div class="history-detail-product">
                                 <strong>${escapeHtml(detail.nama_obat)}</strong>
                                 <span>${escapeHtml(detail.kode_obat || '-')} &middot; ${escapeHtml(detail.satuan_jual || '-')}</span>
-                                ${isCompoundPrescription ? `<span><b>${escapeHtml(detail.racikan_group || 'R/ -')}</b> &middot; Dosis komponen ${escapeHtml(detail.dosis_komponen || '-')}</span>` : ''}
+                                ${isCompoundPrescription ? `<span><b>${escapeHtml(detail.racikan_group || 'R/ -')} &middot; ${escapeHtml(detail.bentuk_racikan || '-')}</b> &middot; Signa ${escapeHtml(detail.signa_1 || '-')} &times; ${escapeHtml(detail.signa_2 || '-')} &middot; JHO ${formatNumber(detail.durasi_hari || 0)}</span>` : ''}
+                                ${isCompoundPrescription ? `<span>Kekuatan ${escapeHtml(detail.kekuatan_obat || '-')} &middot; Dosis resep ${escapeHtml(detail.dosis_komponen || '-')} &middot; Jumlah resep ${formatNumber(detail.jumlah_resep || 0)} &middot; Ambil ${formatNumber(detail.qty_jual || 0)}</span>` : ''}
                                 ${isPrescription ? `<span><b>S:</b> ${escapeHtml(detail.aturan_pakai || '-')}</span>` : ''}
                                 ${isPrescription && (detail.waktu_konsumsi || detail.durasi_hari) ? `<span>${escapeHtml(consumptionLabels[detail.waktu_konsumsi] || detail.waktu_konsumsi || '')}${detail.waktu_konsumsi && detail.durasi_hari ? ' &middot; ' : ''}${detail.durasi_hari ? `${formatNumber(detail.durasi_hari)} hari` : ''}</span>` : ''}
                                 ${detail.keterangan ? `<span>${escapeHtml(detail.keterangan)}</span>` : ''}
@@ -705,6 +717,13 @@
                         <i class="mdi mdi-printer-outline"></i>Cetak Struk
                     </button>
                 `);
+                if (transaction.can_print_labels) {
+                    buttons.push(`
+                        <button type="button" class="btn btn-outline-primary" data-history-action="labels" data-id="${Number(transaction.id)}">
+                            <i class="mdi mdi-label-multiple-outline"></i>Cetak Etiket
+                        </button>
+                    `);
+                }
             }
 
             $('#transactionDrawerFooter').html(buttons.join(''));

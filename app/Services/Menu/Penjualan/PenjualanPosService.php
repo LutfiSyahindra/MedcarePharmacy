@@ -372,8 +372,9 @@ class PenjualanPosService
         ])->findOrFail($obatId);
     }
 
-    private function unitsForProduct(MasterObatModel $obat): array
+    public function unitsForProduct(MasterObatModel $obat): array
     {
+        $obat->loadMissing(['satuan', 'konversiSatuan.satuan']);
         $units = collect();
 
         if ($obat->satuan_id && $obat->satuan) {
@@ -547,8 +548,12 @@ class PenjualanPosService
         $taxBase = max(0, $subtotalNet - $transactionDiscount);
         $taxPercent = ! empty($payload['use_pajak']) ? $this->percent($payload['pajak_percent'] ?? 0) : 0.0;
         $taxTotal = round($taxBase * ($taxPercent / 100), 2);
+        $hasPerGroupEmbalase = $details->contains(fn (array $item) => array_key_exists('embalase_racikan', $item));
+        $groupEmbalase = $details
+            ->groupBy(fn (array $item) => trim((string) ($item['racikan_group'] ?? '')))
+            ->sum(fn ($group) => $this->money($group->first()['embalase_racikan'] ?? 0));
         $embalase = $transaction->jenis_transaksi === 'penjualan_racikan'
-            ? $this->money($payload['embalase'] ?? 0)
+            ? ($hasPerGroupEmbalase ? round($groupEmbalase, 2) : $this->money($payload['embalase'] ?? 0))
             : 0.0;
         $grandTotal = round($taxBase + $taxTotal + $embalase, 2);
 
@@ -613,7 +618,15 @@ class PenjualanPosService
                 'waktu_konsumsi' => $isPrescription ? $this->nullableString($item['waktu_konsumsi'] ?? null) : null,
                 'durasi_hari' => $isPrescription && ! empty($item['durasi_hari']) ? (int) $item['durasi_hari'] : null,
                 'racikan_group' => $isCompoundPrescription ? $this->nullableString($item['racikan_group'] ?? null) : null,
+                'bentuk_racikan' => $isCompoundPrescription ? $this->nullableString($item['bentuk_racikan'] ?? null) : null,
+                'jumlah_racikan' => $isCompoundPrescription && isset($item['jumlah_racikan']) ? $this->quantity($item['jumlah_racikan']) : null,
+                'jumlah_ambil_resep' => $isCompoundPrescription && isset($item['jumlah_ambil_resep']) ? $this->quantity($item['jumlah_ambil_resep']) : null,
+                'signa_1' => $isCompoundPrescription ? $this->nullableString($item['signa_1'] ?? null) : null,
+                'signa_2' => $isCompoundPrescription ? $this->nullableString($item['signa_2'] ?? null) : null,
+                'embalase_racikan' => $isCompoundPrescription ? $this->money($item['embalase_racikan'] ?? 0) : 0,
                 'dosis_komponen' => $isCompoundPrescription ? $this->nullableString($item['dosis_komponen'] ?? null) : null,
+                'kekuatan_obat' => $isCompoundPrescription ? $this->nullableString($item['kekuatan_obat'] ?? null) : null,
+                'jumlah_resep' => $isCompoundPrescription && isset($item['jumlah_resep']) ? $this->quantity($item['jumlah_resep']) : null,
             ],
             'allocations' => $allocations,
             'totals' => [

@@ -35,12 +35,25 @@
         }
 
         .receipt {
+            position: relative;
             width: 80mm;
             margin: 0 auto;
             padding: 5mm 4mm 6mm;
             overflow: hidden;
             background: var(--paper);
             box-shadow: 0 12px 32px rgba(16, 24, 40, 0.14);
+        }
+
+        .receipt-patient-copy {
+            border-top: 1.6mm solid #1594c4;
+        }
+
+        .receipt-pharmacy-copy {
+            border-top: 1.6mm solid #087a62;
+        }
+
+        .receipt + .receipt {
+            margin-top: 20px;
         }
 
         .receipt-header {
@@ -95,6 +108,25 @@
             border-bottom: 1px solid var(--ink);
         }
 
+        .document-copy {
+            display: grid;
+            min-width: 0;
+            gap: 0.5mm;
+        }
+
+        .copy-label {
+            color: var(--brand);
+            font-size: 7.5px;
+            font-weight: 800;
+            letter-spacing: 0.9px;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .receipt-pharmacy-copy .copy-label {
+            color: #087a62;
+        }
+
         .document-title {
             font-size: 10px;
             font-weight: 800;
@@ -128,6 +160,13 @@
             display: grid;
             grid-template-columns: 19mm 2mm minmax(0, 1fr);
             row-gap: 0.8mm;
+        }
+
+        .meta-card {
+            padding: 2.4mm;
+            border: 1px solid #d8dde5;
+            border-radius: 2mm;
+            background: #fbfcfd;
         }
 
         .meta-row {
@@ -225,6 +264,251 @@
 
         .prescription-note strong {
             color: var(--ink);
+        }
+
+        .compound-recipe {
+            margin: 2.5mm 0 2mm;
+            padding: 2mm 2.3mm;
+            border: 1px solid var(--line);
+            border-left: 2px solid var(--brand);
+            border-radius: 2mm;
+            background: #f7f8fc;
+            font-size: 9px;
+            line-height: 1.45;
+        }
+
+        .compound-recipe strong {
+            color: var(--ink);
+        }
+
+        .patient-compound-list {
+            display: grid;
+            gap: 2mm;
+        }
+
+        .patient-compound-item {
+            display: flex;
+            align-items: center;
+            gap: 2mm;
+            padding: 2.5mm;
+            border: 1px solid var(--line);
+            border-left: 2px solid var(--brand);
+            border-radius: 2mm;
+            background: #f7f8fc;
+        }
+
+        .patient-compound-number {
+            display: inline-flex;
+            width: 7mm;
+            height: 7mm;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #e4f5fb;
+            color: #067aa6;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .patient-compound-name {
+            min-width: 0;
+            font-size: 10px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .receipt-copy-note {
+            margin: 2.5mm 0 0;
+            padding: 1.8mm 2mm;
+            border-radius: 1.5mm;
+            background: #f3f6f8;
+            color: var(--muted);
+            font-size: 8px;
+            line-height: 1.45;
+            text-align: center;
+        }
+
+        .summary-card {
+            padding: 2.2mm 2.4mm;
+            border: 1px solid #d8dde5;
+            border-radius: 2mm;
+            background: #fbfcfd;
+        }
+
+        .summary-card .grand-total {
+            margin-right: -2.4mm;
+            margin-left: -2.4mm;
+            padding-right: 2.4mm;
+            padding-left: 2.4mm;
+            background: #f3f6f8;
+        }
+
+        .pharmacy-compound-list {
+            display: grid;
+            gap: 3mm;
+        }
+
+        .pharmacy-compound-group {
+            overflow: hidden;
+            break-inside: avoid;
+            border: 1px solid #bfc9cf;
+            border-radius: 2.2mm;
+            background: #fff;
+        }
+
+        .compound-group-header {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 2mm;
+            padding: 2.3mm;
+            border-bottom: 1px solid #c8d4d1;
+            background: #eef8f5;
+        }
+
+        .compound-group-index {
+            display: inline-flex;
+            min-width: 8mm;
+            height: 8mm;
+            align-items: center;
+            justify-content: center;
+            padding: 0 1.4mm;
+            border-radius: 1.6mm;
+            background: #087a62;
+            color: #fff;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+        }
+
+        .compound-group-title {
+            display: grid;
+            min-width: 0;
+            gap: 0.3mm;
+        }
+
+        .compound-group-title strong {
+            font-size: 10px;
+            overflow-wrap: anywhere;
+        }
+
+        .compound-group-title small,
+        .compound-group-total small {
+            color: var(--muted);
+            font-size: 7.5px;
+        }
+
+        .compound-group-total {
+            display: grid;
+            gap: 0.2mm;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .compound-group-total strong {
+            font-size: 9px;
+        }
+
+        .compound-clinical-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.2mm 2mm;
+            padding: 2mm 2.3mm;
+            border-bottom: 1px dashed #cfd8d5;
+            background: #fbfdfc;
+            font-size: 8px;
+        }
+
+        .compound-clinical-grid span {
+            min-width: 0;
+            color: var(--muted);
+            overflow-wrap: anywhere;
+        }
+
+        .compound-clinical-grid b {
+            color: var(--ink);
+        }
+
+        .compound-component-list {
+            counter-reset: compound-component;
+        }
+
+        .compound-component {
+            counter-increment: compound-component;
+            break-inside: avoid;
+            padding: 2.3mm;
+            border-bottom: 1px dashed #d7dde2;
+        }
+
+        .compound-component:last-child {
+            border-bottom: 0;
+        }
+
+        .compound-component-head {
+            display: grid;
+            grid-template-columns: 5mm minmax(0, 1fr) auto;
+            gap: 1mm;
+            align-items: start;
+        }
+
+        .compound-component-number::before {
+            content: counter(compound-component) ".";
+            color: #087a62;
+            font-size: 8px;
+            font-weight: 800;
+        }
+
+        .compound-component-name {
+            font-size: 9.5px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .compound-component-total {
+            padding-left: 1mm;
+            font-size: 9px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .compound-component-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8mm 2mm;
+            margin: 1.3mm 0 0 6mm;
+            color: var(--muted);
+            font-size: 8px;
+            line-height: 1.4;
+        }
+
+        .compound-component-metrics span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .compound-component-metrics b {
+            color: var(--ink);
+        }
+
+        .compound-component-metrics .is-wide {
+            grid-column: 1 / -1;
+            padding-top: 0.8mm;
+            border-top: 1px dotted #d7dde2;
+        }
+
+        .compound-signa {
+            padding: 2mm 2.3mm;
+            border-top: 1px solid #c8d4d1;
+            background: #f5faf8;
+            color: #38564e;
+            font-size: 8px;
+            line-height: 1.45;
+        }
+
+        .exact-quantity {
+            color: #075f46;
+            font-weight: 800;
         }
 
         .summary-row,
@@ -355,6 +639,12 @@
                 box-shadow: none;
             }
 
+            .receipt + .receipt {
+                margin-top: 0;
+                break-before: page;
+                page-break-before: always;
+            }
+
             .print-button {
                 display: none;
             }
@@ -366,8 +656,29 @@
     @php
         $currency = fn ($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
         $number = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
+        $preciseNumber = fn ($value) => number_format((float) $value, 2, ',', '.');
         $isPrescription = in_array($transaction->jenis_transaksi, ['penjualan_resep', 'penjualan_racikan'], true);
         $isCompoundPrescription = $transaction->jenis_transaksi === 'penjualan_racikan';
+        $compoundGroups = $isCompoundPrescription
+            ? $transaction->details->groupBy(fn ($detail) => trim((string) $detail->racikan_group) ?: 'R/ -')
+            : collect();
+        $compoundPatientName = function ($detail) {
+            preg_match('/(\d+)/', (string) $detail->racikan_group, $matches);
+            $groupName = isset($matches[1]) ? 'Racikan '.$matches[1] : ($detail->racikan_group ?: 'Racikan');
+
+            return $groupName.' · '.($detail->bentuk_racikan ?: 'Bentuk racikan');
+        };
+        $exactCompoundUsage = function ($detail) {
+            $prescriptionQuantity = (float) $detail->jumlah_resep;
+            $compoundQuantity = (float) $detail->jumlah_racikan;
+            $compoundTake = (float) $detail->jumlah_ambil_resep;
+
+            if ($prescriptionQuantity > 0 && $compoundQuantity > 0 && $compoundTake > 0) {
+                return round($prescriptionQuantity * ($compoundTake / $compoundQuantity), 2);
+            }
+
+            return (float) $detail->qty_jual;
+        };
         $cashier = $transaction->completedBy->name ?? $transaction->createdBy->name ?? '-';
         $pharmacyName = $apotekProfile
             ? $apotekProfile->name
@@ -397,7 +708,96 @@
         <button type="button" class="print-button" onclick="window.print()">Cetak Struk</button>
     @endunless
 
-    <main class="receipt">
+    @if ($isCompoundPrescription)
+        <main class="receipt receipt-patient-copy">
+            <header class="receipt-header">
+                @if ($pharmacyLogo)
+                    <img src="{{ $pharmacyLogo }}" alt="Logo {{ $pharmacyName }}" class="receipt-logo">
+                @endif
+                <p class="branch-name">{{ $pharmacyName }}</p>
+                @if ($apotekProfile?->slogan)
+                    <p class="branch-slogan">{{ $apotekProfile->slogan }}</p>
+                @endif
+                @if ($pharmacyAddress)
+                    <p class="branch-detail">{{ $pharmacyAddress }}</p>
+                @endif
+                @if ($pharmacyPhone || $apotekProfile?->whatsapp)
+                    <p class="branch-detail branch-contact">
+                        @if ($pharmacyPhone)
+                            <span>Tel. {{ $pharmacyPhone }}</span>
+                        @endif
+                        @if ($apotekProfile?->whatsapp)
+                            <span>WA {{ $apotekProfile->whatsapp }}</span>
+                        @endif
+                    </p>
+                @endif
+            </header>
+
+            <section class="document-heading" aria-label="Salinan pasien">
+                <span class="document-copy">
+                    <span class="copy-label">Salinan Pasien</span>
+                    <span class="document-title">Bukti Pembayaran Resep</span>
+                </span>
+                <span class="status-badge {{ $transaction->payment_status }}">
+                    {{ $paymentStatusLabels[$transaction->payment_status] ?? $transaction->payment_status }}
+                </span>
+            </section>
+
+            <div class="meta meta-card">
+                <div class="meta-row"><span class="meta-label">No. Transaksi</span><span class="separator">:</span><span class="meta-value">{{ $transaction->nomor_transaksi }}</span></div>
+                <div class="meta-row"><span class="meta-label">Tanggal</span><span class="separator">:</span><span class="meta-value">{{ optional($transaction->tanggal_transaksi)->format('d/m/Y H:i') }}</span></div>
+                <div class="meta-row"><span class="meta-label">Pasien</span><span class="separator">:</span><span class="meta-value">{{ $transaction->customer_name ?: 'Umum' }}</span></div>
+                <div class="meta-row"><span class="meta-label">No. Resep</span><span class="separator">:</span><span class="meta-value">{{ $transaction->nomor_resep ?: '-' }}</span></div>
+                <div class="meta-row"><span class="meta-label">Dokter</span><span class="separator">:</span><span class="meta-value">{{ $transaction->dokter_name ?: '-' }}</span></div>
+            </div>
+
+            <hr class="divider">
+
+            <section aria-label="Daftar racikan pasien">
+                <div class="section-label">Racikan yang Diterima</div>
+                <div class="patient-compound-list">
+                    @foreach ($compoundGroups as $groupDetails)
+                        @php($compoundReference = $groupDetails->first())
+                        <div class="patient-compound-item">
+                            <span class="patient-compound-number">{{ $loop->iteration }}</span>
+                            <span class="patient-compound-name">{{ $compoundPatientName($compoundReference) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+
+            <hr class="divider">
+
+            <section class="summary-card" aria-label="Ringkasan pembayaran pasien">
+                <div class="summary-row"><span>Subtotal</span><span>{{ $currency($transaction->subtotal_gross) }}</span></div>
+                @if ((float) $transaction->diskon_item_total + (float) $transaction->diskon_transaksi_nominal > 0)
+                    <div class="summary-row discount"><span>Total Diskon</span><span>-{{ $currency((float) $transaction->diskon_item_total + (float) $transaction->diskon_transaksi_nominal) }}</span></div>
+                @endif
+                @if ((float) $transaction->pajak_total > 0)
+                    <div class="summary-row"><span>Pajak</span><span>{{ $currency($transaction->pajak_total) }}</span></div>
+                @endif
+                @if ((float) $transaction->embalase > 0)
+                    <div class="summary-row"><span>Embalase Racikan</span><span>{{ $currency($transaction->embalase) }}</span></div>
+                @endif
+                <div class="summary-row grand-total"><span>Total</span><span>{{ $currency($transaction->grand_total) }}</span></div>
+                <div class="summary-row"><span>Bayar</span><span>{{ $currency($transaction->total_bayar) }}</span></div>
+                <div class="summary-row">
+                    <span>{{ (float) $transaction->sisa_tagihan > 0 ? 'Sisa Tagihan' : 'Kembalian' }}</span>
+                    <span>{{ $currency((float) $transaction->sisa_tagihan > 0 ? $transaction->sisa_tagihan : $transaction->kembalian) }}</span>
+                </div>
+            </section>
+
+            <p class="receipt-copy-note">Salinan pasien tidak memuat komposisi bahan. Detail peracikan dan penggunaan bahan tercatat pada salinan apotek.</p>
+
+            <footer class="receipt-footer">
+                <p class="thank-you">Terima kasih</p>
+                <p class="footer-note">{{ $apotekProfile?->receipt_footer ?: 'Semoga lekas sehat. Simpan struk ini sebagai bukti transaksi.' }}</p>
+                <div class="footer-mark"></div>
+            </footer>
+        </main>
+    @endif
+
+    <main class="receipt {{ $isCompoundPrescription ? 'receipt-pharmacy-copy' : '' }}">
         <header class="receipt-header">
             @if ($pharmacyLogo)
                 <img
@@ -439,13 +839,20 @@
         </header>
 
         <section class="document-heading" aria-label="Status transaksi">
-            <span class="document-title">Bukti Pembayaran</span>
+            @if ($isCompoundPrescription)
+                <span class="document-copy">
+                    <span class="copy-label">Salinan Apotek</span>
+                    <span class="document-title">Lembar Peracikan</span>
+                </span>
+            @else
+                <span class="document-title">Bukti Pembayaran</span>
+            @endif
             <span class="status-badge {{ $transaction->payment_status }}">
                 {{ $paymentStatusLabels[$transaction->payment_status] ?? $transaction->payment_status }}
             </span>
         </section>
 
-        <div class="meta">
+        <div class="meta {{ $isCompoundPrescription ? 'meta-card' : '' }}">
             <div class="meta-row"><span class="meta-label">No. Transaksi</span><span class="separator">:</span><span class="meta-value">{{ $transaction->nomor_transaksi }}</span></div>
             <div class="meta-row"><span class="meta-label">Tanggal</span><span class="separator">:</span><span class="meta-value">{{ optional($transaction->tanggal_transaksi)->format('d/m/Y H:i') }}</span></div>
             <div class="meta-row"><span class="meta-label">Kasir</span><span class="separator">:</span><span class="meta-value">{{ $cashier }}</span></div>
@@ -466,43 +873,111 @@
 
         <hr class="divider">
 
-        <section aria-label="Daftar produk">
-            <div class="section-label">Rincian Produk</div>
-            @foreach ($transaction->details as $detail)
-                <article class="item">
-                    <div class="item-primary">
-                        <span class="item-number">{{ $loop->iteration }}.</span>
-                        <span class="item-name">{{ $detail->nama_obat }}</span>
-                        <span class="item-total">{{ $currency($detail->subtotal_gross) }}</span>
-                    </div>
-                    <div class="item-secondary">
-                        {{ $number($detail->qty_jual) }} {{ $detail->satuan_jual }} &times; {{ $currency($detail->harga_jual) }}
-                    </div>
-                    @if ((float) $detail->diskon_nominal > 0)
-                        <div class="item-discount">
-                            <span>Diskon item</span>
-                            <span>-{{ $currency($detail->diskon_nominal) }}</span>
-                        </div>
-                    @endif
-                    @if ($isPrescription)
-                        <div class="prescription-note">
-                            @if ($isCompoundPrescription)
-                                <div><strong>{{ $detail->racikan_group ?: 'R/ -' }}</strong> &middot; {{ $detail->dosis_komponen ?: 'Dosis belum dicatat' }}</div>
-                            @endif
-                            <div>
-                                <strong>Aturan pakai:</strong> {{ $detail->aturan_pakai ?: '-' }}
-                                @if ($detail->waktu_konsumsi || $detail->durasi_hari)
-                                    ({{ $consumptionLabels[$detail->waktu_konsumsi] ?? $detail->waktu_konsumsi }}{{ $detail->waktu_konsumsi && $detail->durasi_hari ? ', ' : '' }}{{ $detail->durasi_hari ? $detail->durasi_hari . ' hari' : '' }})
+        @if ($isCompoundPrescription)
+            <section aria-label="Racikan apotek">
+                <div class="section-label">Rincian Per Racikan</div>
+                <div class="pharmacy-compound-list">
+                    @foreach ($compoundGroups as $groupCode => $groupDetails)
+                        @php($compoundReference = $groupDetails->first())
+                        @php($groupLineTotal = (float) $groupDetails->sum('total_line'))
+                        @php($groupEmbalase = (float) $compoundReference->embalase_racikan)
+                        @php($groupTotal = $groupLineTotal + $groupEmbalase)
+                        <article class="pharmacy-compound-group">
+                            <header class="compound-group-header">
+                                <span class="compound-group-index">{{ $groupCode }}</span>
+                                <span class="compound-group-title">
+                                    <strong>{{ $compoundPatientName($compoundReference) }}</strong>
+                                    <small>{{ $groupDetails->count() }} komponen obat</small>
+                                </span>
+                                <span class="compound-group-total">
+                                    <small>Total racikan</small>
+                                    <strong>{{ $currency($groupTotal) }}</strong>
+                                </span>
+                            </header>
+
+                            <div class="compound-clinical-grid">
+                                <span><b>Dibuat</b><br>{{ $number($compoundReference->jumlah_racikan) }} {{ $compoundReference->bentuk_racikan ?: 'racikan' }}</span>
+                                <span><b>Ambil Resep</b><br>{{ $number($compoundReference->jumlah_ambil_resep) }}</span>
+                                <span><b>Signa</b><br>{{ $compoundReference->signa_1 ?: '-' }} &times; {{ $compoundReference->signa_2 ?: '-' }}</span>
+                                <span><b>JHO</b><br>{{ $compoundReference->durasi_hari ?: '-' }} hari</span>
+                                @if ($groupEmbalase > 0)
+                                    <span><b>Embalase</b><br>{{ $currency($groupEmbalase) }}</span>
                                 @endif
                             </div>
-                            @if ($detail->keterangan)
-                                <div>{{ $detail->keterangan }}</div>
-                            @endif
+
+                            <div class="compound-component-list">
+                                @foreach ($groupDetails as $detail)
+                                    @php($exactUsage = $exactCompoundUsage($detail))
+                                    <div class="compound-component">
+                                        <div class="compound-component-head">
+                                            <span class="compound-component-number"></span>
+                                            <span class="compound-component-name">{{ $detail->nama_obat }}</span>
+                                            <span class="compound-component-total">{{ $currency($detail->total_line) }}</span>
+                                        </div>
+                                        <div class="compound-component-metrics">
+                                            <span><b>Kekuatan</b><br>{{ $detail->kekuatan_obat ?: '-' }}</span>
+                                            <span><b>Dosis Resep</b><br>{{ $detail->dosis_komponen ?: '-' }}</span>
+                                            <span><b>Jumlah Resep</b><br>{{ $preciseNumber($detail->jumlah_resep) }} {{ $detail->satuan_jual }}</span>
+                                            <span><b>Kebutuhan Tepat</b><br><span class="exact-quantity">{{ $preciseNumber($exactUsage) }} {{ $detail->satuan_jual }}</span></span>
+                                            <span><b>Stok Keluar</b><br>{{ $number($detail->qty_jual) }} {{ $detail->satuan_jual }}</span>
+                                            <span><b>Harga Satuan</b><br>{{ $currency($detail->harga_jual) }}</span>
+                                            @if ((float) $detail->diskon_nominal > 0)
+                                                <span><b>Diskon</b><br>-{{ $currency($detail->diskon_nominal) }}</span>
+                                            @endif
+                                            @if ($detail->keterangan)
+                                                <span class="is-wide"><b>Catatan Komponen</b><br>{{ $detail->keterangan }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <footer class="compound-signa">
+                                <strong>Aturan pakai:</strong> {{ $compoundReference->aturan_pakai ?: '-' }}
+                                @if ($compoundReference->waktu_konsumsi || $compoundReference->durasi_hari)
+                                    ({{ $consumptionLabels[$compoundReference->waktu_konsumsi] ?? $compoundReference->waktu_konsumsi }}{{ $compoundReference->waktu_konsumsi && $compoundReference->durasi_hari ? ', ' : '' }}{{ $compoundReference->durasi_hari ? $compoundReference->durasi_hari.' hari' : '' }})
+                                @endif
+                            </footer>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @else
+            <section aria-label="Daftar produk">
+                <div class="section-label">Rincian Produk</div>
+                @foreach ($transaction->details as $detail)
+                    <article class="item">
+                        <div class="item-primary">
+                            <span class="item-number">{{ $loop->iteration }}.</span>
+                            <span class="item-name">{{ $detail->nama_obat }}</span>
+                            <span class="item-total">{{ $currency($detail->subtotal_gross) }}</span>
                         </div>
-                    @endif
-                </article>
-            @endforeach
-        </section>
+                        <div class="item-secondary">
+                            {{ $number($detail->qty_jual) }} {{ $detail->satuan_jual }} &times; {{ $currency($detail->harga_jual) }}
+                        </div>
+                        @if ((float) $detail->diskon_nominal > 0)
+                            <div class="item-discount">
+                                <span>Diskon item</span>
+                                <span>-{{ $currency($detail->diskon_nominal) }}</span>
+                            </div>
+                        @endif
+                        @if ($isPrescription)
+                            <div class="prescription-note">
+                                <div>
+                                    <strong>Aturan pakai:</strong> {{ $detail->aturan_pakai ?: '-' }}
+                                    @if ($detail->waktu_konsumsi || $detail->durasi_hari)
+                                        ({{ $consumptionLabels[$detail->waktu_konsumsi] ?? $detail->waktu_konsumsi }}{{ $detail->waktu_konsumsi && $detail->durasi_hari ? ', ' : '' }}{{ $detail->durasi_hari ? $detail->durasi_hari.' hari' : '' }})
+                                    @endif
+                                </div>
+                                @if ($detail->keterangan)
+                                    <div>{{ $detail->keterangan }}</div>
+                                @endif
+                            </div>
+                        @endif
+                    </article>
+                @endforeach
+            </section>
+        @endif
 
         <hr class="divider">
 
@@ -551,8 +1026,8 @@
         @endif
 
         <footer class="receipt-footer">
-            <p class="thank-you">Terima kasih</p>
-            <p class="footer-note">{{ $apotekProfile?->receipt_footer ?: 'Semoga lekas sehat. Simpan struk ini sebagai bukti transaksi.' }}</p>
+            <p class="thank-you">{{ $isCompoundPrescription ? 'Dokumen Internal Apotek' : 'Terima kasih' }}</p>
+            <p class="footer-note">{{ $isCompoundPrescription ? 'Gunakan lembar ini untuk verifikasi komposisi, pengambilan stok, dan audit peracikan.' : ($apotekProfile?->receipt_footer ?: 'Semoga lekas sehat. Simpan struk ini sebagai bukti transaksi.') }}</p>
             @if ($apotekProfile?->pharmacist_name || $apotekProfile?->pharmacist_license_number || $apotekProfile?->pharmacy_license_number || $apotekProfile?->tax_id)
                 <p class="pharmacy-legal">
                     @if ($apotekProfile?->pharmacist_name)

@@ -8,29 +8,52 @@
     @include("template.AddOn.datePicker")
     @include("medcare.menu.penjualan.pos.partials.style")
     @include("medcare.menu.penjualan.pos.partials.simpleStyle")
+    @include("medcare.menu.penjualan.pos.partials.premiumCashierStyle")
+    @include("medcare.menu.penjualan.pos.partials.prescriptionCashierStyle")
+    @include("medcare.menu.penjualan.pos.partials.prescriptionComfortStyle")
 @endpush
 
 @section("content")
-    <main class="pos-page pos-page--cashier pos-simple" aria-label="Kasir point of sale">
+    <main class="pos-page pos-page--cashier pos-simple pos-premium" aria-label="Kasir point of sale">
         <header class="pos-appbar">
             <div class="pos-brand">
-                <span class="pos-brand-mark"><i class="mdi mdi-storefront-outline"></i></span>
+                <span class="pos-brand-mark"><i class="mdi mdi-point-of-sale"></i></span>
                 <div class="pos-brand-copy">
-                    <div class="pos-eyebrow">MEDCARE · POINT OF SALE</div>
                     <div class="pos-brand-title">
-                        <h1>Kasir POS</h1>
-                        <span>Penjualan apotek</span>
+                        <h1>Medcare Kasir</h1>
+                        <span>Point of sale apotek</span>
+                    </div>
+                    <div class="pos-brand-meta">
+                        <span class="pos-session-status" id="posConnection"><i class="mdi mdi-circle"></i> Online</span>
+                        <span class="pos-clock"><i class="mdi mdi-clock-outline"></i><span id="posClock">Memuat waktu...</span></span>
                     </div>
                 </div>
             </div>
 
             <div class="pos-appbar-center">
-                <span class="pos-session-status" id="posConnection"><i class="mdi mdi-circle"></i> Sistem online</span>
-                <span class="pos-clock"><i class="mdi mdi-clock-outline"></i><span id="posClock">Memuat waktu...</span></span>
-                <span class="pos-cashier-profile" title="Kasir aktif">
-                    <span class="pos-cashier-avatar">{{ strtoupper(substr(auth()->user()->name ?? "K", 0, 1)) }}</span>
-                    <span><small>Kasir aktif</small><strong>{{ auth()->user()->name ?? "Kasir" }}</strong></span>
-                </span>
+                <nav class="pos-flow" aria-label="Tahapan transaksi">
+                    <button type="button" class="pos-flow-step is-active" id="posFlowProduct" data-pos-jump="product"
+                        aria-label="Buka langkah pilih produk">
+                        <span class="pos-flow-icon"><i class="mdi mdi-barcode-scan"></i><b>1</b></span>
+                        <span><small>Langkah 1</small><strong>Produk</strong></span>
+                    </button>
+                    <span class="pos-flow-divider" aria-hidden="true"><i class="mdi mdi-chevron-right"></i></span>
+                    <button type="button" class="pos-flow-step" id="posFlowCart" data-pos-jump="cart"
+                        aria-label="Buka langkah review keranjang">
+                        <span class="pos-flow-icon"><i class="mdi mdi-cart-outline"></i><b>2</b></span>
+                        <span><small>Langkah 2</small><strong>Keranjang</strong></span>
+                    </button>
+                    <span class="pos-flow-divider" aria-hidden="true"><i class="mdi mdi-chevron-right"></i></span>
+                    <button type="button" class="pos-flow-step" id="posFlowPayment" data-pos-jump="payment"
+                        aria-label="Buka langkah pembayaran">
+                        <span class="pos-flow-icon"><i class="mdi mdi-credit-card-check-outline"></i><b>3</b></span>
+                        <span><small>Langkah 3</small><strong>Pembayaran</strong></span>
+                    </button>
+                    <div class="pos-flow-summary">
+                        <span><small>Item</small><strong id="headerCartCount">0</strong></span>
+                        <span><small>Total</small><strong id="headerGrandTotal">Rp 0</strong></span>
+                    </div>
+                </nav>
             </div>
 
             <div class="pos-appbar-actions">
@@ -43,7 +66,7 @@
                     </button>
                 @endif
                 <button type="button" class="btn pos-btn-quiet" id="newTransactionBtn" title="Transaksi baru (F8)">
-                    <i class="mdi mdi-plus-circle-outline"></i><span>Transaksi baru</span><kbd>F8</kbd>
+                    <i class="mdi mdi-plus"></i><span>Baru</span><kbd>F8</kbd>
                 </button>
                 <a href="{{ route("penjualan.pos.history") }}" class="btn pos-btn-quiet" title="Riwayat transaksi">
                     <i class="mdi mdi-history"></i><span>Riwayat</span>
@@ -51,30 +74,14 @@
                 <button type="button" class="btn pos-btn-quiet" id="printLastReceiptBtn" disabled title="Cetak struk transaksi terakhir">
                     <i class="mdi mdi-printer-outline"></i><span>Struk terakhir</span>
                 </button>
+                <span class="pos-cashier-profile" title="Kasir aktif">
+                    <span class="pos-cashier-avatar">{{ strtoupper(substr(auth()->user()->name ?? "K", 0, 1)) }}</span>
+                    <span><small>Kasir</small><strong>{{ auth()->user()->name ?? "Kasir" }}</strong></span>
+                </span>
             </div>
         </header>
 
-        <section class="pos-flow" aria-label="Progres transaksi">
-            <div class="pos-flow-track" aria-hidden="true"><span id="posFlowProgress"></span></div>
-            <div class="pos-flow-step is-active" id="posFlowProduct">
-                <span class="pos-flow-icon"><i class="mdi mdi-barcode-scan"></i><b>1</b></span>
-                <span><small>Langkah 1</small><strong>Pilih produk</strong></span>
-            </div>
-            <div class="pos-flow-step" id="posFlowCart">
-                <span class="pos-flow-icon"><i class="mdi mdi-cart-outline"></i><b>2</b></span>
-                <span><small>Langkah 2</small><strong>Review keranjang</strong></span>
-            </div>
-            <div class="pos-flow-step" id="posFlowPayment">
-                <span class="pos-flow-icon"><i class="mdi mdi-credit-card-check-outline"></i><b>3</b></span>
-                <span><small>Langkah 3</small><strong>Terima pembayaran</strong></span>
-            </div>
-            <div class="pos-flow-summary">
-                <span><small>Item</small><strong id="headerCartCount">0</strong></span>
-                <span><small>Total berjalan</small><strong id="headerGrandTotal">Rp 0</strong></span>
-            </div>
-        </section>
-
-        <div class="pos-workspace" id="posWorkspace">
+        <div class="pos-workspace is-stage-product" id="posWorkspace" data-cashier-stage="product">
             <span id="posCatalogHomeAnchor" class="d-none" aria-hidden="true"></span>
             <aside class="pos-catalog" aria-label="Pilih produk">
                 <section class="pos-surface pos-product-panel">
@@ -83,8 +90,8 @@
                             <span class="pos-catalog-step">1</span>
                             <div>
                                 <span class="pos-section-kicker">PRODUK</span>
-                                <h2>Cari produk</h2>
-                                <p>Cari obat atau scan barcode, lalu tentukan jumlah.</p>
+                                <h2>Tambah produk</h2>
+                                <p>Cari nama, kode, atau scan barcode.</p>
                             </div>
                         </div>
                         <span class="pos-catalog-ready"><i class="mdi mdi-access-point"></i> Scanner aktif</span>
@@ -109,13 +116,13 @@
 
                     <div class="pos-search-box" id="productSearchBox">
                         <div class="pos-search-topline">
-                            <span class="pos-search-eyebrow"><i class="mdi mdi-lightning-bolt"></i> Pencarian cepat</span>
+                            <span class="pos-search-eyebrow"><i class="mdi mdi-lightning-bolt"></i> Input produk</span>
                             <span class="pos-search-shortcut"><kbd>F2</kbd></span>
                         </div>
 
                         <label class="pos-search-title" for="productSearch">
-                            Cari obat atau scan barcode
-                            <small>Ketik nama obat, kode produk, atau barcode</small>
+                            Cari produk
+                            <small>Nama obat, kode produk, atau barcode</small>
                         </label>
 
                         <div class="pos-search-control">
@@ -233,6 +240,10 @@
             </aside>
 
             <section class="pos-checkout" aria-label="Transaksi aktif">
+                <section class="pos-customer-card" id="posCustomerCard" aria-label="Profil pembeli">
+                    <span id="posDetailsHomeAnchor" class="d-none" aria-hidden="true"></span>
+                </section>
+
                 <section class="pos-surface pos-transaction-panel" id="transactionPanel">
                     <div class="pos-transaction-hero">
                         <span class="pos-transaction-orbit" aria-hidden="true"></span>
@@ -248,25 +259,6 @@
                             <span class="pos-draft-pill" id="transactionState" aria-live="polite">
                                 <i class="mdi mdi-circle-medium"></i><span>Belum disimpan</span>
                             </span>
-                        </div>
-
-                        <div class="pos-transaction-insights" aria-label="Ringkasan keranjang">
-                            <div class="pos-insight-card">
-                                <span class="pos-insight-icon is-indigo"><i class="mdi mdi-cart-variant"></i></span>
-                                <span><small>JENIS ITEM</small><strong id="cartItemCount">0 item</strong></span>
-                            </div>
-                            <div class="pos-insight-card">
-                                <span class="pos-insight-icon is-cyan"><i class="mdi mdi-counter"></i></span>
-                                <span><small>TOTAL KUANTITAS</small><strong id="cartQtyCount">0 qty</strong></span>
-                            </div>
-                            <div class="pos-insight-card">
-                                <span class="pos-insight-icon is-amber"><i class="mdi mdi-cash-multiple"></i></span>
-                                <span><small>NILAI ITEM</small><strong id="cartRunningTotal">Rp 0</strong></span>
-                            </div>
-                            <div class="pos-insight-card" id="cartHealthCard">
-                                <span class="pos-insight-icon is-emerald"><i class="mdi mdi-shield-check-outline"></i></span>
-                                <span><small>KESEHATAN STOK</small><strong id="cartStockHealth">Menunggu item</strong></span>
-                            </div>
                         </div>
 
                         <div class="pos-cart-readiness">
@@ -296,7 +288,6 @@
                         </button>
                     </section>
 
-                    <span id="posDetailsHomeAnchor" class="d-none" aria-hidden="true"></span>
                     <details class="pos-transaction-details">
                         <summary>
                             <span class="pos-detail-customer">
@@ -338,12 +329,12 @@
                                     <input type="hidden" id="jenisResep" value="penjualan_resep">
                                 </div>
                                 <div class="pos-field">
-                                    <label for="customerName"><i class="mdi mdi-account-outline"></i> Nama pelanggan</label>
-                                    <input type="text" id="customerName" class="form-control" placeholder="Contoh: Budi Santoso">
+                                    <label for="customerName"><i class="mdi mdi-account-outline"></i> Nama pelanggan <b>*</b></label>
+                                    <input type="text" id="customerName" class="form-control" placeholder="Wajib diisi" required aria-required="true" autocomplete="name">
                                 </div>
                                 <div class="pos-field">
-                                    <label for="customerPhone"><i class="mdi mdi-phone-outline"></i> No. HP</label>
-                                    <input type="text" id="customerPhone" class="form-control" placeholder="Opsional">
+                                    <label for="customerPhone"><i class="mdi mdi-phone-outline"></i> No. HP <b>*</b></label>
+                                    <input type="tel" id="customerPhone" class="form-control" placeholder="Wajib diisi" required aria-required="true" autocomplete="tel" inputmode="tel">
                                 </div>
                                 <div class="pos-field pos-institution-field">
                                     <label for="instansiName"><i class="mdi mdi-domain"></i> Instansi</label>
@@ -388,37 +379,6 @@
                                     </div>
                                 </div>
 
-                                <section class="pos-compound-setup d-none" id="compoundSetup" aria-label="Pengaturan racikan">
-                                    <div class="pos-compound-steps">
-                                        <span><b>1</b> Pilih kelompok aktif</span>
-                                        <i class="mdi mdi-chevron-right"></i>
-                                        <span><b>2</b> Tambahkan obat</span>
-                                        <i class="mdi mdi-chevron-right"></i>
-                                        <span><b>3</b> Isi dosis & etiket kelompok</span>
-                                    </div>
-                                    <div class="pos-compound-controls">
-                                        <label class="pos-compound-group-control" for="activeCompoundGroup">
-                                            <span>Kelompok tujuan obat berikutnya</span>
-                                            <div>
-                                                <select id="activeCompoundGroup" class="form-select" aria-label="Kelompok racikan aktif"></select>
-                                                <button type="button" class="btn pos-new-compound-group" id="newCompoundGroupBtn">
-                                                    <i class="mdi mdi-plus"></i> R/ baru
-                                                </button>
-                                            </div>
-                                            <small>Obat yang ditambahkan dari katalog akan masuk ke kelompok aktif ini.</small>
-                                        </label>
-                                        <label class="pos-embalase-control" for="embalase">
-                                            <span>Biaya embalase racikan</span>
-                                            <div class="input-group">
-                                                <span class="input-group-text">Rp</span>
-                                                <input type="number" id="embalase" class="form-control" min="0" step="1" value="0" placeholder="0" inputmode="decimal">
-                                            </div>
-                                            <small>Ditambahkan satu kali ke total transaksi racikan.</small>
-                                        </label>
-                                    </div>
-                                    <div class="pos-compound-group-summary" id="compoundGroupSummary" aria-live="polite"></div>
-                                </section>
-
                                 <div class="pos-prescription-form-grid">
                                     <div class="pos-field pos-prescription-field">
                                         <label for="nomorResep"><i class="mdi mdi-identifier"></i> Nomor resep <b>*</b></label>
@@ -438,6 +398,38 @@
                                     </div>
                                 </div>
 
+                                <span id="compoundSetupHomeAnchor" class="d-none" aria-hidden="true"></span>
+                                <section class="pos-compound-setup d-none" id="compoundSetup" aria-label="Pengaturan racikan">
+                                    <div class="pos-compound-steps">
+                                        <span><b>1</b> Susun racikan aktif</span>
+                                        <i class="mdi mdi-chevron-right"></i>
+                                        <span><b>2</b> Simpan racikan</span>
+                                        <i class="mdi mdi-chevron-right"></i>
+                                        <span><b>3</b> Tambah racikan berikutnya</span>
+                                    </div>
+                                    <div class="pos-compound-controls">
+                                        <label class="pos-compound-group-control" for="activeCompoundGroup">
+                                            <span>Racikan aktif</span>
+                                            <div>
+                                                <select id="activeCompoundGroup" class="form-select" aria-label="Kelompok racikan aktif"></select>
+                                                <button type="button" class="btn pos-new-compound-group" id="newCompoundGroupBtn">
+                                                    <i class="mdi mdi-plus"></i> Racikan berikutnya
+                                                </button>
+                                            </div>
+                                            <small>Obat baru otomatis masuk ke racikan aktif.</small>
+                                        </label>
+                                        <div class="pos-compound-save-rule" id="compoundSaveRule">
+                                            <span><i class="mdi mdi-content-save-check-outline"></i></span>
+                                            <div>
+                                                <strong>Selesaikan satu per satu</strong>
+                                                <small id="compoundSaveRuleCopy">Racikan 1 belum disimpan.</small>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" id="embalase" value="0">
+                                    </div>
+                                    <div class="pos-compound-group-summary" id="compoundGroupSummary" aria-live="polite"></div>
+                                </section>
+
                                 <div class="pos-prescription-guidance">
                                     <span><i class="mdi mdi-shield-check-outline"></i></span>
                                     <div>
@@ -455,7 +447,7 @@
                         <div class="pos-cart-title">
                             <span class="pos-cart-title-icon"><i class="mdi mdi-format-list-bulleted-square"></i></span>
                             <span>
-                                <strong>Item yang dijual</strong>
+                                <strong id="cartEditorTitle">Item yang dijual</strong>
                                 <small id="cartEditorCopy">Jumlah dan diskon dapat diubah langsung.</small>
                             </span>
                         </div>
@@ -463,9 +455,6 @@
                             <span class="pos-live-label"><i class="mdi mdi-access-point"></i> STOK LIVE</span>
                             <button type="button" class="btn pos-prescription-toolbar-pay" id="prescriptionToolbarPayBtn" title="Lengkapi resep untuk membayar">
                                 <i class="mdi mdi-credit-card-check-outline"></i> Bayar
-                            </button>
-                            <button type="button" class="btn pos-go-payment-button" id="goToPaymentBtn" disabled>
-                                <i class="mdi mdi-credit-card-outline"></i> Lanjut bayar
                             </button>
                             <button type="button" class="btn pos-clear-button" id="clearCartBtn">
                                 <i class="mdi mdi-trash-can-outline"></i> Kosongkan
@@ -478,7 +467,7 @@
                             <thead>
                                 <tr>
                                     <th><i class="mdi mdi-pill-multiple"></i> Produk</th>
-                                    <th style="width:152px"><i class="mdi mdi-counter"></i> Jumlah</th>
+                                    <th style="width:152px"><i class="mdi mdi-counter"></i> <span id="cartQtyHeaderLabel">Jumlah</span></th>
                                     <th style="width:125px"><i class="mdi mdi-tag-outline"></i> Harga</th>
                                     <th style="width:205px"><i class="mdi mdi-sale-outline"></i> Diskon item</th>
                                     <th style="width:178px"><i class="mdi mdi-package-variant-closed-check"></i> Alokasi FEFO</th>
@@ -511,6 +500,30 @@
                         </table>
                     </div>
 
+                    <div class="pos-cart-dock" role="region" aria-label="Ringkasan dan aksi keranjang">
+                        <div class="pos-transaction-insights" aria-label="Ringkasan keranjang">
+                            <div class="pos-insight-card">
+                                <span class="pos-insight-icon is-indigo"><i class="mdi mdi-cart-variant"></i></span>
+                                <span><small>JENIS ITEM</small><strong id="cartItemCount">0 item</strong></span>
+                            </div>
+                            <div class="pos-insight-card">
+                                <span class="pos-insight-icon is-cyan"><i class="mdi mdi-counter"></i></span>
+                                <span><small>TOTAL KUANTITAS</small><strong id="cartQtyCount">0 qty</strong></span>
+                            </div>
+                            <div class="pos-insight-card" id="cartHealthCard">
+                                <span class="pos-insight-icon is-emerald"><i class="mdi mdi-shield-check-outline"></i></span>
+                                <span><small>STATUS STOK</small><strong id="cartStockHealth">Menunggu item</strong></span>
+                            </div>
+                        </div>
+                        <div class="pos-cart-dock-total">
+                            <span><small>Total sementara</small><strong id="cartRunningTotal">Rp 0</strong></span>
+                            <button type="button" class="btn pos-go-payment-button" id="goToPaymentBtn" disabled>
+                                <span><small>Review selesai</small>Lanjut bayar</span>
+                                <i class="mdi mdi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="pos-cart-footnote">
                         <span><i class="mdi mdi-information-slab-circle-outline"></i> Harga dan batch akan divalidasi kembali saat jumlah item berubah.</span>
                         <span><i class="mdi mdi-lock-check-outline"></i> Perhitungan tersinkron</span>
@@ -519,6 +532,9 @@
 
                 <section class="pos-checkout-stage" id="posPaymentLayout" aria-labelledby="posPaymentTitle">
                     <header class="pos-checkout-hero">
+                        <button type="button" class="btn pos-payment-back" id="backToCartBtn">
+                            <i class="mdi mdi-arrow-left"></i><span>Kembali</span>
+                        </button>
                         <div class="pos-checkout-title">
                             <span class="pos-checkout-step" aria-hidden="true">3</span>
                             <div>
@@ -528,6 +544,9 @@
                             </div>
                         </div>
                         <div class="pos-checkout-hero-side">
+                            <button type="button" class="btn pos-payment-edit-prescription d-none" id="paymentEditPrescriptionBtn">
+                                <i class="mdi mdi-prescription"></i><span>Edit resep</span>
+                            </button>
                             <span class="pos-checkout-state" id="checkoutStatusBadge">
                                 <i class="mdi mdi-progress-clock"></i><span>Menunggu pembayaran</span>
                             </span>
@@ -587,6 +606,7 @@
                                     </span>
                                 </div>
                             </div>
+
                         </div>
 
                         <aside class="pos-total-panel" aria-label="Ringkasan tagihan">
@@ -728,7 +748,15 @@
                     <div>
                         <small>BUKTI PEMBAYARAN</small>
                         <h2 class="modal-title" id="posReceiptModalTitle">Preview struk</h2>
-                        <p>Struk siap dicetak tanpa membuka tab browser baru.</p>
+                        <p id="posReceiptModalCopy">Struk siap dicetak tanpa membuka tab browser baru.</p>
+                    </div>
+                    <div class="pos-receipt-document-tabs" id="posReceiptDocumentTabs" role="tablist" aria-label="Pilih dokumen cetak">
+                        <button type="button" class="is-active" id="receiptDocumentTab" data-receipt-document="receipt" role="tab" aria-selected="true">
+                            <i class="mdi mdi-receipt-text-outline"></i> Struk
+                        </button>
+                        <button type="button" class="d-none" id="labelsDocumentTab" data-receipt-document="labels" role="tab" aria-selected="false">
+                            <i class="mdi mdi-label-multiple-outline"></i> Etiket resep
+                        </button>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
@@ -744,7 +772,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn pos-receipt-close" data-bs-dismiss="modal">Tutup</button>
                     <button type="button" class="btn pos-receipt-print" id="printReceiptModalBtn" disabled>
-                        <i class="mdi mdi-printer-outline"></i> Cetak struk
+                        <i class="mdi mdi-printer-outline"></i> <span>Cetak struk</span>
                     </button>
                 </div>
             </div>
@@ -758,61 +786,73 @@
                     <div class="pos-prescription-type-step-shell">
                         <div class="modal-header">
                             <div class="pos-prescription-modal-heading">
-                                <span><i class="mdi mdi-prescription"></i></span>
+                                <span class="pos-rx-brand-mark"><b>R<em>x</em></b></span>
                                 <div>
-                                    <small>WORKSPACE RESEP</small>
-                                    <h2 class="modal-title" id="prescriptionTypeModalTitle">Pilih jenis resep</h2>
-                                    <p>Pilih alur sesuai cara obat disiapkan.</p>
+                                    <small>MEDCARE · PRESCRIPTION DESK</small>
+                                    <h2 class="modal-title" id="prescriptionTypeModalTitle">Mulai transaksi resep</h2>
+                                    <p>Satu workspace untuk penyiapan, etiket, dan pembayaran resep.</p>
                                 </div>
                             </div>
                             <button type="button" class="btn-close btn-close-white" id="closePrescriptionTypeBtn" aria-label="Tutup"></button>
                         </div>
                         <div class="modal-body">
                             <div class="pos-prescription-modal-intro">
-                                <span><i class="mdi mdi-information-outline"></i></span>
+                                <span><i class="mdi mdi-shape-outline"></i></span>
                                 <div>
-                                    <strong>Pilih berdasarkan cara penyiapan obat</strong>
-                                    <small>Jenis resep dapat diubah kembali selama proses resep berlangsung.</small>
+                                    <small>LANGKAH AWAL</small>
+                                    <strong>Bagaimana obat pada resep ini disiapkan?</strong>
+                                    <p>Pilih alur kerja yang sesuai. Anda tetap dapat mengganti jenis resep sebelum pembayaran.</p>
                                 </div>
+                                <span class="pos-rx-intro-badge"><i class="mdi mdi-shield-check-outline"></i> Validasi klinis aktif</span>
                             </div>
 
                             <div class="pos-prescription-type-grid" role="group" aria-label="Pilih jenis resep">
                                 <button type="button" class="pos-prescription-type-option" data-prescription-type="penjualan_resep" aria-pressed="false">
-                                    <span class="pos-prescription-type-icon"><i class="mdi mdi-pill-multiple"></i></span>
+                                    <span class="pos-rx-option-topline">
+                                        <span class="pos-prescription-type-icon"><i class="mdi mdi-pill-multiple"></i></span>
+                                        <span class="pos-rx-option-number">01</span>
+                                    </span>
                                     <span class="pos-prescription-type-copy">
-                                        <small>OBAT TERPISAH</small>
-                                        <strong>Resep Non Racikan</strong>
-                                        <span>Setiap obat memiliki etiket dan aturan pakai sendiri.</span>
-                                        <span class="pos-prescription-type-points">
-                                            <b><i class="mdi mdi-check"></i> Signa per obat</b>
-                                            <b><i class="mdi mdi-check"></i> Tanpa kelompok R/</b>
+                                        <small>OBAT DISIAPKAN TERPISAH</small>
+                                        <strong>Non Racikan</strong>
+                                        <span>Untuk resep dengan etiket dan aturan pakai berbeda pada setiap obat.</span>
+                                        <span class="pos-prescription-type-points" aria-label="Fitur resep non racikan">
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Signa per obat</b>
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Etiket individual</b>
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Proses lebih singkat</b>
                                         </span>
                                     </span>
+                                    <span class="pos-rx-option-action">Buka kasir <i class="mdi mdi-arrow-right"></i></span>
                                     <i class="mdi mdi-check-circle pos-prescription-type-check"></i>
                                 </button>
                                 <button type="button" class="pos-prescription-type-option" data-prescription-type="penjualan_racikan" aria-pressed="false">
-                                    <span class="pos-prescription-type-icon"><i class="mdi mdi-mortar-pestle-plus"></i></span>
+                                    <span class="pos-rx-option-topline">
+                                        <span class="pos-prescription-type-icon"><i class="mdi mdi-mortar-pestle-plus"></i></span>
+                                        <span class="pos-rx-option-number">02</span>
+                                    </span>
                                     <span class="pos-prescription-type-copy">
-                                        <small>OBAT DIGABUNG</small>
-                                        <strong>Resep Racikan</strong>
-                                        <span>Beberapa obat disiapkan dalam kelompok racikan.</span>
-                                        <span class="pos-prescription-type-points">
-                                            <b><i class="mdi mdi-check"></i> Kelompok R/</b>
-                                            <b><i class="mdi mdi-check"></i> Dosis tiap komponen</b>
+                                        <small>OBAT DIRACIK MENJADI SATU</small>
+                                        <strong>Racikan</strong>
+                                        <span>Untuk resep dengan beberapa komponen dalam satu sediaan dan etiket bersama.</span>
+                                        <span class="pos-prescription-type-points" aria-label="Fitur resep racikan">
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Kelompok R/</b>
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Dosis komponen</b>
+                                            <b><i class="mdi mdi-check-circle-outline"></i> Preview racikan</b>
                                         </span>
                                     </span>
+                                    <span class="pos-rx-option-action">Buka kasir <i class="mdi mdi-arrow-right"></i></span>
                                     <i class="mdi mdi-check-circle pos-prescription-type-check"></i>
                                 </button>
                             </div>
 
                             <div class="pos-prescription-modal-help">
                                 <i class="mdi mdi-lightbulb-on-outline"></i>
-                                <span><strong>Petunjuk:</strong> pilih <b>Racikan</b> bila apotek perlu mencampur dua atau lebih obat menjadi satu sediaan.</span>
+                                <span><strong>Masih ragu?</strong> Pilih Racikan bila dua atau lebih obat harus dicampur menjadi satu sediaan. Selain itu gunakan Non Racikan.</span>
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn pos-prescription-modal-cancel" id="cancelPrescriptionTypeBtn">Batal</button>
-                            <small>Pilih salah satu kartu untuk membuka workspace proses resep.</small>
+                            <span class="pos-rx-chooser-assurance"><i class="mdi mdi-lock-check-outline"></i> Data tersimpan di transaksi kasir aktif</span>
+                            <button type="button" class="btn pos-prescription-modal-cancel" id="cancelPrescriptionTypeBtn"><i class="mdi mdi-arrow-left"></i> Batal</button>
                         </div>
                     </div>
                 </section>
@@ -820,46 +860,72 @@
                 <section class="pos-prescription-cashier-step d-none" id="prescriptionCashierStep" aria-label="Workspace proses resep">
                     <header class="pos-prescription-cashier-header">
                         <div class="pos-prescription-cashier-brand">
-                            <span><i class="mdi mdi-prescription"></i></span>
+                            <span class="pos-rx-brand-mark"><b>R<em>x</em></b></span>
                             <div>
-                                <small>WORKSPACE RESEP</small>
+                                <small>MEDCARE · PRESCRIPTION DESK</small>
                                 <strong id="prescriptionFlowTitle">Resep Non Racikan</strong>
-                                <p>Lengkapi pasien, detail resep, obat, dan etiket.</p>
+                                <p>Penyiapan resep terarah dari data pasien hingga pembayaran.</p>
                             </div>
                         </div>
                         <div class="pos-prescription-flow-steps" aria-label="Tahapan proses resep">
-                            <span class="is-active"><b>1</b> Data resep</span>
-                            <i class="mdi mdi-chevron-right"></i>
-                            <span><b>2</b> Obat & etiket</span>
-                            <i class="mdi mdi-chevron-right"></i>
-                            <span><b>3</b> Lanjut bayar</span>
+                            <span class="is-active"><b>1</b><em>Data resep</em></span>
+                            <i class="mdi mdi-minus"></i>
+                            <span><b>2</b><em>Obat & etiket</em></span>
+                            <i class="mdi mdi-minus"></i>
+                            <span><b>3</b><em>Lanjut bayar</em></span>
                         </div>
-                        <button type="button" class="btn pos-prescription-flow-cancel" id="cancelPrescriptionFlowBtn">
-                            <i class="mdi mdi-close"></i> Batalkan proses
-                        </button>
+                        <div class="pos-rx-header-actions">
+                            <span class="pos-rx-validation-state"><i class="mdi mdi-shield-check-outline"></i> Validasi aktif</span>
+                            <button type="button" class="btn pos-prescription-flow-cancel" id="cancelPrescriptionFlowBtn">
+                                <i class="mdi mdi-close"></i> Batalkan proses
+                            </button>
+                        </div>
                     </header>
 
                     <div class="pos-prescription-cashier-body">
                         <div class="pos-prescription-cashier-layout">
                             <div class="pos-prescription-modal-catalog" id="prescriptionModalCatalogSlot" aria-label="Katalog obat resep"></div>
-                            <section class="pos-prescription-modal-editor" aria-label="Detail dan keranjang resep">
+                            <section class="pos-prescription-modal-details pos-rx-work-panel" aria-label="Data pasien dan resep">
+                                <header class="pos-rx-panel-header">
+                                    <span class="pos-rx-panel-index">01</span>
+                                    <span class="pos-rx-panel-copy">
+                                        <small>IDENTITAS</small>
+                                        <strong>Pasien & resep</strong>
+                                        <p>Lengkapi data wajib sebelum memproses obat.</p>
+                                    </span>
+                                    <span class="pos-rx-panel-state"><i class="mdi mdi-progress-alert"></i> Perlu dilengkapi</span>
+                                </header>
                                 <div id="prescriptionModalDetailsSlot"></div>
+                            </section>
+                            <section class="pos-prescription-modal-editor pos-rx-work-panel" aria-label="Obat dan etiket resep">
+                                <header class="pos-rx-panel-header">
+                                    <span class="pos-rx-panel-index">02</span>
+                                    <span class="pos-rx-panel-copy">
+                                        <small>PENYIAPAN RESEP</small>
+                                        <strong id="prescriptionPreparationTitle">Obat & etiket</strong>
+                                        <p id="prescriptionPreparationCopy">Atur jumlah, signa, dan detail klinis setiap obat.</p>
+                                    </span>
+                                    <span class="pos-rx-panel-live"><i class="mdi mdi-access-point"></i> Stok live</span>
+                                </header>
+                                <div class="pos-rx-compound-slot" id="prescriptionModalCompoundSlot"></div>
                                 <div id="prescriptionModalCartSlot"></div>
                             </section>
                         </div>
                     </div>
 
                     <footer class="pos-prescription-cashier-footer">
-                        <div class="pos-prescription-flow-readiness" id="prescriptionFlowReadiness">
-                            <span><i class="mdi mdi-progress-alert"></i></span>
-                            <div>
-                                <small>KESIAPAN RESEP</small>
-                                <strong id="prescriptionFlowReadinessText">Lengkapi data resep dan obat</strong>
+                        <div class="pos-rx-footer-status">
+                            <div class="pos-prescription-flow-readiness" id="prescriptionFlowReadiness">
+                                <span><i class="mdi mdi-progress-alert"></i></span>
+                                <div>
+                                    <small>KESIAPAN RESEP</small>
+                                    <strong id="prescriptionFlowReadinessText">Lengkapi data resep dan obat</strong>
+                                </div>
                             </div>
-                        </div>
-                        <div class="pos-prescription-flow-metrics">
-                            <span><small>ITEM RESEP</small><strong id="prescriptionModalItemCount">0 item</strong></span>
-                            <span><small>TOTAL SEMENTARA</small><strong id="prescriptionModalGrandTotal">Rp 0</strong></span>
+                            <div class="pos-prescription-flow-metrics">
+                                <span><small>ITEM RESEP</small><strong id="prescriptionModalItemCount">0 item</strong></span>
+                                <span><small>TOTAL SEMENTARA</small><strong id="prescriptionModalGrandTotal">Rp 0</strong></span>
+                            </div>
                         </div>
                         <div class="pos-prescription-flow-actions">
                             <button type="button" class="btn pos-prescription-draft-button" id="savePrescriptionDraftBtn" title="Simpan proses resep sebagai draft">
@@ -868,6 +934,49 @@
                             <button type="button" class="btn pos-finish-prescription-button" id="finishPrescriptionFlowBtn" aria-label="Bayar transaksi resep">
                                 <span><small>Simpan resep & lanjut</small>Bayar</span>
                                 <i class="mdi mdi-credit-card-check-outline"></i>
+                            </button>
+                        </div>
+                    </footer>
+                </section>
+
+                <section class="pos-compound-preview-step d-none" id="compoundPreviewStep" aria-label="Preview resep racikan sebelum pembayaran">
+                    <header class="pos-compound-preview-header">
+                        <div class="pos-compound-preview-brand">
+                            <span><i class="mdi mdi-clipboard-check-multiple-outline"></i></span>
+                            <div>
+                                <small>VERIFIKASI SEBELUM PEMBAYARAN</small>
+                                <strong>Preview resep racikan</strong>
+                                <p>Pastikan pasien, komposisi, jumlah, dan etiket sudah benar.</p>
+                            </div>
+                        </div>
+                        <div class="pos-compound-preview-header-actions">
+                            <div class="pos-compound-preview-status">
+                                <i class="mdi mdi-shield-check-outline"></i>
+                                <span><small>STATUS</small><strong>Siap dikoreksi</strong></span>
+                            </div>
+                            <button type="button" class="btn pos-compound-preview-confirm pos-compound-preview-pay"
+                                id="confirmCompoundPreviewBtn" aria-label="Bayar resep racikan">
+                                <span><small>Semua data sudah sesuai</small>Bayar</span>
+                                <i class="mdi mdi-credit-card-check-outline"></i>
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="pos-compound-preview-body">
+                        <div class="pos-compound-preview-shell">
+                            <section class="pos-compound-preview-summary" id="compoundPreviewSummary"></section>
+                            <section class="pos-compound-preview-groups" id="compoundPreviewGroups" aria-label="Rincian kelompok racikan"></section>
+                        </div>
+                    </div>
+
+                    <footer class="pos-compound-preview-footer">
+                        <div class="pos-compound-preview-assurance">
+                            <i class="mdi mdi-information-slab-circle-outline"></i>
+                            <span><strong>Checkpoint farmasi</strong><small>Pembayaran hanya dibuka setelah preview ini disetujui.</small></span>
+                        </div>
+                        <div class="pos-compound-preview-actions">
+                            <button type="button" class="btn pos-compound-preview-edit" id="editCompoundPreviewBtn">
+                                <i class="mdi mdi-pencil-outline"></i> Koreksi resep
                             </button>
                         </div>
                     </footer>
