@@ -5,6 +5,8 @@
         // ==== Inisiasi Variable Global dan Function ====
         // --- Variabel global
         let editMode = false;
+        let detailPurchaseOrderId = null;
+        let detailPrintDocuments = [];
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
@@ -42,7 +44,7 @@
                         <div>
                             <span class="purchase-detail-number">1</span>
                             <strong>Item Obat</strong>
-                            <small>Pilih obat, satuan, qty, dan harga estimasi.</small>
+                            <small>Pilih obat, satuan, qty, harga estimasi, serta Diskon 1–3.</small>
                         </div>
                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                             <i class="mdi mdi-trash-can-outline"></i> Hapus
@@ -77,6 +79,21 @@
                         <div class="col-lg-2 col-md-4">
                             <label class="form-label">Subtotal</label>
                             <input type="number" class="form-control subtotal" name="subtotal[]" value="${options.subtotal ?? ''}" readonly>
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Diskon 1 (%)</label>
+                            <input type="number" class="form-control purchase-discount" name="diskon_1[]" min="0" max="100" step="0.01" value="${options.diskon1 ?? 0}">
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Diskon 2 (%)</label>
+                            <input type="number" class="form-control purchase-discount" name="diskon_2[]" min="0" max="100" step="0.01" value="${options.diskon2 ?? 0}">
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">Diskon 3 (%)</label>
+                            <input type="number" class="form-control purchase-discount" name="diskon_3[]" min="0" max="100" step="0.01" value="${options.diskon3 ?? 0}">
                         </div>
                     </div>
                 </div>
@@ -142,6 +159,43 @@
         })
         // =================== End Inisiasi Modal ===============
 
+        $('#pembelianModalDetail').on('hidden.bs.modal', function() {
+            detailPurchaseOrderId = null;
+            detailPrintDocuments = [];
+            $('#btnPrintPDF')
+                .prop('disabled', true)
+                .removeClass('btn-outline-primary btn-outline-warning btn-outline-dark')
+                .addClass('btn-outline-danger')
+                .attr('title', 'Surat pesanan akan menyesuaikan golongan obat pada PO')
+                .find('span').text('Cetak Surat Pesanan');
+        });
+
+        $('#btnPrintPDF').on('click', function() {
+            if (!detailPurchaseOrderId || $(this).prop('disabled') || detailPrintDocuments.length < 1) {
+                return;
+            }
+
+            let blockedDocuments = 0;
+
+            detailPrintDocuments.forEach(function(document) {
+                const printWindow = window.open(document.url, '_blank');
+
+                if (printWindow) {
+                    printWindow.opener = null;
+                } else {
+                    blockedDocuments++;
+                }
+            });
+
+            if (blockedDocuments > 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sebagian dokumen diblokir browser',
+                    text: 'Izinkan pop-up untuk situs ini agar seluruh surat pesanan dapat dibuka dari satu tombol.'
+                });
+            }
+        });
+
         // =================== Inisiasi Event Handler ===================
         // --- Tambah baris detail obat baru
         $(document).on('click', '#addDetail', function() {
@@ -165,13 +219,31 @@
             }
         });
 
-        // --- Hitung subtotal dan total otomatis
-        $(document).on('input', '.harga_estimasi, [name="qty[]"]', function() {
-            const row = $(this).closest('.detail-item');
+        function normalizedDiscount(value) {
+            return Math.min(100, Math.max(0, Number(value) || 0));
+        }
+
+        function recalculatePurchaseRow(row) {
             const qty = parseFloat(row.find('[name="qty[]"]').val()) || 0;
             const harga = parseFloat(row.find('.harga_estimasi').val()) || 0;
-            const subtotal = qty * harga;
+            const discounts = [
+                normalizedDiscount(row.find('[name="diskon_1[]"]').val()),
+                normalizedDiscount(row.find('[name="diskon_2[]"]').val()),
+                normalizedDiscount(row.find('[name="diskon_3[]"]').val())
+            ];
+            let subtotal = qty * harga;
+
+            discounts.forEach(function(discount) {
+                subtotal *= 1 - (discount / 100);
+            });
+
             row.find('.subtotal').val(subtotal.toFixed(2));
+        }
+
+        // --- Hitung subtotal bersih setelah Diskon 1, 2, dan 3
+        $(document).on('input', '.harga_estimasi, [name="qty[]"], .purchase-discount', function() {
+            const row = $(this).closest('.detail-item');
+            recalculatePurchaseRow(row);
             hitungTotal();
         });
 
@@ -395,7 +467,7 @@
                 let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
 
                 row.find('.harga_estimasi').val(harga);
-                row.find('.subtotal').val((harga * qty).toFixed(2));
+                recalculatePurchaseRow(row);
 
                 hitungTotal();
             }
@@ -460,7 +532,7 @@
             let harga = hargaDasar * konversi;
 
             row.find('.harga_estimasi').val(harga);
-            row.find('.subtotal').val((harga * qty).toFixed(2));
+            recalculatePurchaseRow(row);
 
             hitungTotal();
         });
@@ -1084,6 +1156,9 @@
                             satuanTerpilih: item.satuan_konversi?.id,
                             qty: item.qty,
                             harga: item.harga_estimasi,
+                            diskon1: item.diskon_1,
+                            diskon2: item.diskon_2,
+                            diskon3: item.diskon_3,
                             subtotal: item.subtotal,
                             selectClass: 'obatSelect',
                             loadingOption: true
@@ -1131,6 +1206,60 @@
                     }
 
                     const detail = po.details;
+                    detailPurchaseOrderId = po.id;
+
+                    const narcoticCount = Number(po.narcotic_item_count ?? 0);
+                    const psychotropicCount = Number(po.psychotropic_item_count ?? 0);
+                    const precursorCount = Number(po.precursor_item_count ?? 0);
+                    detailPrintDocuments = [
+                        {
+                            name: 'Narkotika',
+                            count: narcoticCount,
+                            buttonClass: 'btn-outline-danger',
+                            url: "{{ route("pembelian.suratPesananNarkotika", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'Psikotropika',
+                            count: psychotropicCount,
+                            buttonClass: 'btn-outline-primary',
+                            url: "{{ route("pembelian.suratPesananPsikotropika", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'Prekursor',
+                            count: precursorCount,
+                            buttonClass: 'btn-outline-warning',
+                            url: "{{ route("pembelian.suratPesananPrekursor", ":id") }}".replace(':id', po.id)
+                        }
+                    ].filter(document => document.count > 0);
+
+                    const $printButton = $('#btnPrintPDF');
+                    const totalControlledItems = detailPrintDocuments.reduce(
+                        (total, document) => total + document.count,
+                        0
+                    );
+
+                    $printButton
+                        .removeClass('btn-outline-danger btn-outline-primary btn-outline-warning btn-outline-dark')
+                        .prop('disabled', detailPrintDocuments.length < 1);
+
+                    if (detailPrintDocuments.length === 0) {
+                        $printButton
+                            .addClass('btn-outline-danger')
+                            .attr('title', 'PO ini tidak memiliki item Narkotika, Psikotropika, atau Prekursor')
+                            .find('span').text('Tidak Ada Surat Pesanan Khusus');
+                    } else if (detailPrintDocuments.length === 1) {
+                        const document = detailPrintDocuments[0];
+                        $printButton
+                            .addClass(document.buttonClass)
+                            .attr('title', `Format surat otomatis disesuaikan untuk golongan ${document.name}`)
+                            .find('span').text(`Cetak Surat ${document.name} (${document.count} item)`);
+                    } else {
+                        const documentNames = detailPrintDocuments.map(document => document.name).join(', ');
+                        $printButton
+                            .addClass('btn-outline-dark')
+                            .attr('title', `Buka surat otomatis untuk: ${documentNames}`)
+                            .find('span').text(`Cetak ${detailPrintDocuments.length} Jenis Surat (${totalControlledItems} item)`);
+                    }
 
                     // Header
                     $('#detail_no_po').val(po.no_po);
@@ -1148,12 +1277,25 @@
                     detail.forEach(item => {
                         const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
 
+                        const narcoticBadge = item.is_narcotic
+                            ? `<span class="badge bg-danger bg-opacity-10 text-danger ms-2" title="${escapeHtml(item.narcotic_classification ?? 'Narkotika')}">Narkotika</span>`
+                            : '';
+                        const psychotropicBadge = item.is_psychotropic
+                            ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2" title="${escapeHtml(item.psychotropic_classification ?? 'Psikotropika')}">Psikotropika</span>`
+                            : '';
+                        const precursorBadge = item.is_precursor
+                            ? `<span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
+                            : '';
+
                         $('#detailObatTable tbody').append(`
                     <tr>
-                        <td>${escapeHtml(item.nama_obat ?? '-')}</td>
+                        <td>${escapeHtml(item.nama_obat ?? '-')}${narcoticBadge}${psychotropicBadge}${precursorBadge}</td>
                         <td>${escapeHtml(unitName)}</td>
                         <td>${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
                         <td>Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>
+                        <td>${Number(item.diskon_1 ?? 0).toLocaleString('id-ID')}%</td>
+                        <td>${Number(item.diskon_2 ?? 0).toLocaleString('id-ID')}%</td>
+                        <td>${Number(item.diskon_3 ?? 0).toLocaleString('id-ID')}%</td>
                         <td>Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
                     </tr>
                 `);

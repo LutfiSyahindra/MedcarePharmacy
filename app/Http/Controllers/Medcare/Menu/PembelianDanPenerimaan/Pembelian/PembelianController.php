@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananPrekursorService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananPsikotropikaService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Master\DistributorService;
 use App\Services\Settings\Master\MasterObatService;
 use App\Support\BranchAccess;
+use App\Support\TieredDiscount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +31,10 @@ class PembelianController extends Controller
         PembelianService $PembelianService,
         DistributorService $DistributorService,
         MasterObatService $MasterObatService,
-        private readonly TransactionNotificationService $transactionNotifications
+        private readonly TransactionNotificationService $transactionNotifications,
+        private readonly SuratPesananNarkotikaService $suratPesananNarkotika,
+        private readonly SuratPesananPsikotropikaService $suratPesananPsikotropika,
+        private readonly SuratPesananPrekursorService $suratPesananPrekursor
     ) {
         $this->PembelianService = $PembelianService;
         $this->DistributorService = $DistributorService;
@@ -184,9 +191,18 @@ class PembelianController extends Controller
             'obat_id.*' => 'required|integer',
             'qty.*' => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
+            'diskon_1' => 'required|array',
+            'diskon_1.*' => 'nullable|numeric|min:0|max:100',
+            'diskon_2' => 'required|array',
+            'diskon_2.*' => 'nullable|numeric|min:0|max:100',
+            'diskon_3' => 'required|array',
+            'diskon_3.*' => 'nullable|numeric|min:0|max:100',
             'subtotal.*' => 'required|numeric|min:0',
             'satuan_id.*' => 'required|integer|min:1',
         ]);
+
+        $detailRows = $this->purchaseDetailRows($request);
+        $totalEstimasi = round(collect($detailRows)->sum('subtotal'), 2);
 
         DB::beginTransaction();
 
@@ -203,7 +219,7 @@ class PembelianController extends Controller
                 'distributor_id' => $request->distributor_id,
                 'branch_id' => $branchId,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
-                'total_estimasi' => $request->total_estimasi,
+                'total_estimasi' => $totalEstimasi,
                 'catatan' => $request->catatan,
                 'created_by' => $user->id,
 
@@ -212,14 +228,10 @@ class PembelianController extends Controller
             ]);
 
             // Insert detail
-            foreach ($request->obat_id as $i => $id) {
+            foreach ($detailRows as $detailRow) {
                 $this->PembelianService->createPembelianDetail([
                     'purchase_order_id' => $po->id,
-                    'obat_id' => $id,
-                    'qty' => $request->qty[$i],
-                    'harga_estimasi' => $request->harga_estimasi[$i],
-                    'subtotal' => $request->subtotal[$i],
-                    'satuan_konversi' => $request->satuan_id[$i],
+                    ...$detailRow,
                 ]);
             }
 
@@ -248,8 +260,75 @@ class PembelianController extends Controller
     public function show(string $id)
     {
         $Pembelian = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
+        $narcoticDetails = $this->suratPesananNarkotika->narcoticDetails($Pembelian);
+        $psychotropicDetails = $this->suratPesananPsikotropika->psychotropicDetails($Pembelian);
+        $precursorDetails = $this->suratPesananPrekursor->precursorDetails($Pembelian);
+
+        $Pembelian->setAttribute('has_narcotic_items', $narcoticDetails->isNotEmpty());
+        $Pembelian->setAttribute('narcotic_item_count', $narcoticDetails->count());
+        $Pembelian->setAttribute('has_psychotropic_items', $psychotropicDetails->isNotEmpty());
+        $Pembelian->setAttribute('psychotropic_item_count', $psychotropicDetails->count());
+        $Pembelian->setAttribute('has_precursor_items', $precursorDetails->isNotEmpty());
+        $Pembelian->setAttribute('precursor_item_count', $precursorDetails->count());
 
         return response()->json($Pembelian);
+    }
+
+    public function suratPesananNarkotika(Request $request, string $id)
+    {
+        $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
+        $narcoticDetails = $this->suratPesananNarkotika->narcoticDetails($purchaseOrder);
+
+        abort_if(
+            $narcoticDetails->isEmpty(),
+            422,
+            'Purchase order ini tidak memiliki obat dengan klasifikasi Narkotika.'
+        );
+
+        return view('medcare.menu.pembelianPenerimaan.pembelian.suratPesananNarkotika', [
+            'purchaseOrder' => $purchaseOrder,
+            'narcoticDetails' => $narcoticDetails,
+            'copyCount' => SuratPesananNarkotikaService::COPY_COUNT,
+            'autoPrint' => $request->boolean('print'),
+        ]);
+    }
+
+    public function suratPesananPsikotropika(Request $request, string $id)
+    {
+        $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
+        $psychotropicDetails = $this->suratPesananPsikotropika->psychotropicDetails($purchaseOrder);
+
+        abort_if(
+            $psychotropicDetails->isEmpty(),
+            422,
+            'Purchase order ini tidak memiliki obat dengan klasifikasi Psikotropika.'
+        );
+
+        return view('medcare.menu.pembelianPenerimaan.pembelian.suratPesananPsikotropika', [
+            'purchaseOrder' => $purchaseOrder,
+            'psychotropicDetails' => $psychotropicDetails,
+            'copyCount' => SuratPesananPsikotropikaService::COPY_COUNT,
+            'autoPrint' => $request->boolean('print'),
+        ]);
+    }
+
+    public function suratPesananPrekursor(Request $request, string $id)
+    {
+        $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
+        $precursorDetails = $this->suratPesananPrekursor->precursorDetails($purchaseOrder);
+
+        abort_if(
+            $precursorDetails->isEmpty(),
+            422,
+            'Purchase order ini tidak memiliki obat dengan klasifikasi Prekursor.'
+        );
+
+        return view('medcare.menu.pembelianPenerimaan.pembelian.suratPesananPrekursor', [
+            'purchaseOrder' => $purchaseOrder,
+            'precursorDetails' => $precursorDetails,
+            'copyCount' => SuratPesananPrekursorService::COPY_COUNT,
+            'autoPrint' => $request->boolean('print'),
+        ]);
     }
 
     /**
@@ -418,9 +497,18 @@ class PembelianController extends Controller
             'obat_id.*' => 'required|integer',
             'qty.*' => 'required|numeric|min:1',
             'harga_estimasi.*' => 'required|numeric|min:0',
+            'diskon_1' => 'required|array',
+            'diskon_1.*' => 'nullable|numeric|min:0|max:100',
+            'diskon_2' => 'required|array',
+            'diskon_2.*' => 'nullable|numeric|min:0|max:100',
+            'diskon_3' => 'required|array',
+            'diskon_3.*' => 'nullable|numeric|min:0|max:100',
             'subtotal.*' => 'required|numeric|min:0',
             'satuan_id.*' => 'required|integer|min:1',
         ]);
+
+        $detailRows = $this->purchaseDetailRows($request);
+        $totalEstimasi = round(collect($detailRows)->sum('subtotal'), 2);
 
         DB::beginTransaction();
 
@@ -455,7 +543,7 @@ class PembelianController extends Controller
                 'distributor_id' => $request->distributor_id,
                 'branch_id' => $existingPo->branch_id,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
-                'total_estimasi' => $request->total_estimasi,
+                'total_estimasi' => $totalEstimasi,
                 'catatan' => $request->catatan,
                 'approved_by' => null,
                 'status' => 'waiting_approval',
@@ -466,14 +554,10 @@ class PembelianController extends Controller
             $this->PembelianService->deletePembelianDetail($id);
 
             // =========================== INSERT DETAIL BARU =======================
-            foreach ($request->obat_id as $i => $obatId) {
+            foreach ($detailRows as $detailRow) {
                 $this->PembelianService->createPembelianDetail([
                     'purchase_order_id' => $id,
-                    'obat_id' => $obatId,
-                    'qty' => $request->qty[$i],
-                    'harga_estimasi' => $request->harga_estimasi[$i],
-                    'subtotal' => $request->subtotal[$i],
-                    'satuan_konversi' => $request->satuan_id[$i],
+                    ...$detailRow,
                 ]);
             }
 
@@ -519,5 +603,41 @@ class PembelianController extends Controller
                 'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * @return array<int, array<string, int|float>>
+     */
+    private function purchaseDetailRows(Request $request): array
+    {
+        $rows = [];
+
+        foreach ($request->input('obat_id', []) as $index => $obatId) {
+            $qty = (float) $request->input('qty.'.$index, 0);
+            $price = (float) $request->input('harga_estimasi.'.$index, 0);
+            [$discount1, $discount2, $discount3] = TieredDiscount::percentages(
+                $request->input('diskon_1.'.$index, 0),
+                $request->input('diskon_2.'.$index, 0),
+                $request->input('diskon_3.'.$index, 0)
+            );
+
+            $rows[] = [
+                'obat_id' => (int) $obatId,
+                'qty' => $qty,
+                'harga_estimasi' => $price,
+                'diskon_1' => $discount1,
+                'diskon_2' => $discount2,
+                'diskon_3' => $discount3,
+                'subtotal' => TieredDiscount::netAmount(
+                    $qty * $price,
+                    $discount1,
+                    $discount2,
+                    $discount3
+                ),
+                'satuan_konversi' => (int) $request->input('satuan_id.'.$index),
+            ];
+        }
+
+        return $rows;
     }
 }

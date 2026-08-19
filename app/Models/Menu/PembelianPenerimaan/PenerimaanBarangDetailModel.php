@@ -17,6 +17,10 @@ class PenerimaanBarangDetailModel extends Model
 
     protected $casts = [
         'expired_date' => 'date',
+        'diskon_1' => 'decimal:2',
+        'diskon_2' => 'decimal:2',
+        'diskon_3' => 'decimal:2',
+        'diskon' => 'decimal:2',
     ];
 
     public function penerimaanBarang()

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\TransactionWorkflowNotification;
 use App\Services\Settings\Auth\RoleSettingService;
 use App\Services\Settings\Notification\NotificationSettingService;
+use App\Support\TieredDiscount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
@@ -379,6 +380,9 @@ class TransactionNotificationService
                 $qty = (float) $detail->qty;
                 $price = (float) $detail->harga_estimasi;
                 $total = (float) ($detail->subtotal ?: ($qty * $price));
+                $discount1 = (float) ($detail->diskon_1 ?? 0);
+                $discount2 = (float) ($detail->diskon_2 ?? 0);
+                $discount3 = (float) ($detail->diskon_3 ?? 0);
 
                 return [
                     'row_no' => $index + 1,
@@ -392,7 +396,10 @@ class TransactionNotificationService
                     'unit_conversion' => $conversion,
                     'price' => $price,
                     'subtotal' => $total,
-                    'discount' => null,
+                    'discount' => TieredDiscount::effectivePercentage($discount1, $discount2, $discount3),
+                    'discount_1' => $discount1,
+                    'discount_2' => $discount2,
+                    'discount_3' => $discount3,
                     'tax' => null,
                     'total' => $total,
                     'no_batch' => null,
@@ -427,6 +434,9 @@ class TransactionNotificationService
                     'price' => $price,
                     'subtotal' => $subtotal,
                     'discount' => (float) ($detail->diskon ?? 0),
+                    'discount_1' => (float) ($detail->diskon_1 ?? 0),
+                    'discount_2' => (float) ($detail->diskon_2 ?? 0),
+                    'discount_3' => (float) ($detail->diskon_3 ?? 0),
                     'tax' => (float) ($detail->ppn ?? 0),
                     'total' => (float) ($detail->total ?: $subtotal),
                     'no_batch' => $detail->no_batch,

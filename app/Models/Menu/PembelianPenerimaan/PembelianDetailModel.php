@@ -4,7 +4,6 @@ namespace App\Models\Menu\PembelianPenerimaan;
 
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
-use App\Models\SatuansModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,6 +14,15 @@ class PembelianDetailModel extends Model
     protected $table = 'purchase_order_details';
 
     protected $guarded = [];
+
+    protected $casts = [
+        'qty' => 'decimal:2',
+        'harga_estimasi' => 'decimal:2',
+        'diskon_1' => 'decimal:2',
+        'diskon_2' => 'decimal:2',
+        'diskon_3' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+    ];
 
     public function pembelian()
     {
@@ -33,5 +41,4 @@ class PembelianDetailModel extends Model
             'satuan_konversi'
         );
     }
-
 }

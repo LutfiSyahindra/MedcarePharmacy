@@ -69,7 +69,12 @@ class PembelianRepository
         // Ambil header + distributor + semua detail + relasi obat
         $query = PembelianModel::with([
             'distributor',
-            'details.obat',
+            'branch.apotekProfile',
+            'details.obat.golongan',
+            'details.obat.mainGolongan.golongan',
+            'details.obat.subGolongan.mainGolongan.golongan',
+            'details.obat.sediaan',
+            'details.obat.satuan',
             'details.satuanKonversi.satuan',
         ]);
 

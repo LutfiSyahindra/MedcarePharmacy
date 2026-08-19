@@ -36,7 +36,7 @@
                             <span><i class="mdi mdi-barcode"></i></span>
                             <div>
                                 <strong>Detail Barang</strong>
-                                <small>Qty, batch, expired, harga, diskon, dan PPN diisi lebih dulu.</small>
+                                <small>Qty, batch, expired, harga, dan PPN diisi; diskon mengikuti PO.</small>
                             </div>
                         </div>
                         <div class="purchase-overview-item">
@@ -350,7 +350,7 @@
                                             <th>No Batch</th>
                                             <th>Expired Date</th>
                                             <th>Harga Beli</th>
-                                            <th>Diskon %</th>
+                                            <th>Diskon PO</th>
                                             <th>PPN %</th>
                                             <th>Subtotal</th>
                                             <th>Status</th>

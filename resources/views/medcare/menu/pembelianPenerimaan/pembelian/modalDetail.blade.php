@@ -75,6 +75,9 @@
                                         <th>Satuan</th>
                                         <th>Qty</th>
                                         <th>Harga Estimasi</th>
+                                        <th>Diskon 1</th>
+                                        <th>Diskon 2</th>
+                                        <th>Diskon 3</th>
                                         <th>Subtotal</th>
                                     </tr>
                                 </thead>
@@ -94,9 +97,10 @@
             </div>
 
             <div class="modal-footer d-flex justify-content-between align-items-center">
-                <button type="button" class="btn btn-outline-danger" id="btnPrintPDF">
+                <button type="button" class="btn btn-outline-danger" id="btnPrintPDF" disabled
+                    title="Surat pesanan akan menyesuaikan golongan obat pada PO">
                     <i class="mdi mdi-file-pdf-box fs-5"></i>
-                    <span>Cetak PDF</span>
+                    <span>Cetak Surat Pesanan</span>
                 </button>
 
                 <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">

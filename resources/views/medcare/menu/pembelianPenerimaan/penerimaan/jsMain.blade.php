@@ -253,6 +253,22 @@
             return normalizedPercent(value);
         }
 
+        function tieredDiscountNet(grossAmount, discount1, discount2, discount3) {
+            let netAmount = Math.max(0, Number(grossAmount) || 0);
+
+            [discount1, discount2, discount3].forEach(function(discount) {
+                netAmount *= 1 - (normalizedDiscount(discount) / 100);
+            });
+
+            return netAmount;
+        }
+
+        function effectiveTieredDiscount(discount1, discount2, discount3) {
+            let remaining = tieredDiscountNet(100, discount1, discount2, discount3);
+
+            return Number((100 - remaining).toFixed(2));
+        }
+
         function sameDiscount(left, right) {
             return samePercent(left, right);
         }
@@ -316,7 +332,7 @@
             let batchInput = row.find('input[name="no_batch[]"]');
             let expiredInput = row.find('input[name="expired_date[]"]');
             let hint = row.find('.receive-batch-mode');
-            let rowDiscount = normalizedDiscount(row.find('.receive-discount').val());
+            let rowDiscount = normalizedDiscount(row.data('diskon-efektif'));
             let rowTax = normalizedPercent(row.find('.receive-tax').val());
 
             if (meta.id) {
@@ -777,7 +793,10 @@
             let qtyValue = existing ? Number(existing.qty_diterima || 0) : 0;
             let maxQty = Number(item.outstanding_qty || 0);
             let harga = existing ? Number(existing.harga_beli || 0) : Number(item.harga_estimasi || 0);
-            let diskon = existing ? Number(existing.diskon || 0) : 0;
+            let diskon1 = Number(item.diskon_1 ?? existing?.diskon_1 ?? existing?.diskon ?? 0);
+            let diskon2 = Number(item.diskon_2 ?? existing?.diskon_2 ?? 0);
+            let diskon3 = Number(item.diskon_3 ?? existing?.diskon_3 ?? 0);
+            let diskon = Number(item.diskon_efektif ?? effectiveTieredDiscount(diskon1, diskon2, diskon3));
             let ppn = existing ? Number(existing.ppn || 0) : 11;
             let batch = existing ? (existing.no_batch || '') : '';
             let expired = existing && existing.expired_date ? moment(existing.expired_date).format('YYYY-MM-DD') : '';
@@ -803,7 +822,8 @@
             }
 
             return `
-                <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}">
+                <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}"
+                    data-diskon-1="${diskon1}" data-diskon-2="${diskon2}" data-diskon-3="${diskon3}" data-diskon-efektif="${diskon}">
                     <td>
                         <div class="receive-item-cell">
                             <span class="receive-item-avatar"><i class="mdi mdi-pill"></i></span>
@@ -854,9 +874,12 @@
                         <small class="receive-field-note">Harga per ${escapeHtml(item.satuan || 'satuan')}.</small>
                     </td>
                     <td>
-                        <input type="number" class="form-control form-control-sm receive-discount" name="diskon[]"
-                            min="0" max="100" step="0.01" value="${diskon}">
-                        <small class="receive-field-note">0-100%</small>
+                        <div class="receive-qty-stack">
+                            <strong>D1 ${formatDecimal(diskon1, 0, 2)}%</strong>
+                            <small>D2 ${formatDecimal(diskon2, 0, 2)}%</small>
+                            <small>D3 ${formatDecimal(diskon3, 0, 2)}%</small>
+                        </div>
+                        <small class="receive-field-note">Dari PO · efektif ${formatDecimal(diskon, 0, 2)}%</small>
                     </td>
                     <td>
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
@@ -929,7 +952,9 @@
                 rowCount++;
                 let qty = Number(row.find('.receive-qty').val()) || 0;
                 let price = parseCurrencyValue(row.find('.receive-price').val());
-                let discount = Number(row.find('.receive-discount').val()) || 0;
+                let discount1 = Number(row.data('diskon-1')) || 0;
+                let discount2 = Number(row.data('diskon-2')) || 0;
+                let discount3 = Number(row.data('diskon-3')) || 0;
                 let tax = Number(row.find('.receive-tax').val()) || 0;
                 let max = Number(row.data('max')) || 0;
                 let conversion = Number(row.data('konversi')) || 1;
@@ -940,8 +965,8 @@
                 let expired = row.find('input[name="expired_date[]"]').val()?.trim();
                 let hasBatchInfo = selectedBatchId ? Boolean(batch) : Boolean(batch && expired);
                 let subtotal = qty * price;
-                let discountValue = subtotal * discount / 100;
-                let taxBase = Math.max(0, subtotal - discountValue);
+                let taxBase = tieredDiscountNet(subtotal, discount1, discount2, discount3);
+                let discountValue = Math.max(0, subtotal - taxBase);
                 let taxValue = taxBase * tax / 100;
                 let total = taxBase + taxValue;
                 let check = row.find('.receive-row-check');
@@ -1132,7 +1157,7 @@
             updateFormProgress();
         }
 
-        $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
+        $(document).on('input change', '.receive-qty, .receive-price, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
             let input = $(this);
             let max = Number(input.closest('.receive-detail-row').data('max')) || 0;
 
@@ -1144,7 +1169,7 @@
                 input.val(max);
             }
 
-            if (input.hasClass('receive-discount') || input.hasClass('receive-tax')) {
+            if (input.hasClass('receive-tax')) {
                 setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
             }
 
@@ -1687,7 +1712,9 @@
                             <td>${escapeHtml(item.no_batch || '-')}</td>
                             <td>${formatDateDisplay(item.expired_date)}</td>
                             <td>${formatRupiah(item.harga_beli)}</td>
-                            <td>${Number(item.diskon || 0).toLocaleString('id-ID')}%</td>
+                            <td>${formatDecimal(item.diskon_1, 0, 2)}%</td>
+                            <td>${formatDecimal(item.diskon_2, 0, 2)}%</td>
+                            <td>${formatDecimal(item.diskon_3, 0, 2)}%</td>
                             <td>${Number(item.ppn || 0).toLocaleString('id-ID')}%</td>
                             <td>${formatRupiah(item.total)}</td>
                         </tr>
@@ -1741,7 +1768,8 @@
                             ${marginReference ? `<small class="d-block text-muted">${escapeHtml(marginReference)}</small>` : ''}
                         </td>
                         <td class="text-end">
-                            <span class="d-block">${formatDecimal(item.diskon, 0, 2)}%</span>
+                            <span class="d-block">D1 ${formatDecimal(item.diskon_1, 0, 2)}% · D2 ${formatDecimal(item.diskon_2, 0, 2)}% · D3 ${formatDecimal(item.diskon_3, 0, 2)}%</span>
+                            <small class="d-block text-muted">Efektif ${formatDecimal(item.diskon, 0, 2)}%</small>
                             <small class="text-muted">${formatRupiah(item.nilai_diskon_beli || item.nilai_diskon_jual)}</small>
                             <small class="d-block text-muted">Sudah masuk total</small>
                         </td>

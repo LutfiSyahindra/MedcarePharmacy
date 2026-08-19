@@ -464,7 +464,8 @@
                         </td>
                         <td>${formatRupiah(item.harga_beli)}</td>
                         <td>
-                            <strong>${formatDecimal(item.diskon, 0, 2)}% / ${formatDecimal(item.ppn, 0, 2)}%</strong>
+                            <strong>D1 ${formatDecimal(item.diskon_1, 0, 2)}% · D2 ${formatDecimal(item.diskon_2, 0, 2)}% · D3 ${formatDecimal(item.diskon_3, 0, 2)}%</strong>
+                            <small class="d-block text-muted">Efektif ${formatDecimal(item.diskon, 0, 2)}% / PPN ${formatDecimal(item.ppn, 0, 2)}%</small>
                             <small class="d-block text-muted">${formatRupiah(item.nilai_diskon)} / ${formatRupiah(item.nilai_ppn)}</small>
                         </td>
                         <td><strong>${formatRupiah(item.total)}</strong></td>

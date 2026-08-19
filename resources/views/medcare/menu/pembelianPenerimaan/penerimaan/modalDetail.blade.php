@@ -142,7 +142,7 @@
                             <i class="mdi mdi-pill-multiple"></i>
                             <div>
                                 <strong>Detail Barang</strong>
-                                <small>Qty diterima, batch, expired date, harga, diskon, dan PPN.</small>
+                                <small>Qty diterima, batch, expired date, harga, tiga diskon dari PO, dan PPN.</small>
                             </div>
                         </div>
                         <span class="badge bg-primary bg-opacity-10 text-primary fw-semibold px-3 py-2">
@@ -160,7 +160,9 @@
                                         <th>Batch</th>
                                         <th>Expired</th>
                                         <th>Harga Beli</th>
-                                        <th>Diskon</th>
+                                        <th>Diskon 1</th>
+                                        <th>Diskon 2</th>
+                                        <th>Diskon 3</th>
                                         <th>PPN</th>
                                         <th>Total</th>
                                     </tr>

@@ -270,6 +270,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/pembelian/{id}/reopen-approval', [PembelianController::class, 'reopenApproval'])->name('pembelian.reopenApproval');
         Route::delete('/pembelian/{id}/destroy', [PembelianController::class, 'destroy'])->name('pembelian.destroy');
         Route::get('/pembelian/{id}/show', [PembelianController::class, 'show'])->name('pembelian.show');
+        Route::get('/pembelian/{id}/surat-pesanan-narkotika', [PembelianController::class, 'suratPesananNarkotika'])->name('pembelian.suratPesananNarkotika');
+        Route::get('/pembelian/{id}/surat-pesanan-psikotropika', [PembelianController::class, 'suratPesananPsikotropika'])->name('pembelian.suratPesananPsikotropika');
+        Route::get('/pembelian/{id}/surat-pesanan-prekursor', [PembelianController::class, 'suratPesananPrekursor'])->name('pembelian.suratPesananPrekursor');
         Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');
 
         Route::get('/penerimaan', [PenerimaanController::class, 'penerimaan'])->name('penerimaan.penerimaan');

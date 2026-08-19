@@ -109,7 +109,7 @@
                                 <i class="mdi mdi-pill-multiple"></i>
                                 <div>
                                     <strong>Rincian Obat</strong>
-                                    <small>Tambahkan obat, satuan, jumlah, dan harga estimasinya.</small>
+                                    <small>Tambahkan obat, satuan, jumlah, harga, dan tiga diskon bertingkatnya.</small>
                                 </div>
                             </div>
                             <button type="button" id="addDetail" class="btn btn-success btn-sm purchase-add-detail">
@@ -131,7 +131,7 @@
                                         <div>
                                             <span class="purchase-detail-number">1</span>
                                             <strong>Item Obat</strong>
-                                            <small>Pilih obat, satuan, qty, dan harga estimasi.</small>
+                                            <small>Pilih obat, satuan, qty, harga estimasi, serta Diskon 1–3.</small>
                                         </div>
                                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                                             <i class="mdi mdi-trash-can-outline"></i>
@@ -171,6 +171,24 @@
                                             <label class="form-label">Subtotal</label>
                                             <input type="number" class="form-control subtotal" name="subtotal[]"
                                                 readonly>
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-4">
+                                            <label class="form-label">Diskon 1 (%)</label>
+                                            <input type="number" class="form-control purchase-discount"
+                                                name="diskon_1[]" min="0" max="100" step="0.01" value="0">
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-4">
+                                            <label class="form-label">Diskon 2 (%)</label>
+                                            <input type="number" class="form-control purchase-discount"
+                                                name="diskon_2[]" min="0" max="100" step="0.01" value="0">
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-4">
+                                            <label class="form-label">Diskon 3 (%)</label>
+                                            <input type="number" class="form-control purchase-discount"
+                                                name="diskon_3[]" min="0" max="100" step="0.01" value="0">
                                         </div>
                                     </div>
                                 </div>

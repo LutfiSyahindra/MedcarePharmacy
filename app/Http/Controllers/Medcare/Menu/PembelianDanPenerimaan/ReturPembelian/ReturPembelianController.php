@@ -12,6 +12,7 @@ use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Support\BranchAccess;
+use App\Support\TieredDiscount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -651,13 +652,18 @@ class ReturPembelianController extends Controller
             $hargaStock = (float) ($receiptDetail->harga_beli_stok
                 ?: ($purchaseConversion > 0 ? (float) $receiptDetail->harga_beli / $purchaseConversion : $receiptDetail->harga_beli));
             $harga = $hargaStock * $conversion;
-            $diskon = $this->percent($receiptDetail->diskon ?? 0);
+            [$diskon1, $diskon2, $diskon3] = TieredDiscount::percentages(
+                $receiptDetail->diskon_1,
+                $receiptDetail->diskon_2,
+                $receiptDetail->diskon_3
+            );
+            $diskon = TieredDiscount::effectivePercentage($diskon1, $diskon2, $diskon3);
             $ppn = $this->percent($receiptDetail->ppn ?? 0);
-            $subtotal = $qty * $harga;
-            $nilaiDiskon = $subtotal * ($diskon / 100);
-            $taxBase = max(0, $subtotal - $nilaiDiskon);
-            $nilaiPpn = $taxBase * ($ppn / 100);
-            $total = $taxBase + $nilaiPpn;
+            $subtotal = round($qty * $harga, 2);
+            $taxBase = TieredDiscount::netAmount($subtotal, $diskon1, $diskon2, $diskon3);
+            $nilaiDiskon = round($subtotal - $taxBase, 2);
+            $nilaiPpn = round($taxBase * ($ppn / 100), 2);
+            $total = round($taxBase + $nilaiPpn, 2);
 
             $rows[] = [
                 'penerimaan_barang_detail_id' => $receiptDetail->id,
@@ -675,6 +681,9 @@ class ReturPembelianController extends Controller
                 'expired_date' => $receiptDetail->expired_date,
                 'harga_beli' => $harga,
                 'harga_beli_stok' => $hargaStock,
+                'diskon_1' => $diskon1,
+                'diskon_2' => $diskon2,
+                'diskon_3' => $diskon3,
                 'diskon' => $diskon,
                 'ppn' => $ppn,
                 'subtotal' => $subtotal,
@@ -815,6 +824,9 @@ class ReturPembelianController extends Controller
                     'expired_date' => optional($detail->expired_date)->format('Y-m-d'),
                     'harga_beli' => (float) $detail->harga_beli,
                     'harga_beli_stok' => (float) $detail->harga_beli_stok,
+                    'diskon_1' => (float) ($detail->diskon_1 ?? 0),
+                    'diskon_2' => (float) ($detail->diskon_2 ?? 0),
+                    'diskon_3' => (float) ($detail->diskon_3 ?? 0),
                     'diskon' => (float) ($detail->diskon ?? 0),
                     'ppn' => (float) ($detail->ppn ?? 0),
                     'batch_stock' => (float) ($detail->stokBatch->qty ?? 0),

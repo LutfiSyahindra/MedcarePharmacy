@@ -360,6 +360,18 @@
         $(formSelector).on('submit', function(e) {
             e.preventDefault();
 
+            const formData = $(this).serializeArray();
+            [mainGolonganSelector, subGolonganSelector].forEach(function(selector) {
+                const $field = $(selector);
+
+                if (!formData.some(function(item) { return item.name === $field.attr('name'); })) {
+                    formData.push({
+                        name: $field.attr('name'),
+                        value: $field.val() || ''
+                    });
+                }
+            });
+
             const obatId = $('#obatId').val();
             const url = obatId ?
                 "{{ route("masterObat.update", ":id") }}".replace(':id', obatId) :
@@ -375,7 +387,7 @@
             $.ajax({
                 url: url,
                 method: method,
-                data: $(this).serialize(),
+                data: $.param(formData),
                 success: function(response) {
                     if (response.status === 'success') {
                         $(modalSelector).modal('hide');

@@ -40,6 +40,17 @@
             });
         }
 
+        function tieredDiscountNet(grossAmount, discount1, discount2, discount3) {
+            let netAmount = Math.max(0, Number(grossAmount) || 0);
+
+            [discount1, discount2, discount3].forEach(function(discount) {
+                let percentage = Math.min(100, Math.max(0, Number(discount) || 0));
+                netAmount *= 1 - (percentage / 100);
+            });
+
+            return netAmount;
+        }
+
         function escapeHtml(value) {
             return String(value ?? '-').replace(/[&<>"']/g, function(character) {
                 return {
@@ -289,6 +300,9 @@
             let purchaseConversion = Number(item.konversi || 1) || 1;
             let priceStock = Number(item.harga_beli_stok || 0) || (Number(item.harga_beli || 0) / purchaseConversion);
             let price = priceStock * conversion;
+            let diskon1 = Number(item.diskon_1 ?? existing?.diskon_1 ?? existing?.diskon ?? 0);
+            let diskon2 = Number(item.diskon_2 ?? existing?.diskon_2 ?? 0);
+            let diskon3 = Number(item.diskon_3 ?? existing?.diskon_3 ?? 0);
             let diskon = Number(item.diskon || existing?.diskon || 0);
             let ppn = Number(item.ppn || existing?.ppn || 0);
             let alasan = existing?.alasan_item || '';
@@ -303,7 +317,7 @@
             }).join('');
 
             return `
-                <tr class="return-detail-row" data-max="${maxQty}" data-price="${price}" data-diskon="${diskon}" data-ppn="${ppn}"
+                <tr class="return-detail-row" data-max="${maxQty}" data-price="${price}" data-diskon="${diskon}" data-diskon-1="${diskon1}" data-diskon-2="${diskon2}" data-diskon-3="${diskon3}" data-ppn="${ppn}"
                     data-price-stock="${priceStock}" data-returnable-stock="${Number(item.returnable_qty_stok || 0)}" data-batch-stock="${batchStock}"
                     data-konversi="${conversion}" data-satuan="${escapeHtml(returnUnit)}" data-satuan-stok="${escapeHtml(stockUnit)}">
                     <td>
@@ -389,14 +403,16 @@
                 let qty = Number(row.find('.return-qty').val()) || 0;
                 let maxQty = Number(row.data('max')) || 0;
                 let price = Number(row.data('price')) || 0;
-                let diskon = Number(row.data('diskon')) || 0;
+                let diskon1 = Number(row.data('diskon-1')) || 0;
+                let diskon2 = Number(row.data('diskon-2')) || 0;
+                let diskon3 = Number(row.data('diskon-3')) || 0;
                 let ppn = Number(row.data('ppn')) || 0;
                 let conversion = Number(row.data('konversi')) || 1;
                 let purchaseUnit = row.data('satuan') || 'satuan';
                 let stockUnit = row.data('satuan-stok') || 'satuan stok';
                 let subtotal = qty * price;
-                let nilaiDiskon = subtotal * (diskon / 100);
-                let taxBase = Math.max(0, subtotal - nilaiDiskon);
+                let taxBase = tieredDiscountNet(subtotal, diskon1, diskon2, diskon3);
+                let nilaiDiskon = Math.max(0, subtotal - taxBase);
                 let nilaiPpn = taxBase * (ppn / 100);
                 let total = taxBase + nilaiPpn;
                 let check = row.find('.return-row-check');
@@ -838,7 +854,7 @@
                             <td>${escapeHtml(item.no_batch || '-')}</td>
                             <td>${formatDateDisplay(item.expired_date)}</td>
                             <td>${formatRupiah(item.harga_beli)}</td>
-                            <td>${formatDecimal(item.diskon, 0, 2)}%</td>
+                            <td>D1 ${formatDecimal(item.diskon_1, 0, 2)}% · D2 ${formatDecimal(item.diskon_2, 0, 2)}% · D3 ${formatDecimal(item.diskon_3, 0, 2)}%</td>
                             <td>${formatDecimal(item.ppn, 0, 2)}%</td>
                             <td>${formatRupiah(item.total)}</td>
                             <td>${escapeHtml(item.alasan_item || '-')}</td>

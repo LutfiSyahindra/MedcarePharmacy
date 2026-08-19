@@ -12,11 +12,27 @@ use App\Services\Settings\Master\RakService;
 use App\Services\Settings\Master\SatuanService;
 use App\Services\Settings\Master\SediaanService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
 class MasterObatController extends Controller
 {
-    protected $MasterObatService, $SediaanService, $GolonganService, $SatuanService, $PabrikanService, $DistributorService, $RakService, $KategoriUtamaService;
+    protected $MasterObatService;
+
+    protected $SediaanService;
+
+    protected $GolonganService;
+
+    protected $SatuanService;
+
+    protected $PabrikanService;
+
+    protected $DistributorService;
+
+    protected $RakService;
+
+    protected $KategoriUtamaService;
+
     public function __construct(MasterObatService $MasterObatService, SediaanService $SediaanService, GolonganService $GolonganService, SatuanService $SatuanService, PabrikanService $PabrikanService, DistributorService $DistributorService, RakService $RakService, KategoriUtamaService $KategoriUtamaService)
     {
         $this->MasterObatService = $MasterObatService;
@@ -28,6 +44,7 @@ class MasterObatController extends Controller
         $this->RakService = $RakService;
         $this->KategoriUtamaService = $KategoriUtamaService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -45,10 +62,10 @@ class MasterObatController extends Controller
             ->addColumn('actions', function ($dataMasterObat) {
                 return '
                     <div class="obat-action-group">
-                        <button type="button" class="btn obat-action-btn obat-action-edit" title="Edit obat" onclick="editMasterObat(' . $dataMasterObat['id'] . ')">
+                        <button type="button" class="btn obat-action-btn obat-action-edit" title="Edit obat" onclick="editMasterObat('.$dataMasterObat['id'].')">
                             <i class="mdi mdi-pencil-outline"></i>
                         </button>
-                        <button type="button" class="btn obat-action-btn obat-action-delete" title="Hapus obat" onclick="deleteMasterObat(' . $dataMasterObat['id'] . ')">
+                        <button type="button" class="btn obat-action-btn obat-action-delete" title="Hapus obat" onclick="deleteMasterObat('.$dataMasterObat['id'].')">
                             <i class="mdi mdi-delete-outline"></i>
                         </button>
                     </div>
@@ -62,54 +79,63 @@ class MasterObatController extends Controller
     public function getMainGolongan($golongan)
     {
         $mainGolongan = $this->MasterObatService->getMainGolongan($golongan);
+
         return response()->json($mainGolongan);
     }
 
     public function getSubGolongan($mainGolongan)
     {
         $subGolongan = $this->MasterObatService->getSubGolongan($mainGolongan);
+
         return response()->json($subGolongan);
     }
 
     public function getKategori()
     {
         $kategori = $this->KategoriUtamaService->getKategoriUtama();
+
         return response()->json($kategori);
     }
 
     public function getSediaan()
     {
         $sediaan = $this->SediaanService->getSediaan();
+
         return response()->json($sediaan);
     }
 
     public function getGolongan()
     {
         $golongan = $this->GolonganService->getGolongan();
+
         return response()->json($golongan);
     }
 
     public function getSatuan()
     {
         $satuan = $this->SatuanService->getSatuan();
+
         return response()->json($satuan);
     }
 
     public function getPabrikan()
     {
         $pabrikan = $this->PabrikanService->getPabrikan();
+
         return response()->json($pabrikan);
     }
 
     public function getDistributor()
     {
         $distributor = $this->DistributorService->getDistributor();
+
         return response()->json($distributor);
     }
 
     public function getRak()
     {
         $rak = $this->RakService->getRak();
+
         return response()->json($rak);
     }
 
@@ -126,30 +152,7 @@ class MasterObatController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'kode_obat'       => 'required|string|max:50|unique:master_obats,kode_obat',
-            'nama_obat'       => 'required|string|max:150',
-            'sediaan_id'      => 'required|exists:sediaan_obats,id',
-            'category_id'     => 'required|exists:categories,id',
-            'golongan_id'     => 'required|exists:golongan_obats,id',
-            'main_golongan_id'=> 'nullable|exists:main_golongan_obats,id',
-            'sub_golongan_id' => 'nullable|exists:sub_golongan_obats,id',
-            'satuan_id'       => 'required|exists:satuans,id',
-            'pabrikan_id'     => 'required|exists:pabrikan,id',
-            'distributor_id'  => 'nullable|exists:distributors,id',
-            'rak_id'          => 'nullable|exists:rak_penyimpanans,id',
-
-            'komposisi'       => 'nullable|string|max:255',
-            'indikasi'        => 'nullable|string|max:255',
-            'dosis'           => 'nullable|string|max:255',
-            'kemasan'         => 'nullable|string|max:255',
-
-            'stok_minimum'    => 'required|numeric|min:0',
-            'harga_beli'      => 'required|numeric|min:0',
-
-            'is_generik'      => 'required|boolean',
-            'is_active'       => 'required|boolean',
-        ]);
+        $validated = $this->validateMasterObat($request);
 
         $this->MasterObatService->createMasterObat($validated);
 
@@ -170,6 +173,7 @@ class MasterObatController extends Controller
     public function edit(string $id)
     {
         $dataMasterObat = $this->MasterObatService->findByIdMasterObat($id);
+
         return response()->json($dataMasterObat);
     }
 
@@ -178,38 +182,63 @@ class MasterObatController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'kode_obat'       => 'required|string|max:50|unique:master_obats,kode_obat,' . $id,
-            'nama_obat'       => 'required|string|max:150',
-            'sediaan_id'      => 'required|exists:sediaan_obats,id',
-            'category_id'     => 'required|exists:categories,id',
-            'golongan_id'     => 'required|exists:golongan_obats,id',
-            'main_golongan_id'=> 'nullable|exists:main_golongan_obats,id',
-            'sub_golongan_id' => 'nullable|exists:sub_golongan_obats,id',
-            'satuan_id'       => 'required|exists:satuans,id',
-            'pabrikan_id'     => 'required|exists:pabrikan,id',
-            'distributor_id'  => 'nullable|exists:distributors,id',
-            'rak_id'          => 'nullable|exists:rak_penyimpanans,id',
-
-            'komposisi'       => 'nullable|string|max:255',
-            'indikasi'        => 'nullable|string|max:255',
-            'dosis'           => 'nullable|string|max:255',
-            'kemasan'         => 'nullable|string|max:255',
-            
-            'stok_minimum'    => 'required|numeric|min:0',
-            'harga_beli'      => 'required|numeric|min:0',
-
-            'is_generik'      => 'required|boolean',
-            'is_active'       => 'required|boolean',
-        ]);
+        $validated = $this->validateMasterObat($request, $id);
 
         $dataMasterObat = $this->MasterObatService->updateMasterObat($id, $validated);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Master Obat berhasil diperbarui',
-            'data'    => $dataMasterObat
+            'data' => $dataMasterObat,
         ], 200);
+    }
+
+    private function validateMasterObat(Request $request, ?string $id = null): array
+    {
+        $validated = $request->validate([
+            'kode_obat' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('master_obats', 'kode_obat')->ignore($id),
+            ],
+            'nama_obat' => 'required|string|max:150',
+            'sediaan_id' => 'required|exists:sediaan_obats,id',
+            'category_id' => 'required|exists:categories,id',
+            'golongan_id' => 'required|exists:golongan_obats,id',
+            'main_golongan_id' => [
+                'nullable',
+                Rule::exists('main_golongan_obats', 'id')
+                    ->where(fn ($query) => $query->where('golongan_id', $request->input('golongan_id'))),
+            ],
+            'sub_golongan_id' => [
+                'nullable',
+                Rule::exists('sub_golongan_obats', 'id')
+                    ->where(fn ($query) => $query->where('main_golongan_id', $request->input('main_golongan_id'))),
+            ],
+            'satuan_id' => 'required|exists:satuans,id',
+            'pabrikan_id' => 'required|exists:pabrikan,id',
+            'distributor_id' => 'nullable|exists:distributors,id',
+            'rak_id' => 'nullable|exists:rak_penyimpanans,id',
+
+            'komposisi' => 'nullable|string|max:255',
+            'indikasi' => 'nullable|string|max:255',
+            'dosis' => 'nullable|string|max:255',
+            'kemasan' => 'nullable|string|max:255',
+
+            'stok_minimum' => 'required|numeric|min:0',
+            'harga_beli' => 'required|numeric|min:0',
+
+            'is_generik' => 'required|boolean',
+            'is_active' => 'required|boolean',
+        ]);
+
+        // Select yang disabled tidak dikirim browser. Tetap sertakan nilai NULL
+        // agar klasifikasi lama tidak tertinggal saat hierarki dikosongkan.
+        $validated['main_golongan_id'] = $validated['main_golongan_id'] ?? null;
+        $validated['sub_golongan_id'] = $validated['sub_golongan_id'] ?? null;
+
+        return $validated;
     }
 
     public function updateStatus(Request $request)
@@ -224,15 +253,16 @@ class MasterObatController extends Controller
     {
         try {
             $this->MasterObatService->deleteMasterObat($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Master Obat berhasil dihapus.'
+                'message' => 'Master Obat berhasil dihapus.',
             ]);
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
     }

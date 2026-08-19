@@ -335,10 +335,16 @@
 
         function discountTaxHtml(item) {
             const discount = Number(item.discount || 0);
+            const discount1 = Number(item.discount_1 || 0);
+            const discount2 = Number(item.discount_2 || 0);
+            const discount3 = Number(item.discount_3 || 0);
             const tax = Number(item.tax || 0);
             const parts = [];
 
-            if (discount > 0) {
+            if (discount1 > 0 || discount2 > 0 || discount3 > 0) {
+                parts.push(`D1 ${formatDecimal(discount1, 0, 2)}% · D2 ${formatDecimal(discount2, 0, 2)}% · D3 ${formatDecimal(discount3, 0, 2)}%`);
+                parts.push(`${formatDecimal(discount, 0, 2)}% efektif`);
+            } else if (discount > 0) {
                 parts.push(`${formatDecimal(discount, 0, 2)}% diskon`);
             }
 

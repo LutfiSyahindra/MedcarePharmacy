@@ -12,6 +12,7 @@ use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Margins\MarginsService;
 use App\Support\BranchAccess;
+use App\Support\TieredDiscount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -421,7 +422,6 @@ class PenerimaanController extends Controller
             'tanggal_faktur' => ['required', 'string'],
             'tanggal_jatuh_tempo' => ['nullable', 'string'],
             'subtotal' => ['nullable', 'numeric', 'min:0'],
-            'diskon' => ['nullable', 'numeric', 'min:0'],
             'pajak' => ['nullable', 'numeric', 'min:0'],
             'biaya_lain' => ['nullable', 'numeric', 'min:0'],
             'total_faktur' => ['nullable', 'numeric', 'min:0'],
@@ -444,8 +444,6 @@ class PenerimaanController extends Controller
             'expired_date.*' => ['nullable', 'string'],
             'harga_beli' => ['required', 'array'],
             'harga_beli.*' => ['required', 'numeric', 'min:0'],
-            'diskon' => ['required', 'array'],
-            'diskon.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'ppn' => ['required', 'array'],
             'ppn.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
@@ -535,13 +533,18 @@ class PenerimaanController extends Controller
             $conversion = $this->conversionFactor($poDetail);
             $qtyStock = $qty * $conversion;
             $hargaStock = $conversion > 0 ? $harga / $conversion : $harga;
-            $diskon = $this->discountPercent($request->diskon[$index] ?? 0);
-            $ppn = (float) ($request->ppn[$index] ?? 0);
-            $subtotal = $qty * $harga;
-            $nilaiDiskon = $subtotal * ($diskon / 100);
-            $taxBase = max(0, $subtotal - $nilaiDiskon);
-            $nilaiPpn = $taxBase * ($ppn / 100);
-            $total = $taxBase + $nilaiPpn;
+            [$diskon1, $diskon2, $diskon3] = TieredDiscount::percentages(
+                $poDetail->diskon_1,
+                $poDetail->diskon_2,
+                $poDetail->diskon_3
+            );
+            $diskon = TieredDiscount::effectivePercentage($diskon1, $diskon2, $diskon3);
+            $ppn = $this->discountPercent($request->ppn[$index] ?? 0);
+            $subtotal = round($qty * $harga, 2);
+            $taxBase = TieredDiscount::netAmount($subtotal, $diskon1, $diskon2, $diskon3);
+            $nilaiDiskon = round($subtotal - $taxBase, 2);
+            $nilaiPpn = round($taxBase * ($ppn / 100), 2);
+            $total = round($taxBase + $nilaiPpn, 2);
 
             $rows[] = [
                 'purchase_order_detail_id' => $poDetail->id,
@@ -557,6 +560,9 @@ class PenerimaanController extends Controller
                 'expired_date' => $expired === '' ? null : $this->parseDate($expired),
                 'harga_beli' => $harga,
                 'harga_beli_stok' => $hargaStock,
+                'diskon_1' => $diskon1,
+                'diskon_2' => $diskon2,
+                'diskon_3' => $diskon3,
                 'diskon' => $diskon,
                 'ppn' => $ppn,
                 'subtotal' => $subtotal,
@@ -843,6 +849,14 @@ class PenerimaanController extends Controller
                 'received_qty_stok' => $received * $this->conversionFactor($detail),
                 'outstanding_qty_stok' => $outstanding * $this->conversionFactor($detail),
                 'harga_estimasi' => (float) $detail->harga_estimasi,
+                'diskon_1' => (float) ($detail->diskon_1 ?? 0),
+                'diskon_2' => (float) ($detail->diskon_2 ?? 0),
+                'diskon_3' => (float) ($detail->diskon_3 ?? 0),
+                'diskon_efektif' => TieredDiscount::effectivePercentage(
+                    $detail->diskon_1,
+                    $detail->diskon_2,
+                    $detail->diskon_3
+                ),
                 'harga_estimasi_stok' => $this->conversionFactor($detail) > 0
                     ? (float) $detail->harga_estimasi / $this->conversionFactor($detail)
                     : (float) $detail->harga_estimasi,
@@ -1151,6 +1165,9 @@ class PenerimaanController extends Controller
         $totalHargaBeli = $this->detailTotalPurchasePriceIncludingTax($detail);
         $ppn = (float) ($detail->ppn ?? 0);
         $diskon = (float) ($detail->diskon ?? 0);
+        $diskon1 = (float) ($detail->diskon_1 ?? 0);
+        $diskon2 = (float) ($detail->diskon_2 ?? 0);
+        $diskon3 = (float) ($detail->diskon_3 ?? 0);
         $margin = $this->marginsService->activeMarginForObat($obat);
         $faktorJual = $margin ? (float) $margin->faktor_jual : 1.0;
         $marginReference = $this->marginsService->marginReferenceLabelForObat($obat, $margin);
@@ -1189,6 +1206,9 @@ class PenerimaanController extends Controller
             'margin_tingkat' => $margin?->tingkat,
             'margin_reference' => $marginReference,
             'diskon' => $diskon,
+            'diskon_1' => $diskon1,
+            'diskon_2' => $diskon2,
+            'diskon_3' => $diskon3,
             'nilai_diskon_beli' => round($nilaiDiskon, 2),
             'nilai_diskon_jual' => round($nilaiDiskon, 2),
             'total_harga_beli_include_ppn' => round($totalHargaBeli, 2),
@@ -1244,7 +1264,16 @@ class PenerimaanController extends Controller
 
         $subtotal = (float) ($detail->subtotal ?? ((float) $detail->qty_diterima * (float) $detail->harga_beli));
 
-        return $subtotal > 0 ? $subtotal * ($diskon / 100) : $totalHargaBeli * ($diskon / 100);
+        if ($subtotal > 0) {
+            return TieredDiscount::discountAmount(
+                $subtotal,
+                $detail->diskon_1,
+                $detail->diskon_2,
+                $detail->diskon_3
+            );
+        }
+
+        return $totalHargaBeli * ($diskon / 100);
     }
 
     private function penerimaanQueryForBranch(array $with = [], ?array $branchIds = null)
