@@ -409,6 +409,33 @@
                 </div>
             </li>
 
+            @php
+                $documentMenuActive = request()->routeIs("dokumen.*");
+                $orderDocumentMenuActive = request()->routeIs("dokumen.index", "dokumen.table", "dokumen.template", "dokumen.show");
+                $labelDocumentMenuActive = request()->routeIs("dokumen.etiket.*");
+            @endphp
+            <li class="nav-item">
+                <a class="nav-link {{ $documentMenuActive ? "active" : "" }}" data-bs-toggle="collapse"
+                    href="#dokumen" role="button" aria-expanded="{{ $documentMenuActive ? "true" : "false" }}"
+                    aria-controls="dokumen">
+                    <i class="link-icon" data-feather="file-text"></i>
+                    <span class="link-title">Dokumen</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse {{ $documentMenuActive ? "show" : "" }}" id="dokumen">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item">
+                            <a href="{{ route("dokumen.index") }}"
+                                class="nav-link {{ $orderDocumentMenuActive ? "active" : "" }}">Surat Pesanan</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("dokumen.etiket.index") }}"
+                                class="nav-link {{ $labelDocumentMenuActive ? "active" : "" }}">Etiket</a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#stok" role="button"
                     aria-expanded="false" aria-controls="stok">

@@ -11,6 +11,8 @@ use App\Http\Controllers\Medcare\MasterData\Pabrikan\PabrikanController;
 use App\Http\Controllers\Medcare\MasterData\Rak\RakController;
 use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
+use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
+use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
@@ -28,6 +30,7 @@ use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
 use App\Http\Controllers\Medcare\Settings\Notification\NotificationSettingController;
 use App\Http\Controllers\ProfileController;
+use App\Services\Menu\Dokumen\DocumentArchiveService;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -312,6 +315,23 @@ Route::middleware('auth')->group(function () {
         Route::delete('/retur-pembelian/{id}/ganti-rugi/{compensationId}', [ReturPembelianController::class, 'cancelCompensation'])->name('returPembelian.cancelCompensation');
         Route::delete('/retur-pembelian/{id}/destroy', [ReturPembelianController::class, 'destroy'])->name('returPembelian.destroy');
 
+    });
+
+    Route::prefix('medcare/menu/dokumen')->group(function () {
+        Route::get('/', [DocumentController::class, 'index'])->name('dokumen.index');
+        Route::get('/table', [DocumentController::class, 'table'])->name('dokumen.table');
+        Route::get('/etiket', [LabelDocumentController::class, 'index'])->name('dokumen.etiket.index');
+        Route::get('/etiket/table', [LabelDocumentController::class, 'table'])->name('dokumen.etiket.table');
+        Route::get('/etiket/template/{type}', [LabelDocumentController::class, 'template'])
+            ->whereIn('type', LabelDocumentController::templateTypes())
+            ->name('dokumen.etiket.template');
+        Route::get('/template/{type}', [DocumentController::class, 'template'])
+            ->whereIn('type', DocumentArchiveService::types())
+            ->name('dokumen.template');
+        Route::get('/{type}/{purchaseOrder}', [DocumentController::class, 'show'])
+            ->whereIn('type', DocumentArchiveService::types())
+            ->whereNumber('purchaseOrder')
+            ->name('dokumen.show');
     });
 
     Route::prefix('medcare/menu/penjualan')->group(function () {

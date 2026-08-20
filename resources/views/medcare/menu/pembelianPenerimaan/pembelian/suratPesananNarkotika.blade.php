@@ -68,14 +68,42 @@
         .field-table td { padding: .55mm 0; vertical-align: top; }
         .field-label { width: 38mm; white-space: nowrap; }
         .field-separator { width: 5mm; text-align: center; }
-        .order-description {
-            min-height: 27mm;
-            margin: 2mm 0 0 43mm;
-            padding: 2.5mm 3mm;
-            border: .25mm solid #777;
+        .medicine-table {
+            width: 100%;
+            margin: 2.5mm 0 0;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 10.5pt;
+            line-height: 1.3;
         }
-        .order-description p { margin: 0 0 1.2mm; }
-        .order-description p:last-child { margin-bottom: 0; }
+        .medicine-table th,
+        .medicine-table td {
+            padding: 2mm 2.2mm;
+            border: .3mm solid #4b5563;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+        .medicine-table th {
+            padding-top: 1.7mm;
+            padding-bottom: 1.7mm;
+            background: #e9edf2;
+            font-size: 10pt;
+            font-weight: 700;
+            line-height: 1.2;
+            text-align: center;
+            vertical-align: middle;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .medicine-table .number-column { width: 7%; text-align: center; }
+        .medicine-table .name-column { width: 25%; }
+        .medicine-table .preparation-column { width: 16%; }
+        .medicine-table .strength-column { width: 27%; }
+        .medicine-table .quantity-column { width: 25%; }
+        .medicine-table tbody .number-column,
+        .medicine-table tbody .quantity-column { vertical-align: middle; }
+        .medicine-table tbody .quantity-column { text-align: center; }
+        .medicine-name { display: block; font-size: 10.75pt; font-weight: 700; line-height: 1.25; }
         .signature-wrap {
             display: flex;
             justify-content: flex-end;
@@ -106,6 +134,7 @@
                 margin: 0;
                 box-shadow: none;
             }
+            .medicine-table tr { page-break-inside: avoid; break-inside: avoid; }
         }
     </style>
 </head>
@@ -168,12 +197,26 @@
                 <section class="section compact">
                     <p>dengan Narkotika yang dipesan adalah :</p>
                     <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)</p>
-                    <div class="order-description">
-                        <p><strong>Nama obat:</strong> {{ $medicine?->nama_obat ?: '-' }}</p>
-                        <p><strong>Bentuk sediaan:</strong> {{ $preparation }}</p>
-                        <p><strong>Kekuatan/potensi:</strong> {{ $strength }}</p>
-                        <p><strong>Jumlah:</strong> {{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</p>
-                    </div>
+                    <table class="medicine-table">
+                        <thead>
+                            <tr>
+                                <th class="number-column" scope="col">No.</th>
+                                <th class="name-column" scope="col">Nama obat</th>
+                                <th class="preparation-column" scope="col">Bentuk sediaan</th>
+                                <th class="strength-column" scope="col">Kekuatan/potensi</th>
+                                <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="number-column">1</td>
+                                <td class="name-column"><span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span></td>
+                                <td class="preparation-column">{{ $preparation }}</td>
+                                <td class="strength-column">{{ $strength }}</td>
+                                <td class="quantity-column">{{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </section>
 
                 <section class="section compact">

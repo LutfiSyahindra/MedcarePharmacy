@@ -63,9 +63,15 @@ class SuratPesananPrekursorTest extends TestCase
         $this->assertSame(3, substr_count($html, 'PO-PRE-001/PRE'));
         $this->assertStringContainsString('Formulir 3', $html);
         $this->assertStringContainsString('SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*', $html);
+        $this->assertStringContainsString('class="medicine-table"', $html);
+        $this->assertStringContainsString('class="name-column" scope="col">Nama obat', $html);
+        $this->assertStringContainsString('class="preparation-column" scope="col">Bentuk sediaan', $html);
+        $this->assertStringContainsString('class="strength-column" scope="col">Kekuatan/potensi', $html);
+        $this->assertStringContainsString('class="packaging-column" scope="col">Isi kemasan', $html);
         $this->assertStringContainsString('Pseudoephedrine 60 mg', $html);
         $this->assertStringContainsString('Ephedrine 25 mg', $html);
-        $this->assertStringContainsString('kemasan Box 10 strip', $html);
+        $this->assertStringContainsString('Isi kemasan', $html);
+        $this->assertStringContainsString('Box 10 strip', $html);
         $this->assertStringContainsString('20 Tablet (dua puluh tablet)', $html);
         $this->assertStringContainsString('Apoteker/Tenaga Teknis Kefarmasian', $html);
         $this->assertStringContainsString('No. SIPA/SIKTTK', $html);

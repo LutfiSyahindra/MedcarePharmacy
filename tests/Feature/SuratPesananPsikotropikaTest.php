@@ -63,6 +63,10 @@ class SuratPesananPsikotropikaTest extends TestCase
         $this->assertSame(3, substr_count($html, 'PO-PSI-001/PSI'));
         $this->assertStringContainsString('Formulir 2', $html);
         $this->assertStringContainsString('SURAT PESANAN PSIKOTROPIKA', $html);
+        $this->assertStringContainsString('class="medicine-table"', $html);
+        $this->assertStringContainsString('class="name-column" scope="col">Nama obat', $html);
+        $this->assertStringContainsString('class="preparation-column" scope="col">Bentuk sediaan', $html);
+        $this->assertStringContainsString('class="strength-column" scope="col">Kekuatan/potensi', $html);
         $this->assertStringContainsString('Diazepam 5 mg', $html);
         $this->assertStringContainsString('Clobazam 10 mg', $html);
         $this->assertStringContainsString('20 Tablet (dua puluh tablet)', $html);

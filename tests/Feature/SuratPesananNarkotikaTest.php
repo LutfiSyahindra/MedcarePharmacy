@@ -57,6 +57,10 @@ class SuratPesananNarkotikaTest extends TestCase
         $this->assertCount(1, $narcoticDetails);
         $this->assertSame(3, substr_count($html, 'class="narcotic-order-sheet"'));
         $this->assertStringContainsString('SURAT PESANAN NARKOTIKA', $html);
+        $this->assertStringContainsString('class="medicine-table"', $html);
+        $this->assertStringContainsString('class="name-column" scope="col">Nama obat', $html);
+        $this->assertStringContainsString('class="preparation-column" scope="col">Bentuk sediaan', $html);
+        $this->assertStringContainsString('class="strength-column" scope="col">Kekuatan/potensi', $html);
         $this->assertStringContainsString('PO-NAR-001/NAR/01', $html);
         $this->assertStringContainsString('Morphine 10 mg', $html);
         $this->assertStringContainsString('25 Tablet (dua puluh lima tablet)', $html);
