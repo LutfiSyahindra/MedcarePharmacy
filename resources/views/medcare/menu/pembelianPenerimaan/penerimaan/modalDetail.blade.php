@@ -118,8 +118,13 @@
                                     readonly>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small">Total Faktur</label>
+                                <label class="form-label small">Total Faktur (Asli)</label>
                                 <input type="text" class="form-control form-control-sm" id="detailTotalFaktur"
+                                    readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Tagihan Setelah Ganti Rugi</label>
+                                <input type="text" class="form-control form-control-sm" id="detailPayableTotal"
                                     readonly>
                             </div>
                             <div class="col-md-3">

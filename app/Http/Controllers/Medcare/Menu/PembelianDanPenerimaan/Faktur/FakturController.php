@@ -62,6 +62,8 @@ class FakturController extends Controller
             ->addColumn('due_label', fn (PenerimaanBarangModel $row) => $this->dueLabel($row))
             ->addColumn('payment_progress', fn (PenerimaanBarangModel $row) => $this->paymentProgress($row))
             ->addColumn('total_faktur_value', fn (PenerimaanBarangModel $row) => $this->invoiceTotal($row))
+            ->addColumn('supplier_compensation_discount_value', fn (PenerimaanBarangModel $row) => $this->compensationDiscount($row))
+            ->addColumn('payable_total_value', fn (PenerimaanBarangModel $row) => $this->payableTotal($row))
             ->addColumn('jumlah_dibayar_value', fn (PenerimaanBarangModel $row) => (float) ($row->jumlah_dibayar ?? 0))
             ->addColumn('sisa_hutang_value', fn (PenerimaanBarangModel $row) => $this->remainingDebt($row))
             ->addColumn('user', fn (PenerimaanBarangModel $row) => $row->createdBy->name ?? '-')
@@ -96,8 +98,17 @@ class FakturController extends Controller
 
             $biayaLain = $this->moneyValue($request->input('biaya_lain'));
             $totalFaktur = $this->computedInvoiceTotal($faktur, $biayaLain);
-            $jumlahDibayar = min($this->moneyValue($request->input('jumlah_dibayar')), $totalFaktur);
-            $sisaHutang = max(0, $totalFaktur - $jumlahDibayar);
+            $potonganGantiRugi = $this->compensationDiscount($faktur);
+
+            if ($potonganGantiRugi > $totalFaktur + 0.009) {
+                throw ValidationException::withMessages([
+                    'biaya_lain' => 'Total faktur tidak boleh lebih kecil dari potongan ganti rugi sebesar Rp '.number_format($potonganGantiRugi, 0, ',', '.').'.',
+                ]);
+            }
+
+            $tagihanSetelahGantiRugi = max(0, $totalFaktur - $potonganGantiRugi);
+            $jumlahDibayar = min($this->moneyValue($request->input('jumlah_dibayar')), $tagihanSetelahGantiRugi);
+            $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
 
             $faktur->update([
                 'nomor_faktur' => trim((string) $request->nomor_faktur),
@@ -108,7 +119,7 @@ class FakturController extends Controller
                 'grand_total' => $totalFaktur,
                 'jumlah_dibayar' => $jumlahDibayar,
                 'sisa_hutang' => $sisaHutang,
-                'status_pembayaran' => $this->paymentStatus($totalFaktur, $jumlahDibayar),
+                'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, $jumlahDibayar),
                 'catatan' => $request->catatan,
             ]);
 
@@ -127,10 +138,10 @@ class FakturController extends Controller
 
             $this->ensureEditable($faktur);
 
-            $totalFaktur = $this->invoiceTotal($faktur);
+            $tagihanSetelahGantiRugi = $this->payableTotal($faktur);
 
             $faktur->update([
-                'jumlah_dibayar' => $totalFaktur,
+                'jumlah_dibayar' => $tagihanSetelahGantiRugi,
                 'sisa_hutang' => 0,
                 'status_pembayaran' => 'lunas',
             ]);
@@ -149,12 +160,12 @@ class FakturController extends Controller
 
             $this->ensureEditable($faktur);
 
-            $totalFaktur = $this->invoiceTotal($faktur);
+            $tagihanSetelahGantiRugi = $this->payableTotal($faktur);
 
             $faktur->update([
                 'jumlah_dibayar' => 0,
-                'sisa_hutang' => $totalFaktur,
-                'status_pembayaran' => 'belum_dibayar',
+                'sisa_hutang' => $tagihanSetelahGantiRugi,
+                'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, 0),
             ]);
 
             return response()->json([
@@ -203,6 +214,8 @@ class FakturController extends Controller
             ->values();
 
         $totalFaktur = $this->invoiceTotal($faktur);
+        $potonganGantiRugi = $this->compensationDiscount($faktur);
+        $tagihanSetelahGantiRugi = $this->payableTotal($faktur);
         $jumlahDibayar = (float) ($faktur->jumlah_dibayar ?? 0);
         $sisaHutang = $this->remainingDebt($faktur);
 
@@ -231,6 +244,8 @@ class FakturController extends Controller
                 'biaya_lain' => (float) ($faktur->biaya_lain ?? 0),
                 'grand_total' => (float) ($faktur->grand_total ?? 0),
                 'total_faktur' => $totalFaktur,
+                'supplier_compensation_discount' => $potonganGantiRugi,
+                'payable_total' => $tagihanSetelahGantiRugi,
                 'jumlah_dibayar' => $jumlahDibayar,
                 'sisa_hutang' => $sisaHutang,
                 'payment_progress' => $this->paymentProgress($faktur),
@@ -316,6 +331,8 @@ class FakturController extends Controller
             'overdue' => $active->filter(fn (PenerimaanBarangModel $row) => $this->dueState($row) === 'overdue')->count(),
             'due_soon' => $active->filter(fn (PenerimaanBarangModel $row) => $this->dueState($row) === 'due_soon')->count(),
             'total_value' => $active->sum(fn (PenerimaanBarangModel $row) => $this->invoiceTotal($row)),
+            'compensation_value' => $active->sum(fn (PenerimaanBarangModel $row) => $this->compensationDiscount($row)),
+            'payable_value' => $active->sum(fn (PenerimaanBarangModel $row) => $this->payableTotal($row)),
             'paid_value' => $active->sum(fn (PenerimaanBarangModel $row) => (float) ($row->jumlah_dibayar ?? 0)),
             'remaining_debt' => $active->sum(fn (PenerimaanBarangModel $row) => $this->remainingDebt($row)),
         ];
@@ -361,13 +378,17 @@ class FakturController extends Controller
         };
     }
 
-    private function paymentStatus(float $totalFaktur, float $jumlahDibayar): string
+    private function paymentStatus(float $tagihanSetelahGantiRugi, float $jumlahDibayar): string
     {
-        if ($totalFaktur <= 0 || $jumlahDibayar <= 0) {
+        if ($tagihanSetelahGantiRugi <= 0) {
+            return 'lunas';
+        }
+
+        if ($jumlahDibayar <= 0) {
             return 'belum_dibayar';
         }
 
-        return $jumlahDibayar >= $totalFaktur ? 'lunas' : 'sebagian';
+        return $jumlahDibayar >= $tagihanSetelahGantiRugi ? 'lunas' : 'sebagian';
     }
 
     private function paymentStatusLabel(string $status): string
@@ -381,10 +402,10 @@ class FakturController extends Controller
 
     private function paymentProgress(PenerimaanBarangModel $faktur): int
     {
-        $total = $this->invoiceTotal($faktur);
+        $total = $this->payableTotal($faktur);
 
         if ($total <= 0) {
-            return 0;
+            return (string) $faktur->status_pembayaran === 'lunas' ? 100 : 0;
         }
 
         return (int) min(100, round(((float) ($faktur->jumlah_dibayar ?? 0) / $total) * 100));
@@ -410,15 +431,19 @@ class FakturController extends Controller
         return round(max(0, $total), 2);
     }
 
+    private function compensationDiscount(PenerimaanBarangModel $faktur): float
+    {
+        return round(max(0, (float) ($faktur->supplier_compensation_discount ?? 0)), 2);
+    }
+
+    private function payableTotal(PenerimaanBarangModel $faktur): float
+    {
+        return round(max(0, $this->invoiceTotal($faktur) - $this->compensationDiscount($faktur)), 2);
+    }
+
     private function remainingDebt(PenerimaanBarangModel $faktur): float
     {
-        $storedDebt = (float) ($faktur->sisa_hutang ?? 0);
-
-        if ($storedDebt > 0) {
-            return round($storedDebt, 2);
-        }
-
-        return round(max(0, $this->invoiceTotal($faktur) - (float) ($faktur->jumlah_dibayar ?? 0)), 2);
+        return round(max(0, $this->payableTotal($faktur) - (float) ($faktur->jumlah_dibayar ?? 0)), 2);
     }
 
     private function ensureEditable(PenerimaanBarangModel $faktur): void

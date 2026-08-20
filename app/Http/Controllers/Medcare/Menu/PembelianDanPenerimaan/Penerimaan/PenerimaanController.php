@@ -751,9 +751,9 @@ class PenerimaanController extends Controller
             $this->moneyValue($supplierCompensationDiscount),
             $grossTotalFaktur
         );
-        $totalFaktur = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
-        $jumlahDibayar = min($this->moneyValue($request->jumlah_dibayar), $totalFaktur);
-        $sisaHutang = max(0, $totalFaktur - $jumlahDibayar);
+        $tagihanSetelahGantiRugi = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
+        $jumlahDibayar = min($this->moneyValue($request->jumlah_dibayar), $tagihanSetelahGantiRugi);
+        $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
 
         return [
             'nomor_penerimaan' => $request->nomor_penerimaan,
@@ -769,13 +769,13 @@ class PenerimaanController extends Controller
             'subtotal' => $subtotal,
             'total_diskon' => $diskon,
             'total_ppn' => $pajak,
-            'grand_total' => $totalFaktur,
+            'grand_total' => $grossTotalFaktur,
             'diskon' => $diskon,
             'pajak' => $pajak,
             'biaya_lain' => $biayaLain,
             'supplier_compensation_discount' => $supplierCompensationDiscount,
-            'total_faktur' => $totalFaktur,
-            'status_pembayaran' => $this->paymentStatus($totalFaktur, $jumlahDibayar),
+            'total_faktur' => $grossTotalFaktur,
+            'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, $jumlahDibayar),
             'jumlah_dibayar' => $jumlahDibayar,
             'sisa_hutang' => $sisaHutang,
             'catatan' => $request->catatan,

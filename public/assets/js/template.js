@@ -103,42 +103,83 @@
 
 
 
-    //Add active class to nav-link based on url dynamically
-    function addActiveClass(element) {
-        if (current === "") {
-          //for root url
-          if (element.attr('href').indexOf("index.html") !== -1) {
-            element.parents('.nav-item').last().addClass('active');
-            if (element.parents('.sub-menu').length) {
-              element.closest('.collapse').addClass('show');
-              element.addClass('active');
-            }
-          }
-        } else {
-          //for other url
-          if (element.attr('href').indexOf(current) !== -1) {
-            element.parents('.nav-item').last().addClass('active');
-            if (element.parents('.sub-menu').length) {
-              element.closest('.collapse').addClass('show');
-              element.addClass('active');
-            }
-            if (element.parents('.submenu-item').length) {
-              element.addClass('active');
-            }
-          }
-        }
+    // Activate one navigation link using its complete URL path. Matching only the
+    // last URL segment made related menus (for example all "golongan" links)
+    // active at the same time.
+    function normalizeNavigationPath(value) {
+      try {
+        var path = new URL(value, window.location.origin).pathname.replace(/\/+$/, '');
+        return path || '/';
+      } catch (error) {
+        return '';
+      }
     }
 
-      var current = location.pathname.split("/").slice(-1)[0].replace(/^\/|\/$/g, '');
-      $('.nav li a', sidebar).each(function() {
-        var $this = $(this);
-        addActiveClass($this);
+    function activateNavigation(links) {
+      var currentPath = normalizeNavigationPath(window.location.href);
+      var candidates = [];
+
+      links.each(function() {
+        var element = $(this);
+        var href = element.attr('href');
+
+        if (!href || href === '#' || href.indexOf('javascript:') === 0 || element.is('[data-bs-toggle]')) {
+          return;
+        }
+
+        var path = normalizeNavigationPath(this.href || href);
+        if (!path) {
+          return;
+        }
+
+        var isExact = path === currentPath;
+        var isParentPath = path !== '/' && currentPath.indexOf(path + '/') === 0;
+
+        if (isExact || isParentPath) {
+          candidates.push({
+            element: element,
+            path: path,
+            exact: isExact
+          });
+        }
       });
 
-    $('.horizontal-menu .nav li a').each(function() {
-      var $this = $(this);
-      addActiveClass($this);
-    })
+      candidates.sort(function(a, b) {
+        if (a.exact !== b.exact) {
+          return a.exact ? -1 : 1;
+        }
+
+        return b.path.length - a.path.length;
+      });
+
+      var match = candidates[0];
+      if (!match) {
+        return;
+      }
+
+      var element = match.element;
+      var collapse = element.closest('.collapse');
+
+      element.addClass('active');
+      element.closest('.nav-item').addClass('active');
+      element.parents('.nav-item').last().addClass('active');
+
+      if (collapse.length) {
+        collapse.addClass('show');
+        collapse.prev('[data-bs-toggle="collapse"]').attr('aria-expanded', 'true');
+      }
+
+      if (element.parents('.submenu-item').length) {
+        element.addClass('active');
+      }
+    }
+
+    sidebar.find('.nav-item.active, .nav-link.active').removeClass('active');
+    sidebar.find('.collapse.show').removeClass('show');
+    sidebar.find('[data-bs-toggle="collapse"]').attr('aria-expanded', 'false');
+    activateNavigation($('.nav li a', sidebar));
+
+    activateNavigation($('.horizontal-menu .nav li a'));
 
 
     //  open sidebar-folded when hover

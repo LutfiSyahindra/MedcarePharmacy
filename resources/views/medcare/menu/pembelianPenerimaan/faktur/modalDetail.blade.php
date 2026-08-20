@@ -85,7 +85,7 @@
                             <span><i class="mdi mdi-cash-multiple"></i></span>
                             <div>
                                 <strong>Nilai Faktur</strong>
-                                <small>Subtotal, diskon, pajak, dan pembayaran.</small>
+                                <small>Nilai asli faktur, ganti rugi, dan pembayaran.</small>
                             </div>
                         </div>
                         <div class="invoice-money-list">
@@ -104,6 +104,14 @@
                             <div>
                                 <span>Biaya Lain</span>
                                 <strong id="detailOtherCost">Rp 0</strong>
+                            </div>
+                            <div>
+                                <span>Potongan Ganti Rugi</span>
+                                <strong id="detailCompensationDiscount">Rp 0</strong>
+                            </div>
+                            <div class="is-emphasis">
+                                <span>Tagihan Setelah Ganti Rugi</span>
+                                <strong id="detailPayableTotal">Rp 0</strong>
                             </div>
                             <div class="is-emphasis">
                                 <span>Dibayar</span>

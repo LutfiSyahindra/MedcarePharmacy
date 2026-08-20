@@ -119,9 +119,17 @@
                         <span>PPN</span>
                         <strong id="paymentTax">Rp 0</strong>
                     </div>
-                    <div class="is-total">
-                        <span>Total Baru</span>
+                    <div>
+                        <span>Potongan Ganti Rugi</span>
+                        <strong id="paymentCompensationDiscount">Rp 0</strong>
+                    </div>
+                    <div>
+                        <span>Total Faktur (Asli)</span>
                         <strong id="paymentComputedTotal">Rp 0</strong>
+                    </div>
+                    <div class="is-total">
+                        <span>Tagihan Setelah Ganti Rugi</span>
+                        <strong id="paymentPayableTotal">Rp 0</strong>
                     </div>
                 </section>
 

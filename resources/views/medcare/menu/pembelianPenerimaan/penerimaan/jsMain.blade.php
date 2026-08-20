@@ -162,25 +162,25 @@
             return meta[status] || meta.belum_dibayar;
         }
 
-        function updateInvoicePaymentUi(total, paid, debt, status) {
-            let paidPercent = total > 0 ? Math.min(100, (paid / total) * 100) : (status === 'lunas' ? 100 : 0);
+        function updateInvoicePaymentUi(payableTotal, paid, debt, status) {
+            let paidPercent = payableTotal > 0 ? Math.min(100, (paid / payableTotal) * 100) : (status === 'lunas' ? 100 : 0);
             let meta = paymentStatusMeta(status);
 
             $('#invoicePaymentStatusBadge')
                 .removeClass('is-unpaid is-partial is-paid')
                 .addClass(meta.className)
                 .html(`<i class="mdi ${meta.icon}"></i> ${meta.label}`);
-            $('#invoiceBoardTotal').text(formatRupiah(total));
+            $('#invoiceBoardTotal').text(formatRupiah(payableTotal));
             $('#invoiceBoardPaid').text(formatRupiah(paid));
             $('#invoiceBoardDebt').text(formatRupiah(debt));
             $('#invoicePaidPercent').text(`${paidPercent.toFixed(0)}%`);
             $('#invoicePaidMeter').css('width', `${paidPercent}%`);
-            $('#invoiceBoardHint').text(total > 0 || status === 'lunas' ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
+            $('#invoiceBoardHint').text(payableTotal > 0 || status === 'lunas' ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
 
             $('.receive-payment-action').removeClass('is-active');
             if (status === 'belum_dibayar') {
                 $('.receive-payment-action[data-payment-action="none"]').addClass('is-active');
-            } else if (status === 'sebagian' && total > 0 && Math.abs(paid - (total / 2)) < 0.01) {
+            } else if (status === 'sebagian' && payableTotal > 0 && Math.abs(paid - (payableTotal / 2)) < 0.01) {
                 $('.receive-payment-action[data-payment-action="half"]').addClass('is-active');
             } else if (status === 'lunas') {
                 $('.receive-payment-action[data-payment-action="full"]').addClass('is-active');
@@ -1072,28 +1072,28 @@
             let maxCompensationDiscount = Math.min(grossTotal, supplierCompensationAvailable);
             let compensationDiscount = compensationEnabled ? parseCurrencyValue(compensationInput.val()) : 0;
             compensationDiscount = Math.min(maxCompensationDiscount, compensationDiscount);
-            let total = Math.max(0, grossTotal - compensationDiscount);
+            let payableTotal = Math.max(0, grossTotal - compensationDiscount);
             let paid = getMoneyInput('jumlah_dibayar');
             let isEditingPaid = paidInput.is(':focus');
 
             if (!isEditingPaid) {
                 if (paymentPreset === 'full') {
-                    paid = total;
+                    paid = payableTotal;
                 } else if (paymentPreset === 'half') {
-                    paid = total / 2;
+                    paid = payableTotal / 2;
                 } else if (paymentPreset === 'none') {
                     paid = 0;
                 }
             }
 
-            if (paid > total) {
-                paid = total;
+            if (paid > payableTotal) {
+                paid = payableTotal;
             }
 
-            let debt = Math.max(0, total - paid);
-            let paymentStatus = paymentStatusFromAmounts(total, paid);
+            let debt = Math.max(0, payableTotal - paid);
+            let paymentStatus = paymentStatusFromAmounts(payableTotal, paid);
 
-            if (grossTotal > 0 && total <= 0) {
+            if (grossTotal > 0 && payableTotal <= 0) {
                 paymentStatus = 'lunas';
             }
 
@@ -1105,7 +1105,7 @@
             } else {
                 compensationInput.data('raw-value', formatMoneyInputValue(compensationDiscount));
             }
-            setMoneyInput('total_faktur', total);
+            setMoneyInput('total_faktur', grossTotal);
             setMoneyInput('sisa_hutang', debt);
             $('select[name="status_pembayaran"]').val(paymentStatus);
 
@@ -1122,15 +1122,16 @@
                 paidInput.data('raw-value', formatMoneyInputValue(paid));
             }
 
-            updateInvoicePaymentUi(total, paid, debt, paymentStatus);
+            updateInvoicePaymentUi(payableTotal, paid, debt, paymentStatus);
             $('#supplierCompensationMax').text(formatRupiah(maxCompensationDiscount));
             $('#receiveModalCompensationDiscount').text(formatRupiah(compensationDiscount));
             $('#invoiceBoardFormula').text(compensationDiscount > 0
-                ? 'Subtotal - diskon + PPN + biaya lain - ganti rugi supplier'
-                : 'Subtotal - diskon + PPN + biaya lain');
+                ? `${formatRupiah(grossTotal)} - ganti rugi ${formatRupiah(compensationDiscount)}`
+                : 'Sama dengan total asli faktur');
 
             return {
-                total,
+                total: grossTotal,
+                payableTotal,
                 paid,
                 debt,
                 status: paymentStatus,
@@ -1214,7 +1215,7 @@
 
         $('select[name="status_pembayaran"]').on('change', function() {
             let selectedStatus = $(this).val();
-            let total = getMoneyInput('total_faktur');
+            let total = Math.max(0, getMoneyInput('total_faktur') - getMoneyInput('supplier_compensation_discount'));
             let currentPaid = getMoneyInput('jumlah_dibayar');
 
             if (selectedStatus === 'lunas') {
@@ -1241,7 +1242,7 @@
 
         $('.receive-payment-action').on('click', function() {
             let action = $(this).data('payment-action');
-            let total = getMoneyInput('total_faktur');
+            let total = Math.max(0, getMoneyInput('total_faktur') - getMoneyInput('supplier_compensation_discount'));
             let paid = 0;
             paymentPreset = action;
 
@@ -1685,6 +1686,10 @@
                 $('#detailInvoiceBiayaLain').val(formatRupiah(header.biaya_lain));
                 $('#detailSupplierCompensationDiscount').val(formatRupiah(header.supplier_compensation_discount));
                 $('#detailTotalFaktur').val(formatRupiah(header.total_faktur ?? header.grand_total));
+                $('#detailPayableTotal').val(formatRupiah(Math.max(
+                    0,
+                    Number(header.total_faktur ?? header.grand_total ?? 0) - Number(header.supplier_compensation_discount || 0)
+                )));
                 $('#detailJumlahDibayar').val(formatRupiah(header.jumlah_dibayar));
                 $('#detailSisaHutang').val(formatRupiah(header.sisa_hutang));
                 $('#detailNomorSuratJalan').val(header.nomor_surat_jalan || '-');

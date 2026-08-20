@@ -4,9 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\BranchModel;
 use App\Models\DistributorModel;
+use App\Models\KonversiSatuanModel;
+use App\Models\MasterObatModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
+use App\Models\SatuansModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -170,9 +174,10 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             'tanggal_penerimaan' => now()->format('Y-m-d'),
             'tanggal_faktur' => now()->format('Y-m-d'),
             'subtotal' => 100000,
-            'grand_total' => 60000,
-            'total_faktur' => 60000,
+            'grand_total' => 100000,
+            'total_faktur' => 100000,
             'supplier_compensation_discount' => 40000,
+            'sisa_hutang' => 60000,
             'status' => 'draft',
             'created_by' => $user->id,
         ]);
@@ -202,6 +207,103 @@ class ReturPembelianCompensationTrackingTest extends TestCase
         $compensation = $allocation->compensation()->firstOrFail();
         $this->assertNotNull($compensation->cancelled_at);
         $this->assertSame(100000.0, $retur->fresh('compensations')->compensation_outstanding_value);
+    }
+
+    public function test_supplier_compensation_reduces_payable_amount_without_changing_original_invoice_total(): void
+    {
+        Notification::fake();
+        [$user, $retur] = $this->postedReturn();
+
+        $unit = SatuansModel::create([
+            'kode' => 'BOX-COMP-'.uniqid(),
+            'nama' => 'BOX',
+            'is_active' => true,
+        ]);
+        $obat = MasterObatModel::create([
+            'kode_obat' => 'OBT-COMP-'.uniqid(),
+            'nama_obat' => 'Obat Faktur Ganti Rugi',
+            'satuan_id' => $unit->id,
+            'distributor_id' => $retur->distributor_id,
+            'is_active' => true,
+        ]);
+        $conversion = KonversiSatuanModel::create([
+            'obat_id' => $obat->id,
+            'satuan_id' => $unit->id,
+            'konversi' => 1,
+            'is_default' => true,
+        ]);
+        $receivingPo = PembelianModel::create([
+            'no_po' => 'PO-GROSS-COMP-'.uniqid(),
+            'distributor_id' => $retur->distributor_id,
+            'branch_id' => $retur->purchaseOrder->branch_id,
+            'tanggal_po' => now()->format('Y-m-d'),
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+        $poDetail = PembelianDetailModel::create([
+            'purchase_order_id' => $receivingPo->id,
+            'obat_id' => $obat->id,
+            'qty' => 1,
+            'harga_estimasi' => 100000,
+            'subtotal' => 100000,
+            'satuan_id' => $conversion->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('penerimaan.store'), [
+                'nomor_penerimaan' => 'PB-GROSS-COMP-'.uniqid(),
+                'purchase_order_id' => $receivingPo->id,
+                'nomor_faktur' => 'INV-GROSS-COMP',
+                'tanggal_penerimaan' => now()->format('d-m-Y'),
+                'tanggal_faktur' => now()->format('d-m-Y'),
+                'jumlah_dibayar' => 10000,
+                'supplier_compensation_discount' => 40000,
+                'purchase_order_detail_id' => [$poDetail->id],
+                'obat_id' => [$obat->id],
+                'qty_diterima' => [1],
+                'stok_batch_id' => [null],
+                'no_batch' => ['BATCH-GROSS-COMP'],
+                'expired_date' => [now()->addYear()->format('d-m-Y')],
+                'harga_beli' => [100000],
+                'ppn' => [0],
+            ])
+            ->assertOk();
+
+        $receipt = PenerimaanBarangModel::where('nomor_faktur', 'INV-GROSS-COMP')->firstOrFail();
+
+        $this->assertEquals(100000, (float) $receipt->total_faktur);
+        $this->assertEquals(100000, (float) $receipt->grand_total);
+        $this->assertEquals(40000, (float) $receipt->supplier_compensation_discount);
+        $this->assertEquals(10000, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(50000, (float) $receipt->sisa_hutang);
+        $this->assertSame('sebagian', $receipt->status_pembayaran);
+
+        $this->actingAs($user)
+            ->getJson(route('faktur.show', $receipt->id))
+            ->assertOk()
+            ->assertJsonPath('header.total_faktur', 100000)
+            ->assertJsonPath('header.supplier_compensation_discount', 40000)
+            ->assertJsonPath('header.payable_total', 60000)
+            ->assertJsonPath('header.sisa_hutang', 50000);
+
+        $this->actingAs($user)
+            ->putJson(route('faktur.markPaid', $receipt->id))
+            ->assertOk();
+
+        $receipt->refresh();
+        $this->assertEquals(100000, (float) $receipt->total_faktur);
+        $this->assertEquals(60000, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(0, (float) $receipt->sisa_hutang);
+        $this->assertSame('lunas', $receipt->status_pembayaran);
+
+        $this->actingAs($user)
+            ->putJson(route('faktur.resetPayment', $receipt->id))
+            ->assertOk();
+
+        $receipt->refresh();
+        $this->assertEquals(100000, (float) $receipt->total_faktur);
+        $this->assertEquals(60000, (float) $receipt->sisa_hutang);
+        $this->assertSame('belum_dibayar', $receipt->status_pembayaran);
     }
 
     private function postedReturn(array $overrides = []): array

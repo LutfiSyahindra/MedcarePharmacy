@@ -175,8 +175,10 @@
         function updateInvoiceSummary(summary = {}) {
             const totalValue = Number(summary.total_value || 0);
             const paidValue = Number(summary.paid_value || 0);
+            const compensationValue = Number(summary.compensation_value || 0);
             const remainingDebt = Number(summary.remaining_debt || 0);
-            const paidRatio = totalValue > 0 ? Math.min(100, Math.round((paidValue / totalValue) * 100)) : 0;
+            const settledValue = paidValue + compensationValue;
+            const paidRatio = totalValue > 0 ? Math.min(100, Math.round((settledValue / totalValue) * 100)) : 0;
             const openCount = Number(summary.unpaid || 0) + Number(summary.partial || 0);
 
             $('#invoiceTotalCount, #invoiceAllFilterCount').text(Number(summary.total || 0).toLocaleString('id-ID'));
@@ -188,7 +190,7 @@
             $('#invoiceOpenCount').text(openCount.toLocaleString('id-ID'));
             $('#invoiceRemainingDebt, #invoiceHeaderOutstanding').text(formatRupiah(remainingDebt));
             $('#invoicePaidValue').text(formatRupiah(paidValue));
-            $('#invoicePaidRatio').text(`${paidRatio}% dari total nilai aktif`);
+            $('#invoicePaidRatio').text(`Ganti rugi ${formatRupiah(compensationValue)} · ${paidRatio}% terselesaikan`);
             $('#invoiceHeaderHealth').text(`${openCount.toLocaleString('id-ID')} faktur perlu tindak lanjut`);
             $('#invoiceHealthMeter').css('width', `${paidRatio}%`);
         }
@@ -254,14 +256,24 @@
                     render: data => `<span class="purchase-date"><i class="mdi mdi-calendar-alert"></i>${formatDueDate(data)}</span>`
                 },
                 {
-                    data: 'total_faktur_value',
-                    render: data => `<span class="purchase-money"><i class="mdi mdi-cash"></i>${formatRupiah(data)}</span>`
+                    data: null,
+                    render: row => `
+                        <span class="invoice-money-stack">
+                            <strong>${formatRupiah(row.total_faktur_value)}</strong>
+                            <small>${Number(row.supplier_compensation_discount_value || 0) > 0
+                                ? `Tagihan bersih ${formatRupiah(row.payable_total_value)}`
+                                : 'Tanpa potongan ganti rugi'}</small>
+                        </span>
+                    `
                 },
                 {
                     data: null,
                     render: row => `
                         <span class="invoice-money-stack">
                             <strong>${formatRupiah(row.jumlah_dibayar_value)}</strong>
+                            ${Number(row.supplier_compensation_discount_value || 0) > 0
+                                ? `<small>Ganti rugi ${formatRupiah(row.supplier_compensation_discount_value)}</small>`
+                                : ''}
                             <small>Sisa ${formatRupiah(row.sisa_hutang_value)}</small>
                         </span>
                     `
@@ -438,6 +450,8 @@
             $('#detailDiscount').text(formatRupiah(header.diskon));
             $('#detailTax').text(formatRupiah(header.pajak));
             $('#detailOtherCost').text(formatRupiah(header.biaya_lain));
+            $('#detailCompensationDiscount').text(formatRupiah(header.supplier_compensation_discount));
+            $('#detailPayableTotal').text(formatRupiah(header.payable_total));
             $('#detailPaidAmount').text(formatRupiah(header.jumlah_dibayar));
             $('#detailItemSummary').text(`${Number(header.total_barang || details.length).toLocaleString('id-ID')} item / ${formatDecimal(header.total_qty, 0, 2)} qty`);
             $('#detailInvoiceNote').text(header.catatan || '-');
@@ -501,7 +515,8 @@
             paymentBase = {
                 subtotal: Number(header.subtotal || 0),
                 diskon: Number(header.diskon || 0),
-                pajak: Number(header.pajak || 0)
+                pajak: Number(header.pajak || 0),
+                compensation: Number(header.supplier_compensation_discount || 0)
             };
 
             clearPaymentValidation();
@@ -518,29 +533,33 @@
             $('#paymentSubtotal').text(formatRupiah(header.subtotal));
             $('#paymentDiscount').text(formatRupiah(header.diskon));
             $('#paymentTax').text(formatRupiah(header.pajak));
+            $('#paymentCompensationDiscount').text(formatRupiah(header.supplier_compensation_discount));
             updatePaymentPreview();
         }
 
         function updatePaymentPreview() {
             const biayaLain = moneyValue($('#paymentBiayaLain').val());
             const total = Math.max(0, paymentBase.subtotal - paymentBase.diskon + paymentBase.pajak + biayaLain);
+            const payableTotal = Math.max(0, total - paymentBase.compensation);
             let paid = moneyValue($('#paymentJumlahDibayar').val());
-            paid = Math.min(paid, total);
-            const debt = Math.max(0, total - paid);
-            const progress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
-            const status = total <= 0 || paid <= 0 ? 'belum_dibayar' : (paid >= total ? 'lunas' : 'sebagian');
+            paid = Math.min(paid, payableTotal);
+            const debt = Math.max(0, payableTotal - paid);
+            const progress = payableTotal > 0 ? Math.min(100, Math.round((paid / payableTotal) * 100)) : (total > 0 ? 100 : 0);
+            const status = payableTotal <= 0 && total > 0 ? 'lunas' : (paid <= 0 ? 'belum_dibayar' : (paid >= payableTotal ? 'lunas' : 'sebagian'));
 
             $('#paymentTotalFaktur, #paymentComputedTotal').text(formatRupiah(total));
+            $('#paymentPayableTotal').text(formatRupiah(payableTotal));
             $('#paymentPaidAmount').text(formatRupiah(paid));
             $('#paymentRemainingDebt').text(formatRupiah(debt));
             $('#paymentProgressLabel').text(`${progress}%`);
-            $('#paymentProgressAmount').text(`${formatRupiah(paid)} / ${formatRupiah(total)}`);
+            $('#paymentProgressAmount').text(`${formatRupiah(paid)} / ${formatRupiah(payableTotal)}`);
             $('#paymentProgressMeter').css('width', `${progress}%`);
             $('#paymentStatusReadonly').val(paymentMeta(status).label);
             $('#invoicePaymentStatusBadge').html(paymentBadge(status));
 
             return {
                 total,
+                payableTotal,
                 paid,
                 debt,
                 status
@@ -561,10 +580,11 @@
         $('.invoice-shortcut-btn').on('click', function() {
             const preset = $(this).data('payment-preset');
             const total = Math.max(0, paymentBase.subtotal - paymentBase.diskon + paymentBase.pajak + moneyValue($('#paymentBiayaLain').val()));
+            const payableTotal = Math.max(0, total - paymentBase.compensation);
             let paid = 0;
 
-            if (preset === 'half') paid = total / 2;
-            if (preset === 'full') paid = total;
+            if (preset === 'half') paid = payableTotal / 2;
+            if (preset === 'full') paid = payableTotal;
 
             setMoneyInput('#paymentJumlahDibayar', paid);
             updatePaymentPreview();
@@ -596,7 +616,7 @@
             Swal.fire({
                 icon: 'question',
                 title: 'Tandai faktur lunas?',
-                text: 'Jumlah dibayar akan disamakan dengan total faktur.',
+                text: 'Jumlah dibayar akan disamakan dengan tagihan setelah ganti rugi.',
                 showCancelButton: true,
                 confirmButtonText: 'Ya, tandai lunas',
                 cancelButtonText: 'Batal'
@@ -644,8 +664,8 @@
             const id = $('#faktur_id').val();
             const preview = updatePaymentPreview();
 
-            if (moneyValue($('#paymentJumlahDibayar').val()) > preview.total) {
-                setMoneyInput('#paymentJumlahDibayar', preview.total);
+            if (moneyValue($('#paymentJumlahDibayar').val()) > preview.payableTotal) {
+                setMoneyInput('#paymentJumlahDibayar', preview.payableTotal);
             }
 
             const submitButton = $('#submitFakturPayment');

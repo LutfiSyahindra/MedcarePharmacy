@@ -566,8 +566,37 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
 }
 
-.sidebar-folded.open-sidebar-folded .medcare-sidebar {
+.sidebar-folded.open-sidebar-folded .medcare-sidebar,
+.sidebar-folded.open-sidebar-folded .medcare-sidebar .sidebar-header {
   width: var(--medcare-sidebar-width);
+}
+
+.sidebar-folded.open-sidebar-folded .medcare-sidebar .sidebar-header {
+  justify-content: space-between;
+  padding: 0 17px;
+}
+
+.sidebar-folded.open-sidebar-folded .medcare-sidebar .sidebar-header .sidebar-brand {
+  display: flex;
+  width: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (min-width: 992px) {
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header .sidebar-brand {
+    display: none;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header .sidebar-toggler {
+    margin: 0;
+  }
+
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item .link-title,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .nav .nav-item .link-arrow,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-body .collapse {
+    display: none !important;
+  }
 }
 
 @media (max-width: 991px) {
@@ -592,8 +621,12 @@
     padding: 0 17px;
   }
 
-  .sidebar-folded .medcare-sidebar .sidebar-header .sidebar-brand {
+  .sidebar-folded .medcare-sidebar .sidebar-header .sidebar-brand,
+  .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-header .sidebar-brand {
     display: flex;
+    width: auto;
+    opacity: 1;
+    visibility: visible;
   }
 
   .sidebar-folded:not(.open-sidebar-folded) .medcare-sidebar .sidebar-profile {

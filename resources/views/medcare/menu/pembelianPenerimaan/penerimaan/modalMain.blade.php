@@ -401,7 +401,7 @@
 
                             <div class="receive-invoice-board">
                                 <div class="receive-invoice-main">
-                                    <span>Total Tagihan</span>
+                                    <span>Tagihan Setelah Ganti Rugi</span>
                                     <strong id="invoiceBoardTotal">Rp 0</strong>
                                     <small id="invoiceBoardFormula">Subtotal - diskon + PPN + biaya lain</small>
                                 </div>
@@ -450,10 +450,10 @@
                                         <i class="mdi mdi-cash-minus"></i>
                                     </span>
                                     <div>
-                                        <strong>Potong Ganti Rugi dari Faktur Ini</strong>
+                                        <strong>Gunakan Ganti Rugi untuk Mengurangi Tagihan</strong>
                                         <small>
                                             Saldo tersedia <b id="supplierCompensationAvailable">Rp 0</b>.
-                                            Potongan dialokasikan ke retur jatuh tempo atau terlama terlebih dahulu.
+                                            Total asli faktur tetap utuh; potongan hanya mengurangi tagihan yang dibayar.
                                         </small>
                                     </div>
                                 </div>
@@ -528,7 +528,7 @@
                                     <small class="purchase-field-hint">Tambahkan ongkir, admin, atau biaya supplier.</small>
                                 </div>
                                 <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Total Faktur</label>
+                                    <label class="form-label">Total Faktur (Asli)</label>
                                     <input type="text" class="form-control invoice-money fw-bold" name="total_faktur"
                                         value="Rp 0" inputmode="numeric" readonly>
                                 </div>
@@ -548,7 +548,7 @@
                                             value="Rp 0" inputmode="numeric" autocomplete="off"
                                             placeholder="Rp 0">
                                     </div>
-                                    <small class="purchase-field-hint">Tidak bisa melebihi total faktur.</small>
+                                    <small class="purchase-field-hint">Tidak bisa melebihi tagihan setelah ganti rugi.</small>
                                 </div>
                                 <div class="col-lg-3 col-md-6">
                                     <label class="form-label">Sisa Hutang</label>
@@ -562,7 +562,7 @@
                     <div class="purchase-total-panel">
                         <div class="purchase-total-copy">
                             <span>Total Faktur</span>
-                            <small>Subtotal dihitung dari detail barang, diskon, PPN, dan biaya lain.</small>
+                            <small>Nilai asli dari detail barang, diskon, PPN, dan biaya lain; tidak dikurangi ganti rugi.</small>
                         </div>
                         <div class="purchase-total-stats">
                             <span><strong id="receiveModalItemCount">0</strong> item</span>

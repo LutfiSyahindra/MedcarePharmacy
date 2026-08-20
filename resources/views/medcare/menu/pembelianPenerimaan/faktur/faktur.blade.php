@@ -57,7 +57,7 @@
                 <div class="purchase-stat-copy">
                     <strong id="invoiceRemainingDebt">Rp 0</strong>
                     <span>Sisa Hutang</span>
-                    <small>Belum terbayar ke supplier.</small>
+                    <small>Setelah potongan ganti rugi.</small>
                 </div>
             </article>
             <article class="purchase-stat is-draft">
@@ -82,7 +82,7 @@
             <article class="invoice-insight-card">
                 <span class="invoice-insight-icon is-paid"><i class="mdi mdi-cash-check"></i></span>
                 <div>
-                    <small>Terbayar</small>
+                    <small>Dibayar Tunai</small>
                     <strong id="invoicePaidValue">Rp 0</strong>
                     <span id="invoicePaidRatio">0% dari total nilai aktif</span>
                 </div>
