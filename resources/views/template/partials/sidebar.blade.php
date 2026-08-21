@@ -380,6 +380,9 @@
                         <li class="nav-item">
                             <a href="{{ route("penjualan.pos.history") }}" class="nav-link">Riwayat Transaksi Kasir</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route("returPenjualan.index") }}" class="nav-link">Retur Penjualan</a>
+                        </li>
                     </ul>
                 </div>
             </li>

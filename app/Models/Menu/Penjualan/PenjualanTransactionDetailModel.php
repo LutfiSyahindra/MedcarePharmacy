@@ -54,4 +54,9 @@ class PenjualanTransactionDetailModel extends Model
     {
         return $this->hasMany(PenjualanTransactionBatchModel::class, 'penjualan_transaction_detail_id');
     }
+
+    public function salesReturnDetails()
+    {
+        return $this->hasMany(ReturPenjualanDetailModel::class, 'penjualan_transaction_detail_id');
+    }
 }

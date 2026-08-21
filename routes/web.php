@@ -19,6 +19,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\Pembelian
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
+use App\Http\Controllers\Medcare\Menu\Penjualan\ReturPenjualanController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
 use App\Http\Controllers\Medcare\Settings\ApotekProfile\ApotekProfileController;
@@ -343,6 +344,19 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('medcare/menu/penjualan')->group(function () {
+        Route::get('/retur-penjualan', [ReturPenjualanController::class, 'index'])->name('returPenjualan.index');
+        Route::get('/retur-penjualan/table', [ReturPenjualanController::class, 'table'])->name('returPenjualan.table');
+        Route::get('/retur-penjualan/transactions', [ReturPenjualanController::class, 'transactions'])->name('returPenjualan.transactions');
+        Route::get('/retur-penjualan/transactions/{id}', [ReturPenjualanController::class, 'transaction'])->name('returPenjualan.transaction');
+        Route::get('/retur-penjualan/generate-number', [ReturPenjualanController::class, 'generateNumber'])->name('returPenjualan.generateNumber');
+        Route::post('/retur-penjualan', [ReturPenjualanController::class, 'store'])->name('returPenjualan.store');
+        Route::get('/retur-penjualan/{id}/show', [ReturPenjualanController::class, 'show'])->name('returPenjualan.show');
+        Route::get('/retur-penjualan/{id}/edit', [ReturPenjualanController::class, 'edit'])->name('returPenjualan.edit');
+        Route::put('/retur-penjualan/{id}', [ReturPenjualanController::class, 'update'])->name('returPenjualan.update');
+        Route::put('/retur-penjualan/{id}/post', [ReturPenjualanController::class, 'post'])->name('returPenjualan.post');
+        Route::put('/retur-penjualan/{id}/cancel', [ReturPenjualanController::class, 'cancel'])->name('returPenjualan.cancel');
+        Route::delete('/retur-penjualan/{id}', [ReturPenjualanController::class, 'destroy'])->name('returPenjualan.destroy');
+
         Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');
         Route::get('/pos/riwayat', [PenjualanPosController::class, 'history'])->name('penjualan.pos.history');
         Route::get('/pos/products', [PenjualanPosController::class, 'products'])->name('penjualan.pos.products');

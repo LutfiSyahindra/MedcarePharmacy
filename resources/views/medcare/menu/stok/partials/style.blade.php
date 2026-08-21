@@ -543,7 +543,10 @@
     .stock-table tbody tr.is-row-expired,
     .stock-table tbody tr.is-row-keluar,
     .stock-table tbody tr.is-row-penyesuaian_keluar,
-    .stock-table tbody tr.is-row-pembatalan_penerimaan {
+    .stock-table tbody tr.is-row-pembatalan_penerimaan,
+    .stock-table tbody tr.is-row-penjualan,
+    .stock-table tbody tr.is-row-retur_pembelian,
+    .stock-table tbody tr.is-row-pembatalan_retur_penjualan {
         box-shadow: inset 3px 0 0 #ef4444;
     }
 
@@ -554,6 +557,9 @@
 
     .stock-table tbody tr.is-row-masuk,
     .stock-table tbody tr.is-row-penyesuaian_masuk,
+    .stock-table tbody tr.is-row-pembatalan_penjualan,
+    .stock-table tbody tr.is-row-pembatalan_retur_pembelian,
+    .stock-table tbody tr.is-row-retur_penjualan,
     .stock-table tbody tr.is-row-saldo_awal {
         box-shadow: inset 3px 0 0 #10b981;
     }
@@ -817,7 +823,10 @@
     }
 
     .stock-status.is-masuk,
-    .stock-status.is-penyesuaian_masuk {
+    .stock-status.is-penyesuaian_masuk,
+    .stock-status.is-pembatalan_penjualan,
+    .stock-status.is-pembatalan_retur_pembelian,
+    .stock-status.is-retur_penjualan {
         background: #ecfdf5;
         color: #047857;
     }
@@ -830,7 +839,10 @@
     .stock-status.is-keluar,
     .stock-status.is-expired,
     .stock-status.is-penyesuaian_keluar,
-    .stock-status.is-pembatalan_penerimaan {
+    .stock-status.is-pembatalan_penerimaan,
+    .stock-status.is-penjualan,
+    .stock-status.is-retur_pembelian,
+    .stock-status.is-pembatalan_retur_penjualan {
         background: #fef2f2;
         color: #b91c1c;
     }

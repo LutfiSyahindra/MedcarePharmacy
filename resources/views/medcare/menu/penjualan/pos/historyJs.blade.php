@@ -8,7 +8,8 @@
             show: '{{ route("penjualan.pos.show", ":id") }}',
             receipt: '{{ route("penjualan.pos.receipt", ":id") }}',
             labels: '{{ route("penjualan.pos.labels", ":id") }}',
-            cancel: '{{ route("penjualan.pos.cancel", ":id") }}'
+            cancel: '{{ route("penjualan.pos.cancel", ":id") }}',
+            salesReturn: '{{ route("returPenjualan.index") }}'
         };
         const statusLabels = {
             draft: 'Sementara',
@@ -187,6 +188,12 @@
             }
 
             if (row.can_print) {
+                actions.push(`
+                    <button type="button" class="history-row-action is-primary" data-history-action="return" data-id="${Number(row.id)}"
+                        title="Buat retur penjualan" aria-label="Retur ${escapeHtml(row.nomor_transaksi)}">
+                        <i class="mdi mdi-keyboard-return"></i>
+                    </button>
+                `);
                 actions.push(`
                     <button type="button" class="history-row-action" data-history-action="print" data-id="${Number(row.id)}"
                         title="Cetak struk" aria-label="Cetak struk ${escapeHtml(row.nomor_transaksi)}">
@@ -464,6 +471,7 @@
             if (action === 'resume') window.location.href = `${urls.pos}?draft_id=${encodeURIComponent(id)}`;
             if (action === 'print') window.open(urls.receipt.replace(':id', id), '_blank', 'noopener');
             if (action === 'labels') window.open(urls.labels.replace(':id', id), '_blank', 'noopener');
+            if (action === 'return') window.location.href = `${urls.salesReturn}?transaction=${encodeURIComponent(id)}`;
             if (action === 'cancel') cancelTransaction(id);
         });
 
@@ -710,9 +718,18 @@
 
             if (transaction.status === 'completed') {
                 buttons.push(`
+                    <button type="button" class="btn btn-outline-primary" data-history-action="return" data-id="${Number(transaction.id)}">
+                        <i class="mdi mdi-keyboard-return"></i>Retur Penjualan
+                    </button>
+                `);
+                if (transaction.can_cancel) {
+                    buttons.push(`
                     <button type="button" class="btn btn-outline-danger" data-history-action="cancel" data-id="${Number(transaction.id)}">
                         <i class="mdi mdi-cancel"></i>Batalkan
                     </button>
+                    `);
+                }
+                buttons.push(`
                     <button type="button" class="btn btn-primary" data-history-action="print" data-id="${Number(transaction.id)}">
                         <i class="mdi mdi-printer-outline"></i>Cetak Struk
                     </button>

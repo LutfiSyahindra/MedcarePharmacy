@@ -48,6 +48,12 @@
             penyesuaian_masuk: 'Penyesuaian Masuk',
             penyesuaian_keluar: 'Penyesuaian Keluar',
             pembatalan_penerimaan: 'Pembatalan Penerimaan',
+            penjualan: 'Penjualan POS',
+            pembatalan_penjualan: 'Pembatalan Penjualan',
+            retur_pembelian: 'Retur Pembelian',
+            pembatalan_retur_pembelian: 'Pembatalan Retur Pembelian',
+            retur_penjualan: 'Retur Penjualan',
+            pembatalan_retur_penjualan: 'Pembatalan Retur Penjualan',
             saldo_awal: 'Saldo Awal'
         };
 
@@ -59,6 +65,12 @@
                 penyesuaian_masuk: 'mdi-plus-circle-outline',
                 penyesuaian_keluar: 'mdi-minus-circle-outline',
                 pembatalan_penerimaan: 'mdi-cancel',
+                penjualan: 'mdi-cart-arrow-down',
+                pembatalan_penjualan: 'mdi-cart-arrow-up',
+                retur_pembelian: 'mdi-truck-minus-outline',
+                pembatalan_retur_pembelian: 'mdi-truck-plus-outline',
+                retur_penjualan: 'mdi-keyboard-return',
+                pembatalan_retur_penjualan: 'mdi-backup-restore',
                 saldo_awal: 'mdi-database-plus-outline'
             } [type] || 'mdi-swap-horizontal';
         }
@@ -329,7 +341,7 @@
             }],
             rowCallback: function(row, data) {
                 $(row)
-                    .removeClass('is-row-masuk is-row-keluar is-row-expired is-row-penyesuaian_masuk is-row-penyesuaian_keluar is-row-pembatalan_penerimaan is-row-saldo_awal')
+                    .removeClass('is-row-masuk is-row-keluar is-row-expired is-row-penyesuaian_masuk is-row-penyesuaian_keluar is-row-pembatalan_penerimaan is-row-penjualan is-row-pembatalan_penjualan is-row-retur_pembelian is-row-pembatalan_retur_pembelian is-row-retur_penjualan is-row-pembatalan_retur_penjualan is-row-saldo_awal')
                     .addClass(`is-row-${data.jenis_mutasi}`);
             },
             drawCallback: function() {

@@ -269,6 +269,12 @@ class PenjualanPosService
             }
 
             if ($transaction->status === 'completed') {
+                if ($transaction->salesReturns()->whereIn('status', ['draft', 'posted'])->exists()) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Transaksi memiliki retur penjualan aktif. Batalkan atau hapus retur tersebut terlebih dahulu.',
+                    ]);
+                }
+
                 foreach ($transaction->details as $detail) {
                     foreach ($detail->batchAllocations as $allocation) {
                         if ($allocation->cancel_kartu_stok_id) {

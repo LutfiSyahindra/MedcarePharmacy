@@ -125,6 +125,12 @@
                     <option value="penyesuaian_masuk">Penyesuaian Masuk</option>
                     <option value="penyesuaian_keluar">Penyesuaian Keluar</option>
                     <option value="pembatalan_penerimaan">Pembatalan Penerimaan</option>
+                    <option value="penjualan">Penjualan POS</option>
+                    <option value="pembatalan_penjualan">Pembatalan Penjualan</option>
+                    <option value="retur_pembelian">Retur Pembelian</option>
+                    <option value="pembatalan_retur_pembelian">Pembatalan Retur Pembelian</option>
+                    <option value="retur_penjualan">Retur Penjualan</option>
+                    <option value="pembatalan_retur_penjualan">Pembatalan Retur Penjualan</option>
                     <option value="saldo_awal">Saldo Awal</option>
                 </select>
             </div>

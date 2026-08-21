@@ -163,7 +163,10 @@ class PenjualanPosController extends Controller
         ];
 
         $query->with(['branch', 'createdBy'])
-            ->withCount('details')
+            ->withCount([
+                'details',
+                'salesReturns as active_sales_returns_count' => fn ($query) => $query->whereIn('status', ['draft', 'posted']),
+            ])
             ->latest('tanggal_transaksi')
             ->latest('id');
 
@@ -189,7 +192,9 @@ class PenjualanPosController extends Controller
             ->addColumn('can_resume', fn ($transaction) => $transaction->status === 'draft')
             ->addColumn('can_print', fn ($transaction) => $transaction->status === 'completed')
             ->addColumn('can_print_labels', fn ($transaction) => $this->canPrintLabels($transaction))
-            ->addColumn('can_cancel', fn ($transaction) => in_array($transaction->status, ['draft', 'completed'], true))
+            ->addColumn('has_active_sales_return', fn ($transaction) => (int) ($transaction->active_sales_returns_count ?? 0) > 0)
+            ->addColumn('can_cancel', fn ($transaction) => in_array($transaction->status, ['draft', 'completed'], true)
+                && (int) ($transaction->active_sales_returns_count ?? 0) === 0)
             ->with(['summary' => $summary])
             ->make(true);
     }
@@ -363,6 +368,9 @@ class PenjualanPosController extends Controller
             'details.obat.satuan',
             'details.obat.konversiSatuan.satuan',
         ]);
+        $hasActiveSalesReturn = $transaction->salesReturns()
+            ->whereIn('status', ['draft', 'posted'])
+            ->exists();
 
         return [
             'id' => $transaction->id,
@@ -374,6 +382,8 @@ class PenjualanPosController extends Controller
             'jenis_label' => PenjualanPosService::TRANSACTION_TYPES[$transaction->jenis_transaksi] ?? $transaction->jenis_transaksi,
             'status' => $transaction->status,
             'payment_status' => $transaction->payment_status,
+            'has_active_sales_return' => $hasActiveSalesReturn,
+            'can_cancel' => in_array($transaction->status, ['draft', 'completed'], true) && ! $hasActiveSalesReturn,
             'can_print_labels' => $this->canPrintLabels($transaction),
             'labels_url' => $this->canPrintLabels($transaction)
                 ? route('penjualan.pos.labels', $transaction->id)

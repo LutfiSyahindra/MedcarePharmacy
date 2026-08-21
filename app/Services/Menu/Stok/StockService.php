@@ -9,6 +9,9 @@ use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
+use App\Models\Menu\Penjualan\ReturPenjualanBatchModel;
+use App\Models\Menu\Penjualan\ReturPenjualanDetailModel;
+use App\Models\Menu\Penjualan\ReturPenjualanModel;
 use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
@@ -241,6 +244,56 @@ class StockService
             'keterangan' => 'Pembatalan penjualan POS '.$nomorTransaksi.' - '.$detail->nama_obat.' ('
                 .number_format($qtyStock, 2, ',', '.').' '
                 .($detail->satuan_stok ?: $detail->obat?->satuan?->nama ?: 'satuan stok').')',
+            'created_by' => $createdBy ?: Auth::id(),
+        ]);
+    }
+
+    public function recordSaleReturn(
+        ReturPenjualanModel $return,
+        ReturPenjualanDetailModel $detail,
+        ReturPenjualanBatchModel $batchAllocation,
+        ?int $createdBy = null
+    ): KartuStokModel {
+        return $this->recordMovement([
+            'branch_id' => $return->branch_id,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $batchAllocation->stok_batch_id,
+            'qty' => (float) $batchAllocation->qty_stok,
+            'preserve_batch_cost' => true,
+            'jenis_mutasi' => 'retur_penjualan',
+            'tanggal_mutasi' => $return->posted_at ?: now(),
+            'reference_type' => ReturPenjualanModel::class,
+            'reference_id' => $return->id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $return->nomor_retur,
+            'keterangan' => 'Retur penjualan '.$return->nomor_retur.' dari transaksi '
+                .($return->transaction?->nomor_transaksi ?: '-').' - '.$detail->nama_obat.' ('
+                .number_format((float) $batchAllocation->qty_stok, 2, ',', '.').' '
+                .($detail->satuan_stok ?: 'satuan stok').')',
+            'created_by' => $createdBy ?: Auth::id(),
+        ]);
+    }
+
+    public function recordSaleReturnCancellation(
+        ReturPenjualanModel $return,
+        ReturPenjualanDetailModel $detail,
+        ReturPenjualanBatchModel $batchAllocation,
+        ?int $createdBy = null
+    ): KartuStokModel {
+        return $this->recordMovement([
+            'branch_id' => $return->branch_id,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $batchAllocation->stok_batch_id,
+            'qty' => (float) $batchAllocation->qty_stok,
+            'jenis_mutasi' => 'pembatalan_retur_penjualan',
+            'tanggal_mutasi' => $return->cancelled_at ?: now(),
+            'reference_type' => ReturPenjualanModel::class,
+            'reference_id' => $return->id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $return->nomor_retur,
+            'keterangan' => 'Pembatalan retur penjualan '.$return->nomor_retur.' - '.$detail->nama_obat.' ('
+                .number_format((float) $batchAllocation->qty_stok, 2, ',', '.').' '
+                .($detail->satuan_stok ?: 'satuan stok').')',
             'created_by' => $createdBy ?: Auth::id(),
         ]);
     }
@@ -638,6 +691,7 @@ class StockService
             'penyesuaian_masuk',
             'pembatalan_retur_pembelian',
             'pembatalan_penjualan',
+            'retur_penjualan',
         ], true);
     }
 

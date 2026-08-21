@@ -589,6 +589,8 @@ class StokController extends Controller
             'pembatalan_retur_pembelian' => 'Pembatalan Retur Pembelian',
             'penjualan' => 'Penjualan POS',
             'pembatalan_penjualan' => 'Pembatalan Penjualan',
+            'retur_penjualan' => 'Retur Penjualan',
+            'pembatalan_retur_penjualan' => 'Pembatalan Retur Penjualan',
             'saldo_awal' => 'Saldo Awal',
             default => ucwords(str_replace('_', ' ', $jenisMutasi)),
         };

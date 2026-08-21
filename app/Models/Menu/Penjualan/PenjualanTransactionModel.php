@@ -49,6 +49,11 @@ class PenjualanTransactionModel extends Model
         return $this->hasMany(PenjualanPaymentModel::class, 'penjualan_transaction_id');
     }
 
+    public function salesReturns()
+    {
+        return $this->hasMany(ReturPenjualanModel::class, 'penjualan_transaction_id');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
