@@ -103,6 +103,55 @@
         .medicine-table tbody .number-column,
         .medicine-table tbody .quantity-column { vertical-align: middle; }
         .medicine-table tbody .quantity-column { text-align: center; }
+        .commercial-section-heading {
+            display: flex;
+            align-items: center;
+            gap: 2.5mm;
+            margin: 1.5mm 0 2mm;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+        }
+        .commercial-section-heading .copy-role-badge {
+            padding: 1mm 2mm;
+            border: .25mm solid #64748b;
+            border-radius: 1mm;
+            background: #e2e8f0;
+            font-size: 8.75pt;
+            font-weight: 700;
+            letter-spacing: .25pt;
+            text-transform: uppercase;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .commercial-section-heading strong { font-size: 10.5pt; }
+        .medicine-table.commercial-detail-table {
+            border: .35mm solid #334155;
+            font-family: Arial, sans-serif;
+            font-size: 9.75pt;
+            line-height: 1.35;
+        }
+        .medicine-table.commercial-detail-table th,
+        .medicine-table.commercial-detail-table td { padding: 2.3mm 1.8mm; }
+        .medicine-table.commercial-detail-table th {
+            color: #fff;
+            background: #334155;
+            font-size: 9.25pt;
+            letter-spacing: .1pt;
+        }
+        .medicine-table.commercial-detail-table .number-column { width: 5%; }
+        .medicine-table.commercial-detail-table .name-column { width: 28%; }
+        .medicine-table.commercial-detail-table .order-quantity-column { width: 8%; text-align: center; vertical-align: middle; }
+        .medicine-table.commercial-detail-table .order-unit-column { width: 11%; text-align: center; vertical-align: middle; }
+        .medicine-table.commercial-detail-table .price-column { width: 16%; text-align: right; vertical-align: middle; white-space: nowrap; }
+        .medicine-table.commercial-detail-table .discount-column { width: 14%; text-align: center; vertical-align: middle; }
+        .medicine-table.commercial-detail-table .total-price-column { width: 18%; text-align: right; vertical-align: middle; white-space: nowrap; }
+        .medicine-table.commercial-detail-table .medicine-name { color: #0f172a; font-size: 10.25pt; }
+        .medicine-meta { display: block; margin-top: 1mm; color: #475569; font-size: 9pt; line-height: 1.4; }
+        .medicine-meta strong { color: #1e293b; }
+        .order-quantity-value,
+        .price-value,
+        .total-price-value { color: #0f172a; font-size: 10.25pt; font-weight: 700; }
+        .discount-tier { display: block; white-space: nowrap; font-size: 9.25pt; line-height: 1.45; }
         .medicine-name { display: block; font-size: 10.75pt; font-weight: 700; line-height: 1.25; }
         .signature-wrap {
             display: flex;
@@ -163,11 +212,25 @@
     @foreach ($narcoticDetails as $detail)
         @for ($copy = 1; $copy <= $copyCount; $copy++)
             @php
+                $showsCommercialDetails = $copy >= $copyCount - 1;
+                $commercialCopyLabel = $copy === $copyCount ? 'Rangkap Internal' : 'Rangkap Distributor';
                 $medicine = $detail->obat;
                 $unitName = $detail->satuanKonversi?->satuan?->nama ?: ($medicine?->satuan?->nama ?: 'unit');
                 $preparation = $medicine?->sediaan?->nama ?: '-';
                 $strength = $medicine?->komposisi ?: ($medicine?->dosis ?: '-');
                 $quantity = number_format((float) $detail->qty, 0, ',', '.');
+                $basePrice = (float) $detail->harga_estimasi;
+                $totalPrice = $detail->subtotal !== null
+                    ? (float) $detail->subtotal
+                    : \App\Support\TieredDiscount::netAmount(
+                        (float) $detail->qty * $basePrice,
+                        $detail->diskon_1,
+                        $detail->diskon_2,
+                        $detail->diskon_3
+                    );
+                $formattedBasePrice = number_format($basePrice, 0, ',', '.');
+                $formattedTotalPrice = number_format($totalPrice, 0, ',', '.');
+                $formatDiscount = static fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
             @endphp
             <main class="narcotic-order-sheet">
                 <span class="form-label-top">Formulir 1</span>
@@ -196,24 +259,56 @@
 
                 <section class="section compact">
                     <p>dengan Narkotika yang dipesan adalah :</p>
-                    <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)</p>
-                    <table class="medicine-table">
+                    @if ($showsCommercialDetails)
+                        <div class="commercial-section-heading">
+                            <span class="copy-role-badge">{{ $commercialCopyLabel }}</span>
+                            <strong>Rincian pemesanan dan harga</strong>
+                        </div>
+                    @else
+                        <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)</p>
+                    @endif
+                    <table class="medicine-table{{ $showsCommercialDetails ? ' commercial-detail-table' : '' }}">
                         <thead>
                             <tr>
                                 <th class="number-column" scope="col">No.</th>
-                                <th class="name-column" scope="col">Nama obat</th>
-                                <th class="preparation-column" scope="col">Bentuk sediaan</th>
-                                <th class="strength-column" scope="col">Kekuatan/potensi</th>
-                                <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
+                                @if ($showsCommercialDetails)
+                                    <th class="name-column" scope="col">Obat dan spesifikasi</th>
+                                    <th class="order-quantity-column" scope="col">Qty order</th>
+                                    <th class="order-unit-column" scope="col">Satuan order</th>
+                                    <th class="price-column" scope="col">Harga dasar</th>
+                                    <th class="discount-column" scope="col">Diskon</th>
+                                    <th class="total-price-column" scope="col">Total harga</th>
+                                @else
+                                    <th class="name-column" scope="col">Nama obat</th>
+                                    <th class="preparation-column" scope="col">Bentuk sediaan</th>
+                                    <th class="strength-column" scope="col">Kekuatan/potensi</th>
+                                    <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td class="number-column">1</td>
-                                <td class="name-column"><span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span></td>
-                                <td class="preparation-column">{{ $preparation }}</td>
-                                <td class="strength-column">{{ $strength }}</td>
-                                <td class="quantity-column">{{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</td>
+                                @if ($showsCommercialDetails)
+                                    <td class="name-column">
+                                        <span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span>
+                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}</span>
+                                    </td>
+                                    <td class="order-quantity-column"><span class="order-quantity-value">{{ $quantity }}</span></td>
+                                    <td class="order-unit-column">{{ $unitName }}</td>
+                                    <td class="price-column"><span class="price-value">Rp {{ $formattedBasePrice }}</span></td>
+                                    <td class="discount-column">
+                                        <span class="discount-tier">D1 {{ $formatDiscount($detail->diskon_1) }}%</span>
+                                        <span class="discount-tier">D2 {{ $formatDiscount($detail->diskon_2) }}%</span>
+                                        <span class="discount-tier">D3 {{ $formatDiscount($detail->diskon_3) }}%</span>
+                                    </td>
+                                    <td class="total-price-column"><span class="total-price-value">Rp {{ $formattedTotalPrice }}</span></td>
+                                @else
+                                    <td class="name-column"><span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span></td>
+                                    <td class="preparation-column">{{ $preparation }}</td>
+                                    <td class="strength-column">{{ $strength }}</td>
+                                    <td class="quantity-column">{{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</td>
+                                @endif
                             </tr>
                         </tbody>
                     </table>
@@ -243,7 +338,7 @@
                     <p class="notes-title">Catatan:</p>
                     <ul>
                         <li>Satu surat pesanan hanya berlaku untuk satu jenis Narkotika.</li>
-                        <li>Surat Pesanan dibuat sekurang-kurangnya 3 (tiga) rangkap.</li>
+                        <li>Surat Pesanan dibuat 5 (lima) rangkap.</li>
                     </ul>
                 </section>
 

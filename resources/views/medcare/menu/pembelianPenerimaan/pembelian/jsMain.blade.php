@@ -35,11 +35,12 @@
         function detailItemTemplate(options = {}) {
             let selectClass = options.selectClass ? ` ${options.selectClass}` : '';
             let satuanAttr = options.satuanTerpilih ? ` data-satuan-terpilih="${options.satuanTerpilih}"` : '';
+            let isOot = options.isOot === true || Number(options.isOot) === 1;
             let loadingOption = options.loadingOption ?
                 `<option value="${options.obatId || ''}">Loading...</option>` : '';
 
             return `
-                <div class="detail-item purchase-detail-card"${satuanAttr}>
+                <div class="detail-item purchase-detail-card${isOot ? ' is-oot' : ''}"${satuanAttr}>
                     <div class="purchase-detail-card-head">
                         <div>
                             <span class="purchase-detail-number">1</span>
@@ -94,6 +95,18 @@
                         <div class="col-lg-2 col-md-4">
                             <label class="form-label">Diskon 3 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_3[]" min="0" max="100" step="0.01" value="${options.diskon3 ?? 0}">
+                        </div>
+
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label">Surat Pesanan Khusus</label>
+                            <div class="purchase-oot-option">
+                                <input type="hidden" class="oot-value" name="is_oot[]" value="${isOot ? 1 : 0}">
+                                <div class="form-check form-switch mb-0">
+                                    <input type="checkbox" class="form-check-input oot-toggle" ${isOot ? 'checked' : ''}>
+                                    <label class="form-check-label">Tandai sebagai OOT</label>
+                                </div>
+                                <small>Jika salah satu item dipilih, PO hanya menghasilkan Surat Pesanan OOT.</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,9 +177,9 @@
             detailPrintDocuments = [];
             $('#btnPrintPDF')
                 .prop('disabled', true)
-                .removeClass('btn-outline-primary btn-outline-warning btn-outline-dark')
+                .removeClass('btn-outline-info btn-outline-primary btn-outline-warning btn-outline-success btn-outline-dark')
                 .addClass('btn-outline-danger')
-                .attr('title', 'Surat pesanan akan menyesuaikan golongan obat pada PO')
+                .attr('title', 'Surat pesanan mengikuti golongan obat; penandaan OOT memiliki prioritas untuk seluruh PO')
                 .find('span').text('Cetak Surat Pesanan');
         });
 
@@ -217,6 +230,17 @@
                 refreshDetailNumbers();
                 hitungTotal();
             }
+        });
+
+        $(document).on('change', '.oot-toggle', function() {
+            const row = $(this).closest('.detail-item');
+            row.find('.oot-value').val(this.checked ? 1 : 0);
+            row.toggleClass('is-oot', this.checked);
+        });
+
+        $(document).on('click', '.purchase-oot-option .form-check-label', function() {
+            const toggle = $(this).siblings('.oot-toggle');
+            toggle.prop('checked', !toggle.prop('checked')).trigger('change');
         });
 
         function normalizedDiscount(value) {
@@ -1160,6 +1184,7 @@
                             diskon2: item.diskon_2,
                             diskon3: item.diskon_3,
                             subtotal: item.subtotal,
+                            isOot: item.is_oot,
                             selectClass: 'obatSelect',
                             loadingOption: true
                         });
@@ -1208,57 +1233,74 @@
                     const detail = po.details;
                     detailPurchaseOrderId = po.id;
 
+                    const regularCount = Number(po.regular_item_count ?? 0);
                     const narcoticCount = Number(po.narcotic_item_count ?? 0);
                     const psychotropicCount = Number(po.psychotropic_item_count ?? 0);
                     const precursorCount = Number(po.precursor_item_count ?? 0);
-                    detailPrintDocuments = [
-                        {
-                            name: 'Narkotika',
-                            count: narcoticCount,
-                            buttonClass: 'btn-outline-danger',
-                            url: "{{ route("pembelian.suratPesananNarkotika", ":id") }}".replace(':id', po.id)
-                        },
-                        {
-                            name: 'Psikotropika',
-                            count: psychotropicCount,
-                            buttonClass: 'btn-outline-primary',
-                            url: "{{ route("pembelian.suratPesananPsikotropika", ":id") }}".replace(':id', po.id)
-                        },
-                        {
-                            name: 'Prekursor',
-                            count: precursorCount,
-                            buttonClass: 'btn-outline-warning',
-                            url: "{{ route("pembelian.suratPesananPrekursor", ":id") }}".replace(':id', po.id)
-                        }
-                    ].filter(document => document.count > 0);
+                    const ootCount = Number(po.oot_item_count ?? 0);
+                    const ootDocument = {
+                        name: 'OOT',
+                        count: ootCount,
+                        buttonClass: 'btn-outline-success',
+                        url: "{{ route("pembelian.suratPesananOot", ":id") }}".replace(':id', po.id)
+                    };
+
+                    detailPrintDocuments = ootCount > 0
+                        ? [ootDocument]
+                        : [
+                            {
+                                name: 'Reguler',
+                                count: regularCount,
+                                buttonClass: 'btn-outline-info',
+                                url: "{{ route("pembelian.suratPesananReguler", ":id") }}".replace(':id', po.id)
+                            },
+                            {
+                                name: 'Narkotika',
+                                count: narcoticCount,
+                                buttonClass: 'btn-outline-danger',
+                                url: "{{ route("pembelian.suratPesananNarkotika", ":id") }}".replace(':id', po.id)
+                            },
+                            {
+                                name: 'Psikotropika',
+                                count: psychotropicCount,
+                                buttonClass: 'btn-outline-primary',
+                                url: "{{ route("pembelian.suratPesananPsikotropika", ":id") }}".replace(':id', po.id)
+                            },
+                            {
+                                name: 'Prekursor',
+                                count: precursorCount,
+                                buttonClass: 'btn-outline-warning',
+                                url: "{{ route("pembelian.suratPesananPrekursor", ":id") }}".replace(':id', po.id)
+                            }
+                        ].filter(document => document.count > 0);
 
                     const $printButton = $('#btnPrintPDF');
-                    const totalControlledItems = detailPrintDocuments.reduce(
+                    const totalOrderItems = detailPrintDocuments.reduce(
                         (total, document) => total + document.count,
                         0
                     );
 
                     $printButton
-                        .removeClass('btn-outline-danger btn-outline-primary btn-outline-warning btn-outline-dark')
+                        .removeClass('btn-outline-danger btn-outline-info btn-outline-primary btn-outline-warning btn-outline-success btn-outline-dark')
                         .prop('disabled', detailPrintDocuments.length < 1);
 
                     if (detailPrintDocuments.length === 0) {
                         $printButton
                             .addClass('btn-outline-danger')
-                            .attr('title', 'PO ini tidak memiliki item Narkotika, Psikotropika, atau Prekursor')
-                            .find('span').text('Tidak Ada Surat Pesanan Khusus');
+                            .attr('title', 'PO ini tidak memiliki item yang dapat dibuatkan surat pesanan')
+                            .find('span').text('Tidak Ada Surat Pesanan');
                     } else if (detailPrintDocuments.length === 1) {
                         const document = detailPrintDocuments[0];
                         $printButton
                             .addClass(document.buttonClass)
-                            .attr('title', `Format surat otomatis disesuaikan untuk golongan ${document.name}`)
+                            .attr('title', `${document.count} item akan dicetak pada Surat Pesanan ${document.name}`)
                             .find('span').text(`Cetak Surat ${document.name} (${document.count} item)`);
                     } else {
                         const documentNames = detailPrintDocuments.map(document => document.name).join(', ');
                         $printButton
                             .addClass('btn-outline-dark')
                             .attr('title', `Buka surat otomatis untuk: ${documentNames}`)
-                            .find('span').text(`Cetak ${detailPrintDocuments.length} Jenis Surat (${totalControlledItems} item)`);
+                            .find('span').text(`Cetak ${detailPrintDocuments.length} Jenis Surat (${totalOrderItems} item)`);
                     }
 
                     // Header
@@ -1277,6 +1319,9 @@
                     detail.forEach(item => {
                         const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
 
+                        const regularBadge = item.is_regular
+                            ? `<span class="badge bg-info bg-opacity-10 text-info-emphasis ms-2" title="Obat selain Narkotika, Psikotropika, dan Prekursor">Reguler</span>`
+                            : '';
                         const narcoticBadge = item.is_narcotic
                             ? `<span class="badge bg-danger bg-opacity-10 text-danger ms-2" title="${escapeHtml(item.narcotic_classification ?? 'Narkotika')}">Narkotika</span>`
                             : '';
@@ -1286,10 +1331,13 @@
                         const precursorBadge = item.is_precursor
                             ? `<span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
                             : '';
+                        const ootBadge = item.is_oot
+                            ? `<span class="badge bg-success bg-opacity-10 text-success ms-2" title="Ditentukan manual oleh apoteker pada PO">OOT</span>`
+                            : '';
 
                         $('#detailObatTable tbody').append(`
                     <tr>
-                        <td>${escapeHtml(item.nama_obat ?? '-')}${narcoticBadge}${psychotropicBadge}${precursorBadge}</td>
+                        <td>${escapeHtml(item.nama_obat ?? '-')}${regularBadge}${narcoticBadge}${psychotropicBadge}${precursorBadge}${ootBadge}</td>
                         <td>${escapeHtml(unitName)}</td>
                         <td>${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
                         <td>Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>

@@ -41,7 +41,7 @@ class SuratPesananNarkotikaTest extends TestCase
         )));
     }
 
-    public function test_narcotic_order_view_makes_one_letter_per_item_in_three_copies(): void
+    public function test_narcotic_order_view_makes_one_letter_per_item_in_five_copies_with_commercial_details_on_last_two(): void
     {
         $service = app(SuratPesananNarkotikaService::class);
         $purchaseOrder = $this->purchaseOrderForView();
@@ -55,7 +55,7 @@ class SuratPesananNarkotikaTest extends TestCase
         ])->render();
 
         $this->assertCount(1, $narcoticDetails);
-        $this->assertSame(3, substr_count($html, 'class="narcotic-order-sheet"'));
+        $this->assertSame(5, substr_count($html, 'class="narcotic-order-sheet"'));
         $this->assertStringContainsString('SURAT PESANAN NARKOTIKA', $html);
         $this->assertStringContainsString('class="medicine-table"', $html);
         $this->assertStringContainsString('class="name-column" scope="col">Nama obat', $html);
@@ -67,7 +67,21 @@ class SuratPesananNarkotikaTest extends TestCase
         $this->assertStringContainsString('Apotek Medcare Pusat', $html);
         $this->assertStringContainsString('apt. Siti Sehat, S.Farm.', $html);
         $this->assertStringContainsString('SIPA-001', $html);
-        $this->assertStringContainsString('Rangkap 3 dari 3', $html);
+        $this->assertStringContainsString('Rangkap 5 dari 5', $html);
+        $this->assertSame(2, substr_count($html, 'class="medicine-table commercial-detail-table"'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Internal'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Distributor'));
+        $this->assertSame(2, substr_count($html, 'class="name-column" scope="col">Obat dan spesifikasi'));
+        $this->assertSame(2, substr_count($html, 'class="order-quantity-column" scope="col">Qty order'));
+        $this->assertSame(2, substr_count($html, 'class="order-unit-column" scope="col">Satuan order'));
+        $this->assertSame(2, substr_count($html, 'class="price-column" scope="col">Harga dasar'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-column" scope="col">Total harga'));
+        $this->assertSame(2, substr_count($html, 'class="price-value">Rp 125.000'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-value">Rp 2.605.078'));
+        $this->assertSame(2, substr_count($html, 'D1 10%'));
+        $this->assertSame(2, substr_count($html, 'D2 5%'));
+        $this->assertSame(2, substr_count($html, 'D3 2,5%'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 5 (lima) rangkap.', $html);
         $this->assertStringNotContainsString('Paracetamol 500 mg', $html);
     }
 
@@ -135,7 +149,13 @@ class SuratPesananNarkotikaTest extends TestCase
         $regular->setRelation('sediaan', new SediaanModel(['nama' => 'Tablet']));
         $regular->setRelation('satuan', $tablet);
 
-        $narcoticDetail = (new PembelianDetailModel)->forceFill(['qty' => 25]);
+        $narcoticDetail = (new PembelianDetailModel)->forceFill([
+            'qty' => 25,
+            'harga_estimasi' => 125000,
+            'diskon_1' => 10,
+            'diskon_2' => 5,
+            'diskon_3' => 2.5,
+        ]);
         $narcoticDetail->setRelation('obat', $narcotic);
         $narcoticDetail->setRelation('satuanKonversi', $conversion);
 

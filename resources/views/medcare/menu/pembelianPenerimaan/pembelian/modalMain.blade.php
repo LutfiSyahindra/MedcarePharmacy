@@ -190,6 +190,18 @@
                                             <input type="number" class="form-control purchase-discount"
                                                 name="diskon_3[]" min="0" max="100" step="0.01" value="0">
                                         </div>
+
+                                        <div class="col-lg-3 col-md-6">
+                                            <label class="form-label">Surat Pesanan Khusus</label>
+                                            <div class="purchase-oot-option">
+                                                <input type="hidden" class="oot-value" name="is_oot[]" value="0">
+                                                <div class="form-check form-switch mb-0">
+                                                    <input type="checkbox" class="form-check-input oot-toggle">
+                                                    <label class="form-check-label">Tandai sebagai OOT</label>
+                                                </div>
+                                                <small>Jika salah satu item dipilih, PO hanya menghasilkan Surat Pesanan OOT.</small>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

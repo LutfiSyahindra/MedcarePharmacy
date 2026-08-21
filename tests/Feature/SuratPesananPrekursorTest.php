@@ -45,7 +45,7 @@ class SuratPesananPrekursorTest extends TestCase
         )));
     }
 
-    public function test_precursor_order_combines_all_matching_items_in_form_three_with_three_copies(): void
+    public function test_precursor_order_uses_four_copies_with_commercial_details_on_copies_three_and_four(): void
     {
         $service = app(SuratPesananPrekursorService::class);
         $purchaseOrder = $this->purchaseOrderForView();
@@ -59,8 +59,8 @@ class SuratPesananPrekursorTest extends TestCase
         ])->render();
 
         $this->assertCount(2, $precursorDetails);
-        $this->assertSame(3, substr_count($html, 'class="precursor-order-sheet"'));
-        $this->assertSame(3, substr_count($html, 'PO-PRE-001/PRE'));
+        $this->assertSame(4, substr_count($html, 'class="precursor-order-sheet"'));
+        $this->assertSame(4, substr_count($html, 'PO-PRE-001/PRE'));
         $this->assertStringContainsString('Formulir 3', $html);
         $this->assertStringContainsString('SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*', $html);
         $this->assertStringContainsString('class="medicine-table"', $html);
@@ -75,7 +75,22 @@ class SuratPesananPrekursorTest extends TestCase
         $this->assertStringContainsString('20 Tablet (dua puluh tablet)', $html);
         $this->assertStringContainsString('Apoteker/Tenaga Teknis Kefarmasian', $html);
         $this->assertStringContainsString('No. SIPA/SIKTTK', $html);
-        $this->assertStringContainsString('Rangkap 3 dari 3', $html);
+        $this->assertSame(2, substr_count($html, 'class="medicine-table"'));
+        $this->assertSame(2, substr_count($html, 'class="medicine-table commercial-detail-table"'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Internal'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Distributor'));
+        $this->assertSame(2, substr_count($html, 'class="order-quantity-column" scope="col">Qty order'));
+        $this->assertSame(2, substr_count($html, 'class="order-unit-column" scope="col">Satuan order'));
+        $this->assertSame(2, substr_count($html, 'class="price-column" scope="col">Harga dasar'));
+        $this->assertSame(2, substr_count($html, 'class="discount-column" scope="col">Diskon'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-column" scope="col">Total harga'));
+        $this->assertStringContainsString('Rp 12.500', $html);
+        $this->assertStringContainsString('class="total-price-value">Rp 231.563', $html);
+        $this->assertStringContainsString('class="total-price-value">Rp 115.781', $html);
+        $this->assertStringContainsString('D1 5%', $html);
+        $this->assertStringContainsString('D2 2,5%', $html);
+        $this->assertStringContainsString('Surat Pesanan dibuat 4 (empat) rangkap.', $html);
+        $this->assertStringContainsString('Rangkap 4 dari 4', $html);
         $this->assertStringNotContainsString('Paracetamol 500 mg', $html);
         $this->assertStringNotContainsString('Satu surat pesanan hanya berlaku', $html);
     }
@@ -170,7 +185,13 @@ class SuratPesananPrekursorTest extends TestCase
         KonversiSatuanModel $conversion,
         int $quantity
     ): PembelianDetailModel {
-        $detail = (new PembelianDetailModel)->forceFill(['qty' => $quantity]);
+        $detail = (new PembelianDetailModel)->forceFill([
+            'qty' => $quantity,
+            'harga_estimasi' => 12500,
+            'diskon_1' => 5,
+            'diskon_2' => 2.5,
+            'diskon_3' => 0,
+        ]);
         $detail->setRelation('obat', $medicine);
         $detail->setRelation('satuanKonversi', $conversion);
 

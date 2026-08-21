@@ -225,6 +225,7 @@ class PenjualanPosController extends Controller
             'paymentMethods' => PenjualanPosService::PAYMENT_METHODS,
             'embedded' => $request->boolean('embedded'),
             'autoPrint' => $request->boolean('autoprint', ! $request->boolean('embedded')),
+            'asNota' => $request->boolean('nota'),
         ]);
     }
 

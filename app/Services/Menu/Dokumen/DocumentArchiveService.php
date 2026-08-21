@@ -4,8 +4,10 @@ namespace App\Services\Menu\Dokumen;
 
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananOotService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananPrekursorService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananPsikotropikaService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananRegulerService;
 use App\Support\BranchAccess;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -13,11 +15,15 @@ use Illuminate\Support\Str;
 
 class DocumentArchiveService
 {
+    public const TYPE_REGULAR = 'reguler';
+
     public const TYPE_NARCOTIC = 'narkotika';
 
     public const TYPE_PSYCHOTROPIC = 'psikotropika';
 
     public const TYPE_PRECURSOR = 'prekursor';
+
+    public const TYPE_OOT = 'oot';
 
     private const EAGER_LOADS = [
         'distributor',
@@ -36,6 +42,8 @@ class DocumentArchiveService
         private readonly SuratPesananNarkotikaService $narcoticOrders,
         private readonly SuratPesananPsikotropikaService $psychotropicOrders,
         private readonly SuratPesananPrekursorService $precursorOrders,
+        private readonly SuratPesananOotService $ootOrders,
+        private readonly SuratPesananRegulerService $regularOrders,
     ) {}
 
     /**
@@ -44,9 +52,11 @@ class DocumentArchiveService
     public static function types(): array
     {
         return [
+            self::TYPE_REGULAR,
             self::TYPE_NARCOTIC,
             self::TYPE_PSYCHOTROPIC,
             self::TYPE_PRECURSOR,
+            self::TYPE_OOT,
         ];
     }
 
@@ -87,6 +97,30 @@ class DocumentArchiveService
     {
         $purchaseOrder->loadMissing(self::EAGER_LOADS);
         $documents = collect();
+
+        $ootDetails = $this->ootOrders->ootDetails($purchaseOrder);
+        if ($ootDetails->isNotEmpty()) {
+            return collect([$this->makeDocument(
+                $purchaseOrder,
+                self::TYPE_OOT,
+                $ootDetails,
+                [(string) $purchaseOrder->getAttribute('oot_document_number')],
+                SuratPesananOotService::COPY_COUNT,
+                'pembelian.suratPesananOot',
+            )]);
+        }
+
+        $regularDetails = $this->regularOrders->regularDetails($purchaseOrder);
+        if ($regularDetails->isNotEmpty()) {
+            $documents->push($this->makeDocument(
+                $purchaseOrder,
+                self::TYPE_REGULAR,
+                $regularDetails,
+                [(string) $purchaseOrder->getAttribute('regular_document_number')],
+                SuratPesananRegulerService::COPY_COUNT,
+                'pembelian.suratPesananReguler',
+            ));
+        }
 
         $narcoticDetails = $this->narcoticOrders->narcoticDetails($purchaseOrder);
         if ($narcoticDetails->isNotEmpty()) {
@@ -183,9 +217,11 @@ class DocumentArchiveService
             'sets' => $documents->count(),
             'documents' => (int) $documents->sum('document_count'),
             'purchase_orders' => $documents->pluck('purchase_order_id')->unique()->count(),
+            'reguler' => (int) $documents->where('type', self::TYPE_REGULAR)->sum('document_count'),
             'narkotika' => (int) $documents->where('type', self::TYPE_NARCOTIC)->sum('document_count'),
             'psikotropika' => (int) $documents->where('type', self::TYPE_PSYCHOTROPIC)->sum('document_count'),
             'prekursor' => (int) $documents->where('type', self::TYPE_PRECURSOR)->sum('document_count'),
+            'oot' => (int) $documents->where('type', self::TYPE_OOT)->sum('document_count'),
             'pages' => (int) $documents->sum('page_count'),
         ];
     }
@@ -272,6 +308,11 @@ class DocumentArchiveService
     public function typeMetadata(string $type): array
     {
         return match ($type) {
+            self::TYPE_REGULAR => [
+                'label' => 'Surat Pesanan Reguler',
+                'short_label' => 'Reguler',
+                'description' => 'Surat pesanan untuk obat selain Narkotika, Psikotropika, dan Prekursor.',
+            ],
             self::TYPE_NARCOTIC => [
                 'label' => 'Surat Pesanan Narkotika',
                 'short_label' => 'Narkotika',
@@ -287,15 +328,22 @@ class DocumentArchiveService
                 'short_label' => 'Prekursor',
                 'description' => 'Surat pesanan obat atau bahan obat Prekursor Farmasi.',
             ],
+            self::TYPE_OOT => [
+                'label' => 'Surat Pesanan OOT',
+                'short_label' => 'OOT',
+                'description' => 'Surat pesanan Obat-Obat Tertentu yang dipilih manual oleh apoteker pada PO.',
+            ],
         };
     }
 
     private function classificationAttribute(string $type): string
     {
         return match ($type) {
+            self::TYPE_REGULAR => 'regular_classification',
             self::TYPE_NARCOTIC => 'narcotic_classification',
             self::TYPE_PSYCHOTROPIC => 'psychotropic_classification',
             self::TYPE_PRECURSOR => 'precursor_classification',
+            self::TYPE_OOT => 'oot_classification',
         };
     }
 

@@ -1157,6 +1157,39 @@
         padding: .95rem;
     }
 
+    .purchase-modal .detail-item.is-oot {
+        border-color: #86cfa5 !important;
+        box-shadow: 0 0 0 2px rgba(25, 135, 84, .08);
+    }
+
+    .purchase-oot-option {
+        min-height: 64px;
+        padding: .55rem .7rem;
+        border: 1px solid var(--purchase-border);
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .purchase-oot-option .form-check-label {
+        color: var(--purchase-text);
+        font-size: .82rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .purchase-oot-option small {
+        display: block;
+        margin-top: .2rem;
+        color: var(--purchase-muted);
+        font-size: .72rem;
+        line-height: 1.3;
+    }
+
+    .purchase-oot-option .form-check-input:checked {
+        border-color: #198754;
+        background-color: #198754;
+    }
+
     .purchase-modal .remove-detail {
         border-radius: 8px;
         font-weight: 800;

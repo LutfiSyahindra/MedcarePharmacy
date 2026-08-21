@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Template {{ $meta["label"] }} - {{ $branch->apotekProfile?->name ?: $branch->name }}</title>
+    @php
+        $usesPackaging = in_array($type, ["reguler", "prekursor", "oot"], true);
+    @endphp
     <style>
         @page { size: A4 portrait; margin: 10mm; }
         * { box-sizing: border-box; }
@@ -41,7 +44,7 @@
             color: #fff;
             border: 0;
             border-radius: 7px;
-            background: {{ $type === "narkotika" ? "#c62828" : ($type === "psikotropika" ? "#4054b2" : "#b7791f") }};
+            background: {{ $type === "reguler" ? "#0f766e" : ($type === "narkotika" ? "#c62828" : ($type === "psikotropika" ? "#4054b2" : ($type === "oot" ? "#198754" : "#b7791f"))) }};
             font-weight: 700;
             cursor: pointer;
         }
@@ -55,7 +58,10 @@
             border: .35mm solid #111;
             background: #fff;
             box-shadow: 0 4px 22px rgba(15, 23, 42, .14);
+            page-break-after: always;
+            break-after: page;
         }
+        .order-sheet:last-of-type { page-break-after: auto; break-after: auto; }
         .screen-template-label {
             position: absolute;
             top: 4mm;
@@ -73,7 +79,7 @@
         }
         .form-label-top { position: absolute; top: 4mm; right: 7mm; font-size: 9.5pt; }
         .document-header { margin-top: 3mm; text-align: center; }
-        .document-header h1 { margin: 0 0 1mm; font-size: {{ $type === "prekursor" ? "12pt" : "14pt" }}; text-decoration: underline; }
+        .document-header h1 { margin: 0 0 1mm; font-size: {{ $usesPackaging ? "12pt" : "14pt" }}; text-decoration: underline; }
         .document-number { display: flex; align-items: end; justify-content: center; gap: 2mm; margin: 0; font-size: 11pt; }
         .fill-line { display: inline-block; min-width: 65mm; min-height: 5mm; border-bottom: .25mm dotted #333; }
         .fill-line.is-wide { min-width: 105mm; }
@@ -90,7 +96,7 @@
             margin: 2.5mm 0 0;
             border-collapse: collapse;
             table-layout: fixed;
-            font-size: {{ $type === "prekursor" ? "9.5pt" : "10.5pt" }};
+            font-size: {{ $usesPackaging ? "9.5pt" : "10.5pt" }};
             line-height: 1.3;
         }
         .medicine-table th,
@@ -104,7 +110,7 @@
             padding-top: 1.7mm;
             padding-bottom: 1.7mm;
             background: #e9edf2;
-            font-size: {{ $type === "prekursor" ? "9.25pt" : "10pt" }};
+            font-size: {{ $usesPackaging ? "9.25pt" : "10pt" }};
             font-weight: 700;
             line-height: 1.2;
             text-align: center;
@@ -113,15 +119,53 @@
             print-color-adjust: exact;
         }
         .medicine-table .number-column { width: 7%; text-align: center; }
-        .medicine-table .name-column { width: {{ $type === "prekursor" ? "20%" : "25%" }}; }
-        .medicine-table .preparation-column { width: {{ $type === "prekursor" ? "13%" : "16%" }}; }
-        .medicine-table .strength-column { width: {{ $type === "prekursor" ? "22%" : "27%" }}; }
+        .medicine-table .name-column { width: {{ $usesPackaging ? "20%" : "25%" }}; }
+        .medicine-table .preparation-column { width: {{ $usesPackaging ? "13%" : "16%" }}; }
+        .medicine-table .strength-column { width: {{ $usesPackaging ? "22%" : "27%" }}; }
         .medicine-table .packaging-column { width: 14%; }
-        .medicine-table .quantity-column { width: {{ $type === "prekursor" ? "24%" : "25%" }}; }
+        .medicine-table .quantity-column { width: {{ $usesPackaging ? "24%" : "25%" }}; }
+        .commercial-section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 3mm;
+            margin: 0 0 2mm;
+        }
+        .copy-role-badge {
+            display: inline-block;
+            padding: 1mm 3mm;
+            border: .25mm solid #64748b;
+            border-radius: 1mm;
+            background: #e9edf2;
+            font-family: Arial, sans-serif;
+            font-size: 8.5pt;
+            font-weight: 700;
+            letter-spacing: .2pt;
+            text-transform: uppercase;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .commercial-section-heading strong { font-size: 10.5pt; }
+        .medicine-table.commercial-template-table {
+            border: .35mm solid #334155;
+            font-family: Arial, sans-serif;
+            font-size: 9.5pt;
+        }
+        .medicine-table.commercial-template-table th {
+            color: #fff;
+            background: #334155;
+            font-size: 9pt;
+        }
+        .medicine-table.commercial-template-table .name-column { width: 29%; }
+        .medicine-table.commercial-template-table .unit-column { width: 11%; text-align: center; }
+        .medicine-table.commercial-template-table .quantity-column { width: 9%; text-align: center; }
+        .medicine-table.commercial-template-table .price-column { width: 17%; text-align: right; }
+        .medicine-table.commercial-template-table .total-price-column { width: 19%; text-align: right; }
+        .medicine-table.commercial-template-table .discount-column { width: 15%; text-align: center; }
         .medicine-table .empty-row td { height: 10mm; }
         .medicine-table .empty-row.is-single-item td { height: 27mm; }
         .signature-wrap { display: flex; justify-content: flex-end; margin-top: {{ $type === "narkotika" ? "7mm" : "5mm" }}; }
-        .signature { width: {{ $type === "prekursor" ? "82mm" : "75mm" }}; text-align: left; }
+        .signature { width: {{ $usesPackaging ? "82mm" : "75mm" }}; text-align: left; }
         .signature p { margin: 0 0 3mm; }
         .signature-date { display: flex; align-items: end; gap: 1mm; }
         .signature-date .fill-line { min-width: 36mm; }
@@ -154,24 +198,37 @@
         $profileIncomplete = ! $profile?->pharmacist_name || ! $profile?->pharmacist_license_number;
         $city = $profile?->city ?: "................................";
         $formLabel = match ($type) {
+            "reguler" => "Surat Umum",
             "narkotika" => "Formulir 1",
             "psikotropika" => "Formulir 2",
-            default => "Formulir 3",
+            "prekursor" => "Formulir 3",
+            default => "Formulir 4",
         };
         $documentTitle = match ($type) {
+            "reguler" => "SURAT PESANAN OBAT REGULER",
             "narkotika" => "SURAT PESANAN NARKOTIKA",
             "psikotropika" => "SURAT PESANAN PSIKOTROPIKA",
-            default => "SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*",
+            "prekursor" => "SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*",
+            default => "SURAT PESANAN OBAT-OBAT TERTENTU",
         };
         $orderSubject = match ($type) {
+            "reguler" => "Obat Reguler",
             "narkotika" => "Narkotika",
             "psikotropika" => "Psikotropika",
-            default => "Obat/Bahan Obat/Prekursor Farmasi*",
+            "prekursor" => "Obat/Bahan Obat/Prekursor Farmasi*",
+            default => "Obat-Obat Tertentu",
+        };
+        $copyCount = match ($type) {
+            "reguler" => \App\Services\Menu\PembelianPenerimaan\SuratPesananRegulerService::COPY_COUNT,
+            "narkotika" => \App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService::COPY_COUNT,
+            "psikotropika" => \App\Services\Menu\PembelianPenerimaan\SuratPesananPsikotropikaService::COPY_COUNT,
+            "prekursor" => \App\Services\Menu\PembelianPenerimaan\SuratPesananPrekursorService::COPY_COUNT,
+            default => \App\Services\Menu\PembelianPenerimaan\SuratPesananOotService::COPY_COUNT,
         };
     @endphp
 
     <div class="template-toolbar">
-        <span><strong>Template kosong</strong> &middot; {{ $meta["label"] }} &middot; {{ $facilityName }}</span>
+        <span><strong>Template kosong</strong> &middot; {{ $meta["label"] }} &middot; {{ $copyCount }} lembar &middot; {{ $facilityName }}</span>
         @if ($profileIncomplete)
             <span class="profile-warning">Nama Apoteker atau SIPA belum lengkap di Profil Apotek.</span>
         @endif
@@ -179,6 +236,20 @@
         <button type="button" onclick="window.print()">Cetak / Simpan PDF</button>
     </div>
 
+    @for ($copy = 1; $copy <= $copyCount; $copy++)
+        @php
+            if ($type === "reguler") {
+                $copyRole = $copy === 1 ? "Internal Apotek" : "Distributor";
+            } elseif ($copy === $copyCount) {
+                $copyRole = "Internal Apotek";
+            } elseif ($copy === $copyCount - 1) {
+                $copyRole = "Distributor";
+            } else {
+                $copyRole = null;
+            }
+
+            $showsCommercialDetails = $type === "reguler" || $copyRole !== null;
+        @endphp
     <main class="order-sheet">
         <span class="screen-template-label">Template kosong</span>
         <span class="form-label-top">{{ $formLabel }}</span>
@@ -207,35 +278,60 @@
 
         <section class="section compact">
             <p>dengan {{ $orderSubject }} yang dipesan adalah :</p>
-            <p>
-                {{ $type === "prekursor"
-                    ? "(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf, isi kemasan)"
-                    : "(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)" }}
-            </p>
-            <table class="medicine-table">
+            @if ($showsCommercialDetails)
+                <div class="commercial-section-heading">
+                    <span class="copy-role-badge">Lembar {{ $copyRole }}</span>
+                    <strong>Rincian pemesanan dan harga</strong>
+                </div>
+            @else
+                <p>
+                    {{ $usesPackaging
+                        ? "(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf, isi kemasan)"
+                        : "(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)" }}
+                </p>
+            @endif
+            <table class="medicine-table{{ $showsCommercialDetails ? ' commercial-template-table' : '' }}">
                 <thead>
                     <tr>
-                        <th class="number-column" scope="col">No.</th>
-                        <th class="name-column" scope="col">Nama obat</th>
-                        <th class="preparation-column" scope="col">Bentuk sediaan</th>
-                        <th class="strength-column" scope="col">Kekuatan/potensi</th>
-                        @if ($type === "prekursor")
-                            <th class="packaging-column" scope="col">Isi kemasan</th>
+                        @if ($showsCommercialDetails)
+                            <th class="name-column" scope="col">Obat</th>
+                            <th class="unit-column" scope="col">Satuan</th>
+                            <th class="quantity-column" scope="col">Qty</th>
+                            <th class="price-column" scope="col">Harga dasar</th>
+                            <th class="total-price-column" scope="col">Harga total</th>
+                            <th class="discount-column" scope="col">Diskon</th>
+                        @else
+                            <th class="number-column" scope="col">No.</th>
+                            <th class="name-column" scope="col">Nama obat</th>
+                            <th class="preparation-column" scope="col">Bentuk sediaan</th>
+                            <th class="strength-column" scope="col">Kekuatan/potensi</th>
+                            @if ($usesPackaging)
+                                <th class="packaging-column" scope="col">Isi kemasan</th>
+                            @endif
+                            <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
                         @endif
-                        <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for ($row = 1; $row <= ($type === "narkotika" ? 1 : 5); $row++)
                         <tr class="empty-row{{ $type === "narkotika" ? " is-single-item" : "" }}">
-                            <td class="number-column">{{ $row }}</td>
-                            <td class="name-column"></td>
-                            <td class="preparation-column"></td>
-                            <td class="strength-column"></td>
-                            @if ($type === "prekursor")
-                                <td class="packaging-column"></td>
+                            @if ($showsCommercialDetails)
+                                <td class="name-column"></td>
+                                <td class="unit-column"></td>
+                                <td class="quantity-column"></td>
+                                <td class="price-column"></td>
+                                <td class="total-price-column"></td>
+                                <td class="discount-column"></td>
+                            @else
+                                <td class="number-column">{{ $row }}</td>
+                                <td class="name-column"></td>
+                                <td class="preparation-column"></td>
+                                <td class="strength-column"></td>
+                                @if ($usesPackaging)
+                                    <td class="packaging-column"></td>
+                                @endif
+                                <td class="quantity-column"></td>
                             @endif
-                            <td class="quantity-column"></td>
                         </tr>
                     @endfor
                 </tbody>
@@ -243,7 +339,7 @@
         </section>
 
         <section class="section compact">
-            <p>{{ $type === "prekursor" ? "Obat/Bahan Obat/Prekursor Farmasi tersebut" : $orderSubject }} akan dipergunakan untuk :</p>
+            <p>{{ $orderSubject }} tersebut akan dipergunakan untuk :</p>
             <table class="field-table">
                 <tr><td class="field-label">Nama Sarana</td><td class="field-separator">:</td><td>{{ $facilityName }} (Apotek)</td></tr>
                 <tr><td class="field-label">Alamat Sarana</td><td class="field-separator">:</td><td>{{ $facilityAddress }}</td></tr>
@@ -267,20 +363,35 @@
         </div>
 
         <section class="notes">
-            <p>*) &nbsp;coret yang tidak perlu</p>
+            @if ($type === "prekursor")
+                <p>*) &nbsp;coret yang tidak perlu</p>
+            @endif
             <p>Catatan:</p>
             @if ($type === "narkotika")
                 <ul>
                     <li>Satu surat pesanan hanya berlaku untuk satu jenis Narkotika.</li>
-                    <li>Surat Pesanan dibuat sekurang-kurangnya 3 (tiga) rangkap.</li>
+                    <li>Surat Pesanan dibuat 5 (lima) rangkap.</li>
                 </ul>
+            @elseif ($type === "psikotropika")
+                <p>Surat Pesanan dibuat 5 (lima) rangkap.</p>
+            @elseif ($type === "reguler")
+                <p>Surat pesanan ini hanya untuk obat selain Narkotika, Psikotropika, dan Prekursor.</p>
+                <p>Surat Pesanan dibuat 2 (dua) lembar untuk Internal Apotek dan Distributor.</p>
             @else
-                <p>Surat Pesanan dibuat sekurang-kurangnya 3 (tiga) rangkap.</p>
+                <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
             @endif
         </section>
 
-        <span class="copy-mark">Template kosong &middot; Cetak sesuai kebutuhan</span>
+        <span class="copy-mark">
+            Template kosong &middot;
+            @if ($copyRole)
+                Lembar {{ $copyRole }} &middot; {{ $copy }} dari {{ $copyCount }}
+            @else
+                Rangkap {{ $copy }} dari {{ $copyCount }}
+            @endif
+        </span>
     </main>
+    @endfor
 
     @if ($autoPrint)
         <script>

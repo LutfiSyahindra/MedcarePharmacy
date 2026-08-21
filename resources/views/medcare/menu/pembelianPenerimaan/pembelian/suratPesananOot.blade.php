@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Surat Pesanan Psikotropika - {{ $purchaseOrder->no_po }}</title>
+    <title>Surat Pesanan OOT - {{ $purchaseOrder->no_po }}</title>
     <style>
         @page { size: A4 portrait; margin: 10mm; }
         * { box-sizing: border-box; }
@@ -12,7 +12,7 @@
             color: #111;
             background: #e9edf2;
             font-family: "Times New Roman", Times, serif;
-            font-size: 12pt;
+            font-size: 11pt;
             line-height: 1.25;
         }
         .print-toolbar {
@@ -36,11 +36,11 @@
             color: #fff;
             border: 0;
             border-radius: 7px;
-            background: #4054b2;
+            background: #198754;
             font-weight: 700;
             cursor: pointer;
         }
-        .psychotropic-order-sheet {
+        .oot-order-sheet {
             position: relative;
             width: 190mm;
             min-height: 277mm;
@@ -52,17 +52,17 @@
             page-break-after: always;
             break-after: page;
         }
-        .psychotropic-order-sheet:last-child { page-break-after: auto; break-after: auto; }
+        .oot-order-sheet:last-child { page-break-after: auto; break-after: auto; }
         .form-label-top { position: absolute; top: 4mm; right: 7mm; font-size: 9.5pt; }
         .document-header { margin-top: 2mm; text-align: center; }
         .document-header h1 {
             margin: 0 0 1mm;
-            font-size: 14pt;
+            font-size: 13pt;
             text-decoration: underline;
         }
         .document-number { margin: 0; font-size: 11pt; }
-        .section { margin-top: 6mm; }
-        .section.compact { margin-top: 3.5mm; }
+        .section { margin-top: 5mm; }
+        .section.compact { margin-top: 3mm; }
         .section > p { margin: 0 0 1.5mm; }
         .field-table { width: 100%; border-collapse: collapse; }
         .field-table td { padding: .55mm 0; vertical-align: top; }
@@ -73,21 +73,21 @@
             margin: 2.5mm 0 0;
             border-collapse: collapse;
             table-layout: fixed;
-            font-size: 10.5pt;
-            line-height: 1.3;
+            font-size: 9.5pt;
+            line-height: 1.25;
         }
         .medicine-table th,
         .medicine-table td {
-            padding: 2mm 2.2mm;
+            padding: 1.7mm 2mm;
             border: .3mm solid #4b5563;
             vertical-align: top;
             overflow-wrap: anywhere;
         }
         .medicine-table th {
-            padding-top: 1.7mm;
-            padding-bottom: 1.7mm;
+            padding-top: 1.5mm;
+            padding-bottom: 1.5mm;
             background: #e9edf2;
-            font-size: 10pt;
+            font-size: 9.25pt;
             font-weight: 700;
             line-height: 1.2;
             text-align: center;
@@ -96,10 +96,11 @@
             print-color-adjust: exact;
         }
         .medicine-table .number-column { width: 7%; text-align: center; }
-        .medicine-table .name-column { width: 25%; }
-        .medicine-table .preparation-column { width: 16%; }
-        .medicine-table .strength-column { width: 27%; }
-        .medicine-table .quantity-column { width: 25%; }
+        .medicine-table .name-column { width: 20%; }
+        .medicine-table .preparation-column { width: 13%; }
+        .medicine-table .strength-column { width: 22%; }
+        .medicine-table .packaging-column { width: 14%; }
+        .medicine-table .quantity-column { width: 24%; }
         .medicine-table tbody .number-column,
         .medicine-table tbody .quantity-column { vertical-align: middle; }
         .medicine-table tbody .quantity-column { text-align: center; }
@@ -152,17 +153,18 @@
         .price-value,
         .total-price-value { color: #0f172a; font-size: 10.25pt; font-weight: 700; }
         .discount-tier { display: block; white-space: nowrap; font-size: 9.25pt; line-height: 1.45; }
-        .medicine-name { display: block; font-size: 10.75pt; font-weight: 700; line-height: 1.25; }
+        .medicine-name { display: block; font-size: 9.75pt; font-weight: 700; line-height: 1.25; }
         .signature-wrap {
             display: flex;
             justify-content: flex-end;
-            margin-top: 5mm;
+            margin-top: 3.5mm;
         }
-        .signature { width: 75mm; text-align: left; }
-        .signature p { margin: 0 0 3.5mm; }
-        .signature-space { height: 16mm; }
-        .signature-name { display: inline-block; min-width: 58mm; font-weight: 700; text-decoration: underline; }
-        .notes { margin-top: 5mm; font-size: 10.5pt; }
+        .signature { width: 82mm; text-align: left; }
+        .signature p { margin: 0 0 2.5mm; }
+        .signature-space { height: 10mm; }
+        .signature-name { display: inline-block; min-width: 65mm; font-weight: 700; text-decoration: underline; }
+        .signature-role { margin: .5mm 0; font-size: 9.5pt; }
+        .notes { margin-top: 3mm; font-size: 10pt; }
         .notes p { margin: 0 0 1.5mm; }
         .copy-mark {
             position: absolute;
@@ -175,7 +177,7 @@
         @media print {
             body { background: #fff; }
             .print-toolbar { display: none !important; }
-            .psychotropic-order-sheet {
+            .oot-order-sheet {
                 width: 190mm;
                 min-height: 277mm;
                 margin: 0;
@@ -200,7 +202,7 @@
     @endphp
 
     <div class="print-toolbar">
-        <span>{{ $psychotropicDetails->count() }} item Psikotropika &middot; {{ $copyCount }} rangkap &middot; {{ $copyCount }} halaman</span>
+        <span>{{ $ootDetails->count() }} item OOT &middot; {{ $copyCount }} rangkap &middot; {{ $copyCount }} halaman</span>
         @if ($profileIncomplete)
             <span class="profile-warning">Nama Apoteker atau SIPA belum lengkap di Profile Apotek.</span>
         @endif
@@ -212,12 +214,12 @@
             $showsCommercialDetails = $copy >= $copyCount - 1;
             $commercialCopyLabel = $copy === $copyCount ? 'Rangkap Internal' : 'Rangkap Distributor';
         @endphp
-        <main class="psychotropic-order-sheet">
-            <span class="form-label-top">Formulir 2</span>
+        <main class="oot-order-sheet">
+            <span class="form-label-top">Formulir 4</span>
 
             <header class="document-header">
-                <h1>SURAT PESANAN PSIKOTROPIKA</h1>
-                <p class="document-number">Nomor : {{ $purchaseOrder->psychotropic_document_number }}</p>
+                <h1>SURAT PESANAN OBAT-OBAT TERTENTU</h1>
+                <p class="document-number">Nomor : {{ $purchaseOrder->oot_document_number }}</p>
             </header>
 
             <section class="section">
@@ -229,7 +231,7 @@
             </section>
 
             <section class="section compact">
-                <p>Mengajukan pesanan Psikotropika kepada :</p>
+                <p>Mengajukan pesanan Obat-Obat Tertentu kepada :</p>
                 <table class="field-table">
                     <tr><td class="field-label">Nama Distributor</td><td class="field-separator">:</td><td>{{ $purchaseOrder->distributor?->nama ?: '-' }}</td></tr>
                     <tr><td class="field-label">Alamat</td><td class="field-separator">:</td><td>{{ $purchaseOrder->distributor?->alamat ?: '-' }}</td></tr>
@@ -238,14 +240,14 @@
             </section>
 
             <section class="section compact">
-                <p>dengan Psikotropika yang dipesan adalah :</p>
+                <p>dengan Obat-Obat Tertentu yang dipesan adalah :</p>
                 @if ($showsCommercialDetails)
                     <div class="commercial-section-heading">
                         <span class="copy-role-badge">{{ $commercialCopyLabel }}</span>
                         <strong>Rincian pemesanan dan harga</strong>
                     </div>
                 @else
-                    <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)</p>
+                    <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf, isi kemasan)</p>
                 @endif
                 <table class="medicine-table{{ $showsCommercialDetails ? ' commercial-detail-table' : '' }}">
                     <thead>
@@ -262,17 +264,19 @@
                                 <th class="name-column" scope="col">Nama obat</th>
                                 <th class="preparation-column" scope="col">Bentuk sediaan</th>
                                 <th class="strength-column" scope="col">Kekuatan/potensi</th>
+                                <th class="packaging-column" scope="col">Isi kemasan</th>
                                 <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
                             @endif
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($psychotropicDetails as $index => $detail)
+                        @foreach ($ootDetails as $index => $detail)
                             @php
                                 $medicine = $detail->obat;
                                 $unitName = $detail->satuanKonversi?->satuan?->nama ?: ($medicine?->satuan?->nama ?: 'unit');
                                 $preparation = $medicine?->sediaan?->nama ?: '-';
                                 $strength = $medicine?->komposisi ?: ($medicine?->dosis ?: '-');
+                                $packaging = $medicine?->kemasan ?: '-';
                                 $quantity = number_format((float) $detail->qty, 0, ',', '.');
                                 $basePrice = (float) $detail->harga_estimasi;
                                 $totalPrice = $detail->subtotal !== null
@@ -292,7 +296,7 @@
                                 @if ($showsCommercialDetails)
                                     <td class="name-column">
                                         <span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span>
-                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}</span>
+                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}<br><strong>Kemasan:</strong> {{ $packaging }}</span>
                                     </td>
                                     <td class="order-quantity-column"><span class="order-quantity-value">{{ $quantity }}</span></td>
                                     <td class="order-unit-column">{{ $unitName }}</td>
@@ -307,6 +311,7 @@
                                     <td class="name-column"><span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span></td>
                                     <td class="preparation-column">{{ $preparation }}</td>
                                     <td class="strength-column">{{ $strength }}</td>
+                                    <td class="packaging-column">{{ $packaging }}</td>
                                     <td class="quantity-column">{{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</td>
                                 @endif
                             </tr>
@@ -316,7 +321,7 @@
             </section>
 
             <section class="section compact">
-                <p>Psikotropika tersebut akan dipergunakan untuk :</p>
+                <p>Obat-Obat Tertentu tersebut akan dipergunakan untuk :</p>
                 <table class="field-table">
                     <tr><td class="field-label">Nama Sarana</td><td class="field-separator">:</td><td>{{ $facilityName }} (Apotek)</td></tr>
                     <tr><td class="field-label">Alamat Sarana</td><td class="field-separator">:</td><td>{{ $facilityAddress }}</td></tr>
@@ -330,14 +335,14 @@
                     <p>Tanda tangan dan stempel</p>
                     <div class="signature-space"></div>
                     <div><span class="signature-name">{{ $pharmacistName }}</span></div>
+                    <div class="signature-role">Apoteker Penanggung Jawab</div>
                     <div>No. SIPA : {{ $pharmacistLicense }}</div>
                 </div>
             </div>
 
             <section class="notes">
-                <p>*) &nbsp;coret yang tidak perlu</p>
                 <p>Catatan:</p>
-                <p>Surat Pesanan dibuat 5 (lima) rangkap.</p>
+                <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
             </section>
 
             <span class="copy-mark">Rangkap {{ $copy }} dari {{ $copyCount }}</span>

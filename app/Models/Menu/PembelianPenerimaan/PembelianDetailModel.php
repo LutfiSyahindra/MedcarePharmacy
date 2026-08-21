@@ -16,6 +16,7 @@ class PembelianDetailModel extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'is_oot' => 'boolean',
         'qty' => 'decimal:2',
         'harga_estimasi' => 'decimal:2',
         'diskon_1' => 'decimal:2',

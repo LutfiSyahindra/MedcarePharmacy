@@ -25,9 +25,18 @@ class DocumentOrderTemplateTest extends TestCase
         $service = app(DocumentArchiveService::class);
 
         $expectedTitles = [
+            'reguler' => 'SURAT PESANAN OBAT REGULER',
             'narkotika' => 'SURAT PESANAN NARKOTIKA',
             'psikotropika' => 'SURAT PESANAN PSIKOTROPIKA',
             'prekursor' => 'SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*',
+            'oot' => 'SURAT PESANAN OBAT-OBAT TERTENTU',
+        ];
+        $expectedCopyCounts = [
+            'reguler' => 2,
+            'narkotika' => 5,
+            'psikotropika' => 5,
+            'prekursor' => 4,
+            'oot' => 4,
         ];
 
         foreach ($expectedTitles as $type => $title) {
@@ -46,7 +55,16 @@ class DocumentOrderTemplateTest extends TestCase
             $this->assertStringContainsString('Template kosong', $html);
             $this->assertStringNotContainsString('Morphine 10 mg', $html);
             $this->assertStringNotContainsString('PT Distributor Sehat', $html);
-            $this->assertSame(1, substr_count($html, 'class="order-sheet"'));
+            $this->assertSame($expectedCopyCounts[$type], substr_count($html, 'class="order-sheet"'));
+            $this->assertSame(2, substr_count($html, 'class="medicine-table commercial-template-table"'));
+            $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Lembar Internal Apotek'));
+            $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Lembar Distributor'));
+            $this->assertSame(2, substr_count($html, '>Obat</th>'));
+            $this->assertSame(2, substr_count($html, '>Satuan</th>'));
+            $this->assertSame(2, substr_count($html, '>Qty</th>'));
+            $this->assertSame(2, substr_count($html, '>Harga dasar</th>'));
+            $this->assertSame(2, substr_count($html, '>Harga total</th>'));
+            $this->assertSame(2, substr_count($html, '>Diskon</th>'));
         }
     }
 
@@ -56,14 +74,25 @@ class DocumentOrderTemplateTest extends TestCase
         $branch->setRelation('apotekProfile', null);
         $service = app(DocumentArchiveService::class);
 
+        $regular = $this->renderTemplate($service, $branch, 'reguler');
         $narcotic = $this->renderTemplate($service, $branch, 'narkotika');
         $psychotropic = $this->renderTemplate($service, $branch, 'psikotropika');
         $precursor = $this->renderTemplate($service, $branch, 'prekursor');
+        $oot = $this->renderTemplate($service, $branch, 'oot');
 
+        $this->assertSame(10, substr_count($regular, 'class="empty-row"'));
+        $this->assertStringContainsString('Surat Umum', $regular);
+        $this->assertStringContainsString('Surat Pesanan dibuat 2 (dua) lembar untuk Internal Apotek dan Distributor.', $regular);
         $this->assertStringContainsString('class="medicine-table"', $narcotic);
-        $this->assertSame(1, substr_count($narcotic, 'class="empty-row is-single-item"'));
-        $this->assertSame(5, substr_count($psychotropic, 'class="empty-row"'));
-        $this->assertSame(5, substr_count($precursor, 'class="empty-row"'));
+        $this->assertSame(5, substr_count($narcotic, 'class="empty-row is-single-item"'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 5 (lima) rangkap.', $narcotic);
+        $this->assertSame(25, substr_count($psychotropic, 'class="empty-row"'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 5 (lima) rangkap.', $psychotropic);
+        $this->assertSame(20, substr_count($precursor, 'class="empty-row"'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 4 (empat) rangkap.', $precursor);
+        $this->assertSame(20, substr_count($oot, 'class="empty-row"'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 4 (empat) rangkap.', $oot);
+        $this->assertStringContainsString('Formulir 4', $oot);
     }
 
     private function renderTemplate(

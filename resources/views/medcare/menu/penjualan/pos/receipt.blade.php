@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Struk {{ $transaction->nomor_transaksi }}</title>
+    <title>{{ ($isTemplate ?? false) ? "Template Nota" : (($asNota ?? false) ? "Nota" : "Struk") }} {{ $transaction->nomor_transaksi }}</title>
     <style>
         :root {
             --ink: #172033;
@@ -659,6 +659,12 @@
         $preciseNumber = fn ($value) => number_format((float) $value, 2, ',', '.');
         $isPrescription = in_array($transaction->jenis_transaksi, ['penjualan_resep', 'penjualan_racikan'], true);
         $isCompoundPrescription = $transaction->jenis_transaksi === 'penjualan_racikan';
+        $receiptTitle = match ($transaction->jenis_transaksi) {
+            'penjualan_resep' => 'Nota Resep Non Racikan',
+            'penjualan_kredit' => 'Nota Penjualan Kredit',
+            'penjualan_instansi' => 'Nota Penjualan Instansi',
+            default => 'Nota Penjualan',
+        };
         $compoundGroups = $isCompoundPrescription
             ? $transaction->details->groupBy(fn ($detail) => trim((string) $detail->racikan_group) ?: 'R/ -')
             : collect();
@@ -705,7 +711,9 @@
     @endphp
 
     @unless ($embedded)
-        <button type="button" class="print-button" onclick="window.print()">Cetak Struk</button>
+        <button type="button" class="print-button" onclick="window.print()">
+            {{ ($isTemplate ?? false) ? "Cetak Template Nota" : (($asNota ?? false) ? "Cetak Nota" : "Cetak Struk") }}
+        </button>
     @endunless
 
     @if ($isCompoundPrescription)
@@ -845,7 +853,7 @@
                     <span class="document-title">Lembar Peracikan</span>
                 </span>
             @else
-                <span class="document-title">Bukti Pembayaran</span>
+                <span class="document-title">{{ $receiptTitle }}</span>
             @endif
             <span class="status-badge {{ $transaction->payment_status }}">
                 {{ $paymentStatusLabels[$transaction->payment_status] ?? $transaction->payment_status }}
@@ -858,6 +866,9 @@
             <div class="meta-row"><span class="meta-label">Kasir</span><span class="separator">:</span><span class="meta-value">{{ $cashier }}</span></div>
             <div class="meta-row"><span class="meta-label">Jenis</span><span class="separator">:</span><span class="meta-value">{{ $transactionTypes[$transaction->jenis_transaksi] ?? $transaction->jenis_transaksi }}</span></div>
             <div class="meta-row"><span class="meta-label">Pelanggan</span><span class="separator">:</span><span class="meta-value">{{ $transaction->customer_name ?: 'Umum' }}</span></div>
+            @if ($transaction->jenis_transaksi === 'penjualan_instansi' && $transaction->instansi_name)
+                <div class="meta-row"><span class="meta-label">Instansi</span><span class="separator">:</span><span class="meta-value">{{ $transaction->instansi_name }}</span></div>
+            @endif
             @if ($transaction->customer_phone)
                 <div class="meta-row"><span class="meta-label">No. Telepon</span><span class="separator">:</span><span class="meta-value">{{ $transaction->customer_phone }}</span></div>
             @endif

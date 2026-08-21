@@ -13,6 +13,7 @@ use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
+use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
@@ -276,6 +277,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/pembelian/{id}/surat-pesanan-narkotika', [PembelianController::class, 'suratPesananNarkotika'])->name('pembelian.suratPesananNarkotika');
         Route::get('/pembelian/{id}/surat-pesanan-psikotropika', [PembelianController::class, 'suratPesananPsikotropika'])->name('pembelian.suratPesananPsikotropika');
         Route::get('/pembelian/{id}/surat-pesanan-prekursor', [PembelianController::class, 'suratPesananPrekursor'])->name('pembelian.suratPesananPrekursor');
+        Route::get('/pembelian/{id}/surat-pesanan-reguler', [PembelianController::class, 'suratPesananReguler'])->name('pembelian.suratPesananReguler');
+        Route::get('/pembelian/{id}/surat-pesanan-oot', [PembelianController::class, 'suratPesananOot'])->name('pembelian.suratPesananOot');
         Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');
 
         Route::get('/penerimaan', [PenerimaanController::class, 'penerimaan'])->name('penerimaan.penerimaan');
@@ -325,6 +328,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/etiket/template/{type}', [LabelDocumentController::class, 'template'])
             ->whereIn('type', LabelDocumentController::templateTypes())
             ->name('dokumen.etiket.template');
+        Route::get('/nota', [ReceiptDocumentController::class, 'index'])->name('dokumen.nota.index');
+        Route::get('/nota/table', [ReceiptDocumentController::class, 'table'])->name('dokumen.nota.table');
+        Route::get('/nota/template/{type}', [ReceiptDocumentController::class, 'template'])
+            ->whereIn('type', ReceiptDocumentController::templateTypes())
+            ->name('dokumen.nota.template');
         Route::get('/template/{type}', [DocumentController::class, 'template'])
             ->whereIn('type', DocumentArchiveService::types())
             ->name('dokumen.template');

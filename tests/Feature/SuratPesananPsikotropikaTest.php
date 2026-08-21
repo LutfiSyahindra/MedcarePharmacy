@@ -45,7 +45,7 @@ class SuratPesananPsikotropikaTest extends TestCase
         )));
     }
 
-    public function test_psychotropic_order_combines_all_matching_items_in_one_letter_with_three_copies(): void
+    public function test_psychotropic_order_combines_all_matching_items_in_one_letter_with_five_copies_and_commercial_details_on_last_two(): void
     {
         $service = app(SuratPesananPsikotropikaService::class);
         $purchaseOrder = $this->purchaseOrderForView();
@@ -59,8 +59,8 @@ class SuratPesananPsikotropikaTest extends TestCase
         ])->render();
 
         $this->assertCount(2, $psychotropicDetails);
-        $this->assertSame(3, substr_count($html, 'class="psychotropic-order-sheet"'));
-        $this->assertSame(3, substr_count($html, 'PO-PSI-001/PSI'));
+        $this->assertSame(5, substr_count($html, 'class="psychotropic-order-sheet"'));
+        $this->assertSame(5, substr_count($html, 'PO-PSI-001/PSI'));
         $this->assertStringContainsString('Formulir 2', $html);
         $this->assertStringContainsString('SURAT PESANAN PSIKOTROPIKA', $html);
         $this->assertStringContainsString('class="medicine-table"', $html);
@@ -71,8 +71,23 @@ class SuratPesananPsikotropikaTest extends TestCase
         $this->assertStringContainsString('Clobazam 10 mg', $html);
         $this->assertStringContainsString('20 Tablet (dua puluh tablet)', $html);
         $this->assertStringContainsString('10 Tablet (sepuluh tablet)', $html);
-        $this->assertStringContainsString('Rangkap 3 dari 3', $html);
-        $this->assertStringContainsString('Surat Pesanan dibuat sekurang-kurangnya 3 (tiga) rangkap.', $html);
+        $this->assertStringContainsString('Rangkap 5 dari 5', $html);
+        $this->assertSame(2, substr_count($html, 'class="medicine-table commercial-detail-table"'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Internal'));
+        $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Rangkap Distributor'));
+        $this->assertSame(2, substr_count($html, 'class="name-column" scope="col">Obat dan spesifikasi'));
+        $this->assertSame(2, substr_count($html, 'class="order-quantity-column" scope="col">Qty order'));
+        $this->assertSame(2, substr_count($html, 'class="order-unit-column" scope="col">Satuan order'));
+        $this->assertSame(2, substr_count($html, 'class="price-column" scope="col">Harga dasar'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-column" scope="col">Total harga'));
+        $this->assertSame(2, substr_count($html, 'class="price-value">Rp 80.000'));
+        $this->assertSame(2, substr_count($html, 'class="price-value">Rp 95.000'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-value">Rp 1.333.800'));
+        $this->assertSame(2, substr_count($html, 'class="total-price-value">Rp 878.750'));
+        $this->assertSame(2, substr_count($html, 'D1 10%'));
+        $this->assertSame(2, substr_count($html, 'D2 5%'));
+        $this->assertSame(2, substr_count($html, 'D3 2,5%'));
+        $this->assertStringContainsString('Surat Pesanan dibuat 5 (lima) rangkap.', $html);
         $this->assertStringNotContainsString('Paracetamol 500 mg', $html);
         $this->assertStringNotContainsString('Satu surat pesanan hanya berlaku', $html);
     }
@@ -134,8 +149,8 @@ class SuratPesananPsikotropikaTest extends TestCase
         $regular->setRelation('sediaan', new SediaanModel(['nama' => 'Tablet']));
         $regular->setRelation('satuan', $tablet);
 
-        $diazepamDetail = $this->detail($diazepam, $conversion, 20);
-        $clobazamDetail = $this->detail($clobazam, $conversion, 10);
+        $diazepamDetail = $this->detail($diazepam, $conversion, 20, 80000, 10, 5, 2.5);
+        $clobazamDetail = $this->detail($clobazam, $conversion, 10, 95000, 7.5, 0, 0);
         $regularDetail = $this->detail($regular, $conversion, 12);
 
         $purchaseOrder = (new PembelianModel)->forceFill([
@@ -160,9 +175,19 @@ class SuratPesananPsikotropikaTest extends TestCase
     private function detail(
         MasterObatModel $medicine,
         KonversiSatuanModel $conversion,
-        int $quantity
+        int $quantity,
+        float $price = 0,
+        float $discount1 = 0,
+        float $discount2 = 0,
+        float $discount3 = 0,
     ): PembelianDetailModel {
-        $detail = (new PembelianDetailModel)->forceFill(['qty' => $quantity]);
+        $detail = (new PembelianDetailModel)->forceFill([
+            'qty' => $quantity,
+            'harga_estimasi' => $price,
+            'diskon_1' => $discount1,
+            'diskon_2' => $discount2,
+            'diskon_3' => $discount3,
+        ]);
         $detail->setRelation('obat', $medicine);
         $detail->setRelation('satuanKonversi', $conversion);
 

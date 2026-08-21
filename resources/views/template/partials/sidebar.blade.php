@@ -413,6 +413,7 @@
                 $documentMenuActive = request()->routeIs("dokumen.*");
                 $orderDocumentMenuActive = request()->routeIs("dokumen.index", "dokumen.table", "dokumen.template", "dokumen.show");
                 $labelDocumentMenuActive = request()->routeIs("dokumen.etiket.*");
+                $receiptDocumentMenuActive = request()->routeIs("dokumen.nota.*");
             @endphp
             <li class="nav-item">
                 <a class="nav-link {{ $documentMenuActive ? "active" : "" }}" data-bs-toggle="collapse"
@@ -431,6 +432,10 @@
                         <li class="nav-item">
                             <a href="{{ route("dokumen.etiket.index") }}"
                                 class="nav-link {{ $labelDocumentMenuActive ? "active" : "" }}">Etiket</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route("dokumen.nota.index") }}"
+                                class="nav-link {{ $receiptDocumentMenuActive ? "active" : "" }}">Nota</a>
                         </li>
                     </ul>
                 </div>

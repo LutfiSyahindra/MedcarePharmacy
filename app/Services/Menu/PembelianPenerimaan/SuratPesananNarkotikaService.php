@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 class SuratPesananNarkotikaService
 {
-    public const COPY_COUNT = 3;
+    public const COPY_COUNT = 5;
 
     /**
      * @return Collection<int, \App\Models\Menu\PembelianPenerimaan\PembelianDetailModel>
