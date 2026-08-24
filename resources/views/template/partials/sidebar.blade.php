@@ -37,6 +37,15 @@
         ? "Cabang {$sidebarBranch->code}"
         : "Pharmacy Management";
     $sidebarProfileMeta = trim($sidebarUserRole . ($sidebarBranch?->code ? " - {$sidebarBranch->code}" : ""));
+    $documentMenuActive = request()->routeIs("dokumen.*");
+    $orderDocumentMenuActive = request()->routeIs("dokumen.index", "dokumen.table", "dokumen.template", "dokumen.show");
+    $labelDocumentMenuActive = request()->routeIs("dokumen.etiket.*");
+    $receiptDocumentMenuActive = request()->routeIs("dokumen.nota.*");
+    $stockMenuActive = request()->routeIs("stok.*", "kartuStok.*", "stockOpname.*");
+    $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
+    $activeStockOpnameLock = $stockOpnameAccess->activeLock();
+    $stockMenuLock = $stockOpnameAccess->stockMenusAreLocked() ? $activeStockOpnameLock : null;
+    $cashierOpnameLock = $activeStockOpnameLock;
 @endphp
 
 <!-- partial:partials/_sidebar.html -->
@@ -374,8 +383,14 @@
                 <div class="collapse" id="penjualan">
                     <ul class="nav sub-menu">
                         <li class="nav-item">
-                            <a href="{{ route("penjualan.pos") }}" class="nav-link" target="_blank"
-                                rel="noopener noreferrer">Kasir / POS</a>
+                            @if ($cashierOpnameLock)
+                                <span class="nav-link text-warning" title="Dikunci oleh {{ $cashierOpnameLock->nomor }}">
+                                    <i class="mdi mdi-lock-outline me-1"></i> Kasir / POS dikunci
+                                </span>
+                            @else
+                                <a href="{{ route("penjualan.pos") }}" class="nav-link" target="_blank"
+                                    rel="noopener noreferrer">Kasir / POS</a>
+                            @endif
                         </li>
                         <li class="nav-item">
                             <a href="{{ route("penjualan.pos.history") }}" class="nav-link">Riwayat Transaksi Kasir</a>
@@ -412,12 +427,6 @@
                 </div>
             </li>
 
-            @php
-                $documentMenuActive = request()->routeIs("dokumen.*");
-                $orderDocumentMenuActive = request()->routeIs("dokumen.index", "dokumen.table", "dokumen.template", "dokumen.show");
-                $labelDocumentMenuActive = request()->routeIs("dokumen.etiket.*");
-                $receiptDocumentMenuActive = request()->routeIs("dokumen.nota.*");
-            @endphp
             <li class="nav-item">
                 <a class="nav-link {{ $documentMenuActive ? "active" : "" }}" data-bs-toggle="collapse"
                     href="#dokumen" role="button" aria-expanded="{{ $documentMenuActive ? "true" : "false" }}"
@@ -444,20 +453,31 @@
                 </div>
             </li>
 
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="collapse" href="#stok" role="button"
-                    aria-expanded="false" aria-controls="stok">
+            <li class="nav-item {{ $stockMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $stockMenuActive ? 'active' : '' }}" data-bs-toggle="collapse" href="#stok" role="button"
+                    aria-expanded="{{ $stockMenuActive ? 'true' : 'false' }}" aria-controls="stok">
                     <i class="link-icon" data-feather="database"></i>
                     <span class="link-title">Stok</span>
                     <i class="link-arrow" data-feather="chevron-down"></i>
                 </a>
-                <div class="collapse" id="stok">
+                <div class="collapse {{ $stockMenuActive ? 'show' : '' }}" id="stok">
                     <ul class="nav sub-menu">
+                        @if (! $stockMenuLock)
+                            <li class="nav-item">
+                                <a href="{{ route("stok.stok") }}" class="nav-link {{ request()->routeIs('stok.*') ? 'active' : '' }}">Stok Barang</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route("kartuStok.kartuStok") }}" class="nav-link {{ request()->routeIs('kartuStok.*') ? 'active' : '' }}">Kartu Stok</a>
+                            </li>
+                        @else
+                            <li class="nav-item">
+                                <span class="nav-link text-warning" title="Dikunci oleh {{ $stockMenuLock->nomor }}">
+                                    <i class="mdi mdi-lock-outline me-1"></i> Stok dikunci
+                                </span>
+                            </li>
+                        @endif
                         <li class="nav-item">
-                            <a href="{{ route("stok.stok") }}" class="nav-link">Stok Barang</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ route("kartuStok.kartuStok") }}" class="nav-link">Kartu Stok</a>
+                            <a href="{{ route('stockOpname.index') }}" class="nav-link {{ request()->routeIs('stockOpname.*') ? 'active' : '' }}">Stock Opname</a>
                         </li>
                     </ul>
                 </div>

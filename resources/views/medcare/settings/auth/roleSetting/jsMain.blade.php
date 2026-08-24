@@ -29,14 +29,20 @@
             const posAllBranch = selectedValue(card, '.js-pos-scope') === 'all_branches';
             const approver = card.find('.js-approver').is(':checked');
             const approvalAllBranch = selectedValue(card, '.js-approval-scope') === 'all_branches';
+            const opnameValidator = card.find('.js-opname-validator').is(':checked');
+            const opnameStockViewer = card.find('.js-opname-stock').is(':checked');
             const notification = card.find('.js-notification').is(':checked');
             const notificationAllBranch = selectedValue(card, '.js-notification-scope') === 'all_branches';
 
             card.toggleClass('is-all-branch', dataAllBranch);
             card.toggleClass('is-pos-all', posAllBranch);
             card.toggleClass('is-approver', approver);
+            card.toggleClass('is-opname-validator', opnameValidator);
+            card.toggleClass('is-opname-stock', opnameStockViewer);
             card.toggleClass('is-notification', notification);
             card.find('.js-approval-panel').toggleClass('is-off', !approver);
+            card.find('.js-opname-validator-panel').toggleClass('is-off', !opnameValidator);
+            card.find('.js-opname-stock-panel').toggleClass('is-off', !opnameStockViewer);
             card.find('.js-notification-panel').toggleClass('is-off', !notification);
 
             setStatus(
@@ -58,6 +64,18 @@
                 approver ? 'is-active' : 'is-off'
             );
             setStatus(
+                card.find('.js-status-opname-validator'),
+                opnameValidator ? 'mdi-clipboard-check-outline' : 'mdi-clipboard-remove-outline',
+                opnameValidator ? 'Opname: validator' : 'Opname: bukan validator',
+                opnameValidator ? 'is-active' : 'is-off'
+            );
+            setStatus(
+                card.find('.js-status-opname-stock'),
+                opnameStockViewer ? 'mdi-database-eye-outline' : 'mdi-database-lock-outline',
+                opnameStockViewer ? 'Stok opname: dapat dilihat' : 'Stok opname: dikunci',
+                opnameStockViewer ? 'is-active' : 'is-off'
+            );
+            setStatus(
                 card.find('.js-status-notification'),
                 notification ? 'mdi-bell-ring-outline' : 'mdi-bell-off-outline',
                 notification ? (notificationAllBranch ? 'Notifikasi: semua branch' : 'Notifikasi: branch asal') : 'Notifikasi: nonaktif',
@@ -69,6 +87,8 @@
             $('#allBranchCount').text($('.js-data-scope[value="1"]:checked').length);
             $('#posAllBranchCount').text($('.js-pos-scope[value="all_branches"]:checked').length);
             $('#approverCount').text($('.js-approver:checked').length);
+            $('#stockOpnameValidatorCount').text($('.js-opname-validator:checked').length);
+            $('#stockDuringOpnameViewerCount').text($('.js-opname-stock:checked').length);
             $('#notificationRoleCount').text($('.js-notification:checked').length);
         }
 
@@ -83,6 +103,8 @@
                 const nameMatches = !query || roleName.includes(query);
                 const filterMatches = activeFilter === 'all'
                     || (activeFilter === 'approver' && card.find('.js-approver').is(':checked'))
+                    || (activeFilter === 'opname-validator' && card.find('.js-opname-validator').is(':checked'))
+                    || (activeFilter === 'opname-stock' && card.find('.js-opname-stock').is(':checked'))
                     || (activeFilter === 'all-branch' && selectedValue(card, '.js-data-scope') === '1')
                     || (activeFilter === 'pos-all' && selectedValue(card, '.js-pos-scope') === 'all_branches')
                     || (activeFilter === 'notification' && card.find('.js-notification').is(':checked'));
@@ -154,6 +176,8 @@
                     if (summary.all_branch !== undefined) $('#allBranchCount').text(summary.all_branch);
                     if (summary.pos_all_branch !== undefined) $('#posAllBranchCount').text(summary.pos_all_branch);
                     if (summary.approver !== undefined) $('#approverCount').text(summary.approver);
+                    if (summary.stock_opname_validator !== undefined) $('#stockOpnameValidatorCount').text(summary.stock_opname_validator);
+                    if (summary.stock_opname_stock_viewer !== undefined) $('#stockDuringOpnameViewerCount').text(summary.stock_opname_stock_viewer);
                     if (summary.notification !== undefined) $('#notificationRoleCount').text(summary.notification);
 
                     savedFormState = form.serialize();

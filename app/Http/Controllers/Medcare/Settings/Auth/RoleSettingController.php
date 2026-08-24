@@ -31,6 +31,8 @@ class RoleSettingController extends Controller
             'settings.*.pos_scope' => ['nullable', 'in:same_branch,all_branches'],
             'settings.*.is_approver' => ['nullable', 'boolean'],
             'settings.*.approval_scope' => ['nullable', 'in:same_branch,all_branches'],
+            'settings.*.is_stock_opname_validator' => ['nullable', 'boolean'],
+            'settings.*.can_view_stock_during_opname' => ['nullable', 'boolean'],
             'settings.*.receives_notifications' => ['nullable', 'boolean'],
             'settings.*.notification_scope' => ['nullable', 'in:same_branch,all_branches'],
         ]);
@@ -44,6 +46,8 @@ class RoleSettingController extends Controller
                 'all_branch' => $roles->where('can_view_all_branches', true)->count(),
                 'pos_all_branch' => $roles->where('pos_scope', RoleSettingService::ALL_BRANCHES)->count(),
                 'approver' => $roles->where('is_approver', true)->count(),
+                'stock_opname_validator' => $roles->where('is_stock_opname_validator', true)->count(),
+                'stock_opname_stock_viewer' => $roles->where('can_view_stock_during_opname', true)->count(),
                 'notification' => $roles->where('receives_notifications', true)->count(),
             ],
         ]);

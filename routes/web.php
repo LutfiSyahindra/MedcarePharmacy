@@ -20,6 +20,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\Penerima
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\ReturPenjualanController;
+use App\Http\Controllers\Medcare\Menu\Stok\StockOpnameController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
 use App\Http\Controllers\Medcare\Settings\ApotekProfile\ApotekProfileController;
@@ -73,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/users/dataRoles', [UsersController::class, 'dataRoles'])->name('users.dataRoles');
         Route::post('/users/assignRoles', [UsersController::class, 'assignRoles'])->name('users.assignRoles');
         Route::get('/users/{id}/getUserRoles', [UsersController::class, 'getUserRoles'])->name('users.getUserRoles');
+        Route::get('/users/{id}/stock-opnames', [UsersController::class, 'stockOpnameTransactions'])->whereNumber('id')->name('users.stockOpnames');
 
         // Role
         Route::get('/roles', [RoleController::class, 'Role'])->name('roles.role');
@@ -357,12 +359,14 @@ Route::middleware('auth')->group(function () {
         Route::put('/retur-penjualan/{id}/cancel', [ReturPenjualanController::class, 'cancel'])->name('returPenjualan.cancel');
         Route::delete('/retur-penjualan/{id}', [ReturPenjualanController::class, 'destroy'])->name('returPenjualan.destroy');
 
-        Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');
+        Route::middleware('cashier.available')->group(function () {
+            Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');
+            Route::get('/pos/products', [PenjualanPosController::class, 'products'])->name('penjualan.pos.products');
+            Route::get('/pos/quote', [PenjualanPosController::class, 'quote'])->name('penjualan.pos.quote');
+            Route::post('/pos/draft', [PenjualanPosController::class, 'storeDraft'])->name('penjualan.pos.draft');
+            Route::post('/pos/complete', [PenjualanPosController::class, 'complete'])->name('penjualan.pos.complete');
+        });
         Route::get('/pos/riwayat', [PenjualanPosController::class, 'history'])->name('penjualan.pos.history');
-        Route::get('/pos/products', [PenjualanPosController::class, 'products'])->name('penjualan.pos.products');
-        Route::get('/pos/quote', [PenjualanPosController::class, 'quote'])->name('penjualan.pos.quote');
-        Route::post('/pos/draft', [PenjualanPosController::class, 'storeDraft'])->name('penjualan.pos.draft');
-        Route::post('/pos/complete', [PenjualanPosController::class, 'complete'])->name('penjualan.pos.complete');
         Route::get('/pos/table', [PenjualanPosController::class, 'table'])->name('penjualan.pos.table');
         Route::get('/pos/{id}/show', [PenjualanPosController::class, 'show'])->name('penjualan.pos.show');
         Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
@@ -371,17 +375,36 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('medcare/menu/stok')->group(function () {
-        Route::get('/stok', [StokController::class, 'stok'])->name('stok.stok');
-        Route::get('/stok/table', [StokController::class, 'stockTable'])->name('stok.table');
-        Route::get('/stok/batch/table', [StokController::class, 'batchTable'])->name('stok.batchTable');
-        Route::get('/stok/riwayat-harga/table', [StokController::class, 'riwayatHargaTable'])->name('stok.riwayatHarga.table');
-        Route::get('/stok/obat-options', [StokController::class, 'obatOptions'])->name('stok.obatOptions');
-        Route::get('/stok/batch-options/{obatId}', [StokController::class, 'batchOptions'])->name('stok.batchOptions');
-        Route::put('/stok/batch/{id}/harga-jual', [StokController::class, 'updateBatchHargaJual'])->name('stok.batch.updateHargaJual');
-        Route::post('/stok/mutasi/store', [StokController::class, 'storeMutation'])->name('stok.mutasi.store');
+        Route::middleware('stock.menus.available')->group(function () {
+            Route::get('/stok', [StokController::class, 'stok'])->name('stok.stok');
+            Route::get('/stok/table', [StokController::class, 'stockTable'])->name('stok.table');
+            Route::get('/stok/batch/table', [StokController::class, 'batchTable'])->name('stok.batchTable');
+            Route::get('/stok/riwayat-harga/table', [StokController::class, 'riwayatHargaTable'])->name('stok.riwayatHarga.table');
+            Route::get('/stok/obat-options', [StokController::class, 'obatOptions'])->name('stok.obatOptions');
+            Route::get('/stok/batch-options/{obatId}', [StokController::class, 'batchOptions'])->name('stok.batchOptions');
+            Route::put('/stok/batch/{id}/harga-jual', [StokController::class, 'updateBatchHargaJual'])->name('stok.batch.updateHargaJual');
+            Route::post('/stok/mutasi/store', [StokController::class, 'storeMutation'])->name('stok.mutasi.store');
 
-        Route::get('/kartu-stok', [StokController::class, 'kartuStok'])->name('kartuStok.kartuStok');
-        Route::get('/kartu-stok/table', [StokController::class, 'kartuTable'])->name('kartuStok.table');
+            Route::get('/kartu-stok', [StokController::class, 'kartuStok'])->name('kartuStok.kartuStok');
+            Route::get('/kartu-stok/table', [StokController::class, 'kartuTable'])->name('kartuStok.table');
+        });
+
+        Route::get('/stock-opname', [StockOpnameController::class, 'index'])->name('stockOpname.index');
+        Route::get('/stock-opname/table', [StockOpnameController::class, 'table'])->name('stockOpname.table');
+        Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stockOpname.store');
+        Route::get('/stock-opname/{id}/print', [StockOpnameController::class, 'printCountSheet'])->whereNumber('id')->name('stockOpname.print');
+        Route::get('/stock-opname/{id}/report.pdf', [StockOpnameController::class, 'downloadReport'])->whereNumber('id')->name('stockOpname.report');
+        Route::get('/stock-opname/{id}', [StockOpnameController::class, 'show'])->name('stockOpname.show');
+        Route::put('/stock-opname/{id}', [StockOpnameController::class, 'update'])->name('stockOpname.update');
+        Route::delete('/stock-opname/{id}', [StockOpnameController::class, 'destroy'])->name('stockOpname.destroy');
+        Route::put('/stock-opname/{id}/start', [StockOpnameController::class, 'start'])->name('stockOpname.start');
+        Route::put('/stock-opname/{id}/counts', [StockOpnameController::class, 'saveCounts'])->name('stockOpname.counts');
+        Route::put('/stock-opname/{id}/submit', [StockOpnameController::class, 'submit'])->name('stockOpname.submit');
+        Route::put('/stock-opname/{id}/reasons', [StockOpnameController::class, 'saveReasons'])->name('stockOpname.reasons');
+        Route::put('/stock-opname/{id}/verify', [StockOpnameController::class, 'verify'])->name('stockOpname.verify');
+        Route::put('/stock-opname/{id}/approve', [StockOpnameController::class, 'approve'])->name('stockOpname.approve');
+        Route::put('/stock-opname/{id}/reject', [StockOpnameController::class, 'reject'])->name('stockOpname.reject');
+        Route::put('/stock-opname/{id}/adjust', [StockOpnameController::class, 'adjust'])->name('stockOpname.adjust');
     });
 });
 

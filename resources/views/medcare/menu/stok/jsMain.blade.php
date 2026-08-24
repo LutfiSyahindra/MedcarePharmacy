@@ -8,6 +8,7 @@
         let riwayatBatchId = '';
         let expiredWarningDays = $('#expiredWarningDays').val() || 90;
         let lastStockSummary = {};
+        const stockOpnameReadOnly = @json($stockOpnameReadOnly ?? false);
         const batchOptionsBaseUrl = '{{ url("medcare/menu/stok/stok/batch-options") }}';
         const updateBatchHargaUrl = '{{ route("stok.batch.updateHargaJual", ":id") }}';
 
@@ -448,9 +449,9 @@
                     searchable: false,
                     render: row => `
                         <span class="stock-action-group">
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="ubahHargaBatch(${Number(row.id)})" title="Ubah harga jual tanpa menambah stok">
+                            ${stockOpnameReadOnly ? '' : `<button type="button" class="btn btn-sm btn-outline-success" onclick="ubahHargaBatch(${Number(row.id)})" title="Ubah harga jual tanpa menambah stok">
                                 <i class="mdi mdi-cash-edit"></i>
-                            </button>
+                            </button>`}
                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterRiwayatHarga(${Number(row.id)}, ${Number(row.obat_id)})" title="Lihat riwayat harga">
                                 <i class="mdi mdi-cash-clock"></i>
                             </button>

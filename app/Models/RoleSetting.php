@@ -14,6 +14,8 @@ class RoleSetting extends Model
         'pos_scope',
         'is_approver',
         'approval_scope',
+        'is_stock_opname_validator',
+        'can_view_stock_during_opname',
         'receives_notifications',
         'notification_scope',
     ];
@@ -21,6 +23,8 @@ class RoleSetting extends Model
     protected $casts = [
         'can_view_all_branches' => 'boolean',
         'is_approver' => 'boolean',
+        'is_stock_opname_validator' => 'boolean',
+        'can_view_stock_during_opname' => 'boolean',
         'receives_notifications' => 'boolean',
     ];
 

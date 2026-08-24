@@ -23,9 +23,12 @@ class StokController extends Controller
 
     public function __construct(private readonly StockService $stockService) {}
 
-    public function stok()
+    public function stok(Request $request)
     {
-        return view('medcare.menu.stok.stok');
+        return view('medcare.menu.stok.stok', [
+            'stockOpnameReadOnly' => (bool) $request->attributes->get('stock_opname_read_only', false),
+            'activeStockOpname' => $request->attributes->get('active_stock_opname'),
+        ]);
     }
 
     public function kartuStok()
@@ -584,6 +587,8 @@ class StokController extends Controller
             'expired' => 'Obat Expired',
             'penyesuaian_masuk' => 'Penyesuaian Masuk',
             'penyesuaian_keluar' => 'Penyesuaian Keluar',
+            'penyesuaian_opname_masuk' => 'Stock Opname Masuk',
+            'penyesuaian_opname_keluar' => 'Stock Opname Keluar',
             'pembatalan_penerimaan' => 'Pembatalan Penerimaan',
             'retur_pembelian' => 'Retur Pembelian',
             'pembatalan_retur_pembelian' => 'Pembatalan Retur Pembelian',

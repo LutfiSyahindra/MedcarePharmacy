@@ -12,6 +12,7 @@ use App\Models\Menu\Stok\StokBatchModel;
 use App\Models\User;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Settings\Auth\RoleSettingService;
+use App\Support\StockOpnameAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +45,8 @@ class PenjualanPosService
 
     public function __construct(
         private readonly StockService $stockService,
-        private readonly RoleSettingService $roleSettings
+        private readonly RoleSettingService $roleSettings,
+        private readonly StockOpnameAccess $stockOpnameAccess
     ) {}
 
     public function canAccessAllBranches(?User $user = null): bool
@@ -101,6 +103,7 @@ class PenjualanPosService
     public function searchProducts(string $search = '', int $limit = 30, ?int $requestedBranchId = null): array
     {
         $branchId = $this->resolveBranchId($requestedBranchId);
+        $this->assertCashierAvailable($branchId);
 
         $search = trim($search);
 
@@ -167,6 +170,7 @@ class PenjualanPosService
     public function productQuote(int $obatId, ?int $satuanId, float $qtyJual = 1, ?int $requestedBranchId = null): array
     {
         $branchId = $this->resolveBranchId($requestedBranchId);
+        $this->assertCashierAvailable($branchId);
         $obat = $this->loadProduct($obatId);
         $unit = $this->resolveUnit($obat, $satuanId);
         $qtyJual = $this->quantity($qtyJual);
@@ -199,6 +203,7 @@ class PenjualanPosService
     {
         return DB::transaction(function () use ($payload) {
             $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
+            $this->assertCashierAvailable($branchId);
             $transaction = $this->transactionForWrite($payload, $branchId, true);
             $this->clearDraftLines($transaction);
             $this->fillBaseHeader($transaction, $payload, $branchId, 'draft');
@@ -225,6 +230,7 @@ class PenjualanPosService
     {
         return DB::transaction(function () use ($payload) {
             $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
+            $this->assertCashierAvailable($branchId);
             $transaction = $this->transactionForWrite($payload, $branchId, false);
             $this->clearDraftLines($transaction);
             $this->fillBaseHeader($transaction, $payload, $branchId, 'completed');
@@ -261,6 +267,7 @@ class PenjualanPosService
                 ->whereIn('branch_id', $branchIds)
                 ->lockForUpdate()
                 ->firstOrFail();
+            $this->assertCashierAvailable((int) $transaction->branch_id);
 
             if ($transaction->status === 'cancelled') {
                 throw ValidationException::withMessages([
@@ -883,6 +890,18 @@ class PenjualanPosService
         }
 
         return $value;
+    }
+
+    private function assertCashierAvailable(int $branchId): void
+    {
+        $opname = $this->stockOpnameAccess->activeLockForBranches([$branchId]);
+
+        if ($opname) {
+            throw ValidationException::withMessages([
+                'stock_opname' => 'Kasir/POS dikunci selama penghitungan fisik '.$opname->nomor
+                    .'. Stok tidak ditampilkan sampai hasil fisik disubmit.',
+            ]);
+        }
     }
 
     private function percent($value): float

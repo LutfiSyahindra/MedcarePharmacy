@@ -61,6 +61,25 @@
                     }
                 },
                 {
+                    data: 'stock_opname_transactions_count',
+                    name: 'stock_opname_transactions_count',
+                    render: function(data, type, row) {
+                        const count = Number(data) || 0;
+
+                        if (type !== 'display') return count;
+
+                        return `
+                            <button type="button" class="user-opname-count ${count ? 'has-transactions' : ''}"
+                                onclick="showUserStockOpnames(${row.id})"
+                                title="Lihat transaksi Stock Opname ${AuthUI.escapeHtml(row.name)}">
+                                <i class="mdi mdi-clipboard-text-clock-outline"></i>
+                                <strong>${count}</strong>
+                                <span>transaksi</span>
+                            </button>
+                        `;
+                    }
+                },
+                {
                     data: 'status',
                     name: 'status',
                     render: function(data, type, row) {
@@ -287,6 +306,120 @@
                         Swal.fire('Gagal', 'Terjadi kesalahan saat menghapus user.', 'error');
                     }
                 });
+            });
+        }
+
+        function formatOpnameDate(value, includeTime = false) {
+            if (!value) return '-';
+
+            const parsed = new Date(String(value).replace(' ', 'T'));
+            if (Number.isNaN(parsed.getTime())) return AuthUI.escapeHtml(value);
+
+            const options = includeTime
+                ? { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }
+                : { day: '2-digit', month: 'short', year: 'numeric' };
+
+            return new Intl.DateTimeFormat('id-ID', options).format(parsed);
+        }
+
+        function opnameStatusClass(status) {
+            return {
+                counting: 'is-counting',
+                awaiting_verification: 'is-waiting',
+                awaiting_approval: 'is-waiting',
+                approved: 'is-approved',
+                adjusted: 'is-completed'
+            }[status] || 'is-draft';
+        }
+
+        function renderUserStockOpnames(response) {
+            const transactions = response.transactions || [];
+            const summary = response.summary || {};
+            const safeName = AuthUI.escapeHtml(response.user?.name || 'User');
+            const safeEmail = AuthUI.escapeHtml(response.user?.email || '');
+
+            $('#userStockOpnamesModalLabel').text(`Transaksi Stock Opname - ${response.user?.name || 'User'}`);
+            $('#userStockOpnamesSubtitle').html(
+                `Riwayat keterlibatan <strong>${safeName}</strong>${safeEmail ? ` (${safeEmail})` : ''}.`
+            );
+
+            ['total', 'counting', 'waiting', 'completed'].forEach(function(key) {
+                $(`#userStockOpnamesSummary [data-summary="${key}"]`).text(Number(summary[key]) || 0);
+            });
+
+            $('#userStockOpnamesSummary').prop('hidden', false);
+
+            if (!transactions.length) {
+                $('#userStockOpnamesEmpty').prop('hidden', false);
+                $('#userStockOpnamesTableWrap').prop('hidden', true);
+                return;
+            }
+
+            const rows = transactions.map(function(transaction) {
+                const roleBadges = (transaction.roles || []).map(function(role) {
+                    return `<span class="user-opname-role">${AuthUI.escapeHtml(role)}</span>`;
+                }).join('');
+                const countedItems = Number(transaction.counted_items) > 0
+                    ? `<small><i class="mdi mdi-format-list-checks"></i> ${Number(transaction.counted_items)} item dihitung</small>`
+                    : '';
+                const lastActivity = (transaction.activities || [])[0];
+                const activityHtml = lastActivity
+                    ? `<strong>${AuthUI.escapeHtml(lastActivity.label)}</strong>
+                       <small>${formatOpnameDate(lastActivity.performed_at, true)}</small>
+                       ${lastActivity.note ? `<span title="${AuthUI.escapeHtml(lastActivity.note)}">${AuthUI.escapeHtml(lastActivity.note)}</span>` : ''}`
+                    : '<span class="auth-muted">Aktivitas tidak tercatat</span>';
+
+                return `
+                    <tr>
+                        <td>
+                            <div class="user-opname-primary">
+                                <strong>${AuthUI.escapeHtml(transaction.nomor)}</strong>
+                                <small><i class="mdi mdi-calendar-blank-outline"></i> ${formatOpnameDate(transaction.tanggal_opname)}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="user-opname-primary">
+                                <strong>${AuthUI.escapeHtml(transaction.branch)}</strong>
+                                <small><i class="mdi mdi-map-marker-outline"></i> ${AuthUI.escapeHtml(transaction.lokasi)}</small>
+                            </div>
+                        </td>
+                        <td><span class="user-opname-status ${opnameStatusClass(transaction.status)}">${AuthUI.escapeHtml(transaction.status_label)}</span></td>
+                        <td><div class="user-opname-roles">${roleBadges || '<span class="auth-muted">Pelaksana</span>'}${countedItems}</div></td>
+                        <td><div class="user-opname-activity">${activityHtml}</div></td>
+                    </tr>
+                `;
+            }).join('');
+
+            $('#userStockOpnamesRows').html(rows);
+            $('#userStockOpnamesEmpty').prop('hidden', true);
+            $('#userStockOpnamesTableWrap').prop('hidden', false);
+        }
+
+        window.showUserStockOpnames = function(userId) {
+            const modal = $('#userStockOpnamesModal');
+
+            $('#userStockOpnamesModalLabel').text('Transaksi Stock Opname');
+            $('#userStockOpnamesSubtitle').text('Riwayat keterlibatan user dalam Stock Opname.');
+            $('#userStockOpnamesRows').empty();
+            $('#userStockOpnamesSummary, #userStockOpnamesEmpty, #userStockOpnamesTableWrap').prop('hidden', true);
+            $('#userStockOpnamesLoading').prop('hidden', false);
+            modal.modal('show');
+
+            $.ajax({
+                url: "{{ route('users.stockOpnames', ':id') }}".replace(':id', userId),
+                type: 'GET',
+                success: renderUserStockOpnames,
+                error: function(xhr) {
+                    modal.modal('hide');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: xhr.responseJSON?.message || 'Transaksi Stock Opname user gagal dimuat.'
+                    });
+                },
+                complete: function() {
+                    $('#userStockOpnamesLoading').prop('hidden', true);
+                }
             });
         }
 

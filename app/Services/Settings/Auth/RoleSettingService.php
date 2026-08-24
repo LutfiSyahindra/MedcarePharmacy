@@ -52,6 +52,8 @@ class RoleSettingService
                         'pos_scope' => $this->scope($setting['pos_scope'] ?? null),
                         'is_approver' => (bool) ($setting['is_approver'] ?? false),
                         'approval_scope' => $this->scope($setting['approval_scope'] ?? null),
+                        'is_stock_opname_validator' => (bool) ($setting['is_stock_opname_validator'] ?? false),
+                        'can_view_stock_during_opname' => (bool) ($setting['can_view_stock_during_opname'] ?? false),
                         'receives_notifications' => (bool) ($setting['receives_notifications'] ?? false),
                         'notification_scope' => $this->scope($setting['notification_scope'] ?? null),
                     ]
@@ -113,6 +115,32 @@ class RoleSettingService
             fn (array $setting) => $setting['is_approver']
                 && $setting['approval_scope'] === self::ALL_BRANCHES
         );
+    }
+
+    public function userIsStockOpnameValidator(?User $user): bool
+    {
+        return $this->userSettings($user)
+            ->contains(fn (array $setting) => $setting['is_stock_opname_validator']);
+    }
+
+    public function canValidateStockOpnameBranch(?User $user, ?int $branchId): bool
+    {
+        return $branchId !== null
+            && $this->userIsStockOpnameValidator($user)
+            && in_array($branchId, BranchAccess::userBranchIds($user), true);
+    }
+
+    public function stockOpnameValidationBranchIds(?User $user): array
+    {
+        return $this->userIsStockOpnameValidator($user)
+            ? BranchAccess::userBranchIds($user)
+            : [];
+    }
+
+    public function userCanViewStockDuringOpname(?User $user): bool
+    {
+        return $this->userSettings($user)
+            ->contains(fn (array $setting) => $setting['can_view_stock_during_opname']);
     }
 
     public function canApproveBranch(?User $user, ?int $branchId): bool
@@ -244,6 +272,8 @@ class RoleSettingService
             'pos_scope' => $this->scope($setting->pos_scope),
             'is_approver' => (bool) $setting->is_approver,
             'approval_scope' => $this->scope($setting->approval_scope),
+            'is_stock_opname_validator' => (bool) $setting->is_stock_opname_validator,
+            'can_view_stock_during_opname' => (bool) $setting->can_view_stock_during_opname,
             'receives_notifications' => (bool) $setting->receives_notifications,
             'notification_scope' => $this->scope($setting->notification_scope),
         ];
@@ -253,6 +283,7 @@ class RoleSettingService
     {
         $key = strtolower(trim($roleName));
         $isDefaultApprover = in_array($key, ['admin', 'apoteker'], true);
+        $isDefaultStockOpnameValidator = in_array($key, ['admin', 'apoteker', 'super admin'], true);
 
         return [
             'can_view_all_branches' => in_array($key, ['admin', 'super admin'], true),
@@ -261,6 +292,8 @@ class RoleSettingService
                 : self::SAME_BRANCH,
             'is_approver' => $isDefaultApprover,
             'approval_scope' => self::SAME_BRANCH,
+            'is_stock_opname_validator' => $isDefaultStockOpnameValidator,
+            'can_view_stock_during_opname' => false,
             'receives_notifications' => false,
             'notification_scope' => self::SAME_BRANCH,
         ];

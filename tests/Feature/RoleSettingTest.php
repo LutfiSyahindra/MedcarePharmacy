@@ -46,6 +46,8 @@ class RoleSettingTest extends TestCase
                         'pos_scope' => 'all_branches',
                         'is_approver' => true,
                         'approval_scope' => 'all_branches',
+                        'is_stock_opname_validator' => true,
+                        'can_view_stock_during_opname' => true,
                         'receives_notifications' => false,
                         'notification_scope' => 'same_branch',
                     ],
@@ -55,6 +57,8 @@ class RoleSettingTest extends TestCase
                         'pos_scope' => 'same_branch',
                         'is_approver' => false,
                         'approval_scope' => 'same_branch',
+                        'is_stock_opname_validator' => false,
+                        'can_view_stock_during_opname' => false,
                         'receives_notifications' => true,
                         'notification_scope' => 'same_branch',
                     ],
@@ -64,11 +68,15 @@ class RoleSettingTest extends TestCase
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('summary.pos_all_branch', 1)
             ->assertJsonPath('summary.approver', 1)
+            ->assertJsonPath('summary.stock_opname_validator', 1)
+            ->assertJsonPath('summary.stock_opname_stock_viewer', 1)
             ->assertJsonPath('summary.notification', 1);
 
         $this->assertDatabaseHas('role_settings', [
             'role_id' => $userRole->id,
             'pos_scope' => 'same_branch',
+            'is_stock_opname_validator' => false,
+            'can_view_stock_during_opname' => false,
             'receives_notifications' => true,
             'notification_scope' => 'same_branch',
         ]);
@@ -156,5 +164,32 @@ class RoleSettingTest extends TestCase
         $setting->update(['pos_scope' => 'all_branches']);
 
         $this->assertEqualsCanonicalizing([$branchA->id, $branchB->id], $posService->transactionBranchIds($user));
+    }
+
+    public function test_stock_opname_validator_and_stock_view_access_are_independent_from_approval(): void
+    {
+        $branch = BranchModel::create(['code' => 'SO', 'name' => 'Branch Opname']);
+        $role = Role::create(['name' => 'Validator Inventori', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->branches()->attach($branch->id);
+        $user->assignRole($role);
+
+        RoleSetting::create([
+            'role_id' => $role->id,
+            'can_view_all_branches' => false,
+            'pos_scope' => 'same_branch',
+            'is_approver' => false,
+            'approval_scope' => 'same_branch',
+            'is_stock_opname_validator' => true,
+            'can_view_stock_during_opname' => true,
+            'receives_notifications' => false,
+            'notification_scope' => 'same_branch',
+        ]);
+
+        $service = app(RoleSettingService::class);
+
+        $this->assertFalse($service->userIsApprover($user));
+        $this->assertTrue($service->canValidateStockOpnameBranch($user, $branch->id));
+        $this->assertTrue($service->userCanViewStockDuringOpname($user));
     }
 }

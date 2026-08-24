@@ -21,6 +21,7 @@
     <div class="auth-page">
         @include("medcare.settings.auth.users.modalMain")
         @include("medcare.settings.auth.users.modalAssignRoles")
+        @include("medcare.settings.auth.users.modalStockOpnames")
         @include("medcare.settings.auth.partials.header")
 
         <div class="auth-stats-grid">
@@ -76,6 +77,7 @@
                             <th>No</th>
                             <th>User</th>
                             <th>Email</th>
+                            <th>Transaksi Opname</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>

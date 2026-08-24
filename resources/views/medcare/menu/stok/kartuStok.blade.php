@@ -124,6 +124,8 @@
                     <option value="expired">Obat Expired</option>
                     <option value="penyesuaian_masuk">Penyesuaian Masuk</option>
                     <option value="penyesuaian_keluar">Penyesuaian Keluar</option>
+                    <option value="penyesuaian_opname_masuk">Stock Opname Masuk</option>
+                    <option value="penyesuaian_opname_keluar">Stock Opname Keluar</option>
                     <option value="pembatalan_penerimaan">Pembatalan Penerimaan</option>
                     <option value="penjualan">Penjualan POS</option>
                     <option value="pembatalan_penjualan">Pembatalan Penjualan</option>

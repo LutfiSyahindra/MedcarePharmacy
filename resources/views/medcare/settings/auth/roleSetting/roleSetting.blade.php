@@ -11,6 +11,8 @@
         $allBranchCount = $roles->where("can_view_all_branches", true)->count();
         $posAllBranchCount = $roles->where("pos_scope", "all_branches")->count();
         $approverCount = $roles->where("is_approver", true)->count();
+        $stockOpnameValidatorCount = $roles->where("is_stock_opname_validator", true)->count();
+        $stockDuringOpnameViewerCount = $roles->where("can_view_stock_during_opname", true)->count();
         $notificationCount = $roles->where("receives_notifications", true)->count();
     @endphp
 
@@ -27,7 +29,7 @@
             <div class="role-setting-hero-copy">
                 <span class="role-setting-kicker"><i class="mdi mdi-shield-key-outline"></i> Pusat kontrol akses</span>
                 <h1>Role Setting</h1>
-                <p>Kelola akses data, POS, approval, dan distribusi notifikasi berdasarkan role dan branch.</p>
+                <p>Kelola akses data, POS, approval, Stok Opname, dan distribusi notifikasi berdasarkan role dan branch.</p>
             </div>
             <div class="role-setting-hero-action">
                 <span class="role-setting-save-state" id="roleSettingSaveState">
@@ -65,6 +67,14 @@
                     <div><strong id="approverCount">{{ $approverCount }}</strong><small>Role approval</small></div>
                 </article>
                 <article>
+                    <span class="is-opname-validator"><i class="mdi mdi-clipboard-check-outline"></i></span>
+                    <div><strong id="stockOpnameValidatorCount">{{ $stockOpnameValidatorCount }}</strong><small>Validator opname</small></div>
+                </article>
+                <article>
+                    <span class="is-opname-stock"><i class="mdi mdi-database-eye-outline"></i></span>
+                    <div><strong id="stockDuringOpnameViewerCount">{{ $stockDuringOpnameViewerCount }}</strong><small>Akses stok saat opname</small></div>
+                </article>
+                <article>
                     <span class="is-notification"><i class="mdi mdi-bell-ring-outline"></i></span>
                     <div><strong id="notificationRoleCount">{{ $notificationCount }}</strong><small>Penerima notifikasi</small></div>
                 </article>
@@ -81,6 +91,7 @@
                 <span><i class="mdi mdi-database-outline"></i> Data</span>
                 <span><i class="mdi mdi-point-of-sale"></i> POS</span>
                 <span><i class="mdi mdi-check-decagram-outline"></i> Approval</span>
+                <span><i class="mdi mdi-clipboard-check-outline"></i> Stok Opname</span>
                 <span><i class="mdi mdi-bell-outline"></i> Notifikasi</span>
             </div>
         </section>
@@ -97,6 +108,8 @@
                 <div class="role-setting-filters" role="group" aria-label="Filter role">
                     <button type="button" class="is-active" data-role-filter="all">Semua</button>
                     <button type="button" data-role-filter="approver">Approval</button>
+                    <button type="button" data-role-filter="opname-validator">Validator opname</button>
+                    <button type="button" data-role-filter="opname-stock">Akses stok saat opname</button>
                     <button type="button" data-role-filter="all-branch">Data lintas branch</button>
                     <button type="button" data-role-filter="pos-all">POS lintas branch</button>
                     <button type="button" data-role-filter="notification">Notifikasi</button>
@@ -127,6 +140,8 @@
                                     <span class="role-setting-status js-status-data"></span>
                                     <span class="role-setting-status js-status-pos"></span>
                                     <span class="role-setting-status js-status-approval"></span>
+                                    <span class="role-setting-status js-status-opname-validator"></span>
+                                    <span class="role-setting-status js-status-opname-stock"></span>
                                     <span class="role-setting-status js-status-notification"></span>
                                 </div>
                             </header>
@@ -211,6 +226,46 @@
                                         <label for="approvalAllBranch{{ $index }}"><i class="mdi mdi-earth"></i> Semua branch</label>
                                     </div>
                                     <span class="role-setting-feature-off"><i class="mdi mdi-information-outline"></i> Approval nonaktif; scope tetap tersimpan.</span>
+                                </fieldset>
+
+                                <fieldset class="role-setting-feature is-opname-validator js-opname-validator-panel">
+                                    <legend class="visually-hidden">Validator Stok Opname {{ $role["name"] }}</legend>
+                                    <div class="role-setting-feature-head">
+                                        <span><i class="mdi mdi-clipboard-check-outline"></i></span>
+                                        <div>
+                                            <strong>Validator Stok Opname</strong>
+                                            <small>Memvalidasi selisih dan rekonsiliasi transaksi pada branch yang dapat diakses</small>
+                                        </div>
+                                        <label class="role-setting-switch" title="Jadikan validator Stok Opname">
+                                            <input type="hidden" name="settings[{{ $index }}][is_stock_opname_validator]" value="0">
+                                            <input type="checkbox" class="js-opname-validator"
+                                                name="settings[{{ $index }}][is_stock_opname_validator]" value="1"
+                                                @checked($role["is_stock_opname_validator"])>
+                                            <i aria-hidden="true"></i>
+                                            <span class="visually-hidden">Jadikan {{ $role["name"] }} validator Stok Opname</span>
+                                        </label>
+                                    </div>
+                                    <span class="role-setting-feature-off"><i class="mdi mdi-information-outline"></i> Role tidak dapat menjalankan validasi Stok Opname.</span>
+                                </fieldset>
+
+                                <fieldset class="role-setting-feature is-opname-stock js-opname-stock-panel">
+                                    <legend class="visually-hidden">Akses Stok Saat Opname {{ $role["name"] }}</legend>
+                                    <div class="role-setting-feature-head">
+                                        <span><i class="mdi mdi-database-eye-outline"></i></span>
+                                        <div>
+                                            <strong>Lihat Stok Saat Opname</strong>
+                                            <small>Tetap dapat membuka Stok Barang dan Kartu Stok dalam mode baca selama blind count</small>
+                                        </div>
+                                        <label class="role-setting-switch" title="Izinkan melihat stok saat opname">
+                                            <input type="hidden" name="settings[{{ $index }}][can_view_stock_during_opname]" value="0">
+                                            <input type="checkbox" class="js-opname-stock"
+                                                name="settings[{{ $index }}][can_view_stock_during_opname]" value="1"
+                                                @checked($role["can_view_stock_during_opname"])>
+                                            <i aria-hidden="true"></i>
+                                            <span class="visually-hidden">Izinkan {{ $role["name"] }} melihat stok saat opname</span>
+                                        </label>
+                                    </div>
+                                    <span class="role-setting-feature-off"><i class="mdi mdi-information-outline"></i> Stok Barang dan Kartu Stok dikunci selama blind count.</span>
                                 </fieldset>
 
                                 <fieldset class="role-setting-feature is-notification js-notification-panel">

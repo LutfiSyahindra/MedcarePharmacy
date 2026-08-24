@@ -37,12 +37,28 @@
                     <i class="mdi mdi-card-bulleted-outline"></i>
                     Kartu Stok
                 </a>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mutasiStokModal">
-                    <i class="mdi mdi-plus-circle-outline"></i>
-                    Catat Mutasi
-                </button>
+                <a href="{{ route('stockOpname.index') }}" class="btn btn-outline-primary">
+                    <i class="mdi mdi-clipboard-check-multiple-outline"></i>
+                    Stock Opname
+                </a>
+                @unless ($stockOpnameReadOnly)
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mutasiStokModal">
+                        <i class="mdi mdi-plus-circle-outline"></i>
+                        Catat Mutasi
+                    </button>
+                @endunless
             </div>
         </section>
+
+        @if ($stockOpnameReadOnly)
+            <div class="alert alert-warning d-flex align-items-start gap-2" role="status">
+                <i class="mdi mdi-eye-lock-outline fs-4"></i>
+                <div>
+                    <strong>Mode baca selama Stok Opname</strong>
+                    <div>Role Anda tetap dapat melihat stok, tetapi perubahan harga dan mutasi dinonaktifkan selama {{ $activeStockOpname?->nomor }} berlangsung di {{ $activeStockOpname?->branch?->name }}.</div>
+                </div>
+            </div>
+        @endif
 
         <div class="stock-stat-grid">
             <article class="stock-stat">

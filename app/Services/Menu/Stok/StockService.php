@@ -14,6 +14,9 @@ use App\Models\Menu\Penjualan\ReturPenjualanDetailModel;
 use App\Models\Menu\Penjualan\ReturPenjualanModel;
 use App\Models\Menu\Stok\KartuStokModel;
 use App\Models\Menu\Stok\RiwayatHargaModel;
+use App\Models\Menu\Stok\StockOpnameDetailModel;
+use App\Models\Menu\Stok\StockOpnameModel;
+use App\Models\Menu\Stok\StockOpnameMovementModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Settings\Margins\MarginsService;
 use App\Support\BranchAccess;
@@ -189,6 +192,45 @@ class StockService
         }
 
         return $this->recordMovement($payload);
+    }
+
+    public function recordStockOpnameAdjustment(
+        StockOpnameModel $opname,
+        StockOpnameDetailModel $detail,
+        ?int $createdBy = null
+    ): KartuStokModel {
+        $difference = round((float) ($detail->selisih_validasi ?? $detail->selisih), 2);
+        $batchNumber = $detail->stok_batch_id
+            ? $detail->no_batch
+            : 'SO-'.$opname->id.'-'.$detail->obat_id;
+
+        if (abs($difference) < 0.005) {
+            throw ValidationException::withMessages([
+                'selisih' => 'Baris tanpa selisih tidak memerlukan penyesuaian.',
+            ]);
+        }
+
+        return $this->recordMovement([
+            'branch_id' => $opname->branch_id,
+            'obat_id' => $detail->obat_id,
+            'stok_batch_id' => $detail->stok_batch_id,
+            'no_batch' => $batchNumber,
+            'expired_date' => $detail->expired_date,
+            'qty' => abs($difference),
+            'harga_beli' => (float) ($detail->hpp ?? 0),
+            'preserve_batch_cost' => true,
+            'bypass_stock_opname_lock' => true,
+            'skip_stock_opname_tracking' => true,
+            'jenis_mutasi' => $difference > 0 ? 'penyesuaian_opname_masuk' : 'penyesuaian_opname_keluar',
+            'tanggal_mutasi' => now(),
+            'reference_type' => StockOpnameModel::class,
+            'reference_id' => $opname->id,
+            'reference_detail_id' => $detail->id,
+            'nomor_referensi' => $opname->nomor,
+            'keterangan' => 'Penyesuaian stock opname '.$opname->nomor.' - '.$detail->nama_obat
+                .' batch '.$batchNumber.'. Alasan: '.($detail->alasan_selisih ?: '-'),
+            'created_by' => $createdBy ?: Auth::id(),
+        ]);
     }
 
     public function recordSaleOutbound(
@@ -383,6 +425,18 @@ class StockService
         $diskon = $hasDiscountPayload ? $this->discountPercent($payload['diskon']) : 0;
         $ppn = $hasTaxPayload ? $this->percent($payload['ppn']) : 0;
         $obat = MasterObatModel::lockForUpdate()->findOrFail($payload['obat_id']);
+        $activeOpnames = $this->activeStockOpnamesFor($branchId, $obat->rak_id);
+
+        if (empty($payload['bypass_stock_opname_lock'])) {
+            $frozenOpname = $activeOpnames->first(fn ($opname) => in_array($opname->status, StockOpnameModel::lockingStatuses(), true));
+
+            if ($frozenOpname) {
+                throw ValidationException::withMessages([
+                    'stok' => 'Stok sedang dibekukan oleh stock opname '.$frozenOpname->nomor.'.',
+                ]);
+            }
+        }
+
         $batch = $this->resolveBatch($payload, $obat, $isInbound, $tanggalMutasi, $diskon, $ppn, $branchId, $hasDiscountPayload, $hasTaxPayload);
         $diskon = $hasDiscountPayload ? $diskon : (float) ($batch->diskon ?? 0);
         $ppn = $hasTaxPayload ? $ppn : (float) ($batch->ppn ?? 0);
@@ -421,7 +475,7 @@ class StockService
             ->where('obat_id', $obat->id)
             ->sum('qty');
 
-        return KartuStokModel::create([
+        $movement = KartuStokModel::create([
             'branch_id' => $branchId,
             'obat_id' => $obat->id,
             'stok_batch_id' => $batch->id,
@@ -441,6 +495,97 @@ class StockService
             'keterangan' => $payload['keterangan'] ?? null,
             'created_by' => $payload['created_by'] ?? Auth::id(),
         ]);
+
+        if (empty($payload['skip_stock_opname_tracking'])) {
+            $this->trackStockOpnameMovements($activeOpnames, $movement);
+        }
+
+        return $movement;
+    }
+
+    private function activeStockOpnamesFor(int $branchId, ?int $rackId)
+    {
+        return StockOpnameModel::query()
+            ->where('branch_id', $branchId)
+            ->whereIn('status', StockOpnameModel::activeStatuses())
+            ->where(function ($query) use ($rackId) {
+                $query->whereNull('rak_id');
+
+                if ($rackId !== null) {
+                    $query->orWhere('rak_id', $rackId);
+                }
+            })
+            ->get();
+    }
+
+    private function trackStockOpnameMovements($activeOpnames, KartuStokModel $movement): void
+    {
+        foreach ($activeOpnames as $opname) {
+            $detail = StockOpnameDetailModel::query()
+                ->where('stock_opname_id', $opname->id)
+                ->where('stok_batch_id', $movement->stok_batch_id)
+                ->first();
+
+            if (! $detail) {
+                $detail = StockOpnameDetailModel::query()
+                    ->where('stock_opname_id', $opname->id)
+                    ->where('obat_id', $movement->obat_id)
+                    ->whereNull('stok_batch_id')
+                    ->first();
+
+                if ($detail) {
+                    $detail->forceFill([
+                        'stok_batch_id' => $movement->stok_batch_id,
+                        'no_batch' => $movement->no_batch,
+                        'expired_date' => $movement->expired_date,
+                        'hpp' => $movement->harga_beli,
+                    ])->save();
+                }
+            }
+
+            if (! $detail) {
+                $batch = StokBatchModel::with(['obat.satuan'])->find($movement->stok_batch_id);
+                $countingClosed = $opname->status !== StockOpnameModel::STATUS_COUNTING;
+
+                $detail = StockOpnameDetailModel::firstOrCreate(
+                    [
+                        'stock_opname_id' => $opname->id,
+                        'stok_batch_id' => $movement->stok_batch_id,
+                    ],
+                    [
+                        'obat_id' => $movement->obat_id,
+                        'rak_id' => $batch?->obat?->rak_id,
+                        'kode_obat' => $batch?->obat?->kode_obat,
+                        'nama_obat' => $batch?->obat?->nama_obat ?: 'Obat #'.$movement->obat_id,
+                        'satuan' => $batch?->obat?->satuan?->nama,
+                        'no_batch' => $movement->no_batch ?: ($batch?->no_batch ?: '-'),
+                        'expired_date' => $movement->expired_date,
+                        'hpp' => $movement->harga_beli,
+                        'stok_sistem_awal' => 0,
+                        'stok_sistem_hitung' => $countingClosed ? 0 : null,
+                        'stok_fisik' => $countingClosed ? 0 : null,
+                        'selisih' => $countingClosed ? 0 : null,
+                        'alasan_selisih' => $countingClosed ? 'Batch masuk setelah periode penghitungan fisik.' : null,
+                        'counted_by' => $countingClosed ? $opname->submitted_by : null,
+                        'counted_at' => $countingClosed ? ($opname->submitted_at ?: now()) : null,
+                    ]
+                );
+            }
+
+            StockOpnameMovementModel::firstOrCreate(
+                ['kartu_stok_id' => $movement->id],
+                [
+                    'stock_opname_id' => $opname->id,
+                    'stock_opname_detail_id' => $detail->id,
+                    'stok_batch_id' => $movement->stok_batch_id,
+                    'jenis_mutasi' => $movement->jenis_mutasi,
+                    'qty_masuk' => $movement->qty_masuk,
+                    'qty_keluar' => $movement->qty_keluar,
+                    'saldo_batch' => $movement->saldo_batch,
+                    'occurred_at' => $movement->tanggal_mutasi,
+                ]
+            );
+        }
     }
 
     private function resolveBatch(
@@ -689,6 +834,7 @@ class StockService
         return in_array($jenisMutasi, [
             'masuk',
             'penyesuaian_masuk',
+            'penyesuaian_opname_masuk',
             'pembatalan_retur_pembelian',
             'pembatalan_penjualan',
             'retur_penjualan',

@@ -441,6 +441,192 @@
         background: #fff7e8 !important;
     }
 
+    .user-opname-count {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border: 1px solid var(--auth-border);
+        border-radius: 999px;
+        padding: .35rem .65rem;
+        color: var(--auth-muted);
+        background: #f8fafc;
+        font-size: .76rem;
+        transition: border-color .16s ease, color .16s ease, background .16s ease, transform .16s ease;
+    }
+
+    .user-opname-count strong {
+        color: inherit;
+        font-size: .85rem;
+    }
+
+    .user-opname-count.has-transactions {
+        border-color: rgba(37, 99, 235, .2);
+        color: var(--auth-primary-strong);
+        background: var(--auth-soft);
+    }
+
+    .user-opname-count:hover {
+        transform: translateY(-1px);
+        border-color: rgba(37, 99, 235, .38);
+        color: var(--auth-primary-strong);
+    }
+
+    .user-opname-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+        margin-bottom: 1rem;
+    }
+
+    .user-opname-summary article {
+        display: flex;
+        align-items: center;
+        gap: .65rem;
+        border: 1px solid var(--auth-border);
+        border-radius: 8px;
+        padding: .8rem;
+        background: #fff;
+    }
+
+    .user-opname-summary article > span {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--auth-primary-strong);
+        background: var(--auth-soft);
+        font-size: 1.05rem;
+    }
+
+    .user-opname-summary strong,
+    .user-opname-summary small {
+        display: block;
+    }
+
+    .user-opname-summary strong {
+        color: var(--auth-text);
+        font-size: 1.1rem;
+        line-height: 1.1;
+    }
+
+    .user-opname-summary small {
+        margin-top: .15rem;
+        color: var(--auth-muted);
+    }
+
+    .user-opname-state {
+        display: flex;
+        min-height: 180px;
+        align-items: center;
+        justify-content: center;
+        gap: .55rem;
+        color: var(--auth-primary-strong);
+    }
+
+    .user-opname-state.is-empty {
+        flex-direction: column;
+        text-align: center;
+        color: var(--auth-muted);
+    }
+
+    .user-opname-state.is-empty i {
+        font-size: 2.4rem;
+        color: #94a3b8;
+    }
+
+    .user-opname-state.is-empty strong {
+        color: var(--auth-text);
+        font-size: 1rem;
+    }
+
+    .user-opname-table-wrap {
+        border: 1px solid var(--auth-border);
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .user-opname-primary,
+    .user-opname-roles,
+    .user-opname-activity {
+        display: flex;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .25rem;
+    }
+
+    .user-opname-primary strong,
+    .user-opname-activity strong {
+        color: var(--auth-text);
+    }
+
+    .user-opname-primary small,
+    .user-opname-roles small,
+    .user-opname-activity small {
+        color: var(--auth-muted);
+    }
+
+    .user-opname-activity span {
+        display: block;
+        max-width: 280px;
+        overflow: hidden;
+        color: var(--auth-muted);
+        font-size: .75rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .user-opname-roles {
+        max-width: 240px;
+        flex-flow: row wrap;
+    }
+
+    .user-opname-roles small {
+        width: 100%;
+    }
+
+    .user-opname-role,
+    .user-opname-status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .27rem .5rem;
+        font-size: .7rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .user-opname-role {
+        color: #5b21b6;
+        background: #f3e8ff;
+    }
+
+    .user-opname-status.is-draft {
+        color: #475569;
+        background: #e2e8f0;
+    }
+
+    .user-opname-status.is-counting {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .user-opname-status.is-waiting {
+        color: #92400e;
+        background: #fef3c7;
+    }
+
+    .user-opname-status.is-approved {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .user-opname-status.is-completed {
+        color: #1e40af;
+        background: #dbeafe;
+    }
+
     .auth-table-meta,
     .auth-table-footer {
         display: flex;
@@ -694,6 +880,10 @@
         .auth-search {
             min-width: 100%;
         }
+
+        .user-opname-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 575.98px) {
@@ -712,6 +902,10 @@
 
         .auth-table-section .table-responsive {
             padding: 0 .75rem .75rem;
+        }
+
+        .user-opname-summary {
+            grid-template-columns: 1fr;
         }
     }
 </style>

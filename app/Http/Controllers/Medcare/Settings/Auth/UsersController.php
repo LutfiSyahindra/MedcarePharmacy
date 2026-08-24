@@ -11,12 +11,16 @@ use Yajra\DataTables\Facades\DataTables;
 
 class UsersController extends Controller
 {
-    protected $UserService, $RolesService;
+    protected $UserService;
+
+    protected $RolesService;
+
     public function __construct(UserService $UserService, RolesService $RolesService)
     {
         $this->UserService = $UserService;
         $this->RolesService = $RolesService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -34,45 +38,43 @@ class UsersController extends Controller
                 'id' => $r['id'],
                 'name' => $r['name'],
                 'email' => $r['email'],
-                'branch_id' => $r['branch_id']??'',
+                'branch_id' => $r['branch_id'] ?? '',
                 'status' => $r['status'],
+                'stock_opname_transactions_count' => (int) ($r['stock_opname_transactions_count'] ?? 0),
             ];
         }
 
         return DataTables::of($dataUsers)
-        ->addIndexColumn()
-        ->addColumn('actions', function ($dataUsers) {
-            return '
+            ->addIndexColumn()
+            ->addColumn('actions', function ($dataUsers) {
+                return '
                 <div class="auth-action-group">
-                    <button type="button" class="btn auth-action-btn auth-action-edit" title="Edit user" onclick="editUsers(' . $dataUsers['id'] . ')"> 
+                    <button type="button" class="btn auth-action-btn auth-action-edit" title="Edit user" onclick="editUsers('.$dataUsers['id'].')">
                         <i class="mdi mdi-pencil-outline"></i>
                     </button> 
-                    <button type="button" class="btn auth-action-btn auth-action-delete" title="Hapus user" onclick="deleteUsers(' . $dataUsers['id'] . ')">  
+                    <button type="button" class="btn auth-action-btn auth-action-delete" title="Hapus user" onclick="deleteUsers('.$dataUsers['id'].')">
                         <i class="mdi mdi-delete-outline"></i>
                     </button>
-                    <button type="button" class="btn auth-action-btn auth-action-assign" title="Assign role" onclick="assignRoles(' . $dataUsers['id'] . ')">  
+                    <button type="button" class="btn auth-action-btn auth-action-assign" title="Assign role" onclick="assignRoles('.$dataUsers['id'].')">
                         <i class="mdi mdi-account-key-outline"></i>
                     </button>
                 </div>
             ';
-        })
-
-        ->rawColumns(['actions'])
-        ->make(true);
+            })
+            ->rawColumns(['actions'])
+            ->make(true);
 
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->UserService->updateStatus($request->id, $request->status);
     }
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Request $request)
-    {
-        
-    }
+    public function create(Request $request) {}
 
     /**
      * Store a newly created resource in storage.
@@ -92,10 +94,9 @@ class UsersController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'User berhasil dibuat',
-            'data' => $user
+            'data' => $user,
         ]);
     }
-
 
     /**
      * Display the specified resource.
@@ -111,6 +112,7 @@ class UsersController extends Controller
     public function edit(string $id)
     {
         $dataUsers = $this->UserService->findById($id);
+
         return response()->json($dataUsers);
     }
 
@@ -122,7 +124,7 @@ class UsersController extends Controller
         // Validasi input
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
+            'email' => 'required|email|unique:users,email,'.$id,
             'password' => 'nullable|string|min:6',
         ]);
 
@@ -134,19 +136,18 @@ class UsersController extends Controller
         // Panggil service untuk update
         $user = $this->UserService->update($id, $validated);
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'message' => 'User tidak ditemukan.'
+                'message' => 'User tidak ditemukan.',
             ], 404);
         }
 
         return response()->json([
             'status' => 'success',
             'message' => 'User berhasil diperbarui.',
-            'data' => $user
+            'data' => $user,
         ], 200);
     }
-
 
     /**
      * Remove the specified resource from storage.
@@ -155,21 +156,24 @@ class UsersController extends Controller
     {
         try {
             $this->UserService->destroy($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'User berhasil dihapus.'
+                'message' => 'User berhasil dihapus.',
             ]);
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
     }
 
-    public function dataRoles(){
+    public function dataRoles()
+    {
         $Roles = $this->RolesService->getRoles();
+
         return response()->json($Roles);
     }
 
@@ -189,7 +193,7 @@ class UsersController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Role berhasil di-assign ke user.'
+            'message' => 'Role berhasil di-assign ke user.',
         ]);
     }
 
@@ -199,7 +203,12 @@ class UsersController extends Controller
 
         return response()->json([
             'status' => true,
-            'data' => $Roles->pluck('id') // hanya kirim array ID
+            'data' => $Roles->pluck('id'), // hanya kirim array ID
         ]);
+    }
+
+    public function stockOpnameTransactions(int $id)
+    {
+        return response()->json($this->UserService->getStockOpnameTransactions($id));
     }
 }

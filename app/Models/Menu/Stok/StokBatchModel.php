@@ -46,6 +46,11 @@ class StokBatchModel extends Model
         return $this->hasMany(RiwayatHargaModel::class, 'stok_batch_id');
     }
 
+    public function stockOpnameDetails()
+    {
+        return $this->hasMany(StockOpnameDetailModel::class, 'stok_batch_id');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
