@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Medcare\DashboardController;
 use App\Http\Controllers\Medcare\MasterData\Distributor\DistributorController;
 use App\Http\Controllers\Medcare\MasterData\Golongan\GolonganController;
 use App\Http\Controllers\Medcare\MasterData\Golongan\MainGolonganController;
@@ -40,9 +41,10 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
-Route::get('/dashboard', function () {
-    return view('medcare/dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/data', [DashboardController::class, 'data'])->name('dashboard.data');
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
