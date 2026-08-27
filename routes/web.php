@@ -20,6 +20,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturContro
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
+use App\Http\Controllers\Medcare\Menu\Pasien\PatientController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\ReturPenjualanController;
 use App\Http\Controllers\Medcare\Menu\Stok\StockOpnameController;
@@ -364,6 +365,7 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('cashier.available')->group(function () {
             Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');
+            Route::get('/pos/patients', [PenjualanPosController::class, 'patients'])->name('penjualan.pos.patients');
             Route::get('/pos/products', [PenjualanPosController::class, 'products'])->name('penjualan.pos.products');
             Route::get('/pos/quote', [PenjualanPosController::class, 'quote'])->name('penjualan.pos.quote');
             Route::post('/pos/draft', [PenjualanPosController::class, 'storeDraft'])->name('penjualan.pos.draft');
@@ -375,6 +377,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
         Route::get('/pos/{id}/labels', [PenjualanPosController::class, 'labels'])->name('penjualan.pos.labels');
         Route::put('/pos/{id}/cancel', [PenjualanPosController::class, 'cancel'])->name('penjualan.pos.cancel');
+    });
+
+    Route::prefix('medcare/menu/pasien')->group(function () {
+        Route::get('/', [PatientController::class, 'index'])->name('pasien.index');
+        Route::get('/table', [PatientController::class, 'table'])->name('pasien.table');
+        Route::get('/visits', [PatientController::class, 'visits'])->name('pasien.visits');
+        Route::post('/', [PatientController::class, 'store'])->name('pasien.store');
+        Route::get('/{patient}', [PatientController::class, 'show'])->whereNumber('patient')->name('pasien.show');
+        Route::put('/{patient}', [PatientController::class, 'update'])->whereNumber('patient')->name('pasien.update');
+        Route::delete('/{patient}', [PatientController::class, 'destroy'])->whereNumber('patient')->name('pasien.destroy');
     });
 
     Route::prefix('medcare/menu/analisis-persediaan')->group(function () {

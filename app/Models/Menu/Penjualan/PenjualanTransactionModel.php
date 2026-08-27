@@ -3,6 +3,7 @@
 namespace App\Models\Menu\Penjualan;
 
 use App\Models\BranchModel;
+use App\Models\PatientModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,11 @@ class PenjualanTransactionModel extends Model
     public function branch()
     {
         return $this->belongsTo(BranchModel::class, 'branch_id');
+    }
+
+    public function patient()
+    {
+        return $this->belongsTo(PatientModel::class, 'patient_id');
     }
 
     public function details()

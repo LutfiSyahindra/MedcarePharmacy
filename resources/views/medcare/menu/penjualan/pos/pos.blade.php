@@ -328,6 +328,12 @@
                                     </select>
                                     <input type="hidden" id="jenisResep" value="penjualan_resep">
                                 </div>
+                                <div class="pos-field pos-patient-search-field">
+                                    <label for="patientSelect"><i class="mdi mdi-account-search-outline"></i> Cari pasien tersimpan</label>
+                                    <input type="hidden" id="patientId">
+                                    <select id="patientSelect" class="form-select" aria-label="Cari pasien berdasarkan nama atau nomor telepon"></select>
+                                    <small class="pos-patient-search-hint"><i class="mdi mdi-sync"></i> Nama dan nomor HP akan terisi otomatis.</small>
+                                </div>
                                 <div class="pos-field">
                                     <label for="customerName"><i class="mdi mdi-account-outline"></i> Nama pelanggan <b>*</b></label>
                                     <input type="text" id="customerName" class="form-control" placeholder="Wajib diisi" required aria-required="true" autocomplete="name">

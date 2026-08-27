@@ -47,6 +47,7 @@
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
     $stockMenuLock = $stockOpnameAccess->stockMenusAreLocked() ? $activeStockOpnameLock : null;
     $cashierOpnameLock = $activeStockOpnameLock;
+    $patientMenuActive = request()->routeIs("pasien.*");
 @endphp
 
 <!-- partial:partials/_sidebar.html -->
@@ -401,6 +402,14 @@
                         </li>
                     </ul>
                 </div>
+            </li>
+
+            <li class="nav-item">
+                <a href="{{ route("pasien.index") }}"
+                    class="nav-link {{ $patientMenuActive ? "active" : "" }}">
+                    <i class="link-icon" data-feather="user-plus"></i>
+                    <span class="link-title">Data Pasien</span>
+                </a>
             </li>
 
             <li class="nav-item">

@@ -660,6 +660,14 @@
     .pos-general-customer-button { flex: 0 0 auto; padding: 6px 8px; color: #5364bd; border: 1px solid #d5dbf4; background: #fff; font-size: 9px; }
     .pos-general-customer-button:hover { color: #3f51b3; border-color: #bec8ee; background: #f2f4ff; }
     .pos-form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; padding: 0; }
+    .pos-patient-search-field { grid-column: 1 / -1; }
+    .pos-patient-search-hint { display: flex; align-items: center; gap: 3px; margin-top: 4px; color: #7b889c; font-size: 8px; }
+    .pos-patient-search-hint i { color: #1a9b79; }
+    .pos-patient-result { display: flex; align-items: center; gap: 9px; padding: 3px 1px; }
+    .pos-patient-result > span { display: inline-flex; width: 30px; height: 30px; flex: 0 0 30px; align-items: center; justify-content: center; color: #5267c8; border-radius: 9px; background: #edf0ff; font-size: 15px; }
+    .pos-patient-result > div { display: grid; min-width: 0; }
+    .pos-patient-result strong { overflow: hidden; color: #33415b; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .pos-patient-result small { color: #7f8da2; font-size: 8px; }
 
     .pos-prescription-workspace { margin-top: 11px; overflow: hidden; border: 1px solid #cfd9f5; border-radius: 14px; background: linear-gradient(145deg, #f8faff, #f4fbfa); box-shadow: 0 8px 22px rgba(45, 65, 129, .06); transition: border-color .2s ease, box-shadow .2s ease; }
     .pos-prescription-workspace.is-ready { border-color: #a9dfce; box-shadow: 0 8px 24px rgba(24, 144, 108, .09); }

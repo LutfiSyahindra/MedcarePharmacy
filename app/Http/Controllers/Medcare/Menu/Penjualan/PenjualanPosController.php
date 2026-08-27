@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Medcare\Menu\Penjualan;
 use App\Http\Controllers\Controller;
 use App\Models\BranchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
+use App\Models\PatientModel;
 use App\Services\Menu\Penjualan\PenjualanPosService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\Facades\DataTables;
 
 class PenjualanPosController extends Controller
@@ -55,6 +57,21 @@ class PenjualanPosController extends Controller
             (int) $request->input('limit', 30),
             isset($validated['branch_id']) ? (int) $validated['branch_id'] : null
         ));
+    }
+
+    public function patients(Request $request)
+    {
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return response()->json([
+            'results' => $this->posService->searchPatients(
+                (string) ($validated['q'] ?? ''),
+                isset($validated['branch_id']) ? (int) $validated['branch_id'] : null
+            ),
+        ]);
     }
 
     public function quote(Request $request)
@@ -273,6 +290,12 @@ class PenjualanPosController extends Controller
 
     private function validatedTransactionPayload(Request $request, bool $draft): array
     {
+        if ($request->filled('customer_phone')) {
+            $request->merge([
+                'customer_phone' => PatientModel::normalizePhone($request->input('customer_phone')),
+            ]);
+        }
+
         $typeKeys = array_keys(PenjualanPosService::TRANSACTION_TYPES);
         $paymentKeys = array_keys(PenjualanPosService::PAYMENT_METHODS);
         $isPrescription = in_array($request->input('jenis_transaksi'), ['penjualan_resep', 'penjualan_racikan'], true);
@@ -287,7 +310,8 @@ class PenjualanPosController extends Controller
             'tanggal_transaksi' => ['nullable', 'date'],
             'jenis_transaksi' => ['required', Rule::in($typeKeys)],
             'customer_name' => [$requiredCustomer, 'nullable', 'string', 'max:150'],
-            'customer_phone' => [$requiredCustomer, 'nullable', 'string', 'max:50'],
+            'customer_phone' => [$requiredCustomer, 'nullable', 'digits_between:8,15'],
+            'patient_id' => ['nullable', 'integer'],
             'nomor_resep' => [$requiredPrescription, 'nullable', 'string', 'max:100'],
             'tanggal_resep' => [$requiredPrescription, 'nullable', 'date'],
             'dokter_name' => [$requiredPrescription, 'nullable', 'string', 'max:150'],
@@ -327,6 +351,7 @@ class PenjualanPosController extends Controller
         ], [
             'customer_name.required' => 'Nama pembeli wajib diisi sebelum transaksi diselesaikan.',
             'customer_phone.required' => 'Nomor HP pembeli wajib diisi sebelum transaksi diselesaikan.',
+            'customer_phone.digits_between' => 'Nomor HP pembeli harus terdiri dari 8 sampai 15 angka.',
             'nomor_resep.required' => 'Nomor resep wajib diisi.',
             'tanggal_resep.required' => 'Tanggal resep wajib diisi.',
             'dokter_name.required' => 'Nama dokter penulis resep wajib diisi.',
@@ -346,6 +371,22 @@ class PenjualanPosController extends Controller
             isset($validated['branch_id']) ? (int) $validated['branch_id'] : null,
             $request->user()
         );
+
+        if (! empty($validated['patient_id'])) {
+            $patient = PatientModel::query()
+                ->whereKey($validated['patient_id'])
+                ->where('branch_id', $validated['branch_id'])
+                ->first();
+
+            if (! $patient) {
+                throw ValidationException::withMessages([
+                    'patient_id' => 'Pasien tidak ditemukan pada cabang POS yang aktif.',
+                ]);
+            }
+
+            $validated['customer_name'] = $patient->name;
+            $validated['customer_phone'] = $patient->phone;
+        }
 
         return $validated;
     }
@@ -390,6 +431,7 @@ class PenjualanPosController extends Controller
                 : null,
             'customer_name' => $transaction->customer_name,
             'customer_phone' => $transaction->customer_phone,
+            'patient_id' => $transaction->patient_id,
             'nomor_resep' => $transaction->nomor_resep,
             'tanggal_resep' => optional($transaction->tanggal_resep)->format('Y-m-d'),
             'dokter_name' => $transaction->dokter_name,

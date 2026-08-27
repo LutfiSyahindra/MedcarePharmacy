@@ -9,6 +9,7 @@ use App\Models\Menu\Penjualan\PenjualanTransactionBatchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Stok\StokBatchModel;
+use App\Models\PatientModel;
 use App\Models\User;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Settings\Auth\RoleSettingService;
@@ -163,6 +164,35 @@ class PenjualanPosService
             ->limit(min(80, max(1, $limit)))
             ->get()
             ->map(fn (MasterObatModel $obat) => $this->productPayload($obat))
+            ->values()
+            ->all();
+    }
+
+    public function searchPatients(string $search = '', ?int $requestedBranchId = null, int $limit = 20): array
+    {
+        $branchId = $this->resolveBranchId($requestedBranchId);
+        $search = trim($search);
+
+        return PatientModel::query()
+            ->where('branch_id', $branchId)
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.$search.'%';
+                $normalizedPhone = PatientModel::normalizePhone($search);
+
+                $query->where(function ($query) use ($like, $normalizedPhone) {
+                    $query->where('name', 'like', $like)
+                        ->when($normalizedPhone !== '', fn ($query) => $query->orWhere('phone', 'like', '%'.$normalizedPhone.'%'));
+                });
+            })
+            ->orderBy('name')
+            ->limit(min(50, max(1, $limit)))
+            ->get(['id', 'name', 'phone'])
+            ->map(fn (PatientModel $patient) => [
+                'id' => $patient->id,
+                'text' => $patient->name.' · '.$patient->phone,
+                'name' => $patient->name,
+                'phone' => $patient->phone,
+            ])
             ->values()
             ->all();
     }
@@ -489,6 +519,8 @@ class PenjualanPosService
             $transaction->nomor_transaksi = $this->generateNoTransaction($branchId, $date);
         }
 
+        $patient = $this->syncPatient($payload, $branchId, $status === 'completed');
+
         $transaction->forceFill([
             'branch_id' => $branchId,
             'tanggal_transaksi' => $date,
@@ -496,6 +528,7 @@ class PenjualanPosService
             'status' => $status,
             'customer_name' => $this->nullableString($payload['customer_name'] ?? null),
             'customer_phone' => $this->nullableString($payload['customer_phone'] ?? null),
+            'patient_id' => $patient?->id,
             'nomor_resep' => $isPrescription ? $this->nullableString($payload['nomor_resep'] ?? null) : null,
             'tanggal_resep' => $isPrescription ? ($payload['tanggal_resep'] ?? null) : null,
             'dokter_name' => $isPrescription ? $this->nullableString($payload['dokter_name'] ?? null) : null,
@@ -504,6 +537,41 @@ class PenjualanPosService
             'catatan' => $this->nullableString($payload['catatan'] ?? null),
             'created_by' => $transaction->created_by ?: Auth::id(),
         ]);
+    }
+
+    private function syncPatient(array $payload, int $branchId, bool $createIfMissing): ?PatientModel
+    {
+        $patientId = (int) ($payload['patient_id'] ?? 0);
+
+        if ($patientId) {
+            return PatientModel::query()
+                ->whereKey($patientId)
+                ->where('branch_id', $branchId)
+                ->firstOrFail();
+        }
+
+        if (! $createIfMissing) {
+            return null;
+        }
+
+        $name = $this->nullableString($payload['customer_name'] ?? null);
+        $phone = PatientModel::normalizePhone($payload['customer_phone'] ?? null);
+
+        if (! $name || ! $phone) {
+            return null;
+        }
+
+        $patient = PatientModel::query()->firstOrNew([
+            'branch_id' => $branchId,
+            'phone' => $phone,
+        ]);
+
+        $patient->name = $name;
+        $patient->updated_by = Auth::id();
+        $patient->created_by = $patient->created_by ?: Auth::id();
+        $patient->save();
+
+        return $patient;
     }
 
     private function clearDraftLines(PenjualanTransactionModel $transaction): void

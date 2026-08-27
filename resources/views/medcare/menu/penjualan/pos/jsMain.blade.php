@@ -10,6 +10,7 @@
         const posBranches = @json($posBranches->values());
         const urls = {
             products: '{{ route("penjualan.pos.products") }}',
+            patients: '{{ route("penjualan.pos.patients") }}',
             quote: '{{ route("penjualan.pos.quote") }}',
             draft: '{{ route("penjualan.pos.draft") }}',
             complete: '{{ route("penjualan.pos.complete") }}',
@@ -43,6 +44,7 @@
             paidTotal: 0,
             diff: 0
         };
+        let applyingPatientSelection = false;
 
         $.ajaxSetup({
             headers: {
@@ -71,6 +73,7 @@
             $('#confirmPosBranchBtn').prop('disabled', !$('#posBranchSelector').val());
             $('#posWorkspace').toggleClass('is-branch-locked', canSwitchPosBranch && !ready);
             $('#productSearch').prop('disabled', !ready).trigger('change.select2');
+            $('#patientSelect').prop('disabled', !ready).trigger('change.select2');
         }
 
         function openPosBranchModal() {
@@ -975,6 +978,63 @@
 
         initializeProductSearch();
 
+        function patientResult(data) {
+            if (data.loading) return data.text;
+            const patient = data.patient || data;
+            return $(`<div class="pos-patient-result"><span><i class="mdi mdi-account-outline"></i></span><div><strong>${escapeHtml(patient.name || data.text)}</strong><small>${escapeHtml(patient.phone || '')}</small></div></div>`);
+        }
+
+        $('#patientSelect').select2({
+            placeholder: 'Ketik nama atau nomor telepon...',
+            minimumInputLength: 0,
+            width: '100%',
+            allowClear: true,
+            ajax: {
+                url: urls.patients,
+                dataType: 'json',
+                delay: 250,
+                cache: true,
+                data: params => ({ q: params.term || '', branch_id: activeBranchId || '' }),
+                processResults: data => ({
+                    results: (data.results || []).map(patient => ({ id: patient.id, text: patient.text, patient }))
+                })
+            },
+            templateResult: patientResult,
+            templateSelection: data => data.patient ? `${data.patient.name} · ${data.patient.phone}` : (data.text || 'Ketik nama atau nomor telepon...'),
+            language: {
+                searching: () => 'Mencari pasien...',
+                noResults: () => 'Pasien belum tersimpan. Isi nama dan nomor HP secara manual.'
+            }
+        });
+
+        function clearPatientSelection() {
+            $('#patientId').val('');
+            $('#patientSelect').val(null).trigger('change.select2');
+        }
+
+        function applyPatient(patient) {
+            if (!patient?.id) return;
+            applyingPatientSelection = true;
+            $('#patientId').val(patient.id);
+            $('#customerName').val(patient.name || '');
+            $('#customerPhone').val(patient.phone || '');
+            updateTransactionDetailSummary();
+            applyingPatientSelection = false;
+        }
+
+        function showSelectedPatient(patient) {
+            if (!patient?.id) {
+                clearPatientSelection();
+                return;
+            }
+            const option = new Option(`${patient.name} · ${patient.phone}`, patient.id, true, true);
+            $('#patientSelect').empty().append(option).trigger('change.select2');
+            $('#patientId').val(patient.id);
+        }
+
+        $('#patientSelect').on('select2:select', event => applyPatient(event.params.data.patient));
+        $('#patientSelect').on('select2:clear', clearPatientSelection);
+
         $('#productSearch')
             .on('select2:opening', function() {
                 $('#productSearchBox').addClass('is-open');
@@ -1820,6 +1880,7 @@
             if (String(this.value || '').trim()) {
                 $(this).removeClass('is-invalid').removeAttr('aria-invalid');
             }
+            if (!applyingPatientSelection && $('#patientId').val()) clearPatientSelection();
         });
 
         $(document).on('click', '[data-pos-jump]', function() {
@@ -2890,6 +2951,7 @@
         });
 
         $('#setGeneralCustomerBtn').on('click', function() {
+            clearPatientSelection();
             $('#customerName, #customerPhone').val('');
             updateTransactionDetailSummary();
             $('#customerName').trigger('focus');
@@ -3030,6 +3092,7 @@
                 jenis_transaksi: currentTransactionType(),
                 customer_name: $('#customerName').val(),
                 customer_phone: $('#customerPhone').val(),
+                patient_id: $('#patientId').val() || null,
                 nomor_resep: $('#nomorResep').val(),
                 tanggal_resep: $('#tanggalResep').val(),
                 dokter_name: $('#dokterName').val(),
@@ -3212,6 +3275,7 @@
             committedTransactionType = 'penjualan_bebas';
             setPrescriptionPaymentMode(false);
             $('#customerName, #customerPhone, #nomorResep, #tanggalResep, #dokterName, #asalResep, #instansiName, #catatanTransaksi').val('');
+            clearPatientSelection();
             $('#transactionDiscountPercent, #transactionDiscountNominal, #taxPercent, #embalase').val(0);
             $('#useTax').prop('checked', false).trigger('change');
             activeCompoundGroup = 'R/ 1';
@@ -3300,6 +3364,11 @@
             committedTransactionType = transaction.jenis_transaksi;
             $('#customerName').val(transaction.customer_name || '');
             $('#customerPhone').val(transaction.customer_phone || '');
+            showSelectedPatient(transaction.patient_id ? {
+                id: transaction.patient_id,
+                name: transaction.customer_name || '',
+                phone: transaction.customer_phone || ''
+            } : null);
             $('#nomorResep').val(transaction.nomor_resep || '');
             $('#tanggalResep').val(transaction.tanggal_resep || '');
             $('#dokterName').val(transaction.dokter_name || '');
