@@ -12,6 +12,7 @@ use App\Http\Controllers\Medcare\MasterData\Pabrikan\PabrikanController;
 use App\Http\Controllers\Medcare\MasterData\Rak\RakController;
 use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
+use App\Http\Controllers\Medcare\Menu\AnalisisPersediaan\InventoryAnalysisController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
@@ -374,6 +375,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
         Route::get('/pos/{id}/labels', [PenjualanPosController::class, 'labels'])->name('penjualan.pos.labels');
         Route::put('/pos/{id}/cancel', [PenjualanPosController::class, 'cancel'])->name('penjualan.pos.cancel');
+    });
+
+    Route::prefix('medcare/menu/analisis-persediaan')->group(function () {
+        Route::post('/saran-pembelian/purchase-orders', [InventoryAnalysisController::class, 'createPurchaseOrders'])
+            ->name('analisisPersediaan.purchaseOrders.store');
+        Route::get('/{analysis}/data', [InventoryAnalysisController::class, 'data'])
+            ->whereIn('analysis', array_keys(\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES))
+            ->name('analisisPersediaan.data');
+        Route::get('/{analysis}', [InventoryAnalysisController::class, 'index'])
+            ->whereIn('analysis', array_keys(\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES))
+            ->name('analisisPersediaan.index');
     });
 
     Route::prefix('medcare/menu/stok')->group(function () {

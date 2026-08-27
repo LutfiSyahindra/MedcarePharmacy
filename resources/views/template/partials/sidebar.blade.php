@@ -42,6 +42,7 @@
     $labelDocumentMenuActive = request()->routeIs("dokumen.etiket.*");
     $receiptDocumentMenuActive = request()->routeIs("dokumen.nota.*");
     $stockMenuActive = request()->routeIs("stok.*", "kartuStok.*", "stockOpname.*");
+    $inventoryAnalysisMenuActive = request()->routeIs("analisisPersediaan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
     $stockMenuLock = $stockOpnameAccess->stockMenusAreLocked() ? $activeStockOpnameLock : null;
@@ -479,6 +480,29 @@
                         <li class="nav-item">
                             <a href="{{ route('stockOpname.index') }}" class="nav-link {{ request()->routeIs('stockOpname.*') ? 'active' : '' }}">Stock Opname</a>
                         </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item {{ $inventoryAnalysisMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $inventoryAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
+                    href="#analisis-persediaan" role="button"
+                    aria-expanded="{{ $inventoryAnalysisMenuActive ? 'true' : 'false' }}"
+                    aria-controls="analisis-persediaan">
+                    <i class="link-icon" data-feather="bar-chart-2"></i>
+                    <span class="link-title">Analisis Persediaan</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse {{ $inventoryAnalysisMenuActive ? 'show' : '' }}" id="analisis-persediaan">
+                    <ul class="nav sub-menu">
+                        @foreach (\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES as $analysisSlug => $analysisMenu)
+                            <li class="nav-item">
+                                <a href="{{ route('analisisPersediaan.index', ['analysis' => $analysisSlug]) }}"
+                                    class="nav-link {{ request()->routeIs('analisisPersediaan.*') && request()->route('analysis') === $analysisSlug ? 'active' : '' }}">
+                                    {{ $analysisMenu['short_title'] }}
+                                </a>
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </li>
