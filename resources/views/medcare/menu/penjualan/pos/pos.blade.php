@@ -65,6 +65,10 @@
                         <i class="mdi mdi-chevron-down"></i>
                     </button>
                 @endif
+                <button type="button" class="btn pos-btn-quiet pos-shift-button" id="cashierShiftButton" title="Kelola shift kasir">
+                    <i class="mdi mdi-cash-register"></i>
+                    <span><small id="cashierShiftCaption">Shift kasir</small><strong id="cashierShiftLabel">Belum dibuka</strong></span>
+                </button>
                 <button type="button" class="btn pos-btn-quiet" id="newTransactionBtn" title="Transaksi baru (F8)">
                     <i class="mdi mdi-plus"></i><span>Baru</span><kbd>F8</kbd>
                 </button>
@@ -717,10 +721,12 @@
                             <select id="posBranchSelector" class="form-select">
                                 <option value="">Pilih cabang untuk memulai transaksi</option>
                                 @foreach ($posBranches as $branch)
-                                    <option value="{{ $branch->id }}">{{ $branch->code }} — {{ $branch->name }}</option>
+                                    <option value="{{ $branch->id }}" @disabled(! data_get($branch->operational, 'is_open'))>
+                                        {{ $branch->code }} — {{ $branch->name }} · {{ data_get($branch->operational, 'label') }}{{ data_get($branch->operational, 'is_open') ? '' : ' (Tutup)' }}
+                                    </option>
                                 @endforeach
                             </select>
-                            <p class="pos-branch-modal-help"><i class="mdi mdi-shield-check-outline"></i> Hanya cabang berstatus aktif yang dapat digunakan.</p>
+                            <p class="pos-branch-modal-help"><i class="mdi mdi-shield-check-outline"></i> Cabang hanya dapat dipilih saat jam operasionalnya aktif.</p>
                         @else
                             <div class="pos-branch-empty">
                                 <i class="mdi mdi-store-alert-outline"></i>
@@ -744,6 +750,97 @@
             </div>
         </div>
     @endif
+
+    <div class="modal fade pos-shift-modal" id="cashierShiftModal" tabindex="-1"
+        aria-labelledby="cashierShiftModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false"
+        data-bs-focus="false">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="pos-shift-modal-icon"><i class="mdi mdi-safe-square-outline"></i></span>
+                    <div class="pos-shift-modal-heading">
+                        <small><i class="mdi mdi-shield-check-outline"></i> KONTROL LACI KAS</small>
+                        <h2 class="modal-title" id="cashierShiftModalTitle">Buka kasir</h2>
+                        <p id="cashierShiftModalCopy">Isi modal awal sebelum menerima transaksi.</p>
+                    </div>
+                    <span class="pos-shift-header-status d-none" id="cashierShiftHeaderStatus"><i class="mdi mdi-circle"></i> Shift aktif</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <section id="cashierShiftClosedPane">
+                        <div class="pos-shift-onboarding">
+                            <div class="pos-shift-onboarding-copy">
+                                <span class="pos-shift-lock-visual"><i class="mdi mdi-lock-clock"></i></span>
+                                <span class="pos-shift-kicker">PERSIAPAN SHIFT</span>
+                                <h3>Mulai sesi kasir dengan saldo yang terkontrol.</h3>
+                                <p>Catat modal awal agar setiap transaksi, kas tambahan, dan pengeluaran dapat direkonsiliasi saat shift ditutup.</p>
+                                <div class="pos-shift-security-note"><i class="mdi mdi-shield-lock-outline"></i><span><strong>Transaksi masih dikunci</strong><small>Akses produk dan pembayaran aktif setelah shift dibuka.</small></span></div>
+                            </div>
+                            <form id="openCashierShiftForm" class="pos-shift-open-card">
+                                <div class="pos-shift-form-heading"><span><i class="mdi mdi-wallet-plus-outline"></i></span><div><strong>Saldo pembuka</strong><small>Uang tunai di laci sebelum transaksi pertama</small></div></div>
+                                <label class="form-label" for="openingCashAmount">Modal awal</label>
+                                <div class="pos-shift-money-input"><span>Rp</span><input type="number" min="0" step="100" id="openingCashAmount" class="form-control" value="0" required></div>
+                                <label class="form-label mt-3" for="openingCashNotes">Catatan <small>(opsional)</small></label>
+                                <textarea id="openingCashNotes" class="form-control" rows="3" maxlength="1000" placeholder="Contoh: modal pecahan dari brankas"></textarea>
+                                <button type="submit" class="btn pos-shift-primary mt-3" id="openCashierShiftBtn"><i class="mdi mdi-lock-open-check-outline"></i><span>Buka kasir & mulai shift</span><i class="mdi mdi-arrow-right"></i></button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section id="cashierShiftOpenPane" class="d-none">
+                        <div class="pos-shift-hero">
+                            <div class="pos-shift-hero-identity">
+                                <span><i class="mdi mdi-circle"></i> Sedang beroperasi</span>
+                                <strong id="activeShiftNumber">-</strong>
+                                <small id="activeShiftOpenedAt">-</small>
+                            </div>
+                            <div class="pos-shift-balance">
+                                <small>Kas seharusnya di laci</small>
+                                <strong id="shiftExpectedCash">Rp 0</strong>
+                                <span><i class="mdi mdi-receipt-text-check-outline"></i> <b id="shiftTransactionCount">0 transaksi</b> tercatat pada shift ini</span>
+                            </div>
+                        </div>
+                        <div class="pos-shift-summary-grid">
+                            <article><span class="pos-shift-metric-icon"><i class="mdi mdi-wallet-outline"></i></span><div><small>Modal awal</small><strong id="shiftOpeningAmount">Rp 0</strong></div></article>
+                            <article><span class="pos-shift-metric-icon"><i class="mdi mdi-cart-check"></i></span><div><small>Penjualan tunai</small><strong id="shiftCashSales">Rp 0</strong></div></article>
+                            <article class="is-in"><span class="pos-shift-metric-icon"><i class="mdi mdi-arrow-bottom-left"></i></span><div><small>Total kas masuk</small><strong id="shiftCashIn">Rp 0</strong></div></article>
+                            <article class="is-out"><span class="pos-shift-metric-icon"><i class="mdi mdi-arrow-top-right"></i></span><div><small>Total kas keluar</small><strong id="shiftCashOut">Rp 0</strong></div></article>
+                        </div>
+
+                        <div class="pos-shift-dashboard">
+                            <div class="pos-shift-movement-panel">
+                                <div class="pos-shift-panel-heading">
+                                    <div><span>ARUS KAS NON-PENJUALAN</span><h3>Rincian kas masuk & keluar</h3><p>Setiap pergerakan tunai pada shift aktif ditampilkan di sini.</p></div>
+                                    <span class="pos-shift-movement-count" id="shiftMovementCount">0 aktivitas</span>
+                                </div>
+                                <div class="pos-shift-movement-toolbar" role="group" aria-label="Filter arus kas">
+                                    <button type="button" class="is-active" data-shift-movement-filter="all">Semua <span id="shiftMovementAllCount">0</span></button>
+                                    <button type="button" data-shift-movement-filter="cash_in"><i class="mdi mdi-arrow-bottom-left"></i> Kas masuk <span id="shiftMovementInCount">0</span></button>
+                                    <button type="button" data-shift-movement-filter="cash_out"><i class="mdi mdi-arrow-top-right"></i> Kas keluar <span id="shiftMovementOutCount">0</span></button>
+                                    <button type="button" class="pos-shift-refresh" id="refreshCashierMovements" title="Muat ulang arus kas" aria-label="Muat ulang arus kas"><i class="mdi mdi-refresh"></i></button>
+                                </div>
+                                <div class="pos-shift-movement-list" id="cashierShiftMovementList" aria-live="polite">
+                                    <div class="pos-shift-movement-empty"><span><i class="mdi mdi-cash-sync"></i></span><strong>Belum ada pergerakan kas</strong><small>Kas masuk dan kas keluar yang dicatat akan tampil secara rinci di sini.</small></div>
+                                </div>
+                            </div>
+
+                            <aside class="pos-shift-command-panel">
+                                <div class="pos-shift-command-heading"><span><i class="mdi mdi-lightning-bolt-outline"></i></span><div><strong>Aksi cepat</strong><small>Kelola uang tunai di laci</small></div></div>
+                                <button type="button" class="btn is-cash-in" data-cash-movement="cash_in"><span><i class="mdi mdi-cash-plus"></i></span><div><strong>Catat kas masuk</strong><small>Tambahan modal atau uang lain</small></div><i class="mdi mdi-chevron-right"></i></button>
+                                <button type="button" class="btn is-cash-out" data-cash-movement="cash_out"><span><i class="mdi mdi-cash-minus"></i></span><div><strong>Catat kas keluar</strong><small>Biaya atau pengeluaran tunai</small></div><i class="mdi mdi-chevron-right"></i></button>
+                                <div class="pos-shift-formula"><span><i class="mdi mdi-calculator-variant-outline"></i></span><p><strong>Perhitungan otomatis</strong>Modal + penjualan tunai + kas masuk − kas keluar.</p></div>
+                                <button type="button" class="btn is-close" id="closeCashierShiftBtn"><i class="mdi mdi-lock-outline"></i><span>Tutup & rekonsiliasi kasir</span></button>
+                            </aside>
+                        </div>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ route('penjualan.pos.shifts') }}" class="btn pos-shift-history"><i class="mdi mdi-chart-timeline-variant"></i> Lihat seluruh riwayat shift</a>
+                    <button type="button" class="btn pos-shift-back" data-bs-dismiss="modal"><i class="mdi mdi-arrow-left"></i> Kembali ke POS</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade pos-receipt-modal" id="posReceiptModal" tabindex="-1"
         aria-labelledby="posReceiptModalTitle" aria-hidden="true">

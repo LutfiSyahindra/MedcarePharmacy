@@ -4,6 +4,8 @@ namespace App\Services\Menu\Penjualan;
 
 use App\Models\BranchModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\Penjualan\CashierCashMovementModel;
+use App\Models\Menu\Penjualan\CashierShiftModel;
 use App\Models\Menu\Penjualan\PenjualanPaymentModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionBatchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
@@ -47,7 +49,8 @@ class PenjualanPosService
     public function __construct(
         private readonly StockService $stockService,
         private readonly RoleSettingService $roleSettings,
-        private readonly StockOpnameAccess $stockOpnameAccess
+        private readonly StockOpnameAccess $stockOpnameAccess,
+        private readonly CashierShiftService $cashierShiftService
     ) {}
 
     public function canAccessAllBranches(?User $user = null): bool
@@ -66,7 +69,12 @@ class PenjualanPosService
 
         $query->whereIn('id', $this->roleSettings->posBranchIds($user, true));
 
-        return $query->get(['id', 'code', 'name']);
+        return $query->get([
+            'id',
+            'code',
+            'name',
+            'operational_timezone',
+        ]);
     }
 
     public function transactionBranchIds(?User $user = null): array
@@ -233,10 +241,10 @@ class PenjualanPosService
     {
         return DB::transaction(function () use ($payload) {
             $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
-            $this->assertCashierAvailable($branchId);
+            $shift = $this->assertCashierAvailable($branchId);
             $transaction = $this->transactionForWrite($payload, $branchId, true);
             $this->clearDraftLines($transaction);
-            $this->fillBaseHeader($transaction, $payload, $branchId, 'draft');
+            $this->fillBaseHeader($transaction, $payload, $branchId, 'draft', $shift->id);
             $transaction->save();
 
             $totals = $this->persistDetails($transaction, $payload, false);
@@ -260,10 +268,10 @@ class PenjualanPosService
     {
         return DB::transaction(function () use ($payload) {
             $branchId = $this->resolveBranchId(isset($payload['branch_id']) ? (int) $payload['branch_id'] : null);
-            $this->assertCashierAvailable($branchId);
+            $shift = $this->assertCashierAvailable($branchId);
             $transaction = $this->transactionForWrite($payload, $branchId, false);
             $this->clearDraftLines($transaction);
-            $this->fillBaseHeader($transaction, $payload, $branchId, 'completed');
+            $this->fillBaseHeader($transaction, $payload, $branchId, 'completed', $shift->id);
             $transaction->save();
 
             $totals = $this->persistDetails($transaction, $payload, true);
@@ -297,7 +305,7 @@ class PenjualanPosService
                 ->whereIn('branch_id', $branchIds)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->assertCashierAvailable((int) $transaction->branch_id);
+            $activeShift = $this->assertCashierAvailable((int) $transaction->branch_id);
 
             if ($transaction->status === 'cancelled') {
                 throw ValidationException::withMessages([
@@ -306,6 +314,17 @@ class PenjualanPosService
             }
 
             if ($transaction->status === 'completed') {
+                $cashRefund = round(max(0,
+                    (float) $transaction->payments()->where('metode', 'tunai')->sum('amount')
+                    - (float) $transaction->kembalian
+                ), 2);
+
+                if ($cashRefund > 0 && $cashRefund > $this->cashierShiftService->summary($activeShift)['expected_cash']) {
+                    throw ValidationException::withMessages([
+                        'cashier_shift' => 'Kas shift aktif tidak mencukupi pengembalian tunai '.number_format($cashRefund, 0, ',', '.').'.',
+                    ]);
+                }
+
                 if ($transaction->salesReturns()->whereIn('status', ['draft', 'posted'])->exists()) {
                     throw ValidationException::withMessages([
                         'status' => 'Transaksi memiliki retur penjualan aktif. Batalkan atau hapus retur tersebut terlebih dahulu.',
@@ -329,6 +348,17 @@ class PenjualanPosService
 
                         $allocation->forceFill(['cancel_kartu_stok_id' => $movement->id])->save();
                     }
+                }
+
+                if ($cashRefund > 0) {
+                    CashierCashMovementModel::create([
+                        'cashier_shift_id' => $activeShift->id,
+                        'type' => 'cash_out',
+                        'amount' => $cashRefund,
+                        'description' => 'Pengembalian pembatalan '.$transaction->nomor_transaksi,
+                        'created_by' => Auth::id(),
+                        'occurred_at' => now(),
+                    ]);
                 }
             }
 
@@ -509,8 +539,13 @@ class PenjualanPosService
         ]);
     }
 
-    private function fillBaseHeader(PenjualanTransactionModel $transaction, array $payload, int $branchId, string $status): void
-    {
+    private function fillBaseHeader(
+        PenjualanTransactionModel $transaction,
+        array $payload,
+        int $branchId,
+        string $status,
+        int $cashierShiftId
+    ): void {
         $date = $this->parseDateTime($payload['tanggal_transaksi'] ?? $transaction->tanggal_transaksi ?? now());
         $type = $this->transactionType($payload['jenis_transaksi'] ?? 'penjualan_bebas');
         $isPrescription = in_array($type, ['penjualan_resep', 'penjualan_racikan'], true);
@@ -523,6 +558,7 @@ class PenjualanPosService
 
         $transaction->forceFill([
             'branch_id' => $branchId,
+            'cashier_shift_id' => $cashierShiftId,
             'tanggal_transaksi' => $date,
             'jenis_transaksi' => $type,
             'status' => $status,
@@ -960,7 +996,7 @@ class PenjualanPosService
         return $value;
     }
 
-    private function assertCashierAvailable(int $branchId): void
+    private function assertCashierAvailable(int $branchId): CashierShiftModel
     {
         $opname = $this->stockOpnameAccess->activeLockForBranches([$branchId]);
 
@@ -970,6 +1006,8 @@ class PenjualanPosService
                     .'. Stok tidak ditampilkan sampai hasil fisik disubmit.',
             ]);
         }
+
+        return $this->cashierShiftService->requireOpenShift($branchId);
     }
 
     private function percent($value): float

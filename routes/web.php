@@ -16,11 +16,12 @@ use App\Http\Controllers\Medcare\Menu\AnalisisPersediaan\InventoryAnalysisContro
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
+use App\Http\Controllers\Medcare\Menu\Pasien\PatientController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan\PenerimaanController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\ReturPembelianController;
-use App\Http\Controllers\Medcare\Menu\Pasien\PatientController;
+use App\Http\Controllers\Medcare\Menu\Penjualan\CashierShiftController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\ReturPenjualanController;
 use App\Http\Controllers\Medcare\Menu\Stok\StockOpnameController;
@@ -362,6 +363,16 @@ Route::middleware('auth')->group(function () {
         Route::put('/retur-penjualan/{id}/post', [ReturPenjualanController::class, 'post'])->name('returPenjualan.post');
         Route::put('/retur-penjualan/{id}/cancel', [ReturPenjualanController::class, 'cancel'])->name('returPenjualan.cancel');
         Route::delete('/retur-penjualan/{id}', [ReturPenjualanController::class, 'destroy'])->name('returPenjualan.destroy');
+
+        Route::get('/pos/shift', [CashierShiftController::class, 'index'])->name('penjualan.pos.shifts');
+        Route::get('/pos/shift/table', [CashierShiftController::class, 'table'])->name('penjualan.pos.shifts.table');
+        Route::get('/pos/shift/status', [CashierShiftController::class, 'status'])->name('penjualan.pos.shifts.status');
+        Route::post('/pos/shift/open', [CashierShiftController::class, 'open'])->name('penjualan.pos.shifts.open');
+        Route::post('/pos/shift/movement', [CashierShiftController::class, 'movement'])->name('penjualan.pos.shifts.movement');
+        Route::post('/pos/shift/close', [CashierShiftController::class, 'close'])->name('penjualan.pos.shifts.close');
+        Route::get('/pos/shift/{shift}', [CashierShiftController::class, 'show'])
+            ->whereNumber('shift')
+            ->name('penjualan.pos.shifts.show');
 
         Route::middleware('cashier.available')->group(function () {
             Route::get('/pos', [PenjualanPosController::class, 'index'])->name('penjualan.pos');

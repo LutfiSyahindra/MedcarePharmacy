@@ -14,6 +14,10 @@
             quote: '{{ route("penjualan.pos.quote") }}',
             draft: '{{ route("penjualan.pos.draft") }}',
             complete: '{{ route("penjualan.pos.complete") }}',
+            shiftStatus: '{{ route("penjualan.pos.shifts.status") }}',
+            shiftOpen: '{{ route("penjualan.pos.shifts.open") }}',
+            shiftMovement: '{{ route("penjualan.pos.shifts.movement") }}',
+            shiftClose: '{{ route("penjualan.pos.shifts.close") }}',
             show: '{{ route("penjualan.pos.show", ":id") }}',
             receipt: '{{ route("penjualan.pos.receipt", ":id") }}',
             labels: '{{ route("penjualan.pos.labels", ":id") }}'
@@ -39,6 +43,8 @@
         let prescriptionPaymentMode = false;
         let compoundPreviewApproved = false;
         let cashierStage = 'product';
+        let cashierMovementFilter = 'all';
+        let cashierMovementLoading = false;
         let lastTotals = {
             grandTotal: 0,
             paidTotal: 0,
@@ -64,16 +70,137 @@
                 : null;
         }
 
+        function cashierShiftModalInstance() {
+            const element = document.getElementById('cashierShiftModal');
+
+            return element && window.bootstrap?.Modal
+                ? bootstrap.Modal.getOrCreateInstance(element)
+                : null;
+        }
+
+        function renderCashierShiftUi() {
+            const branch = activePosBranch();
+            const operational = branch?.operational || {};
+            const shift = branch?.cashier_shift || null;
+            const ready = Boolean(branch && operational.is_open && shift?.status === 'open');
+            const cashierName = ready && shift.cashier_name && shift.cashier_name !== '-'
+                ? shift.cashier_name
+                : null;
+            const shiftIdentity = cashierName
+                ? `${shift.shift_number || '-'} · ${cashierName}`
+                : (shift?.shift_number || '-');
+
+            $('#posWorkspace').toggleClass('is-shift-locked', Boolean(branch) && !ready);
+            $('#cashierShiftButton').toggleClass('is-open', ready);
+            $('#cashierShiftButton').attr('title', ready
+                ? `Kelola shift kasir ${shiftIdentity}`
+                : 'Kelola shift kasir');
+            $('#cashierShiftCaption').text(operational.is_open === false ? `Tutup · ${operational.label || '-'}` : 'Shift kasir');
+            $('#cashierShiftLabel').text(ready ? shiftIdentity : (branch ? 'Belum dibuka' : 'Pilih cabang'));
+            $('#cashierShiftClosedPane').toggleClass('d-none', ready);
+            $('#cashierShiftOpenPane').toggleClass('d-none', !ready);
+            $('#cashierShiftHeaderStatus').toggleClass('d-none', !ready);
+            $('#cashierShiftModalTitle').text(ready ? 'Kelola kasir' : 'Buka kasir');
+            $('#cashierShiftModalCopy').text(ready
+                ? `${branch.name} · ${cashierName || 'User tidak tersedia'} · ${operational.label || 'jam operasional'}`
+                : (operational.is_open === false
+                    ? `Cabang tutup. Jam operasional ${operational.label || '-'}.`
+                    : 'Isi modal awal sebelum menerima transaksi.'));
+            $('#openCashierShiftBtn').prop('disabled', !branch || operational.is_open === false);
+
+            if (ready) {
+                $('#activeShiftNumber').text(shift.shift_number || '-');
+                $('#activeShiftOpenedAt').text(`${cashierName || 'User tidak tersedia'} · Dibuka ${formatShiftTimestamp(shift.opened_at)}`);
+                $('#shiftOpeningAmount').text(formatCurrency(shift.opening_amount));
+                $('#shiftCashSales').text(formatCurrency(shift.cash_sales));
+                $('#shiftCashIn').text(formatCurrency(shift.cash_in_total));
+                $('#shiftCashOut').text(formatCurrency(shift.cash_out_total));
+                $('#shiftExpectedCash').text(formatCurrency(shift.expected_cash));
+                $('#shiftTransactionCount').text(`${shift.transaction_count || 0} transaksi`);
+                renderCashierMovements();
+            }
+
+            return ready;
+        }
+
+        function renderCashierMovements() {
+            const movements = Array.isArray(activePosBranch()?.cashier_movements)
+                ? activePosBranch().cashier_movements
+                : [];
+            const cashInCount = movements.filter(movement => movement.type === 'cash_in').length;
+            const cashOutCount = movements.filter(movement => movement.type === 'cash_out').length;
+            const filteredMovements = cashierMovementFilter === 'all'
+                ? movements
+                : movements.filter(movement => movement.type === cashierMovementFilter);
+
+            $('#shiftMovementCount').text(`${movements.length} aktivitas`);
+            $('#shiftMovementAllCount').text(movements.length);
+            $('#shiftMovementInCount').text(cashInCount);
+            $('#shiftMovementOutCount').text(cashOutCount);
+            $('[data-shift-movement-filter]').removeClass('is-active')
+                .filter(`[data-shift-movement-filter="${cashierMovementFilter}"]`).addClass('is-active');
+
+            if (cashierMovementLoading) {
+                $('#cashierShiftMovementList').html('<div class="pos-shift-movement-loading"><span><i class="mdi mdi-loading mdi-spin"></i></span><small>Memuat rincian arus kas terbaru...</small></div>');
+                return;
+            }
+
+            if (!filteredMovements.length) {
+                const filteredLabel = cashierMovementFilter === 'cash_in'
+                    ? 'kas masuk'
+                    : (cashierMovementFilter === 'cash_out' ? 'kas keluar' : 'pergerakan kas');
+                $('#cashierShiftMovementList').html(`
+                    <div class="pos-shift-movement-empty">
+                        <span><i class="mdi mdi-cash-sync"></i></span>
+                        <strong>Belum ada ${filteredLabel}</strong>
+                        <small>Aktivitas yang dicatat pada shift ini akan tampil lengkap dengan waktu, petugas, dan keterangannya.</small>
+                    </div>`);
+                return;
+            }
+
+            $('#cashierShiftMovementList').html(filteredMovements.map(movement => {
+                const isCashIn = movement.type === 'cash_in';
+                const label = movement.type_label || (isCashIn ? 'Kas Masuk' : 'Kas Keluar');
+                const occurredAt = movement.occurred_at_label || movement.occurred_at || '-';
+
+                return `
+                    <article class="pos-shift-movement-item ${isCashIn ? 'is-in' : 'is-out'}">
+                        <span class="pos-shift-movement-icon"><i class="mdi ${isCashIn ? 'mdi-arrow-bottom-left' : 'mdi-arrow-top-right'}"></i></span>
+                        <div class="pos-shift-movement-copy">
+                            <span><strong>${escapeHtml(label)}</strong><time datetime="${escapeHtml(movement.occurred_at || '')}">${escapeHtml(occurredAt)}</time></span>
+                            <p title="${escapeHtml(movement.description || '-')}">${escapeHtml(movement.description || '-')}</p>
+                            <small><i class="mdi mdi-account-outline"></i> Dicatat oleh ${escapeHtml(movement.created_by || '-')}</small>
+                        </div>
+                        <strong class="pos-shift-movement-amount">${isCashIn ? '+' : '−'} ${formatCurrency(movement.amount)}</strong>
+                    </article>`;
+            }).join(''));
+        }
+
+        function formatShiftTimestamp(value) {
+            const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+
+            return match ? `${match[3]}/${match[2]}/${match[1]} · ${match[4]}:${match[5]}` : (value || '-');
+        }
+
+        function setCashierMovementLoading(isLoading) {
+            cashierMovementLoading = Boolean(isLoading);
+            $('#refreshCashierMovements').prop('disabled', cashierMovementLoading)
+                .find('i').toggleClass('mdi-spin', cashierMovementLoading);
+            renderCashierMovements();
+        }
+
         function updatePosBranchUi() {
             const branch = activePosBranch();
             const ready = Boolean(branch);
+            const shiftReady = Boolean(branch?.cashier_shift && branch?.operational?.is_open);
 
             $('#activePosBranchName').text(branch?.name || 'Pilih cabang');
             $('#posBranchSelector').val(branch?.id || '');
             $('#confirmPosBranchBtn').prop('disabled', !$('#posBranchSelector').val());
             $('#posWorkspace').toggleClass('is-branch-locked', canSwitchPosBranch && !ready);
-            $('#productSearch').prop('disabled', !ready).trigger('change.select2');
-            $('#patientSelect').prop('disabled', !ready).trigger('change.select2');
+            $('#productSearch').prop('disabled', !ready || !shiftReady).trigger('change.select2');
+            $('#patientSelect').prop('disabled', !ready || !shiftReady).trigger('change.select2');
+            renderCashierShiftUi();
         }
 
         function openPosBranchModal() {
@@ -89,10 +216,19 @@
                 return;
             }
 
+            if (branch.operational?.is_open === false) {
+                Swal.fire('Di luar jam operasional', `Kasir ${branch.name} buka pada ${branch.operational.label}.`, 'warning');
+                return;
+            }
+
             activeBranchId = Number(branch.id);
             updatePosBranchUi();
             newTransaction(false);
             posBranchModalInstance()?.hide();
+
+            if (!branch.cashier_shift) {
+                window.setTimeout(() => cashierShiftModalInstance()?.show(), 180);
+            }
 
             if (notify) {
                 Swal.fire({
@@ -117,6 +253,7 @@
 
             if (Number(activeBranchId) === branchId) {
                 posBranchModalInstance()?.hide();
+                if (!activePosBranch()?.cashier_shift) window.setTimeout(() => cashierShiftModalInstance()?.show(), 180);
                 return;
             }
 
@@ -135,6 +272,164 @@
             }
 
             applyPosBranch(branchId);
+        });
+
+        function refreshCashierShift(openModal = false) {
+            const branch = activePosBranch();
+
+            if (!branch) return $.Deferred().reject().promise();
+
+            if (openModal) {
+                cashierMovementFilter = 'all';
+                cashierShiftModalInstance()?.show();
+                if (branch.cashier_shift) setCashierMovementLoading(true);
+            }
+
+            return $.get(urls.shiftStatus, { branch_id: branch.id })
+                .done(response => {
+                    branch.operational = response.operational || branch.operational;
+                    branch.cashier_shift = response.shift || null;
+                    branch.cashier_movements = Array.isArray(response.movements) ? response.movements : [];
+                    updatePosBranchUi();
+                })
+                .fail(xhr => showAjaxError(xhr, 'Status shift gagal dimuat.'))
+                .always(() => {
+                    if (openModal) setCashierMovementLoading(false);
+                });
+        }
+
+        $('#cashierShiftButton').on('click', function() {
+            if (!activePosBranch()) {
+                openPosBranchModal();
+                return;
+            }
+
+            refreshCashierShift(true);
+        });
+
+        $(document).on('click', '[data-shift-movement-filter]', function() {
+            cashierMovementFilter = $(this).data('shift-movement-filter') || 'all';
+            renderCashierMovements();
+        });
+
+        $('#refreshCashierMovements').on('click', function() {
+            setCashierMovementLoading(true);
+            refreshCashierShift().always(() => setCashierMovementLoading(false));
+        });
+
+        $('#openCashierShiftForm').on('submit', function(event) {
+            event.preventDefault();
+            const branch = activePosBranch();
+
+            if (!branch) {
+                openPosBranchModal();
+                return;
+            }
+
+            const button = $('#openCashierShiftBtn');
+            const normalHtml = button.html();
+            button.prop('disabled', true).html('<i class="mdi mdi-loading mdi-spin"></i> Membuka kasir...');
+
+            $.post(urls.shiftOpen, {
+                branch_id: branch.id,
+                opening_amount: Number($('#openingCashAmount').val()) || 0,
+                opening_notes: $('#openingCashNotes').val()
+            }).done(response => {
+                branch.cashier_shift = response.shift;
+                branch.cashier_movements = [];
+                $('#openingCashAmount').val(0);
+                $('#openingCashNotes').val('');
+                updatePosBranchUi();
+                cashierShiftModalInstance()?.hide();
+                Swal.fire({ icon: 'success', title: response.message, toast: true, position: 'top-end', timer: 2200, showConfirmButton: false });
+            }).fail(xhr => showAjaxError(xhr, 'Kasir gagal dibuka.'))
+                .always(() => button.prop('disabled', false).html(normalHtml));
+        });
+
+        $('[data-cash-movement]').on('click', function() {
+            const type = $(this).data('cash-movement');
+            const isCashIn = type === 'cash_in';
+
+            Swal.fire({
+                title: isCashIn ? 'Catat kas masuk' : 'Catat kas keluar',
+                html: `
+                    <div class="text-start">
+                        <label class="form-label" for="shiftMovementAmount">Nominal</label>
+                        <input type="number" min="1" step="100" id="shiftMovementAmount" class="swal2-input m-0 w-100" placeholder="0">
+                        <label class="form-label mt-3" for="shiftMovementDescription">Keterangan</label>
+                        <textarea id="shiftMovementDescription" class="swal2-textarea m-0 w-100" placeholder="Jelaskan sumber atau tujuan kas"></textarea>
+                    </div>`,
+                showCancelButton: true,
+                confirmButtonText: isCashIn ? 'Simpan kas masuk' : 'Simpan kas keluar',
+                cancelButtonText: 'Batal',
+                preConfirm: () => {
+                    const amount = Number($('#shiftMovementAmount').val()) || 0;
+                    const description = String($('#shiftMovementDescription').val() || '').trim();
+                    if (amount <= 0 || !description) {
+                        Swal.showValidationMessage('Nominal dan keterangan wajib diisi.');
+                        return false;
+                    }
+                    return { amount, description };
+                }
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                const branch = activePosBranch();
+                $.post(urls.shiftMovement, {
+                    branch_id: branch.id,
+                    type,
+                    amount: result.value.amount,
+                    description: result.value.description
+                }).done(response => {
+                    branch.cashier_shift = response.shift;
+                    branch.cashier_movements = Array.isArray(response.movements) ? response.movements : [];
+                    renderCashierShiftUi();
+                    Swal.fire({ icon: 'success', title: response.message, toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+                }).fail(xhr => showAjaxError(xhr, 'Mutasi kas gagal disimpan.'));
+            });
+        });
+
+        $('#closeCashierShiftBtn').on('click', function() {
+            const branch = activePosBranch();
+            const shift = branch?.cashier_shift;
+            if (!shift) return;
+
+            Swal.fire({
+                title: 'Tutup kasir',
+                html: `
+                    <div class="text-start">
+                        <div class="alert alert-light border">Kas seharusnya <strong>${formatCurrency(shift.expected_cash)}</strong></div>
+                        <label class="form-label" for="shiftActualCash">Kas fisik saat ini</label>
+                        <input type="number" min="0" step="100" id="shiftActualCash" class="swal2-input m-0 w-100" value="${Number(shift.expected_cash) || 0}">
+                        <label class="form-label mt-3" for="shiftClosingNotes">Catatan penutupan</label>
+                        <textarea id="shiftClosingNotes" class="swal2-textarea m-0 w-100" placeholder="Opsional"></textarea>
+                    </div>`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Hitung & tutup kasir',
+                cancelButtonText: 'Batal',
+                preConfirm: () => ({
+                    actual_cash: Math.max(0, Number($('#shiftActualCash').val()) || 0),
+                    closing_notes: $('#shiftClosingNotes').val()
+                })
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                $.post(urls.shiftClose, {
+                    branch_id: branch.id,
+                    ...result.value
+                }).done(response => {
+                    const closedShift = response.shift;
+                    branch.cashier_shift = null;
+                    updatePosBranchUi();
+                    cashierShiftModalInstance()?.hide();
+                    const difference = Number(closedShift.cash_difference) || 0;
+                    Swal.fire({
+                        icon: Math.abs(difference) < .01 ? 'success' : 'warning',
+                        title: 'Kasir ditutup',
+                        html: `Kas fisik <b>${formatCurrency(closedShift.actual_cash)}</b><br>Selisih kas <b>${formatCurrency(difference)}</b>`,
+                        confirmButtonText: 'Selesai'
+                    });
+                }).fail(xhr => showAjaxError(xhr, 'Kasir gagal ditutup.'));
+            });
         });
 
         function posReceiptModalInstance() {
@@ -3254,6 +3549,7 @@
                         $('#printLastReceiptBtn').prop('disabled', false);
                         newTransaction();
                         showReceiptModal(transaction.id, true, lastReceiptCanPrintLabels);
+                        refreshCashierShift();
                     }
 
                 },
@@ -3536,10 +3832,12 @@
 
         newTransaction(false);
         updatePosBranchUi();
-        const loadingDraft = loadDraftFromQuery();
+        const loadingDraft = activePosBranch()?.cashier_shift ? loadDraftFromQuery() : false;
 
         if (canSwitchPosBranch && !loadingDraft) {
             openPosBranchModal();
+        } else if (activePosBranch() && !activePosBranch().cashier_shift) {
+            cashierShiftModalInstance()?.show();
         }
     });
 </script>

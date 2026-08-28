@@ -12,7 +12,7 @@ class BranchService
     {
         $this->BranchRepository = $BranchRepository;
     }
-    
+
     public function getBranches()
     {
         $branches = $this->BranchRepository->getBranches();
@@ -20,12 +20,12 @@ class BranchService
         $dataBranch = [];
         foreach ($branches as $r) {
             $dataBranch[] = [
-                'id'        => $r->id,
-                'name'      => $r->name,
-                'code'      => $r->code,
-                'address'   => $r->address,
-                'phone'     => $r->phone,
-                'email'     => $r->email,
+                'id' => $r->id,
+                'name' => $r->name,
+                'code' => $r->code,
+                'address' => $r->address,
+                'phone' => $r->phone,
+                'email' => $r->email,
                 'is_active' => $r->is_active,
             ];
         }
@@ -33,7 +33,8 @@ class BranchService
         return $dataBranch;
     }
 
-    public function updateStatus($id, $status){
+    public function updateStatus($id, $status)
+    {
         return $this->BranchRepository->updateStatus($id, $status);
     }
 
@@ -41,7 +42,7 @@ class BranchService
     {
         $branch = $this->BranchRepository->findByIdBranch($id);
 
-        if (!$branch) {
+        if (! $branch) {
             throw new \Exception('Branch not found');
         }
 
@@ -64,5 +65,4 @@ class BranchService
     {
         return $this->BranchRepository->findByIdBranch($id)->delete();
     }
-
 }

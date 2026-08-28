@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BranchModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\PatientModel;
+use App\Services\Menu\Penjualan\CashierShiftService;
 use App\Services\Menu\Penjualan\PenjualanPosService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,15 +15,22 @@ use Yajra\DataTables\Facades\DataTables;
 
 class PenjualanPosController extends Controller
 {
-    public function __construct(private readonly PenjualanPosService $posService) {}
+    public function __construct(
+        private readonly PenjualanPosService $posService,
+        private readonly CashierShiftService $cashierShiftService
+    ) {}
 
     public function index(Request $request)
     {
         $branches = $this->posService->activeBranches($request->user());
-        $branches->load('apotekProfile:id,branch_id,name,logo_path');
-        $branches->each(function (BranchModel $branch) {
+        $branches->load('apotekProfile:id,branch_id,name,logo_path,operational_hours');
+        $branches->each(function (BranchModel $branch) use ($request) {
             $branch->setAttribute('display_name', $branch->apotekProfile?->name ?: $branch->name);
             $branch->setAttribute('logo_url', $branch->apotekProfile?->logo_url ?: asset('assets/apotek/LogoResmi.png'));
+            $branch->setAttribute('operational', $this->cashierShiftService->operationalState($branch));
+            $branch->setAttribute('cashier_shift', $this->cashierShiftService->payload(
+                $this->cashierShiftService->currentShift($request->user(), $branch->id)
+            ));
         });
         $canSwitchBranch = $branches->count() > 1;
 

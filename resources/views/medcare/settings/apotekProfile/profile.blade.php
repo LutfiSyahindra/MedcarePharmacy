@@ -297,6 +297,7 @@
                                     </div>
                                 @endforeach
                             </div>
+                            <small class="text-muted d-block mt-3">Kasir/POS mengikuti jadwal ini. Jam buka dan tutup yang sama berarti buka 24 jam; jadwal yang melewati tengah malam juga didukung.</small>
                         </section>
 
                         <section class="apotek-card">

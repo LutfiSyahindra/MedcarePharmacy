@@ -45,6 +45,11 @@ class PenjualanTransactionModel extends Model
         return $this->belongsTo(PatientModel::class, 'patient_id');
     }
 
+    public function cashierShift()
+    {
+        return $this->belongsTo(CashierShiftModel::class, 'cashier_shift_id');
+    }
+
     public function details()
     {
         return $this->hasMany(PenjualanTransactionDetailModel::class, 'penjualan_transaction_id');

@@ -104,7 +104,8 @@
     .pos-simple .pos-branch-button > span { display: grid; min-width: 0; flex: 1; line-height: 1.1; }
     .pos-simple .pos-branch-button small { color: #98a2b3; font-size: .62rem; font-weight: 700; text-transform: uppercase; }
     .pos-simple .pos-branch-button strong { overflow: hidden; color: #33425a; font-size: .74rem; white-space: nowrap; text-overflow: ellipsis; }
-    .pos-simple .pos-workspace.is-branch-locked { opacity: .45; pointer-events: none; user-select: none; }
+    .pos-simple .pos-workspace.is-branch-locked,
+    .pos-simple .pos-workspace.is-shift-locked { opacity: .45; pointer-events: none; user-select: none; }
 
     .pos-branch-modal .modal-dialog { max-width: 500px; }
     .pos-branch-modal .modal-content { overflow: hidden; border: 0; border-radius: 18px; box-shadow: 0 24px 70px rgba(31, 43, 70, .22); }

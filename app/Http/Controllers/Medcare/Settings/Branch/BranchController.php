@@ -11,13 +11,16 @@ use Yajra\DataTables\Facades\DataTables;
 
 class BranchController extends Controller
 {
+    protected $UserService;
 
-    protected $UserService, $BranchService;
+    protected $BranchService;
+
     public function __construct(UserService $UserService, BranchService $BranchService)
     {
         $this->UserService = $UserService;
         $this->BranchService = $BranchService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -26,7 +29,8 @@ class BranchController extends Controller
         return view('medcare.settings.branch.branch');
     }
 
-    public function updateStatus(Request $request){
+    public function updateStatus(Request $request)
+    {
         return $this->BranchService->updateStatus($request->id, $request->status);
     }
 
@@ -35,22 +39,21 @@ class BranchController extends Controller
         $Branch = $this->BranchService->getBranches();
 
         return DataTables::of($Branch)
-        ->addIndexColumn()
-        ->addColumn('actions', function ($dataBranch) {
-            return '
+            ->addIndexColumn()
+            ->addColumn('actions', function ($dataBranch) {
+                return '
                 <div class="branch-action-group">
-                    <button type="button" class="btn branch-action-btn branch-action-edit" title="Edit branch" onclick="editBranch(' . $dataBranch['id'] . ')"> 
+                    <button type="button" class="btn branch-action-btn branch-action-edit" title="Edit branch" onclick="editBranch('.$dataBranch['id'].')">
                         <i class="mdi mdi-pencil-outline"></i>
                     </button> 
-                    <button type="button" class="btn branch-action-btn branch-action-delete" title="Hapus branch" onclick="deleteBranch(' . $dataBranch['id'] . ')">  
+                    <button type="button" class="btn branch-action-btn branch-action-delete" title="Hapus branch" onclick="deleteBranch('.$dataBranch['id'].')">
                         <i class="mdi mdi-delete-outline"></i>
                     </button>
                 </div>
             ';
-        })
-
-        ->rawColumns(['actions'])
-        ->make(true);
+            })
+            ->rawColumns(['actions'])
+            ->make(true);
 
     }
 
@@ -68,11 +71,11 @@ class BranchController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code'    => 'required|string|max:50|unique:branches,code',
-            'name'    => 'required|string|max:100',
+            'code' => 'required|string|max:50|unique:branches,code',
+            'name' => 'required|string|max:100',
             'address' => 'nullable|string|max:255',
-            'phone'   => 'nullable|string|max:20',
-            'email'   => 'nullable|email|max:100',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:100',
         ]);
 
         Log::info($validated);
@@ -82,7 +85,7 @@ class BranchController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Branch berhasil dibuat',
-            'data' => $branchCreate
+            'data' => $branchCreate,
         ]);
     }
 
@@ -100,6 +103,7 @@ class BranchController extends Controller
     public function edit(string $id)
     {
         $dataBranch = $this->BranchService->findBranch($id);
+
         return response()->json($dataBranch);
     }
 
@@ -109,19 +113,19 @@ class BranchController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'code'    => 'required|string|max:50|unique:branches,code,' . $id,
-            'name'    => 'required|string|max:100',
+            'code' => 'required|string|max:50|unique:branches,code,'.$id,
+            'name' => 'required|string|max:100',
             'address' => 'nullable|string|max:255',
-            'phone'   => 'nullable|string|max:20',
-            'email'   => 'nullable|email|max:100',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:100',
         ]);
 
         $data = [
-            'name'    => $validated['name'],
-            'code'    => $validated['code'],
+            'name' => $validated['name'],
+            'code' => $validated['code'],
             'address' => $validated['address'] ?? null,
-            'phone'   => $validated['phone'] ?? null,
-            'email'   => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
         ];
 
         // panggil service
@@ -130,10 +134,9 @@ class BranchController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Branch berhasil diperbarui',
-            'data'    => $branch
+            'data' => $branch,
         ], 200);
     }
-
 
     /**
      * Remove the specified resource from storage.
@@ -142,17 +145,18 @@ class BranchController extends Controller
     {
         try {
             $this->BranchService->deleteBranch($id);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Branch berhasil dihapus.'
+                'message' => 'Branch berhasil dihapus.',
             ]);
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
-    
+
     }
 }
