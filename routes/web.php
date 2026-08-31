@@ -12,10 +12,14 @@ use App\Http\Controllers\Medcare\MasterData\Pabrikan\PabrikanController;
 use App\Http\Controllers\Medcare\MasterData\Rak\RakController;
 use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
+use App\Http\Controllers\Medcare\Menu\AnalisisOmzet\RevenueAnalysisController;
 use App\Http\Controllers\Medcare\Menu\AnalisisPersediaan\InventoryAnalysisController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
+use App\Http\Controllers\Medcare\Menu\Laporan\InventoryReportController;
+use App\Http\Controllers\Medcare\Menu\Laporan\PurchaseReportController;
+use App\Http\Controllers\Medcare\Menu\Laporan\SalesReportController;
 use App\Http\Controllers\Medcare\Menu\Pasien\PatientController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Faktur\FakturController;
 use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
@@ -409,6 +413,35 @@ Route::middleware('auth')->group(function () {
         Route::get('/{analysis}', [InventoryAnalysisController::class, 'index'])
             ->whereIn('analysis', array_keys(\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES))
             ->name('analisisPersediaan.index');
+    });
+
+    Route::prefix('medcare/menu/analisis-omzet')->group(function () {
+        Route::get('/', [RevenueAnalysisController::class, 'index'])->name('analisisOmzet.index');
+        Route::get('/data', [RevenueAnalysisController::class, 'data'])->name('analisisOmzet.data');
+        Route::post('/target', [RevenueAnalysisController::class, 'storeTarget'])->name('analisisOmzet.target.store');
+        Route::get('/export/excel', [RevenueAnalysisController::class, 'excel'])->name('analisisOmzet.export.excel');
+        Route::get('/export/pdf', [RevenueAnalysisController::class, 'pdf'])->name('analisisOmzet.export.pdf');
+    });
+
+    Route::prefix('medcare/menu/laporan')->group(function () {
+        Route::get('/persediaan/{report}/data', [InventoryReportController::class, 'data'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\InventoryReportService::TYPES))
+            ->name('laporan.persediaan.data');
+        Route::get('/persediaan/{report?}', [InventoryReportController::class, 'index'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\InventoryReportService::TYPES))
+            ->name('laporan.persediaan.index');
+        Route::get('/pembelian/{report}/data', [PurchaseReportController::class, 'data'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\PurchaseReportService::TYPES))
+            ->name('laporan.pembelian.data');
+        Route::get('/pembelian/{report?}', [PurchaseReportController::class, 'index'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\PurchaseReportService::TYPES))
+            ->name('laporan.pembelian.index');
+        Route::get('/penjualan/{report}/data', [SalesReportController::class, 'data'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\SalesReportService::TYPES))
+            ->name('laporan.penjualan.data');
+        Route::get('/penjualan/{report?}', [SalesReportController::class, 'index'])
+            ->whereIn('report', array_keys(\App\Services\Menu\Laporan\SalesReportService::TYPES))
+            ->name('laporan.penjualan.index');
     });
 
     Route::prefix('medcare/menu/stok')->group(function () {
