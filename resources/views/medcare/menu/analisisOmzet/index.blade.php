@@ -56,41 +56,86 @@
             <a href="#roTargetPanel"><i class="mdi mdi-bullseye-arrow"></i><span>Target</span></a>
         </nav>
 
-        <section class="ro-filter-panel ro-panel">
-            <div class="ro-panel-head">
-                <div class="ro-heading"><span><i class="mdi mdi-tune-variant"></i></span><div><h2>Filter analisis</h2><p>Seluruh KPI, grafik, dan tabel mengikuti parameter aktif.</p></div></div>
-                <button type="button" class="ro-filter-toggle" id="roFilterToggle" aria-expanded="true"><i class="mdi mdi-chevron-up"></i></button>
-            </div>
-            <div id="roFilterBody">
-                <div class="ro-presets" role="group" aria-label="Periode cepat">
-                    <span>Periode cepat</span>
-                    <button type="button" data-range="today">Hari Ini</button>
-                    <button type="button" data-range="7">7 Hari Terakhir</button>
-                    <button type="button" data-range="30" class="is-active">30 Hari Terakhir</button>
-                    <button type="button" data-range="mtd">Bulan Ini</button>
-                    <button type="button" data-range="last-month">Bulan Lalu</button>
-                    <button type="button" data-range="ytd">Tahun Ini</button>
-                    <button type="button" data-range="custom">Custom Range</button>
-                </div>
-                <form class="ro-filter-form" id="roFilterForm">
-                    <label class="ro-field"><span>Cabang</span><select id="roBranch" name="branch_id"><option value="">Semua cabang</option></select></label>
-                    <label class="ro-field"><span>Tanggal mulai</span><input type="date" id="roDateStart" name="date_start" value="{{ $defaultDateStart }}"></label>
-                    <label class="ro-field"><span>Tanggal akhir</span><input type="date" id="roDateEnd" name="date_end" value="{{ $defaultDateEnd }}"></label>
-                    <label class="ro-field"><span>Kasir</span><select id="roCashier" name="cashier_id"><option value="">Semua kasir</option></select></label>
-                    <label class="ro-field"><span>Shift</span><select id="roShift" name="shift_id"><option value="">Semua shift</option></select></label>
-                    <label class="ro-field"><span>Obat</span><select id="roMedicine" name="medicine_id"><option value="">Semua obat</option></select></label>
-                    <label class="ro-field"><span>Kategori</span><select id="roCategory" name="category_id"><option value="">Semua kategori</option></select></label>
-                    <label class="ro-field"><span>Golongan</span><select id="roClassification" name="golongan_id"><option value="">Semua golongan</option></select></label>
-                    <label class="ro-field"><span>Jenis penjualan</span><select id="roSaleType" name="transaction_type"><option value="">Semua jenis</option></select></label>
-                    <label class="ro-field"><span>Metode pembayaran</span><select id="roPaymentMethod" name="payment_method"><option value="">Semua metode</option></select></label>
-                    <label class="ro-field ro-field-command-only"><span>Agregasi tren</span><select id="roGranularity" name="granularity"><option value="day">Harian</option><option value="week">Mingguan</option><option value="month">Bulanan</option><option value="year">Tahunan</option></select></label>
-                    <label class="ro-field ro-field-command-only"><span>Ranking produk</span><select id="roTop" name="top"><option value="10">Top 10</option><option value="20">Top 20</option><option value="all">Semua</option></select></label>
-                    <div class="ro-filter-actions">
-                        <button type="button" class="ro-btn ro-btn-ghost" id="roReset"><i class="mdi mdi-filter-remove-outline"></i> Reset</button>
-                        <button type="submit" class="ro-btn ro-btn-primary" id="roApply"><i class="mdi mdi-filter-check-outline"></i> Terapkan Filter</button>
+        <section class="ro-filter-panel ro-panel" id="roFilterPanel" aria-labelledby="roFilterTitle">
+            <span class="ro-filter-aura ro-filter-aura-one" aria-hidden="true"></span>
+            <span class="ro-filter-aura ro-filter-aura-two" aria-hidden="true"></span>
+            <div class="ro-filter-progress" aria-hidden="true"><span></span></div>
+            <div class="ro-panel-head ro-filter-header">
+                <div class="ro-heading ro-filter-heading">
+                    <span><i class="mdi mdi-tune-variant"></i></span>
+                    <div>
+                        <span class="ro-filter-eyebrow">Smart controls</span>
+                        <h2 id="roFilterTitle">Filter Analisis</h2>
+                        <p>Atur cakupan data untuk seluruh KPI, grafik, dan tabel.</p>
                     </div>
-                </form>
-                <div class="ro-active-filters"><span><i class="mdi mdi-filter-variant"></i> Filter aktif <b id="roFilterCount">0</b></span><div id="roActiveFilters"><em>Menyiapkan...</em></div></div>
+                </div>
+                <div class="ro-filter-head-actions">
+                    <div class="ro-filter-state is-ready" id="roFilterState" role="status" aria-live="polite">
+                        <i class="mdi mdi-check-decagram-outline"></i>
+                        <span><small>Status parameter</small><strong id="roFilterStateText">Siap digunakan</strong></span>
+                    </div>
+                    <button type="button" class="ro-filter-toggle" id="roFilterToggle" aria-expanded="true" aria-controls="roFilterBody" title="Ringkas filter">
+                        <span>Ringkas</span><i class="mdi mdi-chevron-up"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="ro-filter-body" id="roFilterBody">
+                <div class="ro-filter-body-inner">
+                    <div class="ro-presets" role="group" aria-label="Periode cepat">
+                        <div class="ro-preset-label"><i class="mdi mdi-calendar-clock-outline"></i><span><strong>Periode cepat</strong><small>Pilih rentang instan</small></span></div>
+                        <div class="ro-preset-options">
+                            <button type="button" data-range="today" aria-pressed="false"><i class="mdi mdi-white-balance-sunny"></i>Hari Ini</button>
+                            <button type="button" data-range="7" aria-pressed="false"><i class="mdi mdi-calendar-week-outline"></i>7 Hari</button>
+                            <button type="button" data-range="30" class="is-active" aria-pressed="true"><i class="mdi mdi-calendar-month-outline"></i>30 Hari</button>
+                            <button type="button" data-range="mtd" aria-pressed="false">Bulan Ini</button>
+                            <button type="button" data-range="last-month" aria-pressed="false">Bulan Lalu</button>
+                            <button type="button" data-range="ytd" aria-pressed="false">Tahun Ini</button>
+                            <button type="button" data-range="custom" aria-pressed="false"><i class="mdi mdi-calendar-edit-outline"></i>Custom</button>
+                        </div>
+                    </div>
+                    <form class="ro-filter-form" id="roFilterForm">
+                        <div class="ro-filter-group">
+                            <div class="ro-filter-group-head">
+                                <span>01</span>
+                                <div><strong>Cakupan utama</strong><small>Tentukan cabang dan periode laporan</small></div>
+                            </div>
+                            <div class="ro-filter-grid ro-filter-grid-primary">
+                                <label class="ro-field"><span><i class="mdi mdi-source-branch"></i>Cabang</span><select id="roBranch" name="branch_id"><option value="">Semua cabang</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-calendar-start-outline"></i>Tanggal mulai</span><input type="date" id="roDateStart" name="date_start" value="{{ $defaultDateStart }}"></label>
+                                <label class="ro-field"><span><i class="mdi mdi-calendar-end-outline"></i>Tanggal akhir</span><input type="date" id="roDateEnd" name="date_end" value="{{ $defaultDateEnd }}"></label>
+                                <label class="ro-field"><span><i class="mdi mdi-account-tie-outline"></i>Kasir</span><select id="roCashier" name="cashier_id"><option value="">Semua kasir</option></select></label>
+                            </div>
+                        </div>
+                        <div class="ro-filter-group ro-filter-group-detail">
+                            <div class="ro-filter-group-head">
+                                <span>02</span>
+                                <div><strong>Segmentasi detail</strong><small>Persempit analisis sesuai kebutuhan</small></div>
+                                <span class="ro-optional-badge">Opsional</span>
+                            </div>
+                            <div class="ro-filter-grid ro-filter-grid-detail">
+                                <label class="ro-field"><span><i class="mdi mdi-clock-outline"></i>Shift</span><select id="roShift" name="shift_id"><option value="">Semua shift</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-pill-multiple"></i>Obat</span><select id="roMedicine" name="medicine_id"><option value="">Semua obat</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-shape-outline"></i>Kategori</span><select id="roCategory" name="category_id"><option value="">Semua kategori</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-format-list-bulleted-type"></i>Golongan</span><select id="roClassification" name="golongan_id"><option value="">Semua golongan</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-cart-arrow-right"></i>Jenis penjualan</span><select id="roSaleType" name="transaction_type"><option value="">Semua jenis</option></select></label>
+                                <label class="ro-field"><span><i class="mdi mdi-credit-card-multiple-outline"></i>Metode pembayaran</span><select id="roPaymentMethod" name="payment_method"><option value="">Semua metode</option></select></label>
+                                <label class="ro-field ro-field-command-only"><span>Agregasi tren</span><select id="roGranularity" name="granularity"><option value="day">Harian</option><option value="week">Mingguan</option><option value="month">Bulanan</option><option value="year">Tahunan</option></select></label>
+                                <label class="ro-field ro-field-command-only"><span>Ranking produk</span><select id="roTop" name="top"><option value="10">Top 10</option><option value="20">Top 20</option><option value="all">Semua</option></select></label>
+                            </div>
+                        </div>
+                        <div class="ro-filter-actions">
+                            <div class="ro-filter-action-copy" id="roFilterActionCopy"><i class="mdi mdi-information-outline"></i><span><strong>Filter tersinkron</strong><small>Ubah parameter lalu terapkan untuk memperbarui dashboard.</small></span></div>
+                            <div>
+                                <button type="button" class="ro-btn ro-btn-ghost" id="roReset"><i class="mdi mdi-backup-restore"></i> Reset</button>
+                                <button type="submit" class="ro-btn ro-btn-primary" id="roApply"><i class="mdi mdi-filter-check-outline"></i> Terapkan Filter</button>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="ro-active-filters">
+                        <span><i class="mdi mdi-filter-variant"></i> Filter aktif <b id="roFilterCount">0</b></span>
+                        <div id="roActiveFilters"><em>Menyiapkan...</em></div>
+                    </div>
+                </div>
             </div>
         </section>
 

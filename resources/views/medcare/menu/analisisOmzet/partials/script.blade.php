@@ -7,7 +7,7 @@
 
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-    const state = { charts: {}, controller: null, analysis: null, toastTimer: null };
+    const state = { charts: {}, controller: null, analysis: null, toastTimer: null, appliedParams: null, filterError: false };
     const form = $('#roFilterForm');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const money = value => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -40,33 +40,85 @@
         state.toastTimer = setTimeout(() => { toast.hidden = true; }, 4200);
     }
 
+    function setFilterState(tone, text) {
+        const status = $('#roFilterState');
+        const icons = {
+            ready: 'mdi-check-decagram-outline',
+            dirty: 'mdi-alert-decagram-outline',
+            loading: 'mdi-loading mdi-spin',
+            error: 'mdi-alert-circle-outline',
+        };
+        status.className = `ro-filter-state is-${tone}`;
+        status.setAttribute('title', text);
+        $('i', status).className = `mdi ${icons[tone] || icons.ready}`;
+        $('#roFilterStateText').textContent = text;
+    }
+
+    function syncFieldStates() {
+        $$('.ro-field', form).forEach(field => {
+            const control = $('input, select', field);
+            field.classList.toggle('is-selected', Boolean(control && String(control.value).trim()));
+        });
+    }
+
+    function syncFilterState() {
+        syncFieldStates();
+        if (state.appliedParams === null) return;
+        const dirty = params().toString() !== state.appliedParams;
+        $('#roFilterPanel').classList.toggle('has-pending-changes', dirty);
+        if (!state.filterError) setFilterState(dirty ? 'dirty' : 'ready', dirty ? 'Perubahan belum diterapkan' : 'Filter tersinkron');
+        const copy = $('#roFilterActionCopy');
+        $('strong', copy).textContent = dirty ? 'Ada perubahan parameter' : 'Filter tersinkron';
+        $('small', copy).textContent = dirty
+            ? 'Klik Terapkan Filter untuk memperbarui seluruh analisis.'
+            : 'Ubah parameter lalu terapkan untuk memperbarui dashboard.';
+    }
+
+    function setPresetActive(range) {
+        $$('.ro-presets button').forEach(button => {
+            const active = button.dataset.range === range;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
+    }
+
     function setLoading(active) {
+        $('#roFilterPanel').classList.toggle('is-loading', active);
+        $('#roFilterPanel').setAttribute('aria-busy', String(active));
         $('#roApply').disabled = active;
         $('#roApply').innerHTML = active
             ? '<i class="mdi mdi-loading mdi-spin"></i> Mengolah Data'
             : '<i class="mdi mdi-filter-check-outline"></i> Terapkan Filter';
+        if (active) setFilterState('loading', 'Memperbarui analisis');
     }
 
     async function load() {
         if (state.controller) state.controller.abort();
-        state.controller = new AbortController();
+        const controller = new AbortController();
+        state.controller = controller;
+        const requestParams = params().toString();
         setLoading(true);
         try {
-            const response = await fetch(`${app.dataset.url}?${params()}`, {
+            const response = await fetch(`${app.dataset.url}?${requestParams}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                signal: state.controller.signal,
+                signal: controller.signal,
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(firstError(payload) || 'Data analisis omzet gagal dimuat.');
             state.analysis = payload.analysis;
             render(payload.analysis);
+            state.filterError = false;
+            state.appliedParams = requestParams;
+            syncFilterState();
         } catch (error) {
             if (error.name !== 'AbortError') {
+                state.filterError = true;
+                setFilterState('error', 'Gagal memperbarui data');
                 showToast(error.message, true);
                 renderError(error.message);
             }
         } finally {
-            setLoading(false);
+            if (state.controller === controller) setLoading(false);
         }
     }
 
@@ -118,6 +170,7 @@
             select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>` + rows.map(row => `<option value="${escapeHtml(value(row))}">${escapeHtml(label(row))}</option>`).join('');
             if ($$(`option`, select).some(option => option.value === selected)) select.value = selected;
         });
+        syncFieldStates();
     }
 
     function renderActiveFilters(filters) {
@@ -312,13 +365,26 @@
         if (range === 'mtd') start = new Date(now.getFullYear(), now.getMonth(), 1);
         if (range === 'last-month') { start = new Date(now.getFullYear(), now.getMonth() - 1, 1); end = new Date(now.getFullYear(), now.getMonth(), 0); }
         if (range === 'ytd') { start = new Date(now.getFullYear(), 0, 1); granularity = 'month'; }
+        setPresetActive(range);
         if (range === 'custom') { $('#roDateStart').focus(); return; }
         $('#roDateStart').value = dateValue(start); $('#roDateEnd').value = dateValue(end); $('#roGranularity').value = granularity;
-        $$('.ro-presets button').forEach(button => button.classList.toggle('is-active', button.dataset.range === range));
+        state.filterError = false;
+        syncFilterState();
         load();
     }
 
     form.addEventListener('submit', event => { event.preventDefault(); load(); });
+    form.addEventListener('change', event => {
+        state.filterError = false;
+        if (event.target.matches('#roDateStart, #roDateEnd')) setPresetActive('custom');
+        syncFilterState();
+    });
+    form.addEventListener('input', event => {
+        if (!event.target.matches('input')) return;
+        state.filterError = false;
+        if (event.target.matches('#roDateStart, #roDateEnd')) setPresetActive('custom');
+        syncFilterState();
+    });
     $$('.ro-presets button').forEach(button => button.addEventListener('click', () => applyPreset(button.dataset.range)));
     $$('#roTrendControls button').forEach(button => button.addEventListener('click', () => {
         if ($('#roGranularity').value === button.dataset.granularity) return;
@@ -334,12 +400,18 @@
     }));
     $('#roReset').addEventListener('click', () => {
         form.reset(); $('#roDateStart').value = app.dataset.defaultStart; $('#roDateEnd').value = app.dataset.defaultEnd;
-        $$('.ro-presets button').forEach(button => button.classList.toggle('is-active', button.dataset.range === '30')); load();
+        setPresetActive('30'); state.filterError = false; syncFilterState(); load();
     });
     $('#roFilterToggle').addEventListener('click', () => {
-        const body = $('#roFilterBody'); const hidden = body.hidden; body.hidden = !hidden;
-        $('#roFilterToggle').setAttribute('aria-expanded', String(hidden));
-        $('i', $('#roFilterToggle')).className = `mdi ${hidden ? 'mdi-chevron-up' : 'mdi-chevron-down'}`;
+        const body = $('#roFilterBody');
+        const collapsed = !body.classList.contains('is-collapsed');
+        body.classList.toggle('is-collapsed', collapsed);
+        $('#roFilterPanel').classList.toggle('is-collapsed', collapsed);
+        $('#roFilterToggle').setAttribute('aria-expanded', String(!collapsed));
+        $('#roFilterToggle').setAttribute('title', collapsed ? 'Buka filter' : 'Ringkas filter');
+        $('span', $('#roFilterToggle')).textContent = collapsed ? 'Buka' : 'Ringkas';
+        body.setAttribute('aria-hidden', String(collapsed));
+        body.inert = collapsed;
     });
     $('#roExportExcel').addEventListener('click', () => { window.location.href = `${app.dataset.excelUrl}?${params()}`; });
     $('#roExportPdf').addEventListener('click', () => { window.location.href = `${app.dataset.pdfUrl}?${params()}`; });
