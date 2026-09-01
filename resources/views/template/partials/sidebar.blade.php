@@ -43,6 +43,7 @@
     $receiptDocumentMenuActive = request()->routeIs("dokumen.nota.*");
     $stockMenuActive = request()->routeIs("stok.*", "kartuStok.*", "stockOpname.*");
     $inventoryAnalysisMenuActive = request()->routeIs("analisisPersediaan.*");
+    $procurementAnalysisMenuActive = request()->routeIs("analisisPengadaan.*");
     $revenueAnalysisMenuActive = request()->routeIs("analisisOmzet.*");
     $reportMenuActive = request()->routeIs("laporan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
@@ -526,6 +527,14 @@
                     class="nav-link {{ $revenueAnalysisMenuActive ? 'active' : '' }}">
                     <i class="link-icon" data-feather="trending-up"></i>
                     <span class="link-title">Analisis Omzet</span>
+                </a>
+            </li>
+
+            <li class="nav-item {{ $procurementAnalysisMenuActive ? 'active' : '' }}">
+                <a href="{{ route('analisisPengadaan.index') }}"
+                    class="nav-link {{ $procurementAnalysisMenuActive ? 'active' : '' }}">
+                    <i class="link-icon" data-feather="activity"></i>
+                    <span class="link-title">Analisis Pengadaan</span>
                 </a>
             </li>
 

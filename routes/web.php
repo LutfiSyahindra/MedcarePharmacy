@@ -13,6 +13,7 @@ use App\Http\Controllers\Medcare\MasterData\Rak\RakController;
 use App\Http\Controllers\Medcare\MasterData\Satuan\SatuanController;
 use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\AnalisisOmzet\RevenueAnalysisController;
+use App\Http\Controllers\Medcare\Menu\AnalisisPengadaan\ProcurementAnalysisController;
 use App\Http\Controllers\Medcare\Menu\AnalisisPersediaan\InventoryAnalysisController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
@@ -421,6 +422,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/target', [RevenueAnalysisController::class, 'storeTarget'])->name('analisisOmzet.target.store');
         Route::get('/export/excel', [RevenueAnalysisController::class, 'excel'])->name('analisisOmzet.export.excel');
         Route::get('/export/pdf', [RevenueAnalysisController::class, 'pdf'])->name('analisisOmzet.export.pdf');
+    });
+
+    Route::prefix('medcare/menu/analisis-pengadaan')->group(function () {
+        Route::get('/', [ProcurementAnalysisController::class, 'index'])->name('analisisPengadaan.index');
+        Route::get('/data', [ProcurementAnalysisController::class, 'data'])->name('analisisPengadaan.data');
+        Route::get('/obat/{medicine}', [ProcurementAnalysisController::class, 'medicine'])
+            ->whereNumber('medicine')
+            ->name('analisisPengadaan.medicine');
     });
 
     Route::prefix('medcare/menu/laporan')->group(function () {
