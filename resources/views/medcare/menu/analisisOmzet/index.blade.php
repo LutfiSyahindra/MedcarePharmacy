@@ -54,6 +54,7 @@
             <a href="#roProductsPanel"><i class="mdi mdi-pill-multiple"></i><span>Produk</span></a>
             <a href="#roBreakdowns"><i class="mdi mdi-chart-donut"></i><span>Kontribusi</span></a>
             <a href="#roTargetPanel"><i class="mdi mdi-bullseye-arrow"></i><span>Target</span></a>
+            <a href="{{ route('laporan.penjualan.index', ['report' => 'ringkasan']) }}"><i class="mdi mdi-file-table-outline"></i><span>Laporan detail</span></a>
         </nav>
 
         <section class="ro-filter-panel ro-panel" id="roFilterPanel" aria-labelledby="roFilterTitle">

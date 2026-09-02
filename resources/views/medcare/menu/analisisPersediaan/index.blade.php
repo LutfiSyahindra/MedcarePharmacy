@@ -55,6 +55,11 @@
                     <span><b>{{ $analysisMenu['short_title'] }}</b><small>{{ str_pad((string) $loop->iteration, 2, '0', STR_PAD_LEFT) }}</small></span>
                 </a>
             @endforeach
+            <a href="{{ route('laporan.persediaan.index', ['report' => 'stok-minimum']) }}"
+                class="ia-analysis-link">
+                <span class="ia-analysis-icon"><i class="mdi mdi-file-table-outline"></i></span>
+                <span><b>Laporan Stok Minimum</b><small>DETAIL</small></span>
+            </a>
         </nav>
 
         <section class="ia-filter-card">

@@ -117,7 +117,8 @@ class InventoryAnalysisTest extends TestCase
             ->assertSee('Analisis Persediaan')
             ->assertSee('Pergerakan Stok')
             ->assertSee('Pareto ABC')
-            ->assertSee('Stok Hampir Habis')
+            ->assertDontSee('Stok Hampir Habis')
+            ->assertSee('Laporan Stok Minimum')
             ->assertSee('Slow Moving')
             ->assertSee('Dead Stock')
             ->assertSee('Saran Pembelian')
@@ -128,6 +129,9 @@ class InventoryAnalysisTest extends TestCase
             ->assertSee('iaFilterToggle', false)
             ->assertSee('iaClearSort', false)
             ->assertSee('iaTableBody', false);
+
+        $this->get(route('analisisPersediaan.index', ['analysis' => 'stok-hampir-habis']))
+            ->assertRedirect(route('laporan.persediaan.index', ['report' => 'stok-minimum']));
 
         $this->get(route('analisisPersediaan.index', ['analysis' => 'saran-pembelian']))
             ->assertOk()
@@ -181,6 +185,27 @@ class InventoryAnalysisTest extends TestCase
             ->assertJsonPath('analysis.rows.0.estimated_purchase', 50000)
             ->assertJsonMissingPath('analysis.rows.0.supplier')
             ->assertJsonMissingPath('analysis.rows.0.distributor_id');
+    }
+
+    public function test_legacy_low_stock_endpoint_ignores_products_without_a_minimum_threshold(): void
+    {
+        $medicine = MasterObatModel::create([
+            'kode_obat' => 'INV-NO-MINIMUM',
+            'nama_obat' => 'Obat Tanpa Batas Minimum',
+            'stok_minimum' => 0,
+            'harga_beli' => 1000,
+            'is_active' => true,
+        ]);
+        $this->storeSale($medicine, 1, 1000, 'INV-SALE-NO-MINIMUM');
+
+        $this->actingAs($this->user)->getJson(route('analisisPersediaan.data', [
+            'analysis' => 'stok-hampir-habis',
+            'date_start' => '2026-05-29',
+            'date_end' => '2026-08-26',
+            'search' => 'INV-NO-MINIMUM',
+        ]))
+            ->assertOk()
+            ->assertJsonCount(0, 'analysis.rows');
     }
 
     public function test_purchase_suggestions_can_create_a_purchase_order_and_recalculate_before_a_repeat_request(): void

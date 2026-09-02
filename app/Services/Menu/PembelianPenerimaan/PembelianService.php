@@ -27,8 +27,9 @@ class PembelianService
 
     public function generatePo()
     {
-        $tahun = date('Y');
-        $bulan = date('m');
+        $now = now();
+        $tahun = $now->format('Y');
+        $bulan = $now->format('m');
 
         $lastPo = PembelianModel::whereYear('created_at', $tahun)
             ->whereMonth('created_at', $bulan)

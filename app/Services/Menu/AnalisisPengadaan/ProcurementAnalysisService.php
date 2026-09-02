@@ -66,6 +66,7 @@ class ProcurementAnalysisService
                     'quantity' => 'Qty pembelian dinormalisasi ke satuan stok menggunakan konversi pada item PO.',
                     'cancelled' => 'PO berstatus rejected dikelompokkan sebagai order dibatalkan.',
                     'need' => 'Kebutuhan = penjualan 30 hari + stok minimum - estimasi stok saat order terakhir.',
+                    'value' => 'Nilai dan harga pada analisis berasal dari estimasi item PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.',
                 ],
             ],
             'summary' => $summary,
@@ -820,7 +821,7 @@ class ProcurementAnalysisService
         return [
             ['tone' => $over > 0 ? 'danger' : 'success', 'icon' => 'mdi-cart-arrow-up', 'title' => $over.' obat terindikasi over order', 'text' => $over > 0 ? 'Tinjau stok saat order dan kecepatan penjualan sebelum PO berikutnya.' : 'Belum ada indikasi pembelian berlebih pada periode aktif.'],
             ['tone' => $under > 0 ? 'warning' : 'success', 'icon' => 'mdi-cart-arrow-down', 'title' => $under.' obat terindikasi under order', 'text' => $under > 0 ? 'Prioritaskan obat dengan kebutuhan yang belum tercukupi.' : 'Kuantitas order telah mencukupi estimasi kebutuhan.'],
-            ['tone' => $slowValue > 0 ? 'warning' : 'info', 'icon' => 'mdi-timer-sand', 'title' => 'Rp '.number_format($slowValue, 0, ',', '.').' untuk slow/non moving', 'text' => 'Nilai order pada produk yang bergerak lambat atau belum terjual dalam 90 hari.'],
+            ['tone' => $slowValue > 0 ? 'warning' : 'info', 'icon' => 'mdi-timer-sand', 'title' => 'Rp '.number_format($slowValue, 0, ',', '.').' untuk slow/non moving', 'text' => 'Nilai estimasi PO pada produk yang bergerak lambat atau belum terjual dalam 90 hari.'],
             ['tone' => 'info', 'icon' => 'mdi-truck-check-outline', 'title' => 'Fulfillment '.$fulfillment.'%', 'text' => $bestSupplier ? $bestSupplier['name'].' memiliki lead time tercepat ('.$bestSupplier['lead_time_days'].' hari).' : 'Lead time akan muncul setelah penerimaan posted tersedia.'],
         ];
     }

@@ -34,6 +34,7 @@ class InventoryAnalysisService
             'description' => 'Prioritaskan produk yang saldo terkininya sudah mencapai atau berada di bawah stok minimum.',
             'icon' => 'mdi-package-variant-minus',
             'tone' => 'amber',
+            'menu_visible' => false,
         ],
         'slow-moving' => [
             'title' => 'Slow Moving',
@@ -57,6 +58,14 @@ class InventoryAnalysisService
             'tone' => 'green',
         ],
     ];
+
+    public static function menuTypes(): array
+    {
+        return array_filter(
+            self::TYPES,
+            fn (array $definition): bool => $definition['menu_visible'] ?? true,
+        );
+    }
 
     public function definition(string $type): array
     {
@@ -444,7 +453,7 @@ class InventoryAnalysisService
     private function lowStock(Collection $rows): array
     {
         $rows = $rows
-            ->filter(fn (array $row) => $row['current_stock'] <= $row['minimum_stock'])
+            ->filter(fn (array $row) => $row['minimum_stock'] > 0 && $row['current_stock'] <= $row['minimum_stock'])
             ->map(function (array $row) {
                 $row['shortage'] = round(max(0, $row['minimum_stock'] - $row['current_stock']), 2);
                 $row['stock_status'] = $row['current_stock'] <= 0 ? 'Kosong' : 'Menipis';

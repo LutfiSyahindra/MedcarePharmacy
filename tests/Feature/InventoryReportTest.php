@@ -126,6 +126,9 @@ class InventoryReportTest extends TestCase
         foreach (InventoryReportService::TYPES as $definition) {
             $response->assertSee($definition['short_title']);
         }
+
+        $response->assertSee('Dashboard analisis')
+            ->assertSee('Stok saat ini: batch dengan saldo positif');
     }
 
     public function test_every_inventory_report_returns_scoped_data_with_complete_columns(): void

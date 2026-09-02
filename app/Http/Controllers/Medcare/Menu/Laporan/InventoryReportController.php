@@ -39,6 +39,8 @@ class InventoryReportController extends Controller
                 'health_eyebrow' => 'Kesehatan persediaan',
                 'health_title' => 'Nilai stok aktif',
                 'health_copy' => 'nilai stok berisiko terhadap total modal persediaan.',
+                'analysis_url' => route('analisisPersediaan.index', ['analysis' => 'pergerakan-stok']),
+                'basis_label' => 'Stok saat ini: batch dengan saldo positif',
             ],
         ]);
     }

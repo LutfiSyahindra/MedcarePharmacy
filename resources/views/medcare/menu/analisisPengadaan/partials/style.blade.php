@@ -28,8 +28,8 @@
     .pa-hero-context > div > span { grid-row: span 2; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.11); font-size: 18px; }
     .pa-hero-context small { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: #add9da; }
     .pa-hero-context strong { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    .pa-hero-context button { border: 0; padding: 10px 14px; border-radius: 11px; color: #174b54; background: #e7fffa; font-weight: 750; font-size: 12px; transition: .2s; }
-    .pa-hero-context button:hover { transform: translateY(-1px); background: #fff; }
+    .pa-hero-context button, .pa-hero-context > a { display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; padding: 10px 14px; border-radius: 11px; color: #174b54; background: #e7fffa; font-weight: 750; font-size: 12px; transition: .2s; }
+    .pa-hero-context button:hover, .pa-hero-context > a:hover { color: #174b54; text-decoration: none; transform: translateY(-1px); background: #fff; }
 
     .pa-tabs { position: sticky; top: 68px; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 18px 0; padding: 6px; border-radius: 16px; background: rgba(255,255,255,.96); border: 1px solid var(--pa-line); box-shadow: 0 8px 26px rgba(27,54,68,.08); backdrop-filter: blur(8px); }
     .pa-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 43px; border: 0; border-radius: 11px; color: #687d89; background: transparent; font-size: 12px; font-weight: 720; transition: .2s; }
@@ -174,7 +174,7 @@
     body.pa-drawer-open { overflow: hidden; }
 
     @media (max-width: 1500px) { .pa-filter-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } .pa-kpi-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
-    @media (max-width: 1100px) { .pa-hero { grid-template-columns: 1fr; } .pa-hero-context { grid-template-columns: repeat(2,minmax(0,1fr)); } .pa-hero-context button { grid-column: span 2; } .pa-grid-wide, .pa-grid-two { grid-template-columns: 1fr; } .pa-insight-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 1100px) { .pa-hero { grid-template-columns: 1fr; } .pa-hero-context { grid-template-columns: repeat(2,minmax(0,1fr)); } .pa-grid-wide, .pa-grid-two { grid-template-columns: 1fr; } .pa-insight-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
     @media (max-width: 820px) { .pa-tabs { top: 62px; overflow-x: auto; grid-template-columns: repeat(5,minmax(145px,1fr)); justify-content: start; } .pa-filter-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .pa-grid-three, .pa-grid-four { grid-template-columns: 1fr; } .pa-kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .pa-section-label { align-items: flex-start; flex-direction: column; gap: 4px; } .pa-need-legend { margin: 0 0 12px; justify-content: flex-start; } }
     @media (max-width: 560px) { .pa-hero { padding: 26px 22px; border-radius: 18px; } .pa-hero-context { grid-template-columns: 1fr; } .pa-hero-context button { grid-column: auto; } .pa-filter-grid, .pa-kpi-grid, .pa-insight-grid, .pa-moving-grid, .pa-detail-kpis { grid-template-columns: 1fr; } .pa-filter-footer { align-items: stretch; flex-direction: column; } .pa-filter-footer > div:last-child { display: grid; grid-template-columns: 1fr 1fr; } .pa-btn + .pa-btn { margin-left: 6px; } .pa-filter-status { display: none; } .pa-split { grid-template-columns: 1fr; } .pa-mini-list { padding: 0 18px 16px; } }
 </style>

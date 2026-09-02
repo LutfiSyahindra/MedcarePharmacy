@@ -510,7 +510,7 @@
                 </a>
                 <div class="collapse {{ $inventoryAnalysisMenuActive ? 'show' : '' }}" id="analisis-persediaan">
                     <ul class="nav sub-menu">
-                        @foreach (\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES as $analysisSlug => $analysisMenu)
+                        @foreach (\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::menuTypes() as $analysisSlug => $analysisMenu)
                             <li class="nav-item">
                                 <a href="{{ route('analisisPersediaan.index', ['analysis' => $analysisSlug]) }}"
                                     class="nav-link {{ request()->routeIs('analisisPersediaan.*') && request()->route('analysis') === $analysisSlug ? 'active' : '' }}">
@@ -534,7 +534,7 @@
                 <a href="{{ route('analisisPengadaan.index') }}"
                     class="nav-link {{ $procurementAnalysisMenuActive ? 'active' : '' }}">
                     <i class="link-icon" data-feather="activity"></i>
-                    <span class="link-title">Analisis Pengadaan</span>
+                    <span class="link-title">Analisis PO & Kebutuhan</span>
                 </a>
             </li>
 
@@ -543,7 +543,7 @@
                     href="#laporan" role="button" aria-expanded="{{ $reportMenuActive ? 'true' : 'false' }}"
                     aria-controls="laporan">
                     <i class="link-icon" data-feather="pie-chart"></i>
-                    <span class="link-title">Laporan</span>
+                    <span class="link-title">Laporan Operasional</span>
                     <i class="link-arrow" data-feather="chevron-down"></i>
                 </a>
                 <div class="collapse {{ $reportMenuActive ? 'show' : '' }}" id="laporan">
@@ -551,19 +551,19 @@
                         <li class="nav-item">
                             <a href="{{ route('laporan.penjualan.index', ['report' => 'ringkasan']) }}"
                                 class="nav-link {{ request()->routeIs('laporan.penjualan.*') ? 'active' : '' }}">
-                                Laporan Penjualan
+                                Detail Penjualan
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('laporan.pembelian.index', ['report' => 'pembelian']) }}"
                                 class="nav-link {{ request()->routeIs('laporan.pembelian.*') ? 'active' : '' }}">
-                                Laporan Pembelian
+                                Realisasi Pembelian
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="{{ route('laporan.persediaan.index', ['report' => 'posisi-stok']) }}"
                                 class="nav-link {{ request()->routeIs('laporan.persediaan.*') ? 'active' : '' }}">
-                                Laporan Persediaan
+                                Stok & Audit
                             </a>
                         </li>
                     </ul>

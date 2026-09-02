@@ -408,6 +408,10 @@ Route::middleware('auth')->group(function () {
     Route::prefix('medcare/menu/analisis-persediaan')->group(function () {
         Route::post('/saran-pembelian/purchase-orders', [InventoryAnalysisController::class, 'createPurchaseOrders'])
             ->name('analisisPersediaan.purchaseOrders.store');
+        Route::redirect(
+            '/stok-hampir-habis',
+            '/medcare/menu/laporan/persediaan/stok-minimum',
+        )->name('analisisPersediaan.lowStock.redirect');
         Route::get('/{analysis}/data', [InventoryAnalysisController::class, 'data'])
             ->whereIn('analysis', array_keys(\App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService::TYPES))
             ->name('analisisPersediaan.data');

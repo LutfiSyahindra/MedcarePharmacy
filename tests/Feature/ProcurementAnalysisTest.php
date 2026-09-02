@@ -87,7 +87,9 @@ class ProcurementAnalysisTest extends TestCase
 
         $this->actingAs($this->user)->get(route('analisisPengadaan.index'))
             ->assertOk()
-            ->assertSee('Analisis Pengadaan')
+            ->assertSee('Analisis PO & Kebutuhan', false)
+            ->assertSee('Perubahan Harga Estimasi PO')
+            ->assertSee('Laporan realisasi')
             ->assertSee('Order vs Kebutuhan')
             ->assertSee('paKpiGrid', false)
             ->assertSee('paTrendChart', false)
@@ -103,6 +105,7 @@ class ProcurementAnalysisTest extends TestCase
         $response = $this->actingAs($this->user)->getJson(route('analisisPengadaan.data', $this->period()))
             ->assertOk()
             ->assertJsonPath('analysis.meta.branch_label', 'Cabang Procurement')
+            ->assertJsonPath('analysis.meta.methodology.value', 'Nilai dan harga pada analisis berasal dari estimasi item PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.')
             ->assertJsonPath('analysis.summary.order_value', 10000)
             ->assertJsonPath('analysis.summary.order_value_previous', 5000)
             ->assertJsonPath('analysis.summary.order_value_change', 100)

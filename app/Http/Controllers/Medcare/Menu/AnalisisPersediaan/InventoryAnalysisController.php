@@ -31,7 +31,7 @@ class InventoryAnalysisController extends Controller
         return view('medcare.menu.analisisPersediaan.index', [
             'analysisType' => $analysis,
             'analysisDefinition' => $this->analysis->definition($analysis),
-            'analysisTypes' => InventoryAnalysisService::TYPES,
+            'analysisTypes' => InventoryAnalysisService::menuTypes(),
             'distributors' => $analysis === 'saran-pembelian'
                 ? DistributorModel::query()
                     ->where('is_active', true)

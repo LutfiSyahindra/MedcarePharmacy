@@ -40,6 +40,8 @@ class PurchaseReportController extends Controller
                 'health_eyebrow' => 'Kesehatan pembelian',
                 'health_title' => 'Setelah retur',
                 'health_copy' => 'rasio retur terhadap pembelian aktual periode aktif.',
+                'analysis_url' => route('analisisPengadaan.index'),
+                'basis_label' => 'PO: estimasi · Pembelian: penerimaan posted',
             ],
         ]);
     }

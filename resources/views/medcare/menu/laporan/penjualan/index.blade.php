@@ -15,6 +15,8 @@
         'health_eyebrow' => 'Kesehatan penjualan',
         'health_title' => 'Setelah retur',
         'health_copy' => 'rasio retur terhadap omzet periode aktif.',
+        'analysis_url' => route('analisisOmzet.index'),
+        'basis_label' => 'Omzet laporan: completed sebelum retur',
     ], $reportModule ?? []);
     $showSupplierFilter = $showSupplierFilter ?? false;
     $defaultDateStart = $defaultDateStart ?? today()->subDays(29)->toDateString();
@@ -55,10 +57,14 @@
                         <a href="#srSummarySection"><i class="mdi mdi-view-dashboard-outline"></i> Ringkasan</a>
                         <a href="#srInsightsSection"><i class="mdi mdi-chart-areaspline"></i> Analisis</a>
                         <a href="#srTablePanel"><i class="mdi mdi-table-large"></i> Detail data</a>
+                        @if (! empty($reportModule['analysis_url']))
+                            <a href="{{ $reportModule['analysis_url'] }}"><i class="mdi mdi-open-in-new"></i> Dashboard analisis</a>
+                        @endif
                     </nav>
                     <div class="sr-hero-pills">
                         <span><i></i> Data operasional langsung</span>
                         <span><i class="mdi mdi-shield-check-outline"></i> Sesuai akses cabang</span>
+                        <span><i class="mdi mdi-information-outline"></i> {{ $reportModule['basis_label'] }}</span>
                     </div>
                 </div>
             </div>

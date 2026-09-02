@@ -203,6 +203,9 @@ class SalesReportTest extends TestCase
         foreach (SalesReportService::TYPES as $definition) {
             $response->assertSee($definition['short_title']);
         }
+
+        $response->assertSee('Dashboard analisis')
+            ->assertSee('Omzet laporan: completed sebelum retur');
     }
 
     public function test_summary_and_every_sales_report_type_return_scoped_operational_data(): void
@@ -212,6 +215,7 @@ class SalesReportTest extends TestCase
 
         $summary->assertOk()
             ->assertJsonPath('report.meta.branch_label', $this->branch->name)
+            ->assertJsonPath('report.meta.amount_basis', 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Omzet.')
             ->assertJsonPath('report.metrics.0.value', 100000)
             ->assertJsonPath('report.metrics.1.value', 1)
             ->assertJsonPath('report.metrics.2.value', 2)
@@ -270,8 +274,13 @@ class SalesReportTest extends TestCase
             ->assertJsonPath('report.table.columns.9.empty_label', 'Belum dihitung')
             ->assertJsonPath('report.table.columns.10.empty_label', 'Menunggu tutup shift');
 
-        $this->getJson(route('laporan.penjualan.data', ['report' => 'kategori', ...$query]))
-            ->assertJsonPath('report.table.rows.0.category', 'Analgesik');
+        $categoryReport = $this->getJson(route('laporan.penjualan.data', ['report' => 'kategori', ...$query]))
+            ->assertJsonPath('report.table.rows.0.category', 'Analgesik')
+            ->assertJsonPath('report.table.rows.0.revenue', 100000);
+        $this->assertSame(
+            'Omzet sebelum retur',
+            collect($categoryReport->json('report.table.columns'))->firstWhere('key', 'revenue')['label'],
+        );
         $this->getJson(route('laporan.penjualan.data', ['report' => 'metode-bayar', ...$query]))
             ->assertJsonPath('report.table.rows.0.payment_method', 'qris')
             ->assertJsonPath('report.table.rows.0.amount', 100000);

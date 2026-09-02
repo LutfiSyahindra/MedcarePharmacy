@@ -15,9 +15,9 @@ class SalesReportService
 {
     public const TYPES = [
         'ringkasan' => [
-            'title' => 'Ringkasan Penjualan',
-            'short_title' => 'Ringkasan',
-            'description' => 'Pantau omzet, transaksi, kuantitas, dan diskon dalam satu pandangan eksekutif.',
+            'title' => 'Rekap Harian Penjualan',
+            'short_title' => 'Rekap Harian',
+            'description' => 'Rekap transaksi completed, kuantitas, diskon, dan omzet sebelum retur per hari.',
             'icon' => 'mdi-view-dashboard-outline',
             'tone' => 'navy',
         ],
@@ -31,7 +31,7 @@ class SalesReportService
         'obat' => [
             'title' => 'Penjualan per Obat',
             'short_title' => 'Per Obat',
-            'description' => 'Bandingkan kuantitas, frekuensi transaksi, dan kontribusi omzet setiap produk obat.',
+            'description' => 'Bandingkan kuantitas, frekuensi transaksi, dan omzet completed sebelum retur setiap produk obat.',
             'icon' => 'mdi-pill-multiple',
             'tone' => 'teal',
         ],
@@ -138,6 +138,7 @@ class SalesReportService
                 'date_start' => $filters['start']->toDateString(),
                 'date_end' => $filters['end']->toDateString(),
                 'period_days' => $filters['start']->diffInDays($filters['end']) + 1,
+                'amount_basis' => 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Omzet.',
                 'generated_at' => now()->format('Y-m-d H:i:s'),
             ],
             'metrics' => $metrics['cards'],
@@ -293,7 +294,7 @@ class SalesReportService
             ];
         } else {
             $cards = [
-                $this->card('Omzet penjualan', $revenue, 'currency', 'mdi-cash-multiple', 'Transaksi berstatus selesai', 'navy'),
+                $this->card('Omzet sebelum retur', $revenue, 'currency', 'mdi-cash-multiple', 'Transaksi completed; retur ditampilkan terpisah', 'navy'),
                 $this->card('Total transaksi', $transactionCount, 'number', 'mdi-receipt-text-check-outline', 'Rata-rata '.number_format($values['average_ticket'], 0, ',', '.').' / transaksi', 'blue'),
                 $this->card('Qty terjual', $values['qty'], 'number', 'mdi-package-variant-closed-check', 'Akumulasi seluruh item', 'teal'),
                 $this->card('Total diskon', $discount, 'currency', 'mdi-sale-outline', 'Diskon item + transaksi', 'amber'),
@@ -342,14 +343,14 @@ class SalesReportService
             ->selectRaw('COALESCE(AVG(sales.grand_total), 0) as average_ticket')
             ->groupByRaw($date);
 
-        return $this->report('Rincian performa harian', $query, [
+        return $this->report('Rekap transaksi completed per hari', $query, [
             $this->column('sale_date', 'Tanggal', 'date'),
             $this->column('transactions', 'Transaksi', 'number'),
             $this->column('items', 'Item', 'number'),
             $this->column('qty', 'Qty', 'number'),
             $this->column('gross', 'Bruto', 'currency'),
             $this->column('discount', 'Diskon', 'currency'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('average_ticket', 'Rata-rata', 'currency'),
         ], [], [
             'sale_date' => 'sale_date', 'transactions' => 'transactions', 'items' => 'items', 'qty' => 'qty',
@@ -399,8 +400,7 @@ class SalesReportService
 
     private function medicineReport(array $branchIds, array $filters): array
     {
-        $allocatedTransactionDiscount = 'CASE WHEN COALESCE(detail_totals.subtotal_net, 0) > 0 '
-            .'THEN COALESCE(sales.diskon_transaksi_nominal, 0) * (details.subtotal_net / detail_totals.subtotal_net) ELSE 0 END';
+        $allocatedTransactionDiscount = $this->allocatedTransactionDiscountExpression();
         $netRevenue = "(details.total_line - {$allocatedTransactionDiscount})";
 
         $query = $this->sales($branchIds, $filters, 'completed')
@@ -419,7 +419,7 @@ class SalesReportService
             ->selectRaw("COALESCE(ROUND(SUM({$netRevenue}), 2), 0) as revenue")
             ->groupBy('details.obat_id', 'details.kode_obat', 'details.nama_obat', 'categories.name', 'details.satuan_jual');
 
-        return $this->report('Kontribusi penjualan setiap obat', $query, [
+        return $this->report('Kontribusi transaksi completed setiap obat', $query, [
             $this->column('product_code', 'Kode obat'),
             $this->column('product_name', 'Nama obat'),
             $this->column('category', 'Kategori'),
@@ -428,7 +428,7 @@ class SalesReportService
             $this->column('qty', 'Qty terjual', 'number'),
             $this->column('gross', 'Bruto', 'currency'),
             $this->column('discount', 'Diskon', 'currency'),
-            $this->column('revenue', 'Omzet bersih', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
         ], ['details.kode_obat', 'details.nama_obat', 'categories.name'], [
             'product_code' => 'product_code', 'product_name' => 'product_name', 'category' => 'category',
             'transactions' => 'transactions', 'qty' => 'qty', 'gross' => 'gross', 'discount' => 'discount', 'revenue' => 'revenue',
@@ -497,14 +497,17 @@ class SalesReportService
             ->selectRaw('ROUND(SUM(return_hpp), 2) as return_hpp')
             ->selectRaw("ROUND({$netHpp}, 2) as net_hpp")
             ->selectRaw("ROUND({$grossProfit}, 2) as gross_profit")
-            ->selectRaw("CASE WHEN {$netSales} != 0 THEN ROUND(({$grossProfit} / {$netSales}) * 100, 2) ELSE 0 END as gross_margin")
+            ->selectRaw("CASE WHEN {$netSales} != 0 THEN ROUND(((1.0 * {$grossProfit}) / {$netSales}) * 100, 2) ELSE 0 END as gross_margin")
             ->groupBy('event_date');
     }
 
     private function categoryReport(array $branchIds, array $filters): array
     {
+        $allocatedTransactionDiscount = $this->allocatedTransactionDiscountExpression();
+        $netRevenue = "(details.total_line - {$allocatedTransactionDiscount})";
         $query = $this->sales($branchIds, $filters, 'completed')
             ->join('penjualan_transaction_details as details', 'details.penjualan_transaction_id', '=', 'sales.id')
+            ->leftJoinSub($this->detailTotals(), 'detail_totals', 'detail_totals.penjualan_transaction_id', '=', 'sales.id')
             ->leftJoin('master_obats as medicines', 'medicines.id', '=', 'details.obat_id')
             ->leftJoin('categories', 'categories.id', '=', 'medicines.category_id')
             ->selectRaw("COALESCE(categories.name, 'Tanpa kategori') as category")
@@ -512,8 +515,8 @@ class SalesReportService
             ->selectRaw('COUNT(DISTINCT sales.id) as transactions')
             ->selectRaw('COALESCE(SUM(details.qty_jual), 0) as qty')
             ->selectRaw('COALESCE(SUM(details.subtotal_gross), 0) as gross')
-            ->selectRaw('COALESCE(SUM(details.diskon_nominal), 0) as discount')
-            ->selectRaw('COALESCE(SUM(details.total_line), 0) as revenue')
+            ->selectRaw("COALESCE(ROUND(SUM(details.diskon_nominal + {$allocatedTransactionDiscount}), 2), 0) as discount")
+            ->selectRaw("COALESCE(ROUND(SUM({$netRevenue}), 2), 0) as revenue")
             ->groupBy('categories.id', 'categories.name');
 
         return $this->report('Performa kategori produk', $query, [
@@ -523,7 +526,7 @@ class SalesReportService
             $this->column('qty', 'Qty terjual', 'number'),
             $this->column('gross', 'Bruto', 'currency'),
             $this->column('discount', 'Diskon', 'currency'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
         ], ['categories.name'], [
             'category' => 'category', 'products' => 'products', 'transactions' => 'transactions',
             'qty' => 'qty', 'gross' => 'gross', 'discount' => 'discount', 'revenue' => 'revenue',
@@ -548,7 +551,7 @@ class SalesReportService
             $this->column('cashier', 'Kasir'),
             $this->column('transactions', 'Transaksi', 'number'),
             $this->column('qty', 'Qty terjual', 'number'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('discount', 'Diskon', 'currency'),
             $this->column('average_ticket', 'Rata-rata transaksi', 'currency'),
             $this->column('last_transaction', 'Transaksi terakhir', 'datetime'),
@@ -587,7 +590,7 @@ class SalesReportService
             $this->column('closed_at', 'Ditutup', 'datetime', 'Shift masih aktif'),
             $this->column('transactions', 'Transaksi', 'number'),
             $this->column('qty', 'Qty', 'number'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('expected_cash', 'Kas seharusnya', 'currency', 'Belum dihitung'),
             $this->column('actual_cash', 'Kas aktual', 'currency', 'Menunggu tutup shift'),
             $this->column('cash_difference', 'Selisih kas', 'signed_currency', 'Menunggu tutup shift'),
@@ -641,7 +644,7 @@ class SalesReportService
             $this->column('transactions', 'Transaksi', 'number'),
             $this->column('items', 'Item', 'number'),
             $this->column('qty', 'Qty', 'number'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('discount', 'Diskon', 'currency'),
             $this->column('average_ticket', 'Rata-rata', 'currency'),
         ], ['sales.jenis_transaksi'], [
@@ -714,7 +717,7 @@ class SalesReportService
             $this->column('transaction_discount', 'Diskon transaksi', 'currency'),
             $this->column('total_discount', 'Total diskon', 'currency'),
             $this->column('discount_ratio', 'Rasio', 'percent'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('cashier', 'Kasir'),
             $this->column('branch', 'Cabang'),
         ], ['sales.nomor_transaksi', 'sales.customer_name', 'cashiers.name', 'branches.name'], [
@@ -779,7 +782,7 @@ class SalesReportService
             $this->column('transactions', 'Transaksi', 'number'),
             $this->column('items', 'Item', 'number'),
             $this->column('qty', 'Qty', 'number'),
-            $this->column('revenue', 'Omzet', 'currency'),
+            $this->column('revenue', 'Omzet sebelum retur', 'currency'),
             $this->column('average_ticket', 'Rata-rata', 'currency'),
         ], [], [
             'sale_hour' => 'sale_hour', 'transactions' => 'transactions', 'items' => 'items',
@@ -928,9 +931,9 @@ class SalesReportService
                 ->selectRaw('COUNT(sales.id) as count_value')
                 ->selectRaw('COALESCE(SUM(sales.grand_total), 0) as amount_value')
                 ->groupByRaw($date)->get();
-            $title = 'Tren omzet penjualan';
-            $subtitle = 'Pergerakan omzet dan jumlah transaksi selesai per hari.';
-            $amountLabel = 'Omzet';
+            $title = 'Tren omzet sebelum retur';
+            $subtitle = 'Pergerakan omzet transaksi completed sebelum retur dan jumlah transaksi per hari.';
+            $amountLabel = 'Omzet sebelum retur';
             $countLabel = 'Transaksi';
         }
 
@@ -1071,8 +1074,8 @@ class SalesReportService
             ->whereIn('returns.branch_id', $branchIds === [] ? [-1] : $branchIds)
             ->where('returns.status', 'posted')
             ->whereBetween('returns.tanggal_retur', [
-                $filters['start']->toDateString(),
-                $filters['end']->toDateString(),
+                $filters['start']->copy()->startOfDay(),
+                $filters['end']->copy()->endOfDay(),
             ]);
     }
 
@@ -1084,6 +1087,14 @@ class SalesReportService
             ->selectRaw('COALESCE(SUM(qty_jual), 0) as qty')
             ->selectRaw('COALESCE(SUM(subtotal_net), 0) as subtotal_net')
             ->groupBy('penjualan_transaction_id');
+    }
+
+    private function allocatedTransactionDiscountExpression(): string
+    {
+        return 'CASE WHEN COALESCE(detail_totals.subtotal_net, 0) > 0 '
+            .'THEN COALESCE(sales.diskon_transaksi_nominal, 0) * ((1.0 * details.subtotal_net) / detail_totals.subtotal_net) '
+            .'WHEN COALESCE(detail_totals.item_count, 0) > 0 '
+            .'THEN COALESCE(sales.diskon_transaksi_nominal, 0) * (1.0 / detail_totals.item_count) ELSE 0 END';
     }
 
     private function transactionCosts(): Builder

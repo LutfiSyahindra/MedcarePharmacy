@@ -204,6 +204,9 @@ class PurchaseReportTest extends TestCase
         foreach (PurchaseReportService::TYPES as $definition) {
             $response->assertSee($definition['short_title']);
         }
+
+        $response->assertSee('Dashboard analisis')
+            ->assertSee('Rekap PO &amp; Realisasi', false);
     }
 
     public function test_every_purchase_report_returns_scoped_operational_data(): void
@@ -227,6 +230,7 @@ class PurchaseReportTest extends TestCase
         }
 
         $this->getJson(route('laporan.pembelian.data', ['report' => 'pembelian', ...$query]))
+            ->assertJsonPath('report.meta.value_basis', 'Nilai PO memakai estimasi item pesanan; nilai pembelian dan harga aktual memakai penerimaan berstatus posted.')
             ->assertJsonPath('report.table.rows.0.no_po', 'PO-RPT-001')
             ->assertJsonPath('report.table.rows.0.actual_value', 110000);
         $this->getJson(route('laporan.pembelian.data', ['report' => 'supplier', ...$query]))

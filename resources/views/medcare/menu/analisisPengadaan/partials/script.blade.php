@@ -136,10 +136,10 @@
 
     function renderKpis(summary) {
         const cards = [
-            ['Total Nilai Order', 'order_value', money, 'mdi-cash-multiple', `Dari ${number(summary.total_items)} baris item`, ''],
+            ['Nilai Estimasi PO', 'order_value', money, 'mdi-cash-multiple', `Dari ${number(summary.total_items)} baris item`, ''],
             ['Total PO', 'total_po', value => `${number(value)} PO`, 'mdi-file-document-multiple-outline', `Sebelumnya ${number(summary.total_po_previous)} PO`, 'tone-green'],
             ['Total Qty Diorder', 'ordered_qty', value => `${number(value)} unit`, 'mdi-package-variant-closed', `Satuan stok terkonversi`, 'tone-violet'],
-            ['Belum Diterima', 'outstanding_value', money, 'mdi-package-variant-remove', `Nilai order outstanding`, 'tone-red'],
+            ['Belum Diterima', 'outstanding_value', money, 'mdi-package-variant-remove', `Estimasi nilai PO outstanding`, 'tone-red'],
             ['Rata-rata Lead Time', 'lead_time_days', value => `${number(value)} hari`, 'mdi-clock-fast', `PO sampai penerimaan pertama`, 'tone-amber'],
             ['Supplier Aktif', 'active_suppliers', value => `${number(value)} supplier`, 'mdi-truck-delivery-outline', `Supplier pada periode aktif`, 'tone-teal'],
         ];
@@ -181,7 +181,7 @@
         mountChart('trend', '#paTrendChart', {
             ...chartBase, chart: { ...chartBase.chart, type: 'line', height: 340 },
             series: [
-                { name: 'Nilai order', type: 'area', data: trend.order_value || [] },
+                { name: 'Nilai estimasi PO', type: 'area', data: trend.order_value || [] },
                 { name: 'Periode sebelumnya', type: 'line', data: trend.previous_order_value || [] },
             ], colors: ['#3277e6', '#9daab1'], stroke: { width: [3, 2], curve: 'smooth', dashArray: [0, 6] },
             fill: { type: ['gradient', 'solid'], opacity: [.35, 1], gradient: { opacityFrom: .42, opacityTo: .04 } }, markers: { size: [3, 2] },
@@ -199,7 +199,7 @@
 
         const suppliers = (analysis.suppliers || []).slice(0, 8);
         mountChart('suppliers', '#paSupplierChart', {
-            ...chartBase, chart: { ...chartBase.chart, type: 'bar', height: 270 }, series: [{ name: 'Nilai order', data: suppliers.map(row => row.order_value) }],
+            ...chartBase, chart: { ...chartBase.chart, type: 'bar', height: 270 }, series: [{ name: 'Nilai estimasi PO', data: suppliers.map(row => row.order_value) }],
             colors: ['#0e9384'], plotOptions: { bar: { borderRadius: 5, columnWidth: '48%' } },
             xaxis: { categories: suppliers.map(row => row.name), labels: { rotate: -35, trim: true } }, yaxis: { labels: { formatter: compactMoney } }, tooltip: { y: { formatter: money } },
         });
@@ -275,7 +275,7 @@
     }
 
     function renderMoving(rows) {
-        $('#paMovingDistribution').innerHTML = rows.length ? rows.map(row => `<article class="pa-moving-card is-${escapeHtml(row.key)}"><small>${escapeHtml(row.label)}</small><strong>${money(row.order_value)}</strong><p>${number(row.medicine_count)} obat · ${number(row.ordered_qty)} unit · ${percent(row.percent)} nilai order</p></article>`).join('') : '<div class="pa-empty">Belum ada distribusi pergerakan.</div>';
+        $('#paMovingDistribution').innerHTML = rows.length ? rows.map(row => `<article class="pa-moving-card is-${escapeHtml(row.key)}"><small>${escapeHtml(row.label)}</small><strong>${money(row.order_value)}</strong><p>${number(row.medicine_count)} obat · ${number(row.ordered_qty)} unit · ${percent(row.percent)} nilai estimasi PO</p></article>`).join('') : '<div class="pa-empty">Belum ada distribusi pergerakan.</div>';
     }
 
     function renderSuppliers(rows) {
@@ -329,7 +329,7 @@
         $('#paDrawerTitle').textContent = medicine.name || 'Detail obat';
         $('#paDrawerMeta').textContent = `${medicine.code || '-'} · ${medicine.category || '-'} · ${medicine.unit || 'unit'}`;
         const kpis = [
-            ['Total Diorder', `${number(summary.ordered_qty)} ${medicine.unit || 'unit'}`], ['Total Nilai Order', money(summary.order_value)],
+            ['Total Diorder', `${number(summary.ordered_qty)} ${medicine.unit || 'unit'}`], ['Nilai Estimasi PO', money(summary.order_value)],
             ['Frekuensi Order', `${number(summary.order_count)} kali`], ['Rata-rata / Order', `${number(summary.average_per_order)} ${medicine.unit || 'unit'}`],
             ['Supplier Utama', summary.main_supplier || '-'], ['Harga Terakhir', money(summary.last_price)],
             ['Harga Terendah', money(summary.lowest_price)], ['Harga Tertinggi', money(summary.highest_price)],
@@ -338,7 +338,7 @@
         ];
         const history = medicine.history || [];
         $('#paDrawerBody').innerHTML = `<div class="pa-detail-kpis">${kpis.map(kpi => `<article class="pa-detail-kpi"><small>${escapeHtml(kpi[0])}</small><strong>${escapeHtml(kpi[1])}</strong></article>`).join('')}</div>
-            <section class="pa-detail-section"><h3>Tren Harga Beli per Satuan Stok</h3><div class="pa-detail-chart" id="paDetailPriceChart"></div></section>
+            <section class="pa-detail-section"><h3>Tren Harga Estimasi PO per Satuan Stok</h3><div class="pa-detail-chart" id="paDetailPriceChart"></div></section>
             <section class="pa-detail-section"><h3>Riwayat Order Barang</h3><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>PO / Tanggal</th><th>Supplier</th><th class="text-end">Qty</th><th class="text-end">Diterima</th><th class="text-end">Harga</th><th class="text-end">Nilai</th><th>Status</th></tr></thead><tbody>${history.length ? history.map(row => `<tr><td><span class="pa-cell-main">${escapeHtml(row.no_po)}</span><span class="pa-cell-sub">${formatDate(row.date)}</span></td><td>${escapeHtml(row.supplier)}</td><td class="text-end">${number(row.qty)} ${escapeHtml(row.unit)}</td><td class="text-end">${number(row.received_qty)}</td><td class="text-end">${money(row.price)}</td><td class="text-end">${money(row.value)}</td><td><span class="pa-badge is-${escapeHtml(row.status)}">${escapeHtml(row.status_label)}</span></td></tr>`).join('') : emptyRow(7)}</tbody></table></div></section>`;
         const priceTrend = medicine.price_trend || [];
         mountChart('detailPrice', '#paDetailPriceChart', {

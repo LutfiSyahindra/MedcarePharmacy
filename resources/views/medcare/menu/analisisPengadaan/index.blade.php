@@ -15,7 +15,7 @@
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="mdi mdi-home-outline"></i> Dashboard</a></li>
                 <li class="breadcrumb-item">Analisis</li>
-                <li class="breadcrumb-item active" aria-current="page">Pengadaan</li>
+                <li class="breadcrumb-item active" aria-current="page">PO & Kebutuhan</li>
             </ol>
         </nav>
 
@@ -27,18 +27,19 @@
                     <span class="pa-eyebrow">Procurement Intelligence</span>
                     <span class="pa-live"><i></i> Data operasional</span>
                 </div>
-                <h1>Analisis Pengadaan</h1>
-                <p>Ukur efektivitas pembelian, ketepatan kebutuhan, performa supplier, dan penyelesaian penerimaan dalam satu workspace.</p>
+                <h1>Analisis PO & Kebutuhan</h1>
+                <p>Ukur ketepatan purchase order, kebutuhan stok, performa supplier, dan penyelesaian penerimaan dalam satu workspace.</p>
                 <div class="pa-hero-points">
-                    <span><i class="mdi mdi-scale-balance"></i> Order vs kebutuhan</span>
+                    <span><i class="mdi mdi-scale-balance"></i> Order vs Kebutuhan</span>
                     <span><i class="mdi mdi-truck-check-outline"></i> Fulfillment supplier</span>
-                    <span><i class="mdi mdi-chart-timeline-variant"></i> Tren harga & lead time</span>
+                    <span><i class="mdi mdi-chart-timeline-variant"></i> Harga estimasi PO & lead time</span>
                 </div>
             </div>
             <div class="pa-hero-context">
                 <div><span><i class="mdi mdi-source-branch"></i></span><small>Cakupan</small><strong id="paHeroBranch">Menyiapkan...</strong></div>
                 <div><span><i class="mdi mdi-calendar-range"></i></span><small>Periode aktif</small><strong id="paHeroPeriod">Menyiapkan...</strong></div>
                 <button type="button" id="paRefresh"><i class="mdi mdi-refresh"></i> Perbarui data</button>
+                <a href="{{ route('laporan.pembelian.index', ['report' => 'pembelian']) }}"><i class="mdi mdi-file-table-outline"></i> Laporan realisasi</a>
             </div>
         </section>
 
@@ -99,7 +100,7 @@
 
             <div class="pa-grid pa-grid-wide">
                 <article class="pa-panel pa-chart-panel">
-                    <div class="pa-panel-head"><div class="pa-heading"><span class="is-blue"><i class="mdi mdi-chart-areaspline"></i></span><div><h2>Trend Nilai Order</h2><p>Nilai PO aktif dibanding periode sebelumnya.</p></div></div><div class="pa-legend"><span><i class="current"></i>Aktif</span><span><i class="previous"></i>Sebelumnya</span></div></div>
+                    <div class="pa-panel-head"><div class="pa-heading"><span class="is-blue"><i class="mdi mdi-chart-areaspline"></i></span><div><h2>Tren Nilai Estimasi PO</h2><p>Nilai estimasi PO aktif dibanding periode sebelumnya.</p></div></div><div class="pa-legend"><span><i class="current"></i>Aktif</span><span><i class="previous"></i>Sebelumnya</span></div></div>
                     <div class="pa-chart pa-chart-lg" id="paTrendChart"><div class="pa-loading"><i class="mdi mdi-loading mdi-spin"></i> Menyusun tren...</div></div>
                 </article>
                 <article class="pa-panel pa-chart-panel">
@@ -132,15 +133,15 @@
             </div>
             <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-navy"><i class="mdi mdi-table-large"></i></span><div><h2>Ringkasan Analisis Barang</h2><p>Frekuensi, qty, nilai, fulfillment, harga, dan pergerakan.</p></div></div><span class="pa-soft-badge" id="paMedicineCount">0 obat</span></div><div class="table-responsive"><table class="table pa-table"><thead><tr><th>Obat</th><th>Supplier utama</th><th class="text-end">Frekuensi</th><th class="text-end">Qty order</th><th class="text-end">Nilai</th><th class="text-end">Diterima</th><th class="text-end">Harga terakhir</th><th class="text-end">Perubahan</th><th>Pergerakan</th></tr></thead><tbody id="paMedicineBody"></tbody></table></div></article>
             <div class="pa-grid pa-grid-two">
-                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-orange"><i class="mdi mdi-chart-line"></i></span><div><h2>Perubahan Harga Beli</h2><p>Perubahan harga satuan stok dari order pertama ke terakhir.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Harga awal</th><th class="text-end">Harga terakhir</th><th class="text-end">Perubahan</th></tr></thead><tbody id="paPriceBody"></tbody></table></div></article>
+                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-orange"><i class="mdi mdi-chart-line"></i></span><div><h2>Perubahan Harga Estimasi PO</h2><p>Perubahan harga estimasi per satuan stok dari PO pertama ke terakhir; harga aktual tersedia pada laporan realisasi.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Estimasi awal</th><th class="text-end">Estimasi terakhir</th><th class="text-end">Perubahan</th></tr></thead><tbody id="paPriceBody"></tbody></table></div></article>
                 <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-cyan"><i class="mdi mdi-repeat-variant"></i></span><div><h2>Frekuensi Reorder</h2><p>Jarak rata-rata pemesanan ulang obat yang sama.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Frekuensi</th><th class="text-end">Rata-rata jeda</th><th>Tanggal terakhir</th></tr></thead><tbody id="paReorderBody"></tbody></table></div></article>
             </div>
             <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-speedometer"></i></span><div><h2>Slow / Fast Moving Order</h2><p>Apakah nilai pembelian didominasi produk cepat atau lambat bergerak.</p></div></div></div><div class="pa-moving-grid" id="paMovingDistribution"></div></article>
         </section>
 
         <section class="pa-tab-panel" data-tab-panel="suppliers">
-            <div class="pa-section-label"><div><span>Supplier performance</span><h2>Analisis supplier</h2></div><p>Nilai order, fulfillment, outstanding, dan lead time.</p></div>
-            <article class="pa-panel"><div class="table-responsive"><table class="table pa-table"><thead><tr><th>Supplier</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty order</th><th class="text-end">Nilai order</th><th class="text-end">Outstanding</th><th class="text-end">Fulfillment</th><th class="text-end">Lead time</th></tr></thead><tbody id="paSupplierBody"></tbody></table></div></article>
+            <div class="pa-section-label"><div><span>Supplier performance</span><h2>Analisis supplier</h2></div><p>Nilai estimasi PO, fulfillment, outstanding, dan lead time.</p></div>
+            <article class="pa-panel"><div class="table-responsive"><table class="table pa-table"><thead><tr><th>Supplier</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty order</th><th class="text-end">Nilai estimasi PO</th><th class="text-end">Outstanding</th><th class="text-end">Fulfillment</th><th class="text-end">Lead time</th></tr></thead><tbody id="paSupplierBody"></tbody></table></div></article>
             <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-shape-outline"></i></span><div><h2>Order per Kategori Obat</h2><p>Distribusi jumlah item, qty, dan nilai berdasarkan kategori.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Kategori</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty</th><th class="text-end">Nilai</th><th class="text-end">Kontribusi</th></tr></thead><tbody id="paCategoryBody"></tbody></table></div></article>
         </section>
 

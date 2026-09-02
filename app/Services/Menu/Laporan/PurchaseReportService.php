@@ -16,9 +16,9 @@ class PurchaseReportService
 {
     public const TYPES = [
         'pembelian' => [
-            'title' => 'Laporan Pembelian',
-            'short_title' => 'Seluruh PO',
-            'description' => 'Pantau seluruh purchase order, komitmen nilai, realisasi penerimaan, dan sisa pesanan. ',
+            'title' => 'Rekap PO & Realisasi',
+            'short_title' => 'PO & Realisasi',
+            'description' => 'Bandingkan estimasi seluruh purchase order dengan realisasi penerimaan posted dan sisa pesanan.',
             'icon' => 'mdi-cart-arrow-down',
             'tone' => 'navy',
         ],
@@ -81,7 +81,7 @@ class PurchaseReportService
         'riwayat-harga' => [
             'title' => 'Riwayat Harga Beli',
             'short_title' => 'Harga Beli',
-            'description' => 'Bandingkan perubahan harga beli aktual setiap obat pada supplier yang sama.',
+            'description' => 'Bandingkan perubahan harga beli aktual dari penerimaan posted untuk obat dan supplier yang sama.',
             'icon' => 'mdi-chart-timeline-variant',
             'tone' => 'rose',
         ],
@@ -136,6 +136,7 @@ class PurchaseReportService
                 'date_start' => $filters['start']->toDateString(),
                 'date_end' => $filters['end']->toDateString(),
                 'period_days' => $filters['start']->diffInDays($filters['end']) + 1,
+                'value_basis' => 'Nilai PO memakai estimasi item pesanan; nilai pembelian dan harga aktual memakai penerimaan berstatus posted.',
                 'generated_at' => now()->format('Y-m-d H:i:s'),
             ],
             'metrics' => $metrics['cards'],
