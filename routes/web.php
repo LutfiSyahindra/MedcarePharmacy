@@ -15,6 +15,7 @@ use App\Http\Controllers\Medcare\MasterData\Sediaan\SediaanController;
 use App\Http\Controllers\Medcare\Menu\AnalisisOmzet\RevenueAnalysisController;
 use App\Http\Controllers\Medcare\Menu\AnalisisPengadaan\ProcurementAnalysisController;
 use App\Http\Controllers\Medcare\Menu\AnalisisPersediaan\InventoryAnalysisController;
+use App\Http\Controllers\Medcare\Menu\AnalisisProfitabilitas\ProfitabilityAnalysisController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
@@ -420,6 +421,20 @@ Route::middleware('auth')->group(function () {
             ->name('analisisPersediaan.index');
     });
 
+    Route::prefix('medcare/menu/analisis-penjualan')->group(function () {
+        Route::get('/', [RevenueAnalysisController::class, 'index'])->name('analisisPenjualan.index');
+        Route::get('/data', [RevenueAnalysisController::class, 'data'])->name('analisisPenjualan.data');
+        Route::post('/target', [RevenueAnalysisController::class, 'storeTarget'])->name('analisisPenjualan.target.store');
+        Route::get('/export/excel', [RevenueAnalysisController::class, 'excel'])->name('analisisPenjualan.export.excel');
+        Route::get('/export/pdf', [RevenueAnalysisController::class, 'pdf'])->name('analisisPenjualan.export.pdf');
+    });
+
+    Route::prefix('medcare/menu/analisis-profitabilitas')->group(function () {
+        Route::get('/', [ProfitabilityAnalysisController::class, 'index'])->name('analisisProfitabilitas.index');
+        Route::get('/data', [ProfitabilityAnalysisController::class, 'data'])->name('analisisProfitabilitas.data');
+    });
+
+    // Alias lama dipertahankan agar bookmark dan integrasi Analisis Omzet tidak terputus.
     Route::prefix('medcare/menu/analisis-omzet')->group(function () {
         Route::get('/', [RevenueAnalysisController::class, 'index'])->name('analisisOmzet.index');
         Route::get('/data', [RevenueAnalysisController::class, 'data'])->name('analisisOmzet.data');

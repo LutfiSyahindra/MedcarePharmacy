@@ -47,6 +47,8 @@ class RevenueAnalysisService
 
         $trend = $this->trend($branchIds, $filters, $previousStart, $previousEnd);
         $products = $this->products($branchIds, $filters, $previousStart, $previousEnd, $summary['net_revenue']);
+        $fastMoving = $this->fastMoving($branchIds, $filters, $previousStart, $previousEnd, $summary['transactions']);
+        $marketBasket = $this->marketBasket($branchIds, $filters);
         $categories = $this->categories($branchIds, $filters, $summary['net_revenue']);
         $saleTypes = $this->saleTypes($branchIds, $filters, $summary['net_revenue']);
         $payments = $this->payments($branchIds, $filters, $summary['net_revenue']);
@@ -68,11 +70,14 @@ class RevenueAnalysisService
                 'generated_at' => now()->format('Y-m-d H:i:s'),
                 'granularity' => $filters['granularity'],
                 'top' => $filters['top'],
+                'product_metric' => $filters['product_metric'] ?? 'revenue',
                 'active_filters' => $this->activeFilterLabels($filters, $context),
             ],
             'summary' => $summary,
             'trend' => $trend,
             'products' => $products,
+            'fast_moving' => $fastMoving,
+            'market_basket' => $marketBasket,
             'categories' => $categories,
             'sale_types' => $saleTypes,
             'payments' => $payments,
@@ -80,7 +85,7 @@ class RevenueAnalysisService
             'weekdays' => $weekdays,
             'cashiers' => $cashiers,
             'target' => $target,
-            'insights' => $this->insights($summary, $products, $categories, $payments, $hourly, $weekdays),
+            'insights' => $this->insights($summary, $products, $categories, $payments, $hourly, $weekdays, $marketBasket),
             'options' => $withOptions ? $this->options($branchIds, $context['branches']) : [],
         ];
     }
@@ -253,9 +258,14 @@ class RevenueAnalysisService
             $row['contribution_percent'] = $netRevenue != 0.0 ? round(($row['revenue'] / $netRevenue) * 100, 2) : 0;
             $row['previous_revenue'] = $previousRevenue;
             $row['growth_percent'] = $this->growth($row['revenue'], $previousRevenue);
+            $row['net_qty'] = round($row['qty'] - $row['return_qty'], 2);
 
             return $row;
-        })->sortByDesc('revenue')->values();
+        })->sortByDesc(match ($filters['product_metric'] ?? 'revenue') {
+            'qty' => 'net_qty',
+            'transactions' => 'transactions',
+            default => 'revenue',
+        })->values();
 
         if ($filters['top'] !== 'all') {
             $rows = $rows->take((int) $filters['top'])->values();
@@ -264,12 +274,64 @@ class RevenueAnalysisService
         return $rows->all();
     }
 
+    private function fastMoving(array $branchIds, array $filters, Carbon $previousStart, Carbon $previousEnd, int $totalTransactions): array
+    {
+        $periodDays = (int) max(1, $filters['start']->copy()->startOfDay()->diffInDays($filters['end']->copy()->startOfDay()) + 1);
+        $previous = $this->productRows($branchIds, $filters, $previousStart, $previousEnd)->keyBy('key');
+        $rows = $this->productRows($branchIds, $filters, $filters['start'], $filters['end'])
+            ->map(function (array $row) use ($periodDays, $previous, $totalTransactions) {
+                $netQty = round($row['qty'] - $row['return_qty'], 2);
+                $previousRow = $previous->get($row['key']);
+                $previousNetQty = $previousRow
+                    ? round($previousRow['qty'] - $previousRow['return_qty'], 2)
+                    : 0.0;
+
+                return [
+                    ...$row,
+                    'net_qty' => $netQty,
+                    'previous_net_qty' => $previousNetQty,
+                    'average_daily_qty' => round($netQty / $periodDays, 2),
+                    'sales_day_frequency_percent' => round(($row['sales_days'] / $periodDays) * 100, 2),
+                    'transaction_penetration_percent' => $totalTransactions > 0
+                        ? round(($row['transactions'] / $totalTransactions) * 100, 2)
+                        : 0,
+                    'qty_growth_percent' => $this->growth($netQty, $previousNetQty),
+                ];
+            })
+            ->filter(fn (array $row) => $row['net_qty'] > 0)
+            ->sort(function (array $left, array $right) {
+                $velocity = $right['average_daily_qty'] <=> $left['average_daily_qty'];
+
+                return $velocity !== 0 ? $velocity : ($right['transactions'] <=> $left['transactions']);
+            })
+            ->values()
+            ->map(fn (array $row, int $index) => ['rank' => $index + 1, ...$row]);
+
+        if ($filters['top'] !== 'all') {
+            $rows = $rows->take((int) $filters['top'])->values();
+        }
+
+        $leader = $rows->first();
+
+        return [
+            'summary' => [
+                'products' => $rows->count(),
+                'net_qty' => round((float) $rows->sum('net_qty'), 2),
+                'leader' => $leader['name'] ?? null,
+                'leader_daily_qty' => (float) ($leader['average_daily_qty'] ?? 0),
+                'period_days' => $periodDays,
+            ],
+            'rows' => $rows->all(),
+        ];
+    }
+
     private function productRows(array $branchIds, array $filters, Carbon $start, Carbon $end): Collection
     {
         $sales = $this->saleLines($branchIds, $filters, $start, $end)
             ->select('details.obat_id', 'details.kode_obat', 'details.nama_obat')
             ->selectRaw("COALESCE(categories.name, 'Tanpa kategori') as category")
             ->selectRaw('COUNT(DISTINCT sales.id) as transactions')
+            ->selectRaw('COUNT(DISTINCT '.$this->dateExpression('sales.tanggal_transaksi').') as sales_days')
             ->selectRaw('COALESCE(SUM(details.qty_jual), 0) as qty')
             ->selectRaw('COALESCE(SUM('.$this->saleRevenueExpression().'), 0) as revenue')
             ->groupBy('details.obat_id', 'details.kode_obat', 'details.nama_obat', 'categories.name')
@@ -295,6 +357,7 @@ class RevenueAnalysisService
                 'qty' => round((float) $row->qty, 2),
                 'return_qty' => round((float) ($return->return_qty ?? 0), 2),
                 'transactions' => (int) $row->transactions,
+                'sales_days' => (int) $row->sales_days,
                 'revenue' => round((float) $row->revenue - (float) ($return->return_value ?? 0), 2),
                 'return_value' => round((float) ($return->return_value ?? 0), 2),
             ];
@@ -313,12 +376,145 @@ class RevenueAnalysisService
                 'qty' => 0,
                 'return_qty' => round((float) $return->return_qty, 2),
                 'transactions' => 0,
+                'sales_days' => 0,
                 'revenue' => round(-(float) $return->return_value, 2),
                 'return_value' => round((float) $return->return_value, 2),
             ]);
         }
 
         return $rows->values();
+    }
+
+    private function marketBasket(array $branchIds, array $filters): array
+    {
+        $totalTransactions = $this->basketTransactions($branchIds, $filters)->count('sales.id');
+        if ($totalTransactions === 0) {
+            return $this->emptyMarketBasket();
+        }
+
+        $productTransactions = $this->basketTransactions($branchIds, $filters)
+            ->join('penjualan_transaction_details as basket_details', 'basket_details.penjualan_transaction_id', '=', 'sales.id')
+            ->join('master_obats as basket_medicines', 'basket_medicines.id', '=', 'basket_details.obat_id')
+            ->when($filters['category_id'] ?? null, fn (Builder $query, int $id) => $query->where('basket_medicines.category_id', $id))
+            ->when($filters['golongan_id'] ?? null, fn (Builder $query, int $id) => $query->where('basket_medicines.golongan_id', $id))
+            ->select('basket_details.obat_id')
+            ->selectRaw('COUNT(DISTINCT sales.id) as transaction_count')
+            ->groupBy('basket_details.obat_id')
+            ->pluck('transaction_count', 'basket_details.obat_id');
+
+        $pairQuery = $this->basketTransactions($branchIds, $filters)
+            ->join('penjualan_transaction_details as basket_a', 'basket_a.penjualan_transaction_id', '=', 'sales.id')
+            ->join('penjualan_transaction_details as basket_b', function ($join) {
+                $join->on('basket_b.penjualan_transaction_id', '=', 'basket_a.penjualan_transaction_id')
+                    ->on('basket_b.obat_id', '>', 'basket_a.obat_id');
+            })
+            ->join('master_obats as medicine_a', 'medicine_a.id', '=', 'basket_a.obat_id')
+            ->join('master_obats as medicine_b', 'medicine_b.id', '=', 'basket_b.obat_id')
+            ->when($filters['category_id'] ?? null, function (Builder $query, int $id) {
+                $query->where('medicine_a.category_id', $id)->where('medicine_b.category_id', $id);
+            })
+            ->when($filters['golongan_id'] ?? null, function (Builder $query, int $id) {
+                $query->where('medicine_a.golongan_id', $id)->where('medicine_b.golongan_id', $id);
+            })
+            ->when($filters['medicine_id'] ?? null, function (Builder $query, int $id) {
+                $query->where(fn (Builder $pair) => $pair
+                    ->where('basket_a.obat_id', $id)
+                    ->orWhere('basket_b.obat_id', $id));
+            })
+            ->select('basket_a.obat_id as product_a_id', 'medicine_a.kode_obat as product_a_code', 'medicine_a.nama_obat as product_a_name')
+            ->addSelect('basket_b.obat_id as product_b_id', 'medicine_b.kode_obat as product_b_code', 'medicine_b.nama_obat as product_b_name')
+            ->selectRaw('COUNT(DISTINCT sales.id) as pair_transactions')
+            ->groupBy(
+                'basket_a.obat_id',
+                'medicine_a.kode_obat',
+                'medicine_a.nama_obat',
+                'basket_b.obat_id',
+                'medicine_b.kode_obat',
+                'medicine_b.nama_obat',
+            )
+            ->orderByDesc('pair_transactions');
+
+        $maximumRows = $filters['top'] === 'all' ? 200 : (int) $filters['top'];
+        $pairs = $pairQuery->limit($maximumRows)->get();
+        $rows = $pairs->map(function ($pair) use ($productTransactions, $totalTransactions) {
+            $pairTransactions = (int) $pair->pair_transactions;
+            $productATransactions = (int) ($productTransactions[$pair->product_a_id] ?? 0);
+            $productBTransactions = (int) ($productTransactions[$pair->product_b_id] ?? 0);
+            $lift = $productATransactions > 0 && $productBTransactions > 0
+                ? ($pairTransactions * $totalTransactions) / ($productATransactions * $productBTransactions)
+                : 0;
+            $roundedLift = round($lift, 2);
+
+            return [
+                'product_a' => [
+                    'id' => (int) $pair->product_a_id,
+                    'code' => $pair->product_a_code,
+                    'name' => $pair->product_a_name,
+                ],
+                'product_b' => [
+                    'id' => (int) $pair->product_b_id,
+                    'code' => $pair->product_b_code,
+                    'name' => $pair->product_b_name,
+                ],
+                'pair_transactions' => $pairTransactions,
+                'support_percent' => round(($pairTransactions / $totalTransactions) * 100, 2),
+                'confidence_a_to_b_percent' => $productATransactions > 0
+                    ? round(($pairTransactions / $productATransactions) * 100, 2)
+                    : 0,
+                'confidence_b_to_a_percent' => $productBTransactions > 0
+                    ? round(($pairTransactions / $productBTransactions) * 100, 2)
+                    : 0,
+                'lift' => $roundedLift,
+                'strength' => $roundedLift > 1.2 ? 'Kuat' : ($roundedLift > 1 ? 'Positif' : ($roundedLift === 1.0 ? 'Netral' : 'Lemah')),
+            ];
+        })->values();
+        $leadingPair = $rows->first();
+
+        return [
+            'summary' => [
+                'transactions_analyzed' => $totalTransactions,
+                'pairs_found' => $rows->count(),
+                'leading_pair' => $leadingPair
+                    ? $leadingPair['product_a']['name'].' + '.$leadingPair['product_b']['name']
+                    : null,
+                'leading_lift' => (float) ($leadingPair['lift'] ?? 0),
+                'row_limit' => $maximumRows,
+            ],
+            'rows' => $rows->all(),
+        ];
+    }
+
+    private function basketTransactions(array $branchIds, array $filters): Builder
+    {
+        return DB::table('penjualan_transactions as sales')
+            ->whereIn('sales.branch_id', $branchIds === [] ? [-1] : $branchIds)
+            ->where('sales.status', 'completed')
+            ->whereBetween('sales.tanggal_transaksi', [$filters['start']->copy()->startOfDay(), $filters['end']->copy()->endOfDay()])
+            ->when($filters['cashier_id'] ?? null, fn (Builder $query, int $id) => $query->where('sales.completed_by', $id))
+            ->when($filters['shift_id'] ?? null, fn (Builder $query, int $id) => $query->where('sales.cashier_shift_id', $id))
+            ->when($filters['transaction_type'] ?? null, fn (Builder $query, string $type) => $query->where('sales.jenis_transaksi', $type))
+            ->when($filters['payment_method'] ?? null, function (Builder $query, string $method) {
+                $query->whereExists(function (Builder $payments) use ($method) {
+                    $payments->selectRaw('1')
+                        ->from('penjualan_payments as basket_payments')
+                        ->whereColumn('basket_payments.penjualan_transaction_id', 'sales.id')
+                        ->where('basket_payments.metode', $method);
+                });
+            });
+    }
+
+    private function emptyMarketBasket(): array
+    {
+        return [
+            'summary' => [
+                'transactions_analyzed' => 0,
+                'pairs_found' => 0,
+                'leading_pair' => null,
+                'leading_lift' => 0,
+                'row_limit' => 0,
+            ],
+            'rows' => [],
+        ];
     }
 
     private function categories(array $branchIds, array $filters, float $netRevenue): array
@@ -420,11 +616,14 @@ class RevenueAnalysisService
             ];
         });
         $peak = $rows->sortByDesc('revenue')->first();
+        $busy = $rows->sortByDesc('transactions')->first();
 
         return [
             'rows' => $rows->all(),
             'peak_hour' => ($peak['revenue'] ?? 0) > 0 ? $peak['label'] : null,
             'peak_revenue' => (float) ($peak['revenue'] ?? 0),
+            'busy_hour' => ($busy['transactions'] ?? 0) > 0 ? $busy['label'] : null,
+            'busy_transactions' => (int) ($busy['transactions'] ?? 0),
         ];
     }
 
@@ -520,8 +719,15 @@ class RevenueAnalysisService
         ];
     }
 
-    private function insights(array $summary, array $products, array $categories, array $payments, array $hourly, array $weekdays): array
-    {
+    private function insights(
+        array $summary,
+        array $products,
+        array $categories,
+        array $payments,
+        array $hourly,
+        array $weekdays,
+        array $marketBasket,
+    ): array {
         $growth = (float) $summary['growth_percent'];
         $direction = $growth > 0 ? 'naik' : ($growth < 0 ? 'turun' : 'stabil');
         $tone = $growth > 0 ? 'positive' : ($growth < 0 ? 'negative' : 'neutral');
@@ -549,10 +755,10 @@ class RevenueAnalysisService
                     : 'Belum ada kategori penyumbang omzet.',
             ],
             [
-                'icon' => 'mdi-clock-fast', 'tone' => 'orange', 'title' => 'Peak hour',
-                'text' => $hourly['peak_hour']
-                    ? 'Puncak omzet terjadi sekitar pukul '.$hourly['peak_hour'].'.'
-                    : 'Belum ada peak hour pada periode ini.',
+                'icon' => 'mdi-clock-fast', 'tone' => 'orange', 'title' => 'Jam ramai',
+                'text' => $hourly['busy_hour']
+                    ? 'Transaksi paling ramai terjadi sekitar pukul '.$hourly['busy_hour'].' dengan '.$hourly['busy_transactions'].' transaksi.'
+                    : 'Belum ada jam ramai pada periode ini.',
             ],
             [
                 'icon' => 'mdi-calendar-star', 'tone' => 'teal', 'title' => 'Hari terbaik',
@@ -565,6 +771,12 @@ class RevenueAnalysisService
                 'text' => $topPayment
                     ? $topPayment['label'].' berkontribusi '.number_format($topPayment['contribution_percent'], 2, ',', '.').'%.'
                     : 'Belum ada metode pembayaran dominan.',
+            ],
+            [
+                'icon' => 'mdi-set-center', 'tone' => 'violet', 'title' => 'Peluang bundling',
+                'text' => $marketBasket['summary']['leading_pair']
+                    ? $marketBasket['summary']['leading_pair'].' menjadi pasangan teratas dengan lift '.number_format($marketBasket['summary']['leading_lift'], 2, ',', '.').'.'
+                    : 'Belum ada pasangan produk pada transaksi yang dianalisis.',
             ],
         ];
     }

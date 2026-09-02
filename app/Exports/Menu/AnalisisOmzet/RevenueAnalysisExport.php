@@ -39,10 +39,20 @@ class RevenueAnalysisExport implements WithMultipleSheets
                     $a['trend']['transactions'][$index] ?? 0,
                     $a['trend']['returns'][$index] ?? 0,
                 ])->all()),
-            new RevenueAnalysisSheet('Produk', ['Kode', 'Nama Obat', 'Kategori', 'Qty Terjual', 'Qty Retur', 'Transaksi', 'Omzet Bersih', 'Kontribusi (%)', 'Growth (%)'],
+            new RevenueAnalysisSheet('Produk', ['Kode', 'Nama Obat', 'Kategori', 'Qty Bersih', 'Qty Retur', 'Transaksi', 'Omzet Bersih', 'Kontribusi (%)', 'Growth (%)'],
                 collect($a['products'])->map(fn ($row) => [
-                    $row['code'], $row['name'], $row['category'], $row['qty'], $row['return_qty'], $row['transactions'],
+                    $row['code'], $row['name'], $row['category'], $row['net_qty'], $row['return_qty'], $row['transactions'],
                     $row['revenue'], $row['contribution_percent'], $row['growth_percent'],
+                ])->all()),
+            new RevenueAnalysisSheet('Fast Moving', ['Rank', 'Kode', 'Nama Obat', 'Kategori', 'Qty Bersih', 'Transaksi', 'Hari Aktif', 'Rata-rata per Hari', 'Penetrasi (%)', 'Growth Qty (%)'],
+                collect($a['fast_moving']['rows'])->map(fn ($row) => [
+                    $row['rank'], $row['code'], $row['name'], $row['category'], $row['net_qty'], $row['transactions'],
+                    $row['sales_days'], $row['average_daily_qty'], $row['transaction_penetration_percent'], $row['qty_growth_percent'],
+                ])->all()),
+            new RevenueAnalysisSheet('Market Basket', ['Produk A', 'Produk B', 'Transaksi Bersama', 'Support (%)', 'Confidence A ke B (%)', 'Confidence B ke A (%)', 'Lift', 'Kekuatan'],
+                collect($a['market_basket']['rows'])->map(fn ($row) => [
+                    $row['product_a']['name'], $row['product_b']['name'], $row['pair_transactions'], $row['support_percent'],
+                    $row['confidence_a_to_b_percent'], $row['confidence_b_to_a_percent'], $row['lift'], $row['strength'],
                 ])->all()),
             new RevenueAnalysisSheet('Kategori', ['Kategori', 'Qty Terjual', 'Qty Retur', 'Omzet Bersih', 'Kontribusi (%)'],
                 collect($a['categories'])->map(fn ($row) => [

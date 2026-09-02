@@ -123,15 +123,21 @@ class RevenueAnalysisTest extends TestCase
 
     public function test_dashboard_requires_authentication_and_renders_complete_workspace(): void
     {
-        $this->get(route('analisisOmzet.index'))->assertRedirect(route('login'));
+        $this->get(route('analisisPenjualan.index'))->assertRedirect(route('login'));
 
-        $this->actingAs($this->user)->get(route('analisisOmzet.index'))
+        $this->actingAs($this->user)->get(route('analisisPenjualan.index'))
             ->assertOk()
-            ->assertSee('Analisis Omzet')
+            ->assertSee('Analisis Penjualan')
             ->assertSee('roKpiGrid', false)
             ->assertSee('roTrendChart', false)
             ->assertSee('roProductBody', false)
+            ->assertSee('roFastMovingBody', false)
+            ->assertSee('roMarketBasketBody', false)
             ->assertSee('Target vs Realisasi Omzet');
+
+        $this->actingAs($this->user)->get(route('analisisOmzet.index'))
+            ->assertOk()
+            ->assertSee('Analisis Penjualan');
     }
 
     public function test_analysis_calculates_net_revenue_growth_breakdowns_and_excludes_cancelled_sales(): void
@@ -153,13 +159,53 @@ class RevenueAnalysisTest extends TestCase
             ->assertJsonPath('analysis.products.0.growth_percent', 60)
             ->assertJsonPath('analysis.categories.0.label', 'Vitamin')
             ->assertJsonPath('analysis.hourly.peak_hour', '10:00')
+            ->assertJsonPath('analysis.hourly.busy_hour', '10:00')
             ->assertJsonPath('analysis.weekdays.peak_day', 'Senin')
-            ->assertJsonPath('analysis.cashiers.0.name', 'Kasir Omzet');
+            ->assertJsonPath('analysis.cashiers.0.name', 'Kasir Omzet')
+            ->assertJsonPath('analysis.fast_moving.rows.0.name', 'Vitamin Omzet')
+            ->assertJsonPath('analysis.fast_moving.rows.0.net_qty', 1)
+            ->assertJsonPath('analysis.market_basket.summary.transactions_analyzed', 1)
+            ->assertJsonCount(0, 'analysis.market_basket.rows');
 
         $payments = collect($response->json('analysis.payments'))->keyBy('key');
         $this->assertSame(32000.0, (float) $payments->get('qris')['revenue']);
         $this->assertSame(48000.0, (float) $payments->get('tunai')['revenue']);
         $this->assertSame(40.0, (float) $payments->get('qris')['contribution_percent']);
+    }
+
+    public function test_fast_moving_product_ranking_and_market_basket_metrics_are_available(): void
+    {
+        $fastMedicine = MasterObatModel::create([
+            'kode_obat' => 'FAST-001',
+            'nama_obat' => 'Produk Cepat',
+            'category_id' => $this->medicine->category_id,
+            'golongan_id' => $this->medicine->golongan_id,
+            'is_active' => true,
+        ]);
+        $basketSale = $this->sale('SALE-BASKET-001', '2026-08-30 11:00:00', 60000, 60000, 0, 0);
+        $this->detail($basketSale, 1, 10000, 0, 10000);
+        $this->detail($basketSale, 5, 50000, 0, 50000, $fastMedicine);
+
+        $response = $this->actingAs($this->user)->getJson(route('analisisPenjualan.data', [
+            ...$this->period(),
+            'product_metric' => 'qty',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('analysis.meta.product_metric', 'qty')
+            ->assertJsonPath('analysis.products.0.name', 'Produk Cepat')
+            ->assertJsonPath('analysis.fast_moving.rows.0.name', 'Produk Cepat')
+            ->assertJsonPath('analysis.fast_moving.rows.0.net_qty', 5)
+            ->assertJsonPath('analysis.market_basket.summary.transactions_analyzed', 2)
+            ->assertJsonPath('analysis.market_basket.summary.pairs_found', 1)
+            ->assertJsonPath('analysis.market_basket.rows.0.product_a.name', 'Vitamin Omzet')
+            ->assertJsonPath('analysis.market_basket.rows.0.product_b.name', 'Produk Cepat')
+            ->assertJsonPath('analysis.market_basket.rows.0.pair_transactions', 1)
+            ->assertJsonPath('analysis.market_basket.rows.0.support_percent', 50)
+            ->assertJsonPath('analysis.market_basket.rows.0.confidence_a_to_b_percent', 50)
+            ->assertJsonPath('analysis.market_basket.rows.0.confidence_b_to_a_percent', 100)
+            ->assertJsonPath('analysis.market_basket.rows.0.lift', 1);
+
+        $this->assertSame('Netral', $response->json('analysis.market_basket.rows.0.strength'));
     }
 
     public function test_every_filter_applies_to_kpis_and_payment_filter_allocates_split_transaction_value(): void
@@ -227,11 +273,11 @@ class RevenueAnalysisTest extends TestCase
 
         $this->get(route('analisisOmzet.export.excel', $this->period()))
             ->assertOk()
-            ->assertDownload('analisis-omzet-20260801-20260831.xlsx');
+            ->assertDownload('analisis-penjualan-20260801-20260831.xlsx');
         $this->get(route('analisisOmzet.export.pdf', $this->period()))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf')
-            ->assertDownload('analisis-omzet-20260801-20260831.pdf');
+            ->assertDownload('analisis-penjualan-20260801-20260831.pdf');
     }
 
     private function period(): array
@@ -261,13 +307,21 @@ class RevenueAnalysisTest extends TestCase
         ]);
     }
 
-    private function detail(PenjualanTransactionModel $sale, float $qty, float $gross, float $discount, float $net): PenjualanTransactionDetailModel
-    {
+    private function detail(
+        PenjualanTransactionModel $sale,
+        float $qty,
+        float $gross,
+        float $discount,
+        float $net,
+        ?MasterObatModel $medicine = null,
+    ): PenjualanTransactionDetailModel {
+        $medicine ??= $this->medicine;
+
         return PenjualanTransactionDetailModel::create([
             'penjualan_transaction_id' => $sale->id,
-            'obat_id' => $this->medicine->id,
-            'kode_obat' => $this->medicine->kode_obat,
-            'nama_obat' => $this->medicine->nama_obat,
+            'obat_id' => $medicine->id,
+            'kode_obat' => $medicine->kode_obat,
+            'nama_obat' => $medicine->nama_obat,
             'satuan_jual' => 'Tablet',
             'qty_jual' => $qty,
             'harga_jual' => $qty > 0 ? $gross / $qty : 0,

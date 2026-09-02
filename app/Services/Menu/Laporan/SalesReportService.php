@@ -4,6 +4,7 @@ namespace App\Services\Menu\Laporan;
 
 use App\Models\BranchModel;
 use App\Models\User;
+use App\Services\Menu\AnalisisProfitabilitas\ProfitabilityMetricsService;
 use App\Support\BranchAccess;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class SalesReportService
 {
+    public function __construct(private readonly ProfitabilityMetricsService $profitabilityMetrics) {}
+
     public const TYPES = [
         'ringkasan' => [
             'title' => 'Rekap Harian Penjualan',
@@ -138,7 +141,7 @@ class SalesReportService
                 'date_start' => $filters['start']->toDateString(),
                 'date_end' => $filters['end']->toDateString(),
                 'period_days' => $filters['start']->diffInDays($filters['end']) + 1,
-                'amount_basis' => 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Omzet.',
+                'amount_basis' => 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Penjualan.',
                 'generated_at' => now()->format('Y-m-d H:i:s'),
             ],
             'metrics' => $metrics['cards'],
@@ -458,47 +461,7 @@ class SalesReportService
 
     private function profitabilityDailyQuery(array $branchIds, array $filters): Builder
     {
-        $saleDate = $this->dateExpression('sales.tanggal_transaksi');
-        $returnDate = $this->dateExpression('returns.tanggal_retur');
-
-        $saleEvents = $this->sales($branchIds, $filters, 'completed')
-            ->leftJoinSub($this->transactionCosts(), 'transaction_costs', 'transaction_costs.penjualan_transaction_id', '=', 'sales.id')
-            ->selectRaw("{$saleDate} as event_date")
-            ->selectRaw('COUNT(sales.id) as transactions')
-            ->selectRaw('COALESCE(SUM(sales.grand_total), 0) as gross_sales')
-            ->selectRaw('0 as returns_value')
-            ->selectRaw('COALESCE(SUM(transaction_costs.hpp), 0) as sales_hpp')
-            ->selectRaw('0 as return_hpp')
-            ->groupByRaw($saleDate);
-
-        $returnEvents = $this->returns($branchIds, $filters)
-            ->leftJoinSub($this->returnDocumentCosts(), 'return_costs', 'return_costs.retur_penjualan_id', '=', 'returns.id')
-            ->selectRaw("{$returnDate} as event_date")
-            ->selectRaw('0 as transactions')
-            ->selectRaw('0 as gross_sales')
-            ->selectRaw('COALESCE(SUM(returns.grand_total), 0) as returns_value')
-            ->selectRaw('0 as sales_hpp')
-            ->selectRaw('COALESCE(SUM(return_costs.hpp), 0) as return_hpp')
-            ->groupByRaw($returnDate);
-
-        $events = $saleEvents->unionAll($returnEvents);
-        $netSales = '(SUM(gross_sales) - SUM(returns_value))';
-        $netHpp = '(SUM(sales_hpp) - SUM(return_hpp))';
-        $grossProfit = "({$netSales} - {$netHpp})";
-
-        return DB::query()
-            ->fromSub($events, 'profit_events')
-            ->selectRaw('event_date as sale_date')
-            ->selectRaw('SUM(transactions) as transactions')
-            ->selectRaw('ROUND(SUM(gross_sales), 2) as gross_sales')
-            ->selectRaw('ROUND(SUM(returns_value), 2) as returns_value')
-            ->selectRaw("ROUND({$netSales}, 2) as net_sales")
-            ->selectRaw('ROUND(SUM(sales_hpp), 2) as sales_hpp')
-            ->selectRaw('ROUND(SUM(return_hpp), 2) as return_hpp')
-            ->selectRaw("ROUND({$netHpp}, 2) as net_hpp")
-            ->selectRaw("ROUND({$grossProfit}, 2) as gross_profit")
-            ->selectRaw("CASE WHEN {$netSales} != 0 THEN ROUND(((1.0 * {$grossProfit}) / {$netSales}) * 100, 2) ELSE 0 END as gross_margin")
-            ->groupBy('event_date');
+        return $this->profitabilityMetrics->dailyQuery($branchIds, $filters['start'], $filters['end']);
     }
 
     private function categoryReport(array $branchIds, array $filters): array
@@ -1095,25 +1058,6 @@ class SalesReportService
             .'THEN COALESCE(sales.diskon_transaksi_nominal, 0) * ((1.0 * details.subtotal_net) / detail_totals.subtotal_net) '
             .'WHEN COALESCE(detail_totals.item_count, 0) > 0 '
             .'THEN COALESCE(sales.diskon_transaksi_nominal, 0) * (1.0 / detail_totals.item_count) ELSE 0 END';
-    }
-
-    private function transactionCosts(): Builder
-    {
-        return DB::table('penjualan_transaction_batches as sale_batches')
-            ->join('penjualan_transaction_details as details', 'details.id', '=', 'sale_batches.penjualan_transaction_detail_id')
-            ->select('details.penjualan_transaction_id')
-            ->selectRaw('COALESCE(SUM(sale_batches.qty_stok * sale_batches.harga_beli), 0) as hpp')
-            ->groupBy('details.penjualan_transaction_id');
-    }
-
-    private function returnDocumentCosts(): Builder
-    {
-        return DB::table('retur_penjualan_batches as return_batches')
-            ->join('retur_penjualan_details as return_details', 'return_details.id', '=', 'return_batches.retur_penjualan_detail_id')
-            ->join('penjualan_transaction_batches as sale_batches', 'sale_batches.id', '=', 'return_batches.penjualan_transaction_batch_id')
-            ->select('return_details.retur_penjualan_id')
-            ->selectRaw('COALESCE(SUM(return_batches.qty_stok * sale_batches.harga_beli), 0) as hpp')
-            ->groupBy('return_details.retur_penjualan_id');
     }
 
     private function dateExpression(string $column): string

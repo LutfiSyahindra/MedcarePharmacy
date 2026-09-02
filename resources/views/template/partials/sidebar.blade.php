@@ -44,7 +44,10 @@
     $stockMenuActive = request()->routeIs("stok.*", "kartuStok.*", "stockOpname.*");
     $inventoryAnalysisMenuActive = request()->routeIs("analisisPersediaan.*");
     $procurementAnalysisMenuActive = request()->routeIs("analisisPengadaan.*");
-    $revenueAnalysisMenuActive = request()->routeIs("analisisOmzet.*");
+    $revenueAnalysisMenuActive = request()->routeIs("analisisOmzet.*") || request()->routeIs("analisisPenjualan.*");
+    $salesAnalysisSection = request()->query('section', 'tren');
+    $profitabilityAnalysisMenuActive = request()->routeIs("analisisProfitabilitas.*");
+    $profitabilityAnalysisSection = request()->query('section', 'profit-product');
     $reportMenuActive = request()->routeIs("laporan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
@@ -523,11 +526,42 @@
             </li>
 
             <li class="nav-item {{ $revenueAnalysisMenuActive ? 'active' : '' }}">
-                <a href="{{ route('analisisOmzet.index') }}"
-                    class="nav-link {{ $revenueAnalysisMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $revenueAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
+                    href="#analisis-penjualan" role="button"
+                    aria-expanded="{{ $revenueAnalysisMenuActive ? 'true' : 'false' }}"
+                    aria-controls="analisis-penjualan">
                     <i class="link-icon" data-feather="trending-up"></i>
-                    <span class="link-title">Analisis Omzet</span>
+                    <span class="link-title">Analisis Penjualan</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
                 </a>
+                <div class="collapse {{ $revenueAnalysisMenuActive ? 'show' : '' }}" id="analisis-penjualan">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item"><a href="{{ route('analisisPenjualan.index', ['section' => 'tren']) }}#roTrendPanel" class="nav-link {{ $revenueAnalysisMenuActive && $salesAnalysisSection === 'tren' ? 'active' : '' }}">Tren Penjualan</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisPenjualan.index', ['section' => 'fast-moving']) }}#roFastMovingPanel" class="nav-link {{ $revenueAnalysisMenuActive && $salesAnalysisSection === 'fast-moving' ? 'active' : '' }}">Fast Moving</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisPenjualan.index', ['section' => 'produk-terlaris']) }}#roProductsPanel" class="nav-link {{ $revenueAnalysisMenuActive && $salesAnalysisSection === 'produk-terlaris' ? 'active' : '' }}">Produk Terlaris</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisPenjualan.index', ['section' => 'jam-ramai']) }}#roHourlyPanel" class="nav-link {{ $revenueAnalysisMenuActive && $salesAnalysisSection === 'jam-ramai' ? 'active' : '' }}">Jam Ramai</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisPenjualan.index', ['section' => 'market-basket']) }}#roMarketBasketPanel" class="nav-link {{ $revenueAnalysisMenuActive && $salesAnalysisSection === 'market-basket' ? 'active' : '' }}">Market Basket</a></li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item {{ $profitabilityAnalysisMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $profitabilityAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
+                    href="#analisis-profitabilitas" role="button"
+                    aria-expanded="{{ $profitabilityAnalysisMenuActive ? 'true' : 'false' }}"
+                    aria-controls="analisis-profitabilitas">
+                    <i class="link-icon" data-feather="dollar-sign"></i>
+                    <span class="link-title">Analisis Profitabilitas</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse {{ $profitabilityAnalysisMenuActive ? 'show' : '' }}" id="analisis-profitabilitas">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item"><a href="{{ route('analisisProfitabilitas.index', ['section' => 'profit-product']) }}#paProductPanel" class="nav-link {{ $profitabilityAnalysisMenuActive && $profitabilityAnalysisSection === 'profit-product' ? 'active' : '' }}">Profit per Produk</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisProfitabilitas.index', ['section' => 'margin']) }}#paMarginPanel" class="nav-link {{ $profitabilityAnalysisMenuActive && $profitabilityAnalysisSection === 'margin' ? 'active' : '' }}">Margin</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisProfitabilitas.index', ['section' => 'gmroi']) }}#paGmroiPanel" class="nav-link {{ $profitabilityAnalysisMenuActive && $profitabilityAnalysisSection === 'gmroi' ? 'active' : '' }}">GMROI</a></li>
+                        <li class="nav-item"><a href="{{ route('analisisProfitabilitas.index', ['section' => 'top-profit-product']) }}#paTopProfitPanel" class="nav-link {{ $profitabilityAnalysisMenuActive && $profitabilityAnalysisSection === 'top-profit-product' ? 'active' : '' }}">Top Profit Product</a></li>
+                    </ul>
+                </div>
             </li>
 
             <li class="nav-item {{ $procurementAnalysisMenuActive ? 'active' : '' }}">

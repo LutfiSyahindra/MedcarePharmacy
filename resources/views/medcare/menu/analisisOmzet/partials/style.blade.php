@@ -378,6 +378,25 @@
     .ro-trend-panel { overflow: hidden; min-height: 450px; }
     .ro-trend-panel .ro-chart { margin: 0 14px 15px; border: 1px solid #edf2f3; border-radius: 16px; background: linear-gradient(180deg, #fff, #fbfdfd); }
     .ro-products-panel .table-responsive { border-top: 1px solid #e9f0f2; }
+    #roTrendPanel, #roFastMovingPanel, #roProductsPanel, #roHourlyPanel, #roMarketBasketPanel { scroll-margin-top: 88px; }
+    .ro-analysis-panel { overflow: hidden; margin-top: 20px; }
+    .ro-heading small { display: block; margin-top: 4px; color: #95a3ad; font-size: 8px; }
+    .ro-basket-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 25px 18px; }
+    .ro-basket-guide span { display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; border: 1px solid #e0e9eb; border-radius: 999px; color: #748794; background: #f7fafb; font-size: 8px; }
+    .ro-basket-guide strong { color: #31576b; font-weight: 900; }
+    .ro-basket-pair { display: flex; min-width: 300px; align-items: center; gap: 9px; }
+    .ro-basket-pair > span { display: grid; min-width: 0; grid-template-columns: 20px minmax(120px, 1fr); column-gap: 7px; align-items: center; }
+    .ro-basket-pair b { display: grid; width: 20px; height: 20px; grid-row: 1 / span 2; place-items: center; border-radius: 7px; color: #fff; background: #0f8f83; font-size: 8px; }
+    .ro-basket-pair > span:last-child b { background: #596fd2; }
+    .ro-basket-pair strong, .ro-basket-pair small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ro-basket-pair strong { color: #294b5d; font-size: 10px; }
+    .ro-basket-pair small { color: #91a0aa; font-size: 8px; }
+    .ro-basket-pair > i { color: #a8b5bd; }
+    .ro-association { display: inline-flex; min-width: 58px; justify-content: center; border-radius: 999px; padding: 5px 8px; color: #6d7f8b; background: #eef2f4; font-size: 8px; font-weight: 900; }
+    .ro-association.is-kuat { color: #087468; background: #ddf5ef; }
+    .ro-association.is-positif { color: #2462b2; background: #e4efff; }
+    .ro-association.is-lemah { color: #a76113; background: #fff0d9; }
+    .ro-basket-table td { vertical-align: middle; }
     .ro-soft-badge { border: 1px solid #d5eee8; padding: 6px 10px; }
     .ro-table thead th { padding: 12px 15px; border-color: #e5edef; color: #617786; background: linear-gradient(180deg, #f8fafb, #f3f7f8); }
     .ro-table td { padding: 14px 15px; }
@@ -450,6 +469,7 @@
         .ro-filter-actions { align-items: stretch; flex-direction: column; padding-right: 20px; padding-left: 20px; }
         .ro-filter-actions > div:last-child { justify-content: flex-end; }
         .ro-active-filters { padding-right: 20px; padding-left: 20px; }
+        .ro-basket-guide { padding-right: 20px; padding-left: 20px; }
     }
     @media (max-width: 479px) {
         .ro-hero-brandline { align-items: flex-start; }

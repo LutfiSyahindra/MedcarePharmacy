@@ -73,7 +73,7 @@ class RevenueAnalysisController extends Controller
     {
         $filters = $this->filters($request);
         $analysis = $this->analysis->build($request->user(), $filters, false);
-        $filename = 'analisis-omzet-'.$filters['start']->format('Ymd').'-'.$filters['end']->format('Ymd').'.xlsx';
+        $filename = 'analisis-penjualan-'.$filters['start']->format('Ymd').'-'.$filters['end']->format('Ymd').'.xlsx';
 
         return Excel::download(new RevenueAnalysisExport($analysis), $filename);
     }
@@ -89,7 +89,7 @@ class RevenueAnalysisController extends Controller
         $dompdf->loadHtml(view('medcare.menu.analisisOmzet.pdf', compact('analysis'))->render());
         $dompdf->setPaper('a4', 'landscape');
         $dompdf->render();
-        $filename = 'analisis-omzet-'.$filters['start']->format('Ymd').'-'.$filters['end']->format('Ymd').'.pdf';
+        $filename = 'analisis-penjualan-'.$filters['start']->format('Ymd').'-'.$filters['end']->format('Ymd').'.pdf';
 
         return response($dompdf->output(), 200, [
             'Content-Type' => 'application/pdf',
@@ -112,6 +112,7 @@ class RevenueAnalysisController extends Controller
             'payment_method' => ['nullable', Rule::in(array_keys(\App\Services\Menu\Penjualan\PenjualanPosService::PAYMENT_METHODS))],
             'granularity' => ['nullable', Rule::in(['day', 'week', 'month', 'year'])],
             'top' => ['nullable', Rule::in(['10', '20', 'all', 10, 20])],
+            'product_metric' => ['nullable', Rule::in(['revenue', 'qty', 'transactions'])],
         ]);
 
         $end = isset($validated['date_end'])
@@ -141,6 +142,7 @@ class RevenueAnalysisController extends Controller
             'payment_method' => $validated['payment_method'] ?? null,
             'granularity' => $validated['granularity'] ?? 'day',
             'top' => (string) ($validated['top'] ?? '10'),
+            'product_metric' => $validated['product_metric'] ?? 'revenue',
         ];
     }
 }

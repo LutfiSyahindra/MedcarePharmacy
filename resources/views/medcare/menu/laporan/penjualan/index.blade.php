@@ -15,7 +15,9 @@
         'health_eyebrow' => 'Kesehatan penjualan',
         'health_title' => 'Setelah retur',
         'health_copy' => 'rasio retur terhadap omzet periode aktif.',
-        'analysis_url' => route('analisisOmzet.index'),
+        'analysis_url' => $reportType === 'keuntungan'
+            ? route('analisisProfitabilitas.index', ['section' => 'profit-product']).'#paProductPanel'
+            : route('analisisPenjualan.index'),
         'basis_label' => 'Omzet laporan: completed sebelum retur',
     ], $reportModule ?? []);
     $showSupplierFilter = $showSupplierFilter ?? false;

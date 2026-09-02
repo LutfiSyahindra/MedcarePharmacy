@@ -104,7 +104,7 @@
                 signal: controller.signal,
             });
             const payload = await response.json();
-            if (!response.ok) throw new Error(firstError(payload) || 'Data analisis omzet gagal dimuat.');
+            if (!response.ok) throw new Error(firstError(payload) || 'Data analisis penjualan gagal dimuat.');
             state.analysis = payload.analysis;
             render(payload.analysis);
             state.filterError = false;
@@ -140,11 +140,13 @@
         renderActiveFilters(analysis.meta.active_filters || []);
         renderKpis(analysis.summary);
         renderTrend(analysis.trend);
+        renderFastMoving(analysis.fast_moving || { summary: {}, rows: [] });
         renderProducts(analysis.products || []);
         renderCategories(analysis.categories || []);
         renderSaleTypes(analysis.sale_types || []);
         renderPayments(analysis.payments || []);
         renderHourly(analysis.hourly || { rows: [] });
+        renderMarketBasket(analysis.market_basket || { summary: {}, rows: [] });
         renderWeekdays(analysis.weekdays || { rows: [] });
         renderCashiers(analysis.cashiers || []);
         renderTarget(analysis.target || {});
@@ -241,6 +243,30 @@
         });
     }
 
+    function renderFastMoving(data) {
+        const rows = data.rows || [];
+        const summary = data.summary || {};
+        $('#roFastMovingCount').textContent = `${number(rows.length)} produk`;
+        $('#roFastMovingSummary').textContent = summary.leader
+            ? `${summary.leader} memimpin dengan rata-rata ${number(summary.leader_daily_qty)} unit bersih per hari selama ${number(summary.period_days)} hari.`
+            : 'Belum ada produk dengan penjualan bersih pada periode ini.';
+        $('#roFastMovingBody').innerHTML = rows.length ? rows.map(row => {
+            const growth = Number(row.qty_growth_percent || 0);
+            const growthClass = growth > 0 ? 'up' : (growth < 0 ? 'down' : 'flat');
+            const growthIcon = growth > 0 ? 'mdi-arrow-up' : (growth < 0 ? 'mdi-arrow-down' : 'mdi-minus');
+            return `<tr>
+                <td><span class="ro-rank ${Number(row.rank) <= 3 ? 'is-top' : ''}">${number(row.rank)}</span></td>
+                <td><span class="ro-product-name"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.code)} · ${escapeHtml(row.category)}</small></span></td>
+                <td class="text-end"><strong>${number(row.net_qty)}</strong></td>
+                <td class="text-end">${number(row.transactions)}</td>
+                <td class="text-end">${number(row.sales_days)}</td>
+                <td class="text-end"><strong>${number(row.average_daily_qty)}</strong></td>
+                <td class="text-end">${percent(row.transaction_penetration_percent)}</td>
+                <td class="text-end"><span class="ro-growth ${growthClass}"><i class="mdi ${growthIcon}"></i>${percent(Math.abs(growth))}</span></td>
+            </tr>`;
+        }).join('') : emptyRow(8, 'Belum ada produk fast moving pada periode ini.');
+    }
+
     function renderProducts(rows) {
         $('#roProductCount').textContent = `${number(rows.length)} produk`;
         $('#roProductBody').innerHTML = rows.length ? rows.map((row, index) => {
@@ -250,7 +276,7 @@
             return `<tr>
                 <td><span class="ro-rank ${index < 3 ? 'is-top' : ''}">${index + 1}</span></td>
                 <td><span class="ro-product-name"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.code)}</small></span></td>
-                <td>${escapeHtml(row.category)}</td><td class="text-end">${number(row.qty)}</td><td class="text-end">${number(row.transactions)}</td>
+                <td>${escapeHtml(row.category)}</td><td class="text-end">${number(row.net_qty)}</td><td class="text-end">${number(row.transactions)}</td>
                 <td class="text-end"><strong>${money(row.revenue)}</strong></td><td class="text-end">${percent(row.contribution_percent)}</td>
                 <td class="text-end"><span class="ro-growth ${growthClass}"><i class="mdi ${growthIcon}"></i>${percent(Math.abs(growth))}</span></td>
             </tr>`;
@@ -300,7 +326,12 @@
 
     function renderHourly(data) {
         const rows = data.rows || [];
-        $('#roPeakHour').textContent = data.peak_hour ? `Peak hour ${data.peak_hour} · ${money(data.peak_revenue)}` : 'Belum ada peak hour pada periode ini.';
+        $('#roPeakHour').textContent = data.busy_hour
+            ? `Paling ramai pukul ${data.busy_hour} · ${number(data.busy_transactions)} transaksi`
+            : 'Belum ada jam ramai pada periode ini.';
+        $('#roPeakRevenue').textContent = data.peak_hour
+            ? `Omzet tertinggi pukul ${data.peak_hour} · ${money(data.peak_revenue)}`
+            : '';
         mountChart('hourly', '#roHourlyChart', {
             ...chartBase, chart: { ...chartBase.chart, type: 'bar', height: 285 },
             series: [{ name: 'Omzet', data: rows.map(row => Number(row.revenue || 0)) }, { name: 'Transaksi', data: rows.map(row => Number(row.transactions || 0)) }],
@@ -309,6 +340,27 @@
             yaxis: [{ labels: { formatter: compactMoney } }, { opposite: true, labels: { formatter: number } }],
             tooltip: { shared: true, intersect: false, y: { formatter: (value, ctx) => ctx.seriesIndex === 1 ? `${number(value)} transaksi` : money(value) } },
         });
+    }
+
+    function renderMarketBasket(data) {
+        const rows = data.rows || [];
+        const summary = data.summary || {};
+        $('#roMarketBasketCount').textContent = `${number(rows.length)} pasangan`;
+        $('#roMarketBasketSummary').textContent = summary.leading_pair
+            ? `${summary.leading_pair} menjadi pasangan teratas dari ${number(summary.transactions_analyzed)} transaksi yang dianalisis.`
+            : `${number(summary.transactions_analyzed)} transaksi dianalisis; belum ditemukan pembelian dua produk berbeda dalam satu struk.`;
+        $('#roMarketBasketBody').innerHTML = rows.length ? rows.map(row => {
+            const strengthClass = String(row.strength || '').toLowerCase();
+            return `<tr>
+                <td><span class="ro-basket-pair"><span><b>A</b><strong>${escapeHtml(row.product_a.name)}</strong><small>${escapeHtml(row.product_a.code || '-')}</small></span><i class="mdi mdi-plus"></i><span><b>B</b><strong>${escapeHtml(row.product_b.name)}</strong><small>${escapeHtml(row.product_b.code || '-')}</small></span></span></td>
+                <td class="text-end"><strong>${number(row.pair_transactions)}</strong></td>
+                <td class="text-end">${percent(row.support_percent)}</td>
+                <td class="text-end">${percent(row.confidence_a_to_b_percent)}</td>
+                <td class="text-end">${percent(row.confidence_b_to_a_percent)}</td>
+                <td class="text-end"><strong>${number(row.lift)}</strong></td>
+                <td><span class="ro-association is-${escapeHtml(strengthClass)}">${escapeHtml(row.strength)}</span></td>
+            </tr>`;
+        }).join('') : emptyRow(7, 'Belum ada pasangan produk untuk filter dan periode ini.');
     }
 
     function renderWeekdays(data) {
@@ -353,10 +405,19 @@
     function syncSegments(meta) {
         $$('#roTrendControls button').forEach(button => button.classList.toggle('is-active', button.dataset.granularity === String(meta.granularity || 'day')));
         $$('#roTopControls button').forEach(button => button.classList.toggle('is-active', button.dataset.top === String(meta.top || '10')));
+        $$('#roProductMetricControls button').forEach(button => button.classList.toggle('is-active', button.dataset.productMetric === String(meta.product_metric || 'revenue')));
+        const metricCopy = {
+            revenue: 'Ranking berdasarkan omzet bersih setelah retur.',
+            qty: 'Ranking berdasarkan qty terjual setelah dikurangi retur.',
+            transactions: 'Ranking berdasarkan jumlah transaksi unik yang memuat produk.',
+        };
+        $('#roProductMetricCopy').textContent = metricCopy[meta.product_metric] || metricCopy.revenue;
     }
 
     function renderError(message) {
         ['#roTrendChart','#roCategoryChart','#roTypeChart','#roPaymentChart','#roHourlyChart','#roWeekdayChart'].forEach(selector => { $(selector).innerHTML = `<div class="ro-empty">${escapeHtml(message)}</div>`; });
+        $('#roFastMovingBody').innerHTML = emptyRow(8, message);
+        $('#roMarketBasketBody').innerHTML = emptyRow(7, message);
     }
 
     function applyPreset(range) {
@@ -396,6 +457,12 @@
         if ($('#roTop').value === button.dataset.top) return;
         $('#roTop').value = button.dataset.top;
         $$('#roTopControls button').forEach(item => item.classList.toggle('is-active', item === button));
+        load();
+    }));
+    $$('#roProductMetricControls button').forEach(button => button.addEventListener('click', () => {
+        if ($('#roProductMetric').value === button.dataset.productMetric) return;
+        $('#roProductMetric').value = button.dataset.productMetric;
+        $$('#roProductMetricControls button').forEach(item => item.classList.toggle('is-active', item === button));
         load();
     }));
     $('#roReset').addEventListener('click', () => {

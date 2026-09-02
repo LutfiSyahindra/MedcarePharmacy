@@ -7,17 +7,17 @@
 
 @section('content')
     <main class="ro-page" id="revenueAnalysisApp"
-        data-url="{{ route('analisisOmzet.data') }}"
-        data-target-url="{{ route('analisisOmzet.target.store') }}"
-        data-excel-url="{{ route('analisisOmzet.export.excel') }}"
-        data-pdf-url="{{ route('analisisOmzet.export.pdf') }}"
+        data-url="{{ route('analisisPenjualan.data') }}"
+        data-target-url="{{ route('analisisPenjualan.target.store') }}"
+        data-excel-url="{{ route('analisisPenjualan.export.excel') }}"
+        data-pdf-url="{{ route('analisisPenjualan.export.pdf') }}"
         data-default-start="{{ $defaultDateStart }}"
         data-default-end="{{ $defaultDateEnd }}">
         <nav class="page-breadcrumb ro-breadcrumb" aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="mdi mdi-home-outline"></i> Dashboard</a></li>
                 <li class="breadcrumb-item">Analisis</li>
-                <li class="breadcrumb-item active" aria-current="page">Omzet</li>
+                <li class="breadcrumb-item active" aria-current="page">Penjualan</li>
             </ol>
         </nav>
 
@@ -26,11 +26,11 @@
             <div class="ro-hero-copy">
                 <div class="ro-hero-brandline">
                     <span class="ro-hero-mark"><i class="mdi mdi-chart-timeline-variant-shimmer"></i></span>
-                    <span class="ro-eyebrow"><i class="mdi mdi-chart-box-outline"></i> Revenue Intelligence</span>
+                    <span class="ro-eyebrow"><i class="mdi mdi-chart-box-outline"></i> Sales Intelligence</span>
                     <span class="ro-live-badge"><i></i> Live Analytics</span>
                 </div>
-                <h1>Analisis Omzet</h1>
-                <p>Pantau pertumbuhan, kontributor, pola waktu, kasir, dan pencapaian target dari satu dashboard operasional.</p>
+                <h1>Analisis Penjualan</h1>
+                <p>Pantau tren, produk terlaris, kecepatan jual, jam ramai, dan peluang bundling dari satu dashboard operasional.</p>
                 <div class="ro-hero-meta">
                     <span><i class="mdi mdi-check-decagram-outline"></i> Transaksi completed</span>
                     <span><i class="mdi mdi-keyboard-return"></i> Retur posted diperhitungkan</span>
@@ -48,13 +48,12 @@
             </div>
         </section>
 
-        <nav class="ro-dashboard-nav" aria-label="Navigasi dashboard omzet">
-            <a href="#roExecutive"><i class="mdi mdi-view-dashboard-outline"></i><span>Ringkasan</span></a>
-            <a href="#roTrendPanel"><i class="mdi mdi-chart-areaspline"></i><span>Tren</span></a>
-            <a href="#roProductsPanel"><i class="mdi mdi-pill-multiple"></i><span>Produk</span></a>
-            <a href="#roBreakdowns"><i class="mdi mdi-chart-donut"></i><span>Kontribusi</span></a>
-            <a href="#roTargetPanel"><i class="mdi mdi-bullseye-arrow"></i><span>Target</span></a>
-            <a href="{{ route('laporan.penjualan.index', ['report' => 'ringkasan']) }}"><i class="mdi mdi-file-table-outline"></i><span>Laporan detail</span></a>
+        <nav class="ro-dashboard-nav" aria-label="Navigasi analisis penjualan">
+            <a href="#roTrendPanel"><i class="mdi mdi-chart-areaspline"></i><span>Tren Penjualan</span></a>
+            <a href="#roFastMovingPanel"><i class="mdi mdi-rocket-launch-outline"></i><span>Fast Moving</span></a>
+            <a href="#roProductsPanel"><i class="mdi mdi-trophy-outline"></i><span>Produk Terlaris</span></a>
+            <a href="#roHourlyPanel"><i class="mdi mdi-clock-fast"></i><span>Jam Ramai</span></a>
+            <a href="#roMarketBasketPanel"><i class="mdi mdi-set-center"></i><span>Market Basket</span></a>
         </nav>
 
         <section class="ro-filter-panel ro-panel" id="roFilterPanel" aria-labelledby="roFilterTitle">
@@ -122,6 +121,7 @@
                                 <label class="ro-field"><span><i class="mdi mdi-credit-card-multiple-outline"></i>Metode pembayaran</span><select id="roPaymentMethod" name="payment_method"><option value="">Semua metode</option></select></label>
                                 <label class="ro-field ro-field-command-only"><span>Agregasi tren</span><select id="roGranularity" name="granularity"><option value="day">Harian</option><option value="week">Mingguan</option><option value="month">Bulanan</option><option value="year">Tahunan</option></select></label>
                                 <label class="ro-field ro-field-command-only"><span>Ranking produk</span><select id="roTop" name="top"><option value="10">Top 10</option><option value="20">Top 20</option><option value="all">Semua</option></select></label>
+                                <label class="ro-field ro-field-command-only"><span>Metrik produk</span><select id="roProductMetric" name="product_metric"><option value="revenue">Omzet</option><option value="qty">Qty bersih</option><option value="transactions">Transaksi</option></select></label>
                             </div>
                         </div>
                         <div class="ro-filter-actions">
@@ -167,10 +167,23 @@
             <div class="ro-chart ro-chart-large" id="roTrendChart"><div class="ro-loading"><i class="mdi mdi-loading mdi-spin"></i> Menyusun tren omzet...</div></div>
         </section>
 
+        <section class="ro-panel ro-products-panel ro-analysis-panel" id="roFastMovingPanel">
+            <div class="ro-panel-head">
+                <div class="ro-heading"><span class="is-green"><i class="mdi mdi-rocket-launch-outline"></i></span><div><h2>Fast Moving</h2><p id="roFastMovingSummary">Mengukur kecepatan jual bersih per hari dan frekuensi transaksi.</p></div></div>
+                <span class="ro-soft-badge" id="roFastMovingCount">0 produk</span>
+            </div>
+            <div class="table-responsive"><table class="table ro-table"><thead><tr><th>Rank</th><th>Nama obat</th><th class="text-end">Qty bersih</th><th class="text-end">Transaksi</th><th class="text-end">Hari aktif</th><th class="text-end">Rata-rata / hari</th><th class="text-end">Penetrasi</th><th class="text-end">Growth qty</th></tr></thead><tbody id="roFastMovingBody"></tbody></table></div>
+        </section>
+
         <section class="ro-panel ro-products-panel" id="roProductsPanel">
             <div class="ro-panel-head">
-                <div class="ro-heading"><span class="is-blue"><i class="mdi mdi-pill-multiple"></i></span><div><h2>Top Produk Penyumbang Omzet</h2><p>Ranking berdasarkan omzet bersih setelah retur.</p></div></div>
+                <div class="ro-heading"><span class="is-blue"><i class="mdi mdi-trophy-outline"></i></span><div><h2>Produk Terlaris</h2><p id="roProductMetricCopy">Ranking berdasarkan omzet bersih setelah retur.</p></div></div>
                 <div class="ro-panel-tools is-inline">
+                    <div class="ro-segment" id="roProductMetricControls" aria-label="Metrik ranking produk">
+                        <button type="button" data-product-metric="revenue" class="is-active">Omzet</button>
+                        <button type="button" data-product-metric="qty">Qty</button>
+                        <button type="button" data-product-metric="transactions">Transaksi</button>
+                    </div>
                     <div class="ro-segment" id="roTopControls" aria-label="Jumlah ranking produk">
                         <button type="button" data-top="10" class="is-active">Top 10</button>
                         <button type="button" data-top="20">Top 20</button>
@@ -179,7 +192,7 @@
                     <span class="ro-soft-badge" id="roProductCount">0 produk</span>
                 </div>
             </div>
-            <div class="table-responsive"><table class="table ro-table"><thead><tr><th>Rank</th><th>Nama obat</th><th>Kategori</th><th class="text-end">Qty terjual</th><th class="text-end">Transaksi</th><th class="text-end">Omzet</th><th class="text-end">Kontribusi</th><th class="text-end">Growth</th></tr></thead><tbody id="roProductBody"></tbody></table></div>
+            <div class="table-responsive"><table class="table ro-table"><thead><tr><th>Rank</th><th>Nama obat</th><th>Kategori</th><th class="text-end">Qty bersih</th><th class="text-end">Transaksi</th><th class="text-end">Omzet</th><th class="text-end">Kontribusi</th><th class="text-end">Growth</th></tr></thead><tbody id="roProductBody"></tbody></table></div>
         </section>
 
         <section class="ro-grid ro-grid-two" id="roBreakdowns">
@@ -198,15 +211,28 @@
                 <div class="ro-panel-head"><div class="ro-heading"><span class="is-green"><i class="mdi mdi-credit-card-multiple-outline"></i></span><div><h2>Omzet per Metode Pembayaran</h2><p>Pembayaran split dinormalisasi terhadap nilai transaksi.</p></div></div></div>
                 <div class="ro-chart" id="roPaymentChart"></div><div class="ro-summary-list" id="roPaymentList"></div>
             </article>
-            <article class="ro-panel">
-                <div class="ro-panel-head"><div class="ro-heading"><span class="is-orange"><i class="mdi mdi-clock-fast"></i></span><div><h2>Analisis Omzet per Jam</h2><p id="roPeakHour">Mencari peak hour apotek...</p></div></div></div>
+            <article class="ro-panel" id="roHourlyPanel">
+                <div class="ro-panel-head"><div class="ro-heading"><span class="is-orange"><i class="mdi mdi-clock-fast"></i></span><div><h2>Jam Ramai</h2><p id="roPeakHour">Mencari jam dengan transaksi terbanyak...</p><small id="roPeakRevenue"></small></div></div></div>
                 <div class="ro-chart" id="roHourlyChart"></div>
             </article>
         </section>
 
+        <section class="ro-panel ro-products-panel ro-analysis-panel" id="roMarketBasketPanel">
+            <div class="ro-panel-head">
+                <div class="ro-heading"><span class="is-violet"><i class="mdi mdi-set-center"></i></span><div><h2>Market Basket</h2><p id="roMarketBasketSummary">Mencari pasangan produk yang muncul pada struk yang sama.</p></div></div>
+                <span class="ro-soft-badge" id="roMarketBasketCount">0 pasangan</span>
+            </div>
+            <div class="ro-basket-guide">
+                <span><strong>Support</strong> porsi seluruh transaksi yang memuat pasangan</span>
+                <span><strong>Confidence</strong> peluang produk kedua ikut terbeli</span>
+                <span><strong>Lift</strong> nilai &gt; 1 menandakan asosiasi positif</span>
+            </div>
+            <div class="table-responsive"><table class="table ro-table ro-basket-table"><thead><tr><th>Pasangan produk</th><th class="text-end">Transaksi bersama</th><th class="text-end">Support</th><th class="text-end">Confidence A → B</th><th class="text-end">Confidence B → A</th><th class="text-end">Lift</th><th>Kekuatan</th></tr></thead><tbody id="roMarketBasketBody"></tbody></table></div>
+        </section>
+
         <section class="ro-grid ro-grid-two">
             <article class="ro-panel">
-                <div class="ro-panel-head"><div class="ro-heading"><span class="is-rose"><i class="mdi mdi-calendar-week"></i></span><div><h2>Analisis Omzet per Hari</h2><p id="roPeakDay">Mencari hari terbaik...</p></div></div></div>
+                <div class="ro-panel-head"><div class="ro-heading"><span class="is-rose"><i class="mdi mdi-calendar-week"></i></span><div><h2>Pola Penjualan per Hari</h2><p id="roPeakDay">Mencari hari terbaik...</p></div></div></div>
                 <div class="ro-chart" id="roWeekdayChart"></div>
                 <div class="table-responsive"><table class="table ro-table ro-table-compact"><thead><tr><th>Hari</th><th class="text-end">Omzet</th><th class="text-end">Rata-rata</th><th class="text-end">Transaksi</th></tr></thead><tbody id="roWeekdayBody"></tbody></table></div>
             </article>

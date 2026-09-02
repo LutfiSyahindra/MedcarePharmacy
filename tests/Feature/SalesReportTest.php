@@ -215,7 +215,7 @@ class SalesReportTest extends TestCase
 
         $summary->assertOk()
             ->assertJsonPath('report.meta.branch_label', $this->branch->name)
-            ->assertJsonPath('report.meta.amount_basis', 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Omzet.')
+            ->assertJsonPath('report.meta.amount_basis', 'Omzet laporan berasal dari transaksi completed sebelum retur. Nilai setelah retur tersedia pada laporan keuntungan dan Analisis Penjualan.')
             ->assertJsonPath('report.metrics.0.value', 100000)
             ->assertJsonPath('report.metrics.1.value', 1)
             ->assertJsonPath('report.metrics.2.value', 2)

@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>Analisis Omzet</title>
+    <title>Analisis Penjualan</title>
     <style>
         @page { margin: 24px; }
         body { font-family: DejaVu Sans, sans-serif; color: #17324d; font-size: 9px; }
@@ -34,7 +34,7 @@
         $number = fn ($value) => number_format((float) $value, 2, ',', '.');
     @endphp
     <div class="header">
-        <h1>Analisis Omzet</h1>
+        <h1>Analisis Penjualan</h1>
         <p class="meta">{{ $analysis['meta']['branch_label'] }} · {{ $analysis['meta']['period_label'] }}</p>
         <p>Dibuat {{ $analysis['meta']['generated_at'] }} · Transaksi completed dikurangi retur posted.</p>
     </div>
@@ -70,19 +70,54 @@
         </tbody>
     </table>
 
-    <h2>Top Produk Penyumbang Omzet</h2>
+    <h2>Produk Terlaris</h2>
     <table class="data">
         <thead><tr><th>#</th><th>Obat</th><th>Kategori</th><th class="right">Qty</th><th class="right">Transaksi</th><th class="right">Omzet</th><th class="right">Kontribusi</th><th class="right">Growth</th></tr></thead>
         <tbody>
             @forelse ($analysis['products'] as $row)
                 <tr>
                     <td>{{ $loop->iteration }}</td><td>{{ $row['name'] }}<br><small>{{ $row['code'] }}</small></td><td>{{ $row['category'] }}</td>
-                    <td class="right">{{ $number($row['qty']) }}</td><td class="right">{{ $row['transactions'] }}</td>
+                    <td class="right">{{ $number($row['net_qty']) }}</td><td class="right">{{ $row['transactions'] }}</td>
                     <td class="right">{{ $money($row['revenue']) }}</td><td class="right">{{ $number($row['contribution_percent']) }}%</td>
                     <td class="right">{{ $number($row['growth_percent']) }}%</td>
                 </tr>
             @empty
                 <tr><td colspan="8">Tidak ada data produk.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    <h2>Fast Moving</h2>
+    <table class="data">
+        <thead><tr><th>#</th><th>Obat</th><th class="right">Qty Bersih</th><th class="right">Transaksi</th><th class="right">Hari Aktif</th><th class="right">Rata-rata / Hari</th><th class="right">Penetrasi</th><th class="right">Growth Qty</th></tr></thead>
+        <tbody>
+            @forelse ($analysis['fast_moving']['rows'] as $row)
+                <tr>
+                    <td>{{ $row['rank'] }}</td><td>{{ $row['name'] }}<br><small>{{ $row['code'] }}</small></td>
+                    <td class="right">{{ $number($row['net_qty']) }}</td><td class="right">{{ $row['transactions'] }}</td>
+                    <td class="right">{{ $row['sales_days'] }}</td><td class="right">{{ $number($row['average_daily_qty']) }}</td>
+                    <td class="right">{{ $number($row['transaction_penetration_percent']) }}%</td><td class="right">{{ $number($row['qty_growth_percent']) }}%</td>
+                </tr>
+            @empty
+                <tr><td colspan="8">Tidak ada data fast moving.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    <div class="page-break"></div>
+    <h2>Market Basket</h2>
+    <table class="data">
+        <thead><tr><th>Produk A</th><th>Produk B</th><th class="right">Bersama</th><th class="right">Support</th><th class="right">Confidence A → B</th><th class="right">Confidence B → A</th><th class="right">Lift</th><th>Kekuatan</th></tr></thead>
+        <tbody>
+            @forelse ($analysis['market_basket']['rows'] as $row)
+                <tr>
+                    <td>{{ $row['product_a']['name'] }}</td><td>{{ $row['product_b']['name'] }}</td>
+                    <td class="right">{{ $row['pair_transactions'] }}</td><td class="right">{{ $number($row['support_percent']) }}%</td>
+                    <td class="right">{{ $number($row['confidence_a_to_b_percent']) }}%</td><td class="right">{{ $number($row['confidence_b_to_a_percent']) }}%</td>
+                    <td class="right">{{ $number($row['lift']) }}</td><td>{{ $row['strength'] }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="8">Tidak ada pasangan produk.</td></tr>
             @endforelse
         </tbody>
     </table>
