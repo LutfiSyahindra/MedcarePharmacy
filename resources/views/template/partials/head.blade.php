@@ -40,4 +40,5 @@
     {{-- Page assets are loaded first so the shared shell stays consistent on every menu. --}}
     @stack("style")
     <link rel="stylesheet" href="{{ asset("assets/css/medcare-sidebar.css") }}">
+    <link rel="stylesheet" href="{{ asset("assets/css/medcare-navbar.css") }}">
 </head>

@@ -527,16 +527,21 @@
 
         function loadNotif() {
             fetch("{{ route("notifikasi.latest") }}")
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) throw new Error('Gagal memuat notifikasi');
+                    return res.json();
+                })
                 .then(data => {
                     listEl.innerHTML = '';
 
                     if (!data.length) {
                         listEl.innerHTML = `
-                        <div class="text-center text-muted py-3">
-                            Tidak ada notifikasi
+                        <div class="medcare-navbar__empty-state">
+                            <span><i data-feather="bell-off"></i></span>
+                            <p>Belum ada notifikasi baru</p>
                         </div>`;
                         badgeEl.innerHTML = '';
+                        feather.replace();
                         return;
                     }
 
@@ -561,7 +566,7 @@
                             </div>
                             <div class="flex-grow-1">
                                 <p class="mb-0 fw-semibold">${escapeNotifHtml(n.document_no || n.title)}</p>
-                                <small class="text-muted">${escapeNotifHtml(n.module_label || 'Notifikasi')} · ${escapeNotifHtml(n.message || '')}</small><br>
+                                <small class="text-muted">${escapeNotifHtml(n.module_label || 'Notifikasi')} &middot; ${escapeNotifHtml(n.message || '')}</small><br>
                                 ${itemsLine}
                                 <small class="text-muted">${escapeNotifHtml(n.time || '')}</small><br>
                                 ${actionPill}
@@ -569,6 +574,17 @@
                         </a>`;
                     });
 
+                    feather.replace();
+                })
+                .catch(() => {
+                    listEl.innerHTML = `
+                    <div class="medcare-navbar__empty-state">
+                        <span><i data-feather="wifi-off"></i></span>
+                        <p>Notifikasi belum dapat dimuat</p>
+                        <button type="button" class="medcare-navbar__empty-retry" onclick="window.loadNotif()">
+                            Coba lagi
+                        </button>
+                    </div>`;
                     feather.replace();
                 });
         }

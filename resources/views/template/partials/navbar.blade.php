@@ -1,250 +1,199 @@
-<nav class="navbar">
-    <a href="#" class="sidebar-toggler">
+@php
+    $navbarUser = auth()->user();
+    $navbarUserName = $navbarUser?->name ?: "Pengguna Medcare";
+    $navbarUserRole = $navbarUser?->getRoleNames()->first() ?: "Team Member";
+    $navbarUserInitials = collect(preg_split('/\s+/', trim($navbarUserName)))
+        ->filter()
+        ->take(2)
+        ->map(fn($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+        ->implode("");
+    $navbarUnreadCount = $navbarUser?->unreadNotifications()->count() ?? 0;
+@endphp
+
+<nav class="navbar medcare-navbar" aria-label="Navigasi atas">
+    <button type="button" class="sidebar-toggler medcare-navbar__menu" aria-label="Buka menu utama"
+        title="Buka menu utama">
         <i data-feather="menu"></i>
-    </a>
+    </button>
+
     <div class="navbar-content">
-        <form class="search-form">
-            <div class="input-group">
-                <div class="input-group-text">
+        <a href="{{ route("dashboard") }}" class="medcare-navbar__mobile-brand" aria-label="Medcare Pharmacy - Dashboard">
+            <span class="medcare-navbar__mobile-brand-icon" aria-hidden="true">
+                <i data-feather="activity"></i>
+            </span>
+            <span>
+                <strong>Medcare</strong>
+                <small>Pharmacy workspace</small>
+            </span>
+        </a>
+
+        <form class="search-form medcare-navbar__search" role="search" onsubmit="return false;">
+            <label class="visually-hidden" for="navbarForm">Cari menu</label>
+            <div class="medcare-navbar__search-shell">
+                <span class="medcare-navbar__search-icon" aria-hidden="true">
                     <i data-feather="search"></i>
-                </div>
-                <input type="text" class="form-control" id="navbarForm" placeholder="Search here...">
+                </span>
+                <input type="search" class="form-control" id="navbarForm" placeholder="Cari menu atau halaman..."
+                    autocomplete="off" spellcheck="false" aria-describedby="navbarSearchHint">
+                <span class="medcare-navbar__search-hint" id="navbarSearchHint">Menu cepat</span>
+                <kbd class="medcare-navbar__shortcut" aria-label="Control K">Ctrl K</kbd>
             </div>
         </form>
-        <ul class="navbar-nav">
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button"
-                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="flag-icon flag-icon-us mt-1" title="us"></i> <span
-                        class="ms-1 me-1 d-none d-md-inline-block">English</span>
-                </a>
-                <div class="dropdown-menu" aria-labelledby="languageDropdown">
-                    <a href="javascript:;" class="dropdown-item py-2"><i class="flag-icon flag-icon-us" title="us"
-                            id="us"></i> <span class="ms-1"> English </span></a>
-                    <a href="javascript:;" class="dropdown-item py-2"><i class="flag-icon flag-icon-fr" title="fr"
-                            id="fr"></i> <span class="ms-1"> French </span></a>
-                    <a href="javascript:;" class="dropdown-item py-2"><i class="flag-icon flag-icon-de" title="de"
-                            id="de"></i> <span class="ms-1"> German </span></a>
-                    <a href="javascript:;" class="dropdown-item py-2"><i class="flag-icon flag-icon-pt" title="pt"
-                            id="pt"></i> <span class="ms-1"> Portuguese </span></a>
-                    <a href="javascript:;" class="dropdown-item py-2"><i class="flag-icon flag-icon-es" title="es"
-                            id="es"></i> <span class="ms-1"> Spanish </span></a>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="appsDropdown" role="button"
-                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i data-feather="grid"></i>
-                </a>
-                <div class="dropdown-menu p-0" aria-labelledby="appsDropdown">
-                    <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-                        <p class="mb-0 fw-bold">Web Apps</p>
-                        <a href="javascript:;" class="text-muted">Edit</a>
-                    </div>
-                    <div class="row g-0 p-1">
-                        <div class="col-3 text-center">
-                            <a href="pages/apps/chat.html"
-                                class="dropdown-item d-flex flex-column align-items-center justify-content-center wd-70 ht-70"><i
-                                    data-feather="message-square" class="icon-lg mb-1"></i>
-                                <p class="tx-12">Chat</p>
-                            </a>
-                        </div>
-                        <div class="col-3 text-center">
-                            <a href="pages/apps/calendar.html"
-                                class="dropdown-item d-flex flex-column align-items-center justify-content-center wd-70 ht-70"><i
-                                    data-feather="calendar" class="icon-lg mb-1"></i>
-                                <p class="tx-12">Calendar</p>
-                            </a>
-                        </div>
-                        <div class="col-3 text-center">
-                            <a href="pages/email/inbox.html"
-                                class="dropdown-item d-flex flex-column align-items-center justify-content-center wd-70 ht-70"><i
-                                    data-feather="mail" class="icon-lg mb-1"></i>
-                                <p class="tx-12">Email</p>
-                            </a>
-                        </div>
-                        <div class="col-3 text-center">
-                            <a href="pages/general/profile.html"
-                                class="dropdown-item d-flex flex-column align-items-center justify-content-center wd-70 ht-70"><i
-                                    data-feather="instagram" class="icon-lg mb-1"></i>
-                                <p class="tx-12">Profile</p>
-                            </a>
-                        </div>
-                    </div>
-                    <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
-                        <a href="javascript:;">View all</a>
-                    </div>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="messageDropdown" role="button"
-                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i data-feather="mail"></i>
-                </a>
-                <div class="dropdown-menu p-0" aria-labelledby="messageDropdown">
-                    <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-                        <p>9 New Messages</p>
-                        <a href="javascript:;" class="text-muted">Clear all</a>
-                    </div>
-                    <div class="p-1">
-                        <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-                            <div class="me-3">
-                                <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30"
-                                    alt="userr">
-                            </div>
-                            <div class="d-flex justify-content-between flex-grow-1">
-                                <div class="me-4">
-                                    <p>Leonardo Payne</p>
-                                    <p class="tx-12 text-muted">Project status</p>
-                                </div>
-                                <p class="tx-12 text-muted">2 min ago</p>
-                            </div>
-                        </a>
-                        <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-                            <div class="me-3">
-                                <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30"
-                                    alt="userr">
-                            </div>
-                            <div class="d-flex justify-content-between flex-grow-1">
-                                <div class="me-4">
-                                    <p>Carl Henson</p>
-                                    <p class="tx-12 text-muted">Client meeting</p>
-                                </div>
-                                <p class="tx-12 text-muted">30 min ago</p>
-                            </div>
-                        </a>
-                        <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-                            <div class="me-3">
-                                <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30"
-                                    alt="userr">
-                            </div>
-                            <div class="d-flex justify-content-between flex-grow-1">
-                                <div class="me-4">
-                                    <p>Jensen Combs</p>
-                                    <p class="tx-12 text-muted">Project updates</p>
-                                </div>
-                                <p class="tx-12 text-muted">1 hrs ago</p>
-                            </div>
-                        </a>
-                        <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-                            <div class="me-3">
-                                <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30"
-                                    alt="userr">
-                            </div>
-                            <div class="d-flex justify-content-between flex-grow-1">
-                                <div class="me-4">
-                                    <p>Amiah Burton</p>
-                                    <p class="tx-12 text-muted">Project deatline</p>
-                                </div>
-                                <p class="tx-12 text-muted">2 hrs ago</p>
-                            </div>
-                        </a>
-                        <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-                            <div class="me-3">
-                                <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30"
-                                    alt="userr">
-                            </div>
-                            <div class="d-flex justify-content-between flex-grow-1">
-                                <div class="me-4">
-                                    <p>Yaretzi Mayo</p>
-                                    <p class="tx-12 text-muted">New record</p>
-                                </div>
-                                <p class="tx-12 text-muted">5 hrs ago</p>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
-                        <a href="javascript:;">View all</a>
-                    </div>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="notificationDropdown" role="button"
-                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i data-feather="bell"></i>
 
-                    {{-- 🔔 BADGE --}}
-                    <span id="navbar-notif-badge">
-                        @if (auth()->user()->unreadNotifications->count())
-                            <span class="badge bg-danger rounded-pill">
-                                {{ auth()->user()->unreadNotifications->count() }}
-                            </span>
+        <ul class="navbar-nav medcare-navbar__actions">
+            <li class="nav-item medcare-navbar__status-item">
+                <span class="medcare-navbar__status" title="Sistem siap digunakan">
+                    <span class="medcare-navbar__status-dot" aria-hidden="true"></span>
+                    <span>
+                        <small>Status sistem</small>
+                        <strong>Operasional</strong>
+                    </span>
+                </span>
+            </li>
+
+            <li class="nav-item dropdown medcare-navbar__action-item">
+                <button type="button" class="nav-link dropdown-toggle medcare-navbar__icon-button"
+                    id="notificationDropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                    aria-label="Buka notifikasi" title="Notifikasi">
+                    <i data-feather="bell"></i>
+                    <span class="medcare-navbar__icon-label">Notifikasi</span>
+                    <span id="navbar-notif-badge" class="medcare-navbar__badge-wrap">
+                        @if ($navbarUnreadCount)
+                            <span class="badge rounded-pill">{{ $navbarUnreadCount }}</span>
                         @endif
                     </span>
-                </a>
+                </button>
 
-                <div class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="notificationDropdown"
-                    style="width: 320px;">
-                    <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-                        <p class="mb-0 fw-bold">Notifikasi</p>
-                        <a href="javascript:;" class="text-muted small" onclick="markAllNotifRead()">
-                            Tandai semua dibaca
-                        </a>
+                <div class="dropdown-menu dropdown-menu-end medcare-navbar__dropdown medcare-navbar__notification-menu p-0"
+                    aria-labelledby="notificationDropdown">
+                    <div class="medcare-navbar__dropdown-heading">
+                        <span class="medcare-navbar__dropdown-heading-icon" aria-hidden="true">
+                            <i data-feather="bell"></i>
+                        </span>
+                        <span class="medcare-navbar__dropdown-heading-copy">
+                            <strong>Notifikasi</strong>
+                            <small>Aktivitas terbaru apotek</small>
+                        </span>
+                        <button type="button" class="medcare-navbar__mark-read" onclick="markAllNotifRead()">
+                            Tandai dibaca
+                        </button>
                     </div>
 
-                    {{-- 🔔 LIST NOTIF --}}
-                    <div id="navbar-notif-list" class="p-1" style="max-height: 300px; overflow-y: auto;">
-                        {{-- Diisi via JS --}}
+                    <div id="navbar-notif-list" class="medcare-navbar__notification-list" aria-live="polite">
+                        <div class="medcare-navbar__empty-state">
+                            <span><i data-feather="loader"></i></span>
+                            <p>Memuat notifikasi...</p>
+                        </div>
                     </div>
 
-                    <div class="px-3 py-2 text-center border-top">
-                        <a href="{{ route("notifikasi.SemuaNotifikasi") }}" class="text-primary">
-                            Lihat semua notifikasi
+                    <div class="medcare-navbar__dropdown-footer">
+                        <a href="{{ route("notifikasi.SemuaNotifikasi") }}">
+                            <span>Lihat semua notifikasi</span>
+                            <i data-feather="arrow-right"></i>
                         </a>
                     </div>
                 </div>
             </li>
 
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button"
-                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <img class="wd-30 ht-30 rounded-circle" src="https://via.placeholder.com/30x30" alt="profile">
-                </a>
-                <div class="dropdown-menu p-0" aria-labelledby="profileDropdown">
-                    <div class="d-flex flex-column align-items-center border-bottom px-5 py-3">
-                        <div class="mb-3">
-                            <img class="wd-80 ht-80 rounded-circle"
-                                src="{{ auth()->user()->avatar ?? "https://via.placeholder.com/80x80" }}"
-                                alt="{{ auth()->user()->name }}">
+            <li class="nav-item dropdown medcare-navbar__profile-item">
+                <button type="button" class="nav-link dropdown-toggle medcare-navbar__profile-trigger"
+                    id="profileDropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                    aria-label="Buka menu akun {{ $navbarUserName }}">
+                    <span class="medcare-navbar__avatar" aria-hidden="true">
+                        <span>{{ $navbarUserInitials ?: "MP" }}</span>
+                        @if ($navbarUser?->avatar)
+                            <img src="{{ $navbarUser->avatar }}" alt="" onerror="this.remove()">
+                        @endif
+                    </span>
+                    <span class="medcare-navbar__profile-copy">
+                        <strong>{{ $navbarUserName }}</strong>
+                        <small>{{ $navbarUserRole }}</small>
+                    </span>
+                    <span class="medcare-navbar__profile-chevron" aria-hidden="true">
+                        <i data-feather="chevron-down"></i>
+                    </span>
+                </button>
+
+                <div class="dropdown-menu dropdown-menu-end medcare-navbar__dropdown medcare-navbar__profile-menu p-0"
+                    aria-labelledby="profileDropdown">
+                    <div class="medcare-navbar__profile-hero">
+                        <span class="medcare-navbar__profile-orb medcare-navbar__profile-orb--one"></span>
+                        <span class="medcare-navbar__profile-orb medcare-navbar__profile-orb--two"></span>
+                        <div class="medcare-navbar__avatar medcare-navbar__avatar--large" aria-hidden="true">
+                            <span>{{ $navbarUserInitials ?: "MP" }}</span>
+                            @if ($navbarUser?->avatar)
+                                <img src="{{ $navbarUser->avatar }}" alt="" onerror="this.remove()">
+                            @endif
                         </div>
-                        <div class="text-center">
-                            <p class="tx-16 fw-bolder">{{ auth()->user()->name }}</p>
-                            <p class="tx-12 text-muted">{{ auth()->user()->email }}</p>
+                        <div class="medcare-navbar__profile-hero-copy">
+                            <small>Akun aktif</small>
+                            <strong>{{ $navbarUserName }}</strong>
+                            <span>{{ $navbarUser?->email }}</span>
                         </div>
                     </div>
-                    <ul class="list-unstyled p-1">
-                        {{-- <li class="dropdown-item py-2">
-                            <a href="pages/general/profile.html" class="text-body ms-0">
-                                <i class="me-2 icon-md" data-feather="user"></i>
-                                <span>Profile</span>
-                            </a>
-                        </li>
-                        <li class="dropdown-item py-2">
-                            <a href="javascript:;" class="text-body ms-0">
-                                <i class="me-2 icon-md" data-feather="edit"></i>
-                                <span>Edit Profile</span>
-                            </a>
-                        </li>
-                        <li class="dropdown-item py-2">
-                            <a href="javascript:;" class="text-body ms-0">
-                                <i class="me-2 icon-md" data-feather="repeat"></i>
-                                <span>Switch User</span>
-                            </a>
-                        </li> --}}
-                        <li class="dropdown-item py-2">
-                            <form method="POST" action="{{ route("logout") }}">
-                                @csrf
-                                <button type="submit"
-                                    class="text-body ms-0 border-0 bg-transparent d-flex align-items-center">
-                                    <i class="me-2 icon-md" data-feather="log-out"></i>
-                                    <span>Log Out</span>
-                                </button>
-                            </form>
-                        </li>
 
-                    </ul>
+                    <div class="medcare-navbar__account-meta">
+                        <span class="medcare-navbar__account-icon"><i data-feather="shield"></i></span>
+                        <span>
+                            <small>Hak akses</small>
+                            <strong>{{ $navbarUserRole }}</strong>
+                        </span>
+                        <span class="medcare-navbar__verified"><i data-feather="check"></i></span>
+                    </div>
+
+                    <div class="medcare-navbar__profile-links">
+                        <a href="{{ route("dashboard") }}" class="medcare-navbar__profile-link">
+                            <span><i data-feather="home"></i></span>
+                            <span>
+                                <strong>Dashboard</strong>
+                                <small>Kembali ke ringkasan utama</small>
+                            </span>
+                            <i data-feather="chevron-right"></i>
+                        </a>
+
+                        <form method="POST" action="{{ route("logout") }}">
+                            @csrf
+                            <button type="submit" class="medcare-navbar__profile-link medcare-navbar__profile-link--logout">
+                                <span><i data-feather="log-out"></i></span>
+                                <span>
+                                    <strong>Keluar</strong>
+                                    <small>Akhiri sesi dengan aman</small>
+                                </span>
+                                <i data-feather="chevron-right"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </li>
         </ul>
     </div>
 </nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('navbarForm');
+        const searchShell = searchInput?.closest('.medcare-navbar__search-shell');
+
+        searchInput?.addEventListener('focus', function() {
+            searchShell?.classList.add('is-focused');
+        });
+
+        searchInput?.addEventListener('blur', function() {
+            searchShell?.classList.remove('is-focused');
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                searchInput?.focus();
+                searchInput?.select();
+            }
+
+            if (event.key === 'Escape' && document.activeElement === searchInput) {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                searchInput.blur();
+            }
+        });
+    });
+</script>

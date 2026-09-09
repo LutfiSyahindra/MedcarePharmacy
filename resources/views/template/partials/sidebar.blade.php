@@ -54,6 +54,21 @@
     $stockMenuLock = $stockOpnameAccess->stockMenusAreLocked() ? $activeStockOpnameLock : null;
     $cashierOpnameLock = $activeStockOpnameLock;
     $patientMenuActive = request()->routeIs("pasien.*");
+    $sidebarCan = static fn(string $permission): bool => (bool) $sidebarUser?->can($permission);
+    $sidebarCanAny = static fn(array $permissions): bool => collect($permissions)->contains($sidebarCan);
+    $sidebarHasSettings = $sidebarCanAny(\App\Support\SidebarPermissions::settings());
+    $sidebarReportsAndAnalysisPermissions = [
+        \App\Support\SidebarPermissions::ANALISIS_PERSEDIAAN,
+        \App\Support\SidebarPermissions::ANALISIS_PENJUALAN,
+        \App\Support\SidebarPermissions::ANALISIS_PROFITABILITAS,
+        \App\Support\SidebarPermissions::ANALISIS_PENGADAAN,
+        \App\Support\SidebarPermissions::LAPORAN,
+    ];
+    $sidebarHasOperations = $sidebarCanAny(array_values(array_diff(
+        \App\Support\SidebarPermissions::operations(),
+        $sidebarReportsAndAnalysisPermissions,
+    )));
+    $sidebarHasReportsAndAnalysis = $sidebarCanAny($sidebarReportsAndAnalysisPermissions);
 @endphp
 
 <!-- partial:partials/_sidebar.html -->
@@ -92,18 +107,22 @@
 
         <ul class="nav sidebar-menu">
             {{-- Main --}}
-            <li class="nav-item nav-category">Overview</li>
-            <li class="nav-item">
-                <a href="{{ route("dashboard") }}"
-                    class="nav-link {{ request()->routeIs("dashboard") ? "active" : "" }}">
-                    <i class="link-icon" data-feather="grid"></i>
-                    <span class="link-title">Dashboard</span>
-                </a>
-            </li>
+            @if ($sidebarCan(\App\Support\SidebarPermissions::DASHBOARD))
+                <li class="nav-item nav-category">Overview</li>
+                <li class="nav-item">
+                    <a href="{{ route("dashboard") }}"
+                        class="nav-link {{ request()->routeIs("dashboard") ? "active" : "" }}">
+                        <i class="link-icon" data-feather="grid"></i>
+                        <span class="link-title">Dashboard</span>
+                    </a>
+                </li>
+            @endif
 
             {{-- Settings --}}
-            <li class="nav-item nav-category">Pengaturan</li>
-            @if (auth()->user()->can("MEDCARE.SETTINGS.PROFILE_APOTEK") || auth()->user()->hasAnyRole(["Admin", "admin", "Apoteker", "apoteker"]))
+            @if ($sidebarHasSettings)
+                <li class="nav-item nav-category">Pengaturan</li>
+            @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_PROFILE_APOTEK))
                 <li class="nav-item">
                     <a href="{{ route("settings.apotek-profile.index") }}"
                         class="nav-link {{ request()->routeIs("settings.apotek-profile.*") ? "active" : "" }}">
@@ -112,7 +131,7 @@
                     </a>
                 </li>
             @endif
-            @can("MEDCARE.SETTINGS.AUTH")
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_AUTH))
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#users" role="button" aria-expanded="false"
                         aria-controls="users">
@@ -134,8 +153,8 @@
                         </ul>
                     </div>
                 </li>
-            @endcan
-            @if (auth()->user()->can("MEDCARE.SETTINGS.AUTH") || auth()->user()->hasAnyRole(["Admin", "admin", "Super Admin", "super admin"]))
+            @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_ROLE_SETTING))
                 <li class="nav-item">
                     <a href="{{ route("settings.role-setting.index") }}"
                         class="nav-link {{ request()->routeIs("settings.role-setting.*") ? "active" : "" }}">
@@ -144,7 +163,7 @@
                     </a>
                 </li>
             @endif
-            @can("MEDCARE.SETTINGS.BRANCH")
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_BRANCH))
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#branch" role="button" aria-expanded="false"
                         aria-controls="branch">
@@ -163,8 +182,8 @@
                         </ul>
                     </div>
                 </li>
-            @endcan
-            @can("MEDCARE.SETTINGS.MARGIN")
+            @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_MARGIN))
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#margin" role="button" aria-expanded="false"
                         aria-controls="branch">
@@ -181,8 +200,8 @@
                         </ul>
                     </div>
                 </li>
-            @endcan
-            @if (auth()->user()->hasAnyRole(["Admin", "admin", "Apoteker", "apoteker"]))
+            @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_NOTIFIKASI))
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="collapse" href="#settings-notifikasi" role="button"
                         aria-expanded="false" aria-controls="settings-notifikasi">
@@ -202,7 +221,8 @@
             @endif
 
             {{-- Master Data --}}
-            <li class="nav-item nav-category">Master Data</li>
+            @if ($sidebarCan(\App\Support\SidebarPermissions::MASTER_DATA))
+                <li class="nav-item nav-category">Master Data</li>
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#kategori_obat" role="button" aria-expanded="false"
                     aria-controls="kategori_obat">
@@ -349,9 +369,13 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
             {{-- Menu --}}
-            <li class="nav-item nav-category">Operasional</li>
+            @if ($sidebarHasOperations)
+                <li class="nav-item nav-category">Operasional</li>
+            @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::NOTIFIKASI))
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#notifikasi" role="button"
                     aria-expanded="false" aria-controls="notifikasi">
@@ -380,7 +404,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::PENJUALAN))
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#penjualan" role="button"
                     aria-expanded="false" aria-controls="penjualan">
@@ -412,7 +438,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::PASIEN))
             <li class="nav-item">
                 <a href="{{ route("pasien.index") }}"
                     class="nav-link {{ $patientMenuActive ? "active" : "" }}">
@@ -420,7 +448,9 @@
                     <span class="link-title">Data Pasien</span>
                 </a>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::PEMBELIAN))
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="collapse" href="#pembelian" role="button"
                     aria-expanded="false" aria-controls="pembelian">
@@ -445,7 +475,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::DOKUMEN))
             <li class="nav-item">
                 <a class="nav-link {{ $documentMenuActive ? "active" : "" }}" data-bs-toggle="collapse"
                     href="#dokumen" role="button" aria-expanded="{{ $documentMenuActive ? "true" : "false" }}"
@@ -471,7 +503,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::STOK))
             <li class="nav-item {{ $stockMenuActive ? 'active' : '' }}">
                 <a class="nav-link {{ $stockMenuActive ? 'active' : '' }}" data-bs-toggle="collapse" href="#stok" role="button"
                     aria-expanded="{{ $stockMenuActive ? 'true' : 'false' }}" aria-controls="stok">
@@ -501,7 +535,13 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarHasReportsAndAnalysis)
+                <li class="nav-item nav-category">Laporan &amp; Analisis</li>
+            @endif
+
+            @if ($sidebarCan(\App\Support\SidebarPermissions::ANALISIS_PERSEDIAAN))
             <li class="nav-item {{ $inventoryAnalysisMenuActive ? 'active' : '' }}">
                 <a class="nav-link {{ $inventoryAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
                     href="#analisis-persediaan" role="button"
@@ -524,7 +564,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::ANALISIS_PENJUALAN))
             <li class="nav-item {{ $revenueAnalysisMenuActive ? 'active' : '' }}">
                 <a class="nav-link {{ $revenueAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
                     href="#analisis-penjualan" role="button"
@@ -544,7 +586,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::ANALISIS_PROFITABILITAS))
             <li class="nav-item {{ $profitabilityAnalysisMenuActive ? 'active' : '' }}">
                 <a class="nav-link {{ $profitabilityAnalysisMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
                     href="#analisis-profitabilitas" role="button"
@@ -563,7 +607,9 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::ANALISIS_PENGADAAN))
             <li class="nav-item {{ $procurementAnalysisMenuActive ? 'active' : '' }}">
                 <a href="{{ route('analisisPengadaan.index') }}"
                     class="nav-link {{ $procurementAnalysisMenuActive ? 'active' : '' }}">
@@ -571,7 +617,9 @@
                     <span class="link-title">Analisis PO & Kebutuhan</span>
                 </a>
             </li>
+            @endif
 
+            @if ($sidebarCan(\App\Support\SidebarPermissions::LAPORAN))
             <li class="nav-item {{ $reportMenuActive ? 'active' : '' }}">
                 <a class="nav-link {{ $reportMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
                     href="#laporan" role="button" aria-expanded="{{ $reportMenuActive ? 'true' : 'false' }}"
@@ -603,6 +651,7 @@
                     </ul>
                 </div>
             </li>
+            @endif
 
         </ul>
     </div>

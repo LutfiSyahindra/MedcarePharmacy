@@ -14,7 +14,7 @@
 
     .medcare-tab-shell {
         position: fixed;
-        top: 60px;
+        top: var(--medcare-navbar-height, 78px);
         right: auto;
         left: var(--medcare-tab-sidebar-width);
         z-index: 970;
@@ -52,7 +52,7 @@
     }
 
     .main-wrapper .page-wrapper .page-content {
-        margin-top: calc(60px + var(--medcare-tab-height));
+        margin-top: calc(var(--medcare-navbar-height, 78px) + var(--medcare-tab-height));
     }
 
     @media (min-width: 992px) {
