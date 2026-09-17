@@ -228,7 +228,8 @@ class CashierShiftService
         string $type,
         float $amount,
         string $description,
-        ?User $user = null
+        ?User $user = null,
+        ?int $financeTransactionId = null
     ): CashierShiftModel {
         $user = $user ?: Auth::user();
         $this->assertOperational($branchId, $user);
@@ -239,7 +240,7 @@ class CashierShiftService
             ]);
         }
 
-        return DB::transaction(function () use ($branchId, $type, $amount, $description, $user) {
+        return DB::transaction(function () use ($branchId, $type, $amount, $description, $user, $financeTransactionId) {
             $shift = $this->lockedOpenShift($branchId, $user);
 
             if ($type === 'cash_out' && round($amount, 2) > $this->summary($shift)['expected_cash']) {
@@ -250,6 +251,7 @@ class CashierShiftService
 
             CashierCashMovementModel::create([
                 'cashier_shift_id' => $shift->id,
+                'finance_transaction_id' => $financeTransactionId,
                 'type' => $type,
                 'amount' => round($amount, 2),
                 'description' => trim($description),

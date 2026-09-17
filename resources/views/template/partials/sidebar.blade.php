@@ -48,6 +48,12 @@
     $salesAnalysisSection = request()->query('section', 'tren');
     $profitabilityAnalysisMenuActive = request()->routeIs("analisisProfitabilitas.*");
     $profitabilityAnalysisSection = request()->query('section', 'profit-product');
+    $financeMenuActive = request()->routeIs("keuangan.*");
+    $financeOverviewActive = request()->routeIs("keuangan.index");
+    $financeMonthlyActive = request()->routeIs("keuangan.monthly");
+    $financeCashFlowActive = request()->routeIs("keuangan.cash-flow");
+    $financeLedgerActive = request()->routeIs("keuangan.ledger");
+    $financeCashierActive = request()->routeIs("keuangan.cashier");
     $reportMenuActive = request()->routeIs("laporan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
@@ -435,6 +441,27 @@
                         <li class="nav-item">
                             <a href="{{ route("returPenjualan.index") }}" class="nav-link">Retur Penjualan</a>
                         </li>
+                    </ul>
+                </div>
+            </li>
+            @endif
+
+            @if ($sidebarCan(\App\Support\SidebarPermissions::KEUANGAN))
+            <li class="nav-item {{ $financeMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $financeMenuActive ? 'active' : '' }}" data-bs-toggle="collapse"
+                    href="#keuangan" role="button" aria-expanded="{{ $financeMenuActive ? 'true' : 'false' }}"
+                    aria-controls="keuangan">
+                    <i class="link-icon" data-feather="dollar-sign"></i>
+                    <span class="link-title">Keuangan</span>
+                    <i class="link-arrow" data-feather="chevron-down"></i>
+                </a>
+                <div class="collapse {{ $financeMenuActive ? 'show' : '' }}" id="keuangan">
+                    <ul class="nav sub-menu">
+                        <li class="nav-item"><a href="{{ route('keuangan.index') }}" class="nav-link {{ $financeOverviewActive ? 'active' : '' }}">Ringkasan</a></li>
+                        <li class="nav-item"><a href="{{ route('keuangan.monthly') }}" class="nav-link {{ $financeMonthlyActive ? 'active' : '' }}">Akun Bulanan</a></li>
+                        <li class="nav-item"><a href="{{ route('keuangan.cash-flow') }}" class="nav-link {{ $financeCashFlowActive ? 'active' : '' }}">Arus Kas</a></li>
+                        <li class="nav-item"><a href="{{ route('keuangan.ledger') }}" class="nav-link {{ $financeLedgerActive ? 'active' : '' }}">Buku Kas</a></li>
+                        <li class="nav-item"><a href="{{ route('keuangan.cashier') }}" class="nav-link {{ $financeCashierActive ? 'active' : '' }}">Kas Kasir</a></li>
                     </ul>
                 </div>
             </li>

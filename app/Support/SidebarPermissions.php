@@ -24,6 +24,8 @@ final class SidebarPermissions
 
     public const PENJUALAN = 'MEDCARE.MENU.PENJUALAN';
 
+    public const KEUANGAN = 'MEDCARE.MENU.KEUANGAN';
+
     public const PASIEN = 'MEDCARE.MENU.PASIEN';
 
     public const PEMBELIAN = 'MEDCARE.MENU.PEMBELIAN';
@@ -78,6 +80,7 @@ final class SidebarPermissions
         return [
             self::NOTIFIKASI,
             self::PENJUALAN,
+            self::KEUANGAN,
             self::PASIEN,
             self::PEMBELIAN,
             self::DOKUMEN,
@@ -101,6 +104,7 @@ final class SidebarPermissions
             self::SETTINGS_ROLE_SETTING,
             self::PASIEN,
             self::DOKUMEN,
+            self::KEUANGAN,
             self::ANALISIS_PERSEDIAAN,
             self::ANALISIS_PENJUALAN,
             self::ANALISIS_PROFITABILITAS,

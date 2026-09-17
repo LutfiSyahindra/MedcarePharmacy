@@ -2,6 +2,7 @@
 
 namespace App\Models\Menu\Penjualan;
 
+use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,5 +28,10 @@ class CashierCashMovementModel extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function financeTransaction()
+    {
+        return $this->belongsTo(FinanceTransactionModel::class, 'finance_transaction_id');
     }
 }

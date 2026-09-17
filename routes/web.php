@@ -19,6 +19,7 @@ use App\Http\Controllers\Medcare\Menu\AnalisisProfitabilitas\ProfitabilityAnalys
 use App\Http\Controllers\Medcare\Menu\Dokumen\DocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\LabelDocumentController;
 use App\Http\Controllers\Medcare\Menu\Dokumen\ReceiptDocumentController;
+use App\Http\Controllers\Medcare\Menu\Keuangan\FinanceController;
 use App\Http\Controllers\Medcare\Menu\Laporan\InventoryReportController;
 use App\Http\Controllers\Medcare\Menu\Laporan\PurchaseReportController;
 use App\Http\Controllers\Medcare\Menu\Laporan\SalesReportController;
@@ -394,6 +395,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/{id}/receipt', [PenjualanPosController::class, 'receipt'])->name('penjualan.pos.receipt');
         Route::get('/pos/{id}/labels', [PenjualanPosController::class, 'labels'])->name('penjualan.pos.labels');
         Route::put('/pos/{id}/cancel', [PenjualanPosController::class, 'cancel'])->name('penjualan.pos.cancel');
+    });
+
+    Route::prefix('medcare/menu/keuangan')->group(function () {
+        Route::get('/', [FinanceController::class, 'index'])->name('keuangan.index');
+        Route::get('/akun-bulanan', [FinanceController::class, 'monthly'])->name('keuangan.monthly');
+        Route::get('/arus-kas', [FinanceController::class, 'cashFlow'])->name('keuangan.cash-flow');
+        Route::get('/buku-kas', [FinanceController::class, 'ledger'])->name('keuangan.ledger');
+        Route::get('/kas-kasir', [FinanceController::class, 'cashier'])->name('keuangan.cashier');
+        Route::get('/data', [FinanceController::class, 'data'])->name('keuangan.data');
+        Route::post('/transactions', [FinanceController::class, 'store'])->name('keuangan.transactions.store');
+        Route::put('/transactions/{transaction}/void', [FinanceController::class, 'void'])
+            ->whereNumber('transaction')
+            ->name('keuangan.transactions.void');
     });
 
     Route::prefix('medcare/menu/pasien')->group(function () {
