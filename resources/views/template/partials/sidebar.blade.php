@@ -54,6 +54,7 @@
     $financeCashFlowActive = request()->routeIs("keuangan.cash-flow");
     $financeLedgerActive = request()->routeIs("keuangan.ledger");
     $financeCashierActive = request()->routeIs("keuangan.cashier");
+    $financeObligationsActive = request()->routeIs("keuangan.obligations*") || request()->routeIs("keuangan.payables.*") || request()->routeIs("keuangan.receivables.*");
     $reportMenuActive = request()->routeIs("laporan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
@@ -460,7 +461,8 @@
                         <li class="nav-item"><a href="{{ route('keuangan.index') }}" class="nav-link {{ $financeOverviewActive ? 'active' : '' }}">Ringkasan</a></li>
                         <li class="nav-item"><a href="{{ route('keuangan.monthly') }}" class="nav-link {{ $financeMonthlyActive ? 'active' : '' }}">Akun Bulanan</a></li>
                         <li class="nav-item"><a href="{{ route('keuangan.cash-flow') }}" class="nav-link {{ $financeCashFlowActive ? 'active' : '' }}">Arus Kas</a></li>
-                        <li class="nav-item"><a href="{{ route('keuangan.ledger') }}" class="nav-link {{ $financeLedgerActive ? 'active' : '' }}">Buku Kas</a></li>
+                        <li class="nav-item"><a href="{{ route('keuangan.obligations') }}" class="nav-link {{ $financeObligationsActive ? 'active' : '' }}">Hutang & Piutang</a></li>
+                          <li class="nav-item"><a href="{{ route('keuangan.ledger') }}" class="nav-link {{ $financeLedgerActive ? 'active' : '' }}">Buku Kas</a></li>
                         <li class="nav-item"><a href="{{ route('keuangan.cashier') }}" class="nav-link {{ $financeCashierActive ? 'active' : '' }}">Kas Kasir</a></li>
                     </ul>
                 </div>

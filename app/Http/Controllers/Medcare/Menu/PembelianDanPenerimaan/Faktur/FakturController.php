@@ -80,14 +80,13 @@ class FakturController extends Controller
 
     public function update(Request $request, $id)
     {
-        $this->normalizeMoneyFields($request, ['biaya_lain', 'jumlah_dibayar']);
+        $this->normalizeMoneyFields($request, ['biaya_lain']);
 
         $request->validate([
             'nomor_faktur' => ['required', 'string', 'max:100'],
             'tanggal_faktur' => ['required', 'string'],
             'tanggal_jatuh_tempo' => ['nullable', 'string'],
             'biaya_lain' => ['nullable', 'numeric', 'min:0'],
-            'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string'],
         ]);
 
@@ -107,7 +106,13 @@ class FakturController extends Controller
             }
 
             $tagihanSetelahGantiRugi = max(0, $totalFaktur - $potonganGantiRugi);
-            $jumlahDibayar = min($this->moneyValue($request->input('jumlah_dibayar')), $tagihanSetelahGantiRugi);
+            $jumlahDibayar = (float) ($faktur->jumlah_dibayar ?? 0);
+
+            if ($jumlahDibayar > $tagihanSetelahGantiRugi + 0.009) {
+                throw ValidationException::withMessages([
+                    'biaya_lain' => 'Tagihan tidak boleh lebih kecil dari pembayaran yang sudah tercatat melalui Keuangan sebesar Rp '.number_format($jumlahDibayar, 0, ',', '.').'.',
+                ]);
+            }
             $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
 
             $faktur->update([
@@ -127,50 +132,6 @@ class FakturController extends Controller
                 'status' => 'success',
                 'message' => 'Faktur berhasil diperbarui.',
                 'data' => $this->fakturPayload((int) $faktur->id),
-            ]);
-        });
-    }
-
-    public function markPaid($id)
-    {
-        return DB::transaction(function () use ($id) {
-            $faktur = $this->fakturQuery()->lockForUpdate()->findOrFail($id);
-
-            $this->ensureEditable($faktur);
-
-            $tagihanSetelahGantiRugi = $this->payableTotal($faktur);
-
-            $faktur->update([
-                'jumlah_dibayar' => $tagihanSetelahGantiRugi,
-                'sisa_hutang' => 0,
-                'status_pembayaran' => 'lunas',
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Faktur ditandai lunas.',
-            ]);
-        });
-    }
-
-    public function resetPayment($id)
-    {
-        return DB::transaction(function () use ($id) {
-            $faktur = $this->fakturQuery()->lockForUpdate()->findOrFail($id);
-
-            $this->ensureEditable($faktur);
-
-            $tagihanSetelahGantiRugi = $this->payableTotal($faktur);
-
-            $faktur->update([
-                'jumlah_dibayar' => 0,
-                'sisa_hutang' => $tagihanSetelahGantiRugi,
-                'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, 0),
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Pembayaran faktur direset.',
             ]);
         });
     }
@@ -273,14 +234,11 @@ class FakturController extends Controller
         ];
 
         if ($row->status !== 'cancelled') {
-            $buttons[] = $button('edit', 'mdi-pencil-outline', 'Edit pembayaran faktur', 'editFaktur');
+            $buttons[] = $button('edit', 'mdi-pencil-outline', 'Edit data faktur', 'editFaktur');
 
-            if ($this->remainingDebt($row) > 0) {
-                $buttons[] = $button('paid', 'mdi-check-decagram-outline', 'Tandai lunas', 'markFakturPaid');
-            }
-
-            if ((float) ($row->jumlah_dibayar ?? 0) > 0) {
-                $buttons[] = $button('reset', 'mdi-backup-restore', 'Reset pembayaran', 'resetFakturPayment');
+            if ($this->remainingDebt($row) > 0 && auth()->user()?->can(\App\Support\SidebarPermissions::KEUANGAN)) {
+                $url = route('keuangan.obligations', ['payable' => $row->id]);
+                $buttons[] = '<a class="invoice-action-btn is-paid" href="'.e($url).'" title="Bayar melalui Keuangan" aria-label="Bayar melalui Keuangan"><i class="mdi mdi-bank-transfer-out"></i></a>';
             }
         }
 

@@ -8,6 +8,9 @@
     <a href="{{ route('keuangan.cash-flow') }}" class="{{ $section === 'cash-flow' ? 'is-active' : '' }}">
         <i class="mdi mdi-chart-timeline-variant"></i><span><b>Arus Kas</b><small>Tren & kanal</small></span>
     </a>
+    <a href="{{ route('keuangan.obligations') }}" class="{{ $section === 'obligations' ? 'is-active' : '' }}">
+        <i class="mdi mdi-swap-horizontal-bold"></i><span><b>Hutang & Piutang</b><small>Bayar & terima</small></span>
+    </a>
     <a href="{{ route('keuangan.ledger') }}" class="{{ $section === 'ledger' ? 'is-active' : '' }}">
         <i class="mdi mdi-book-open-page-variant-outline"></i><span><b>Buku Kas</b><small>Jurnal transaksi</small></span>
     </a>

@@ -82,7 +82,7 @@
             <article class="invoice-insight-card">
                 <span class="invoice-insight-icon is-paid"><i class="mdi mdi-cash-check"></i></span>
                 <div>
-                    <small>Dibayar Tunai</small>
+                    <small>Sudah Dibayar</small>
                     <strong id="invoicePaidValue">Rp 0</strong>
                     <span id="invoicePaidRatio">0% dari total nilai aktif</span>
                 </div>

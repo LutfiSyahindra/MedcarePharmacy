@@ -46,19 +46,9 @@
                     <div class="invoice-payment-meter">
                         <span id="paymentProgressMeter" style="width: 0%"></span>
                     </div>
-                    <div class="invoice-payment-shortcuts" aria-label="Aksi cepat pembayaran">
-                        <button type="button" class="invoice-shortcut-btn" data-payment-preset="none">
-                            <i class="mdi mdi-numeric-0-box-outline"></i>
-                            Belum
-                        </button>
-                        <button type="button" class="invoice-shortcut-btn" data-payment-preset="half">
-                            <i class="mdi mdi-circle-half-full"></i>
-                            50%
-                        </button>
-                        <button type="button" class="invoice-shortcut-btn" data-payment-preset="full">
-                            <i class="mdi mdi-check-decagram-outline"></i>
-                            Lunas
-                        </button>
+                    <div class="alert alert-info mb-0 py-2 px-3 small">
+                        <i class="mdi mdi-bank-transfer me-1"></i>
+                        Pembayaran dan pembatalannya dikelola melalui menu <strong>Keuangan → Hutang & Piutang</strong>.
                     </div>
                 </section>
 
@@ -93,11 +83,11 @@
                         </div>
                     </div>
                     <div class="invoice-field">
-                        <label class="form-label">Jumlah Dibayar</label>
+                        <label class="form-label">Jumlah Dibayar (Keuangan)</label>
                         <div class="input-group">
                             <span class="input-group-text">Rp</span>
                             <input type="text" class="form-control invoice-money-field" name="jumlah_dibayar"
-                                id="paymentJumlahDibayar" autocomplete="off">
+                                id="paymentJumlahDibayar" autocomplete="off" readonly>
                         </div>
                     </div>
                     <div class="invoice-field">

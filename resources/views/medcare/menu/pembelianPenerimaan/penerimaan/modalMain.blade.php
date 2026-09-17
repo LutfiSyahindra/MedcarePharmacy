@@ -422,22 +422,10 @@
                                 <div class="receive-payment-meter" aria-label="Progress pembayaran faktur">
                                     <span id="invoicePaidMeter"></span>
                                 </div>
-                                <div class="receive-payment-actions" aria-label="Aksi cepat pembayaran faktur">
-                                    <button type="button" class="btn btn-light btn-sm receive-payment-action"
-                                        data-payment-action="none">
-                                        <i class="mdi mdi-cash-remove"></i>
-                                        Belum Bayar
-                                    </button>
-                                    <button type="button" class="btn btn-light btn-sm receive-payment-action"
-                                        data-payment-action="half">
-                                        <i class="mdi mdi-chart-donut"></i>
-                                        Bayar 50%
-                                    </button>
-                                    <button type="button" class="btn btn-light btn-sm receive-payment-action"
-                                        data-payment-action="full">
-                                        <i class="mdi mdi-cash-check"></i>
-                                        Lunas
-                                    </button>
+                                <div class="alert alert-info mb-2 py-2 px-3 small">
+                                    <i class="mdi mdi-bank-transfer me-1"></i>
+                                    Penerimaan membuat hutang supplier. Pembayarannya dilakukan setelah posting melalui
+                                    <strong>Keuangan → Hutang & Piutang</strong>.
                                 </div>
                                 <small class="receive-payment-hint" id="invoiceBoardHint">
                                     Isi item penerimaan untuk menghitung tagihan.
@@ -532,29 +520,9 @@
                                     <input type="text" class="form-control invoice-money fw-bold" name="total_faktur"
                                         value="Rp 0" inputmode="numeric" readonly>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Status Pembayaran</label>
-                                    <select class="form-select" name="status_pembayaran">
-                                        <option value="belum_dibayar">Belum Dibayar</option>
-                                        <option value="sebagian">Sebagian</option>
-                                        <option value="lunas">Lunas</option>
-                                    </select>
-                                </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Jumlah Dibayar</label>
-                                    <div class="receive-money-field is-primary" id="paidAmountField">
-                                        <i class="mdi mdi-cash-fast"></i>
-                                        <input type="text" class="form-control invoice-money" name="jumlah_dibayar"
-                                            value="Rp 0" inputmode="numeric" autocomplete="off"
-                                            placeholder="Rp 0">
-                                    </div>
-                                    <small class="purchase-field-hint">Tidak bisa melebihi tagihan setelah ganti rugi.</small>
-                                </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Sisa Hutang</label>
-                                    <input type="text" class="form-control invoice-money fw-bold" name="sisa_hutang"
-                                        value="Rp 0" inputmode="numeric" readonly>
-                                </div>
+                                <input type="hidden" name="status_pembayaran" value="belum_dibayar">
+                                <input type="hidden" name="jumlah_dibayar" value="Rp 0">
+                                <input type="hidden" name="sisa_hutang" value="Rp 0">
                             </div>
                         </div>
                     </section>

@@ -1628,8 +1628,7 @@
                 $('#penerimaanModal').one('shown.bs.modal', function() {
                     $('#penerimaanModalLabel').text('Edit Penerimaan Barang');
                     $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Perbarui Draft');
-                    paymentPreset = header.status_pembayaran === 'lunas' ? 'full' : (header.status_pembayaran ===
-                        'belum_dibayar' ? 'none' : 'manual');
+                    paymentPreset = 'none';
                     $('#penerimaan_id').val(header.id);
                     $('#nomor_penerimaan').val(header.nomor_penerimaan);
                     $('input[name="nomor_faktur"]').val(header.nomor_faktur);
@@ -1643,8 +1642,10 @@
                     setMoneyInput('pajak', header.pajak ?? header.total_ppn);
                     setMoneyInput('biaya_lain', header.biaya_lain);
                     setMoneyInput('total_faktur', header.total_faktur ?? header.grand_total);
-                    setMoneyInput('jumlah_dibayar', header.jumlah_dibayar);
-                    setMoneyInput('sisa_hutang', header.sisa_hutang);
+                    setMoneyInput('jumlah_dibayar', 0);
+                    setMoneyInput('sisa_hutang', Math.max(0,
+                        Number(header.total_faktur ?? header.grand_total ?? 0) -
+                        Number(header.supplier_compensation_discount || 0)));
                     $('textarea[name="catatan"]').val(header.catatan || '');
 
                     loadApprovedPo(header.purchase_order_id, `${po.no_po} - ${po.supplier}`).then(function() {

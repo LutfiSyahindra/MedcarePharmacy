@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const localDateTime = () => { const date = new Date(); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 16); };
     const firstError = payload => { const first = Object.values(payload?.errors || {})[0]; return Array.isArray(first) ? first[0] : (first || payload?.message || 'Permintaan belum dapat diproses.'); };
     const iconForMethod = method => ({tunai:'mdi-cash',transfer:'mdi-bank-transfer',qris:'mdi-qrcode-scan',debit:'mdi-credit-card-outline',credit_card:'mdi-credit-card',ewallet:'mdi-wallet-outline',piutang:'mdi-file-clock-outline',instansi:'mdi-domain',potong_piutang:'mdi-file-percent-outline'}[method] || 'mdi-dots-horizontal-circle-outline');
-    const iconForSource = source => ({pos:'mdi-point-of-sale',return:'mdi-keyboard-return',cashier:'mdi-cash-register',manual:'mdi-book-edit-outline',system:'mdi-cog-transfer-outline'}[source] || 'mdi-circle-outline');
+    const iconForSource = source => ({pos:'mdi-point-of-sale',return:'mdi-keyboard-return',cashier:'mdi-cash-register',manual:'mdi-book-edit-outline',settlement:'mdi-swap-horizontal-bold',system:'mdi-cog-transfer-outline'}[source] || 'mdi-circle-outline');
     const setText = (id, value) => { const target = el(id); if (target) target.textContent = value; };
 
     function loadBranches(meta) {
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!rows.length) { target.innerHTML = '<tr><td colspan="9" class="fn-empty">Belum ada transaksi yang cocok dengan filter ini.</td></tr>'; return; }
         target.innerHTML = rows.map(row => {
             const voided = row.status === 'voided';
-            const sourceClass = row.source === 'manual' ? 'is-manual' : (row.source === 'cashier' ? 'is-cashier' : (row.source === 'return' ? 'is-return' : (row.source === 'system' ? 'is-system' : '')));
+            const sourceClass = row.source === 'manual' ? 'is-manual' : (row.source === 'cashier' ? 'is-cashier' : (row.source === 'return' ? 'is-return' : (['system', 'settlement'].includes(row.source) ? 'is-system' : '')));
             const action = row.can_void ? `<button type="button" class="fn-row-action" data-void-id="${row.record_id}" data-reference="${escapeHtml(row.reference)}" title="Batalkan transaksi"><i class="mdi mdi-cancel"></i></button>` : '';
             return `<tr class="${voided ? 'fn-voided' : ''}"><td><span class="fn-reference"><b>${escapeHtml(row.reference)}</b><small>${escapeHtml(row.occurred_at_label)}${row.external_reference ? ` · ${escapeHtml(row.external_reference)}` : ''}</small></span></td><td>${escapeHtml(row.branch_name)}</td><td><span class="fn-category"><b>${escapeHtml(row.category_label)}</b><small title="${escapeHtml(row.description)}">${escapeHtml(row.description)}</small></span></td><td>${voided ? '<span class="fn-status">Dibatalkan</span>' : `<span class="fn-source ${sourceClass}"><i class="mdi ${iconForSource(row.source)}"></i>${escapeHtml(row.source_label)}</span>`}</td><td><span class="fn-method-badge"><i class="mdi ${iconForMethod(row.payment_method)}"></i>${escapeHtml(row.payment_method_label)}</span></td><td class="text-end fn-amount is-income">${row.type === 'income' ? money(row.amount) : '—'}</td><td class="text-end fn-amount is-expense">${row.type === 'expense' ? money(row.amount) : '—'}</td><td>${escapeHtml(row.created_by)}</td><td>${action}</td></tr>`;
         }).join('');
@@ -258,6 +258,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    const initialParams = new URLSearchParams(window.location.search);
+    ['source', 'type', 'payment_method', 'search'].forEach(name => {
+        const field = el('fnFilterForm')?.elements.namedItem(name);
+        if (field && initialParams.has(name)) field.value = initialParams.get(name);
+    });
     renderCategories();
     syncCashNotice();
     load();

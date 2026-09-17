@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\ApotekProfile;
 use App\Models\BranchModel;
+use App\Models\DistributorModel;
 use App\Models\Menu\Keuangan\FinanceAccountModel;
 use App\Models\Menu\Keuangan\FinanceTransactionModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Penjualan\CashierCashMovementModel;
 use App\Models\Menu\Penjualan\CashierShiftModel;
 use App\Models\Menu\Penjualan\PenjualanPaymentModel;
@@ -351,6 +354,118 @@ class FinanceModuleTest extends TestCase
         $this->assertDatabaseCount('finance_transactions', 0);
     }
 
+    public function test_supplier_payables_and_customer_receivables_are_settled_through_finance(): void
+    {
+        $supplier = DistributorModel::create([
+            'kode' => 'SUP-FIN-01',
+            'nama' => 'Supplier Finance',
+            'is_active' => true,
+        ]);
+        $purchaseOrder = PembelianModel::create([
+            'no_po' => 'PO-FIN-001',
+            'distributor_id' => $supplier->id,
+            'branch_id' => $this->branch->id,
+            'tanggal_po' => today(),
+            'status' => 'approved',
+            'created_by' => $this->user->id,
+        ]);
+        $receipt = PenerimaanBarangModel::create([
+            'nomor_penerimaan' => 'PB-FIN-001',
+            'purchase_order_id' => $purchaseOrder->id,
+            'distributor_id' => $supplier->id,
+            'nomor_faktur' => 'INV-FIN-001',
+            'tanggal_penerimaan' => today(),
+            'tanggal_faktur' => today(),
+            'tanggal_jatuh_tempo' => today()->subDay(),
+            'grand_total' => 100000,
+            'total_faktur' => 100000,
+            'jumlah_dibayar' => 0,
+            'sisa_hutang' => 100000,
+            'status_pembayaran' => 'belum_dibayar',
+            'status' => 'posted',
+            'created_by' => $this->user->id,
+        ]);
+        $sale = PenjualanTransactionModel::create([
+            'branch_id' => $this->branch->id,
+            'nomor_transaksi' => 'POS-CREDIT-001',
+            'tanggal_transaksi' => now(),
+            'jenis_transaksi' => 'penjualan_kredit',
+            'status' => 'completed',
+            'payment_status' => 'credit',
+            'customer_name' => 'Pelanggan Kredit',
+            'grand_total' => 80000,
+            'total_bayar' => 0,
+            'sisa_tagihan' => 80000,
+            'created_by' => $this->user->id,
+            'completed_by' => $this->user->id,
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('keuangan.obligations'))
+            ->assertOk()
+            ->assertSee('Hutang Supplier')
+            ->assertSee('Piutang Pelanggan & Instansi', false);
+
+        $this->getJson(route('keuangan.obligations.data'))
+            ->assertOk()
+            ->assertJsonPath('obligations.summary.payable', 100000)
+            ->assertJsonPath('obligations.summary.receivable', 80000)
+            ->assertJsonPath('obligations.summary.overdue_count', 1)
+            ->assertJsonPath('obligations.payables.0.counterparty', 'Supplier Finance')
+            ->assertJsonPath('obligations.receivables.0.counterparty', 'Pelanggan Kredit');
+
+        $payableResponse = $this->postJson(route('keuangan.payables.pay', $receipt->id), [
+            'payment_method' => 'transfer',
+            'amount' => 40000,
+            'occurred_at' => '2026-09-14T10:00',
+            'reference_no' => 'TRF-SUP-001',
+        ])->assertCreated();
+        $receivableResponse = $this->postJson(route('keuangan.receivables.collect', $sale->id), [
+            'payment_method' => 'qris',
+            'amount' => 30000,
+            'occurred_at' => '2026-09-14T11:00',
+            'reference_no' => 'QR-AR-001',
+        ])->assertCreated();
+
+        $receipt->refresh();
+        $sale->refresh();
+        $this->assertEquals(40000, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(60000, (float) $receipt->sisa_hutang);
+        $this->assertSame('sebagian', $receipt->status_pembayaran);
+        $this->assertEquals(30000, (float) $sale->total_bayar);
+        $this->assertEquals(50000, (float) $sale->sisa_tagihan);
+        $this->assertSame('credit', $sale->payment_status);
+
+        $supplierJournal = FinanceTransactionModel::where('number', $payableResponse->json('transaction_number'))->firstOrFail();
+        $receivableJournal = FinanceTransactionModel::where('number', $receivableResponse->json('transaction_number'))->firstOrFail();
+        $this->assertSame('supplier_payable', $supplierJournal->source_type);
+        $this->assertSame('customer_receivable', $receivableJournal->source_type);
+        $this->assertDatabaseHas('penjualan_payments', [
+            'penjualan_transaction_id' => $sale->id,
+            'finance_transaction_id' => $receivableJournal->id,
+            'amount' => 30000,
+        ]);
+
+        $this->getJson(route('keuangan.data', ['date_start' => '2026-09-14', 'date_end' => '2026-09-14']))
+            ->assertOk()
+            ->assertJsonPath('finance.summary.income', 30000)
+            ->assertJsonPath('finance.summary.expense', 40000)
+            ->assertJsonPath('finance.summary.transaction_count', 2);
+
+        foreach ([$supplierJournal, $receivableJournal] as $journal) {
+            $this->putJson(route('keuangan.transactions.void', $journal->id), [
+                'reason' => 'Koreksi pembayaran pengujian',
+            ])->assertOk();
+        }
+
+        $this->assertEquals(0, (float) $receipt->fresh()->jumlah_dibayar);
+        $this->assertEquals(100000, (float) $receipt->fresh()->sisa_hutang);
+        $this->assertEquals(0, (float) $sale->fresh()->total_bayar);
+        $this->assertEquals(80000, (float) $sale->fresh()->sisa_tagihan);
+        $this->assertDatabaseMissing('penjualan_payments', ['finance_transaction_id' => $receivableJournal->id]);
+    }
+
     public function test_user_cannot_post_finance_transaction_to_an_unassigned_branch(): void
     {
         $otherBranch = BranchModel::create([
@@ -376,7 +491,7 @@ class FinanceModuleTest extends TestCase
         $unauthorized = User::factory()->create();
         $unauthorized->branches()->attach($this->branch->id);
 
-        foreach (['keuangan.index', 'keuangan.monthly', 'keuangan.cash-flow', 'keuangan.ledger', 'keuangan.cashier'] as $route) {
+        foreach (['keuangan.index', 'keuangan.monthly', 'keuangan.cash-flow', 'keuangan.obligations', 'keuangan.ledger', 'keuangan.cashier'] as $route) {
             $this->actingAs($unauthorized)->get(route($route))->assertForbidden();
         }
 

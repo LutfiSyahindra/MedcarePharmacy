@@ -6,8 +6,10 @@ use App\Models\BranchModel;
 use App\Models\Menu\Keuangan\FinanceAccountModel;
 use App\Models\Menu\Keuangan\FinanceCategoryModel;
 use App\Models\Menu\Keuangan\FinanceTransactionModel;
+use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Penjualan\CashierCashMovementModel;
 use App\Models\Menu\Penjualan\CashierShiftModel;
+use App\Models\Menu\Penjualan\PenjualanPaymentModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Penjualan\ReturPenjualanModel;
 use App\Models\User;
@@ -74,11 +76,22 @@ class FinanceService
         'lainnya' => 'Lainnya',
     ];
 
+    public const SETTLEMENT_PAYMENT_METHODS = [
+        'tunai' => 'Tunai',
+        'transfer' => 'Transfer Bank',
+        'qris' => 'QRIS',
+        'debit' => 'Kartu Debit',
+        'credit_card' => 'Kartu Kredit',
+        'ewallet' => 'E-Wallet',
+        'lainnya' => 'Lainnya',
+    ];
+
     public const SOURCES = [
         'pos' => 'Penjualan POS',
         'return' => 'Retur Penjualan',
         'cashier' => 'Mutasi Kasir',
         'manual' => 'Jurnal Manual',
+        'settlement' => 'Hutang & Piutang',
         'system' => 'Jurnal Sistem',
     ];
 
@@ -133,6 +146,364 @@ class FinanceService
             'open_drawers' => $this->openDrawers($context['branch_ids']),
             'rows' => $rows->all(),
         ];
+    }
+
+    public function obligations(User $user, array $filters): array
+    {
+        $context = $this->context($user, $filters['branch_id'] ?? null);
+        $payables = $this->supplierPayables($context['branch_ids']);
+        $receivables = $this->customerReceivables($context['branch_ids']);
+        $search = mb_strtolower(trim((string) ($filters['search'] ?? '')));
+
+        if ($search !== '') {
+            $matches = fn (array $row) => str_contains(mb_strtolower(implode(' ', [
+                $row['reference'],
+                $row['secondary_reference'],
+                $row['counterparty'],
+                $row['branch_name'],
+            ])), $search);
+            $payables = $payables->filter($matches)->values();
+            $receivables = $receivables->filter($matches)->values();
+        }
+
+        if (($filters['due_status'] ?? '') === 'overdue') {
+            $payables = $payables->where('due_state', 'overdue')->values();
+            $receivables = collect();
+        } elseif (($filters['due_status'] ?? '') === 'due_soon') {
+            $payables = $payables->where('due_state', 'due_soon')->values();
+            $receivables = collect();
+        }
+
+        $kind = (string) ($filters['kind'] ?? '');
+        $visiblePayables = $kind === 'receivable' ? collect() : $payables;
+        $visibleReceivables = $kind === 'payable' ? collect() : $receivables;
+
+        return [
+            'meta' => [
+                'branches' => $context['branches']->map(fn (BranchModel $branch) => [
+                    'id' => (int) $branch->id,
+                    'code' => $branch->code,
+                    'name' => $branch->name,
+                ])->values()->all(),
+                'selected_branch_id' => $context['selected_branch_id'],
+                'branch_label' => $context['branch_label'],
+                'generated_at' => now()->format('Y-m-d H:i:s'),
+            ],
+            'summary' => [
+                'payable' => round((float) $payables->sum('remaining'), 2),
+                'receivable' => round((float) $receivables->sum('remaining'), 2),
+                'payable_count' => $payables->count(),
+                'receivable_count' => $receivables->count(),
+                'overdue_payable' => round((float) $payables->where('due_state', 'overdue')->sum('remaining'), 2),
+                'overdue_count' => $payables->where('due_state', 'overdue')->count(),
+            ],
+            'payables' => $visiblePayables->values()->all(),
+            'receivables' => $visibleReceivables->values()->all(),
+        ];
+    }
+
+    public function paySupplier(User $user, int $receiptId, array $payload): FinanceTransactionModel
+    {
+        return DB::transaction(function () use ($user, $receiptId, $payload) {
+            $receipt = PenerimaanBarangModel::query()
+                ->whereKey($receiptId)
+                ->where('status', 'posted')
+                ->whereHas('purchaseOrder', fn ($query) => $query->whereIn('branch_id', BranchAccess::userBranchIds($user)))
+                ->with(['purchaseOrder.branch', 'purchaseOrder.distributor', 'distributor'])
+                ->lockForUpdate()
+                ->firstOrFail();
+            $branch = $this->accessibleBranch($user, (int) $receipt->purchaseOrder->branch_id, true);
+            $remaining = $this->supplierRemaining($receipt);
+            $amount = round((float) $payload['amount'], 2);
+
+            if ($remaining <= 0.009) {
+                throw ValidationException::withMessages(['amount' => 'Faktur supplier ini sudah lunas.']);
+            }
+            if ($amount > $remaining + 0.009) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal pembayaran melebihi sisa hutang Rp '.number_format($remaining, 0, ',', '.').'.',
+                ]);
+            }
+
+            $method = $this->settlementMethod((string) $payload['payment_method']);
+            $occurredAt = $this->settlementOccurredAt($branch, $method, $payload['occurred_at'] ?? null);
+            $category = $this->settlementCategory($branch, 'expense', 'PAYABLE-SUPPLIER', 'Pembayaran Hutang Supplier', 'Hutang Supplier');
+            $supplier = $receipt->distributor?->nama ?: $receipt->purchaseOrder?->distributor?->nama ?: 'Supplier';
+            $transaction = FinanceTransactionModel::create([
+                'branch_id' => $branch->id,
+                'category_id' => $category->id,
+                'number' => $this->nextNumber($branch, $occurredAt),
+                'transaction_date' => $occurredAt,
+                'type' => 'supplier_payment',
+                'status' => 'posted',
+                'amount' => $amount,
+                'payment_method' => $method,
+                'description' => 'Pembayaran faktur '.$receipt->nomor_faktur.' kepada '.$supplier,
+                'reference_no' => $this->nullableText($payload['reference_no'] ?? null),
+                'source_type' => 'supplier_payable',
+                'source_id' => $receipt->id,
+                'source_key' => 'payment-'.Str::uuid(),
+                'metadata' => [
+                    'nomor_faktur' => $receipt->nomor_faktur,
+                    'nomor_penerimaan' => $receipt->nomor_penerimaan,
+                    'counterparty' => $supplier,
+                    'notes' => $this->nullableText($payload['notes'] ?? null),
+                ],
+                'created_by' => $user->id,
+                'posted_at' => now(),
+            ]);
+
+            $paid = round((float) $receipt->jumlah_dibayar + $amount, 2);
+            $newRemaining = round(max(0, $remaining - $amount), 2);
+            $receipt->forceFill([
+                'jumlah_dibayar' => $paid,
+                'sisa_hutang' => $newRemaining,
+                'status_pembayaran' => $newRemaining <= 0.009 ? 'lunas' : 'sebagian',
+            ])->save();
+
+            $this->recordSettlementCashMovement($transaction, $branch, $user);
+
+            return $transaction->fresh(['branch', 'category', 'createdBy', 'cashierMovements.shift']);
+        });
+    }
+
+    public function collectReceivable(User $user, int $saleId, array $payload): FinanceTransactionModel
+    {
+        return DB::transaction(function () use ($user, $saleId, $payload) {
+            $sale = PenjualanTransactionModel::query()
+                ->whereKey($saleId)
+                ->where('status', 'completed')
+                ->whereIn('branch_id', BranchAccess::userBranchIds($user))
+                ->with(['branch', 'patient'])
+                ->lockForUpdate()
+                ->firstOrFail();
+            $branch = $this->accessibleBranch($user, (int) $sale->branch_id, true);
+            $remaining = round(max(0, (float) $sale->sisa_tagihan), 2);
+            $amount = round((float) $payload['amount'], 2);
+
+            if ($remaining <= 0.009) {
+                throw ValidationException::withMessages(['amount' => 'Piutang transaksi ini sudah lunas.']);
+            }
+            if ($amount > $remaining + 0.009) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal penerimaan melebihi sisa piutang Rp '.number_format($remaining, 0, ',', '.').'.',
+                ]);
+            }
+
+            $method = $this->settlementMethod((string) $payload['payment_method']);
+            $occurredAt = $this->settlementOccurredAt($branch, $method, $payload['occurred_at'] ?? null);
+            $category = $this->settlementCategory($branch, 'income', 'RECEIVABLE-CUSTOMER', 'Pelunasan Piutang', 'Piutang Pelanggan');
+            $customer = $sale->instansi_name ?: $sale->customer_name ?: $sale->patient?->name ?: 'Pelanggan umum';
+            $transaction = FinanceTransactionModel::create([
+                'branch_id' => $branch->id,
+                'category_id' => $category->id,
+                'number' => $this->nextNumber($branch, $occurredAt),
+                'transaction_date' => $occurredAt,
+                'type' => 'receivable_payment',
+                'status' => 'posted',
+                'amount' => $amount,
+                'payment_method' => $method,
+                'description' => 'Penerimaan piutang '.$sale->nomor_transaksi.' dari '.$customer,
+                'reference_no' => $this->nullableText($payload['reference_no'] ?? null),
+                'source_type' => 'customer_receivable',
+                'source_id' => $sale->id,
+                'source_key' => 'payment-'.Str::uuid(),
+                'metadata' => [
+                    'nomor_transaksi' => $sale->nomor_transaksi,
+                    'counterparty' => $customer,
+                    'notes' => $this->nullableText($payload['notes'] ?? null),
+                ],
+                'created_by' => $user->id,
+                'posted_at' => now(),
+            ]);
+
+            PenjualanPaymentModel::create([
+                'penjualan_transaction_id' => $sale->id,
+                'finance_transaction_id' => $transaction->id,
+                'metode' => $method,
+                'amount' => $amount,
+                'reference_no' => $this->nullableText($payload['reference_no'] ?? null),
+                'paid_at' => $occurredAt,
+                'received_by' => $user->id,
+                'catatan' => $this->nullableText($payload['notes'] ?? null),
+            ]);
+
+            $newPaid = round((float) $sale->total_bayar + $amount, 2);
+            $newRemaining = round(max(0, $remaining - $amount), 2);
+            $sale->forceFill([
+                'total_bayar' => $newPaid,
+                'sisa_tagihan' => $newRemaining,
+                'kembalian' => round(max(0, $newPaid - (float) $sale->grand_total), 2),
+                'payment_status' => $newRemaining <= 0.009 ? 'paid' : 'credit',
+            ])->save();
+
+            $this->recordSettlementCashMovement($transaction, $branch, $user);
+
+            return $transaction->fresh(['branch', 'category', 'createdBy', 'cashierMovements.shift']);
+        });
+    }
+
+    private function supplierPayables(array $branchIds): Collection
+    {
+        return PenerimaanBarangModel::query()
+            ->where('status', 'posted')
+            ->where(function ($query) {
+                $query->where('sisa_hutang', '>', 0)
+                    ->orWhere('status_pembayaran', '!=', 'lunas');
+            })
+            ->whereHas('purchaseOrder', fn ($query) => $query->whereIn('branch_id', $branchIds === [] ? [-1] : $branchIds))
+            ->with(['purchaseOrder.branch:id,code,name', 'purchaseOrder.distributor:id,nama', 'distributor:id,nama'])
+            ->get()
+            ->map(function (PenerimaanBarangModel $receipt) {
+                $dueDate = $receipt->tanggal_jatuh_tempo?->copy()->startOfDay();
+                $remaining = $this->supplierRemaining($receipt);
+                $dueState = ! $dueDate
+                    ? 'no_due'
+                    : ($dueDate->lt(today()) ? 'overdue' : ($dueDate->lte(today()->addDays(7)) ? 'due_soon' : 'open'));
+
+                return [
+                    'kind' => 'payable',
+                    'id' => (int) $receipt->id,
+                    'reference' => $receipt->nomor_faktur ?: $receipt->nomor_penerimaan,
+                    'secondary_reference' => $receipt->nomor_penerimaan,
+                    'counterparty' => $receipt->distributor?->nama ?: $receipt->purchaseOrder?->distributor?->nama ?: 'Supplier',
+                    'branch_id' => (int) $receipt->purchaseOrder->branch_id,
+                    'branch_name' => $receipt->purchaseOrder?->branch?->name ?? '-',
+                    'date' => optional($receipt->tanggal_faktur ?: $receipt->tanggal_penerimaan)->format('Y-m-d'),
+                    'date_label' => optional($receipt->tanggal_faktur ?: $receipt->tanggal_penerimaan)->format('d/m/Y') ?: '-',
+                    'due_date' => optional($dueDate)->format('Y-m-d'),
+                    'due_date_label' => optional($dueDate)->format('d/m/Y'),
+                    'due_state' => $dueState,
+                    'due_label' => match ($dueState) {
+                        'overdue' => 'Lewat jatuh tempo',
+                        'due_soon' => 'Jatuh tempo ≤ 7 hari',
+                        'open' => 'Belum jatuh tempo',
+                        default => 'Tanpa jatuh tempo',
+                    },
+                    'original_total' => $this->supplierInvoiceTotal($receipt),
+                    'adjustment' => round((float) $receipt->supplier_compensation_discount, 2),
+                    'total' => $this->supplierPayableTotal($receipt),
+                    'paid' => round((float) $receipt->jumlah_dibayar, 2),
+                    'remaining' => $remaining,
+                ];
+            })
+            ->filter(fn (array $row) => $row['remaining'] > 0.009)
+            ->sortBy(fn (array $row) => sprintf('%d-%s-%012d', match ($row['due_state']) {
+                'overdue' => 0,
+                'due_soon' => 1,
+                'open' => 2,
+                default => 3,
+            }, $row['due_date'] ?: '9999-12-31', $row['id']))
+            ->values();
+    }
+
+    private function customerReceivables(array $branchIds): Collection
+    {
+        return PenjualanTransactionModel::query()
+            ->whereIn('branch_id', $branchIds === [] ? [-1] : $branchIds)
+            ->where('status', 'completed')
+            ->where('sisa_tagihan', '>', 0)
+            ->with(['branch:id,code,name', 'patient:id,name'])
+            ->orderBy('tanggal_transaksi')
+            ->get()
+            ->map(function (PenjualanTransactionModel $sale) {
+                $date = $sale->tanggal_transaksi ?: $sale->completed_at;
+                $counterparty = $sale->instansi_name ?: $sale->customer_name ?: $sale->patient?->name ?: 'Pelanggan umum';
+
+                return [
+                    'kind' => 'receivable',
+                    'id' => (int) $sale->id,
+                    'reference' => $sale->nomor_transaksi,
+                    'secondary_reference' => $sale->jenis_transaksi === 'penjualan_instansi' ? ($sale->instansi_name ?: 'Penjualan instansi') : 'Penjualan kredit',
+                    'counterparty' => $counterparty,
+                    'branch_id' => (int) $sale->branch_id,
+                    'branch_name' => $sale->branch?->name ?? '-',
+                    'date' => optional($date)->format('Y-m-d'),
+                    'date_label' => optional($date)->format('d/m/Y') ?: '-',
+                    'due_date' => null,
+                    'due_date_label' => null,
+                    'due_state' => 'open',
+                    'due_label' => max(0, (int) optional($date)->diffInDays(today())).' hari berjalan',
+                    'original_total' => round((float) $sale->grand_total, 2),
+                    'adjustment' => 0,
+                    'total' => round((float) $sale->grand_total, 2),
+                    'paid' => round((float) $sale->total_bayar, 2),
+                    'remaining' => round(max(0, (float) $sale->sisa_tagihan), 2),
+                ];
+            })
+            ->values();
+    }
+
+    private function supplierInvoiceTotal(PenerimaanBarangModel $receipt): float
+    {
+        $total = (float) $receipt->total_faktur;
+
+        return round(max(0, $total > 0 ? $total : (float) $receipt->grand_total), 2);
+    }
+
+    private function supplierPayableTotal(PenerimaanBarangModel $receipt): float
+    {
+        return round(max(0, $this->supplierInvoiceTotal($receipt) - (float) $receipt->supplier_compensation_discount), 2);
+    }
+
+    private function supplierRemaining(PenerimaanBarangModel $receipt): float
+    {
+        return round(max(0, $this->supplierPayableTotal($receipt) - (float) $receipt->jumlah_dibayar), 2);
+    }
+
+    private function settlementMethod(string $method): string
+    {
+        if (! isset(self::SETTLEMENT_PAYMENT_METHODS[$method])) {
+            throw ValidationException::withMessages(['payment_method' => 'Metode pembayaran tidak tersedia.']);
+        }
+
+        return $method;
+    }
+
+    private function settlementOccurredAt(BranchModel $branch, string $method, mixed $value): Carbon
+    {
+        return $method === 'tunai'
+            ? now()
+            : Carbon::parse($value, $branch->operational_timezone ?: CashierShiftService::DEFAULT_TIMEZONE)->utc();
+    }
+
+    private function settlementCategory(
+        BranchModel $branch,
+        string $type,
+        string $code,
+        string $name,
+        string $group,
+    ): FinanceCategoryModel {
+        return FinanceCategoryModel::updateOrCreate([
+            'branch_id' => $branch->id,
+            'code' => $code,
+        ], [
+            'name' => $name,
+            'type' => $type,
+            'group' => $group,
+            'is_operational' => false,
+            'is_system' => true,
+            'is_active' => true,
+        ]);
+    }
+
+    private function recordSettlementCashMovement(
+        FinanceTransactionModel $transaction,
+        BranchModel $branch,
+        User $user,
+    ): void {
+        if ($transaction->payment_method !== 'tunai') {
+            return;
+        }
+
+        $this->cashierShiftService->addMovement(
+            (int) $branch->id,
+            $transaction->type === 'supplier_payment' ? 'cash_out' : 'cash_in',
+            (float) $transaction->amount,
+            $transaction->number.' · '.$transaction->description,
+            $user,
+            (int) $transaction->id,
+        );
     }
 
     private function monthlyAccounts(array $branchIds, Carbon $end, bool $filterApplied = false): array
@@ -358,7 +729,7 @@ class FinanceService
             $transaction = FinanceTransactionModel::query()
                 ->whereKey($transactionId)
                 ->whereIn('branch_id', BranchAccess::userBranchIds($user))
-                ->where('source_type', 'manual')
+                ->whereIn('source_type', ['manual', 'supplier_payable', 'customer_receivable'])
                 ->with('cashierMovements.shift')
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -387,6 +758,36 @@ class FinanceService
                 );
             }
 
+            if ($transaction->source_type === 'supplier_payable') {
+                $receipt = PenerimaanBarangModel::query()->lockForUpdate()->find($transaction->source_id);
+
+                if ($receipt) {
+                    $paid = round(max(0, (float) $receipt->jumlah_dibayar - (float) $transaction->amount), 2);
+                    $remaining = round(max(0, $this->supplierPayableTotal($receipt) - $paid), 2);
+                    $receipt->forceFill([
+                        'jumlah_dibayar' => $paid,
+                        'sisa_hutang' => $remaining,
+                        'status_pembayaran' => $remaining <= 0.009 ? 'lunas' : ($paid > 0.009 ? 'sebagian' : 'belum_dibayar'),
+                    ])->save();
+                }
+            }
+
+            if ($transaction->source_type === 'customer_receivable') {
+                $sale = PenjualanTransactionModel::query()->lockForUpdate()->find($transaction->source_id);
+                PenjualanPaymentModel::query()->where('finance_transaction_id', $transaction->id)->delete();
+
+                if ($sale) {
+                    $paid = round((float) $sale->payments()->sum('amount'), 2);
+                    $remaining = round(max(0, (float) $sale->grand_total - $paid), 2);
+                    $sale->forceFill([
+                        'total_bayar' => $paid,
+                        'sisa_tagihan' => $remaining,
+                        'kembalian' => round(max(0, $paid - (float) $sale->grand_total), 2),
+                        'payment_status' => $remaining <= 0.009 ? 'paid' : 'credit',
+                    ])->save();
+                }
+            }
+
             $transaction->forceFill([
                 'status' => 'voided',
                 'voided_by' => $user->id,
@@ -404,7 +805,11 @@ class FinanceService
             ->whereIn('branch_id', $branchIds)
             ->where('status', 'completed')
             ->whereBetween('completed_at', [$start, $end])
-            ->with(['branch:id,code,name,operational_timezone', 'completedBy:id,name', 'payments'])
+            ->with([
+                'branch:id,code,name,operational_timezone',
+                'completedBy:id,name',
+                'payments' => fn ($query) => $query->whereNull('finance_transaction_id'),
+            ])
             ->get()
             ->flatMap(function (PenjualanTransactionModel $transaction) {
                 $remainingChange = (float) $transaction->kembalian;
@@ -508,7 +913,11 @@ class FinanceService
             ->with(['branch:id,code,name,operational_timezone', 'category:id,code,name,type', 'createdBy:id,name'])
             ->get()
             ->map(function (FinanceTransactionModel $transaction) {
-                $source = $transaction->source_type === 'manual' ? 'manual' : 'system';
+                $source = match ($transaction->source_type) {
+                    'manual' => 'manual',
+                    'supplier_payable', 'customer_receivable' => 'settlement',
+                    default => 'system',
+                };
                 $type = $this->directionForFinanceType((string) $transaction->type, $transaction->category?->type);
 
                 return $this->row([
@@ -560,7 +969,7 @@ class FinanceService
             'payment_method_label' => self::PAYMENT_METHODS[$row['payment_method']]
                 ?? PenjualanPosService::PAYMENT_METHODS[$row['payment_method']]
                 ?? Str::headline($row['payment_method']),
-            'can_void' => $row['source'] === 'manual' && $row['status'] === 'posted',
+            'can_void' => in_array($row['source'], ['manual', 'settlement'], true) && $row['status'] === 'posted',
         ];
     }
 

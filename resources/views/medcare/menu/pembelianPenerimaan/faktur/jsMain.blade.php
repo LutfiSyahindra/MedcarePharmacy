@@ -4,9 +4,7 @@
         const routes = {
             table: '{{ route("faktur.table") }}',
             show: '{{ route("faktur.show", ":id") }}',
-            update: '{{ route("faktur.update", ":id") }}',
-            markPaid: '{{ route("faktur.markPaid", ":id") }}',
-            resetPayment: '{{ route("faktur.resetPayment", ":id") }}'
+            update: '{{ route("faktur.update", ":id") }}'
         };
 
         let invoiceDateStart = moment().startOf('month').format('YYYY-MM-DD');
@@ -611,52 +609,6 @@
             $('#fakturDetailModal').modal('hide');
             window.editFaktur(id);
         });
-
-        window.markFakturPaid = function(id) {
-            Swal.fire({
-                icon: 'question',
-                title: 'Tandai faktur lunas?',
-                text: 'Jumlah dibayar akan disamakan dengan tagihan setelah ganti rugi.',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, tandai lunas',
-                cancelButtonText: 'Batal'
-            }).then(function(result) {
-                if (!result.isConfirmed) return;
-
-                $.ajax({
-                    url: routeUrl(routes.markPaid, id),
-                    type: 'PUT',
-                    success: function(response) {
-                        Swal.fire('Berhasil', response.message || 'Faktur ditandai lunas.', 'success');
-                        FakturTable.ajax.reload(null, false);
-                    },
-                    error: handleAjaxError
-                });
-            });
-        };
-
-        window.resetFakturPayment = function(id) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Reset pembayaran faktur?',
-                text: 'Jumlah dibayar akan kembali menjadi nol.',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, reset',
-                cancelButtonText: 'Batal'
-            }).then(function(result) {
-                if (!result.isConfirmed) return;
-
-                $.ajax({
-                    url: routeUrl(routes.resetPayment, id),
-                    type: 'PUT',
-                    success: function(response) {
-                        Swal.fire('Berhasil', response.message || 'Pembayaran faktur direset.', 'success');
-                        FakturTable.ajax.reload(null, false);
-                    },
-                    error: handleAjaxError
-                });
-            });
-        };
 
         $('#fakturPaymentForm').on('submit', function(e) {
             e.preventDefault();

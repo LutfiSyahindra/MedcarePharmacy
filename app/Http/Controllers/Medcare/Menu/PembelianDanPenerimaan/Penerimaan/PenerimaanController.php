@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan;
 
 use App\Http\Controllers\Controller;
+use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
@@ -362,6 +363,18 @@ class PenerimaanController extends Controller
             }
 
             if ($penerimaan->status === 'posted') {
+                $hasSupplierPayments = FinanceTransactionModel::query()
+                    ->where('source_type', 'supplier_payable')
+                    ->where('source_id', $penerimaan->id)
+                    ->where('status', 'posted')
+                    ->exists();
+
+                if ($hasSupplierPayments) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Penerimaan tidak dapat dibatalkan karena memiliki pembayaran supplier aktif. Batalkan jurnal pembayarannya melalui Buku Kas terlebih dahulu.',
+                    ]);
+                }
+
                 foreach ($penerimaan->details as $detail) {
                     $this->stockService->reverseReceipt($penerimaan, $detail);
                 }
@@ -425,9 +438,6 @@ class PenerimaanController extends Controller
             'pajak' => ['nullable', 'numeric', 'min:0'],
             'biaya_lain' => ['nullable', 'numeric', 'min:0'],
             'total_faktur' => ['nullable', 'numeric', 'min:0'],
-            'status_pembayaran' => ['nullable', 'in:belum_dibayar,sebagian,lunas'],
-            'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],
-            'sisa_hutang' => ['nullable', 'numeric', 'min:0'],
             'supplier_compensation_discount' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string'],
             'purchase_order_detail_id' => ['required', 'array'],
@@ -752,8 +762,8 @@ class PenerimaanController extends Controller
             $grossTotalFaktur
         );
         $tagihanSetelahGantiRugi = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
-        $jumlahDibayar = min($this->moneyValue($request->jumlah_dibayar), $tagihanSetelahGantiRugi);
-        $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
+        $jumlahDibayar = 0.0;
+        $sisaHutang = $tagihanSetelahGantiRugi;
 
         return [
             'nomor_penerimaan' => $request->nomor_penerimaan,
@@ -775,7 +785,7 @@ class PenerimaanController extends Controller
             'biaya_lain' => $biayaLain,
             'supplier_compensation_discount' => $supplierCompensationDiscount,
             'total_faktur' => $grossTotalFaktur,
-            'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, $jumlahDibayar),
+            'status_pembayaran' => $tagihanSetelahGantiRugi <= 0 ? 'lunas' : 'belum_dibayar',
             'jumlah_dibayar' => $jumlahDibayar,
             'sisa_hutang' => $sisaHutang,
             'catatan' => $request->catatan,
@@ -1045,19 +1055,6 @@ class PenerimaanController extends Controller
     private function moneyValue($value): float
     {
         return round(max(0, (float) ($value ?: 0)), 2);
-    }
-
-    private function paymentStatus(float $totalFaktur, float $jumlahDibayar): string
-    {
-        if ($totalFaktur <= 0) {
-            return 'lunas';
-        }
-
-        if ($jumlahDibayar <= 0) {
-            return 'belum_dibayar';
-        }
-
-        return $jumlahDibayar >= $totalFaktur ? 'lunas' : 'sebagian';
     }
 
     private function sameDiscount(float $left, float $right): bool

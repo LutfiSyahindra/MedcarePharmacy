@@ -11,7 +11,12 @@
         data-section="{{ $section }}"
         data-url="{{ route('keuangan.data') }}"
         data-store-url="{{ route('keuangan.transactions.store') }}"
-        data-void-base="{{ url('/medcare/menu/keuangan/transactions') }}">
+        data-void-base="{{ url('/medcare/menu/keuangan/transactions') }}"
+        @if ($section === 'obligations')
+            data-obligations-url="{{ route('keuangan.obligations.data') }}"
+            data-payable-base="{{ url('/medcare/menu/keuangan/hutang-supplier') }}"
+            data-receivable-base="{{ url('/medcare/menu/keuangan/piutang') }}"
+        @endif>
         <nav class="page-breadcrumb" aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
@@ -32,12 +37,20 @@
                         <button type="button" class="btn fn-btn-light" id="fnAddTransaction" disabled>
                             <i class="mdi mdi-plus-circle-outline"></i> Catat transaksi
                         </button>
+                    @elseif ($section === 'obligations')
+                        <a href="{{ route('keuangan.ledger', ['source' => 'settlement']) }}" class="btn fn-btn-light">
+                            <i class="mdi mdi-book-check-outline"></i> Riwayat pembayaran
+                        </a>
                     @else
                         <a href="{{ route('keuangan.ledger') }}" class="btn fn-btn-light">
                             <i class="mdi mdi-book-plus-outline"></i> Buka buku kas
                         </a>
                     @endif
-                    @if ($section === 'cashier')
+                    @if ($section === 'obligations')
+                        <a href="{{ route('faktur.faktur') }}" class="btn fn-btn-ghost">
+                            <i class="mdi mdi-receipt-text-outline"></i> Lihat faktur supplier
+                        </a>
+                    @elseif ($section === 'cashier')
                         <a href="{{ route('penjualan.pos.shifts') }}" class="btn fn-btn-ghost">
                             <i class="mdi mdi-history"></i> Riwayat shift
                         </a>
@@ -56,19 +69,27 @@
             </div>
         </header>
 
-        @include("medcare.menu.keuangan.partials.filter")
+        @if ($section !== 'obligations')
+            @include("medcare.menu.keuangan.partials.filter")
 
-        <div class="fn-state fn-loading" id="fnLoading" role="status"><span></span><div><b>Memuat {{ strtolower($page['title']) }}...</b><small>Data disiapkan dari sumber transaksi yang terhubung.</small></div></div>
-        <div class="fn-state fn-error" id="fnError" hidden><i class="mdi mdi-alert-circle-outline"></i><div><b>Data keuangan belum dapat dimuat</b><small id="fnErrorCopy">Silakan coba kembali.</small></div><button type="button" id="fnRetry">Coba lagi</button></div>
+            <div class="fn-state fn-loading" id="fnLoading" role="status"><span></span><div><b>Memuat {{ strtolower($page['title']) }}...</b><small>Data disiapkan dari sumber transaksi yang terhubung.</small></div></div>
+            <div class="fn-state fn-error" id="fnError" hidden><i class="mdi mdi-alert-circle-outline"></i><div><b>Data keuangan belum dapat dimuat</b><small id="fnErrorCopy">Silakan coba kembali.</small></div><button type="button" id="fnRetry">Coba lagi</button></div>
+        @endif
 
         @include($page['view'])
 
         @if ($section === 'ledger')
             @include("medcare.menu.keuangan.partials.transaction-modal")
+        @elseif ($section === 'obligations')
+            @include("medcare.menu.keuangan.partials.settlement-modal")
         @endif
     </div>
 @endsection
 
 @push("scripts")
-    @include("medcare.menu.keuangan.partials.script")
+    @if ($section === 'obligations')
+        @include("medcare.menu.keuangan.partials.obligations-script")
+    @else
+        @include("medcare.menu.keuangan.partials.script")
+    @endif
 @endpush

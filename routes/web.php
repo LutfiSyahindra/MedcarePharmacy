@@ -314,8 +314,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/faktur/table', [FakturController::class, 'table'])->name('faktur.table');
         Route::get('/faktur/{id}/show', [FakturController::class, 'show'])->name('faktur.show');
         Route::put('/faktur/{id}/update', [FakturController::class, 'update'])->name('faktur.update');
-        Route::put('/faktur/{id}/mark-paid', [FakturController::class, 'markPaid'])->name('faktur.markPaid');
-        Route::put('/faktur/{id}/reset-payment', [FakturController::class, 'resetPayment'])->name('faktur.resetPayment');
 
         Route::get('/retur-pembelian', [ReturPembelianController::class, 'returPembelian'])->name('returPembelian.returPembelian');
         Route::get('/retur-pembelian/table', [ReturPembelianController::class, 'table'])->name('returPembelian.table');
@@ -403,7 +401,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/arus-kas', [FinanceController::class, 'cashFlow'])->name('keuangan.cash-flow');
         Route::get('/buku-kas', [FinanceController::class, 'ledger'])->name('keuangan.ledger');
         Route::get('/kas-kasir', [FinanceController::class, 'cashier'])->name('keuangan.cashier');
+        Route::get('/hutang-piutang', [FinanceController::class, 'obligations'])->name('keuangan.obligations');
         Route::get('/data', [FinanceController::class, 'data'])->name('keuangan.data');
+        Route::get('/hutang-piutang/data', [FinanceController::class, 'obligationsData'])->name('keuangan.obligations.data');
+        Route::post('/hutang-supplier/{receipt}/payments', [FinanceController::class, 'paySupplier'])
+            ->whereNumber('receipt')
+            ->name('keuangan.payables.pay');
+        Route::post('/piutang/{sale}/payments', [FinanceController::class, 'collectReceivable'])
+            ->whereNumber('sale')
+            ->name('keuangan.receivables.collect');
         Route::post('/transactions', [FinanceController::class, 'store'])->name('keuangan.transactions.store');
         Route::put('/transactions/{transaction}/void', [FinanceController::class, 'void'])
             ->whereNumber('transaction')

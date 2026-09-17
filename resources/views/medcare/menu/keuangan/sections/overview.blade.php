@@ -11,6 +11,7 @@
     <div class="fn-feature-grid">
         <a href="{{ route('keuangan.monthly') }}"><span class="is-green"><i class="mdi mdi-calendar-month-outline"></i></span><div><h3>Akun Bulanan</h3><p>Omzet & keuntungan setiap bulan, lengkap dengan HPP dan margin.</p></div><i class="mdi mdi-arrow-right"></i></a>
         <a href="{{ route('keuangan.cash-flow') }}"><span class="is-blue"><i class="mdi mdi-chart-timeline-variant"></i></span><div><h3>Arus Kas</h3><p>Bandingkan uang masuk, uang keluar, dan kanal pembayaran.</p></div><i class="mdi mdi-arrow-right"></i></a>
+        <a href="{{ route('keuangan.obligations') }}"><span class="is-violet"><i class="mdi mdi-swap-horizontal-bold"></i></span><div><h3>Hutang & Piutang</h3><p>Bayar supplier dan terima pelunasan pelanggan melalui jurnal Keuangan.</p></div><i class="mdi mdi-arrow-right"></i></a>
         <a href="{{ route('keuangan.ledger') }}"><span class="is-orange"><i class="mdi mdi-book-open-page-variant-outline"></i></span><div><h3>Buku Kas Terpadu</h3><p>Cari transaksi dan catat jurnal operasional dengan jejak audit.</p></div><i class="mdi mdi-arrow-right"></i></a>
         <a href="{{ route('keuangan.cashier') }}"><span class="is-violet"><i class="mdi mdi-cash-register"></i></span><div><h3>Kas Kasir</h3><p>Pantau saldo seharusnya pada semua shift yang sedang aktif.</p></div><i class="mdi mdi-arrow-right"></i></a>
     </div>

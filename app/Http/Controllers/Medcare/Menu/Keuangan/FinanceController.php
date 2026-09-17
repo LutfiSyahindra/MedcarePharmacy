@@ -41,6 +41,11 @@ class FinanceController extends Controller
         return $this->page($request, 'cashier');
     }
 
+    public function obligations(Request $request): View
+    {
+        return $this->page($request, 'obligations');
+    }
+
     private function page(Request $request, string $section): View
     {
         $this->authorizeFinance($request);
@@ -86,6 +91,14 @@ class FinanceController extends Controller
                 'icon' => 'mdi-cash-register',
                 'view' => 'medcare.menu.keuangan.sections.cashier',
             ],
+            'obligations' => [
+                'title' => 'Hutang & Piutang',
+                'eyebrow' => 'Payables & Receivables',
+                'heading' => 'Selesaikan hutang dan piutang dari satu pintu.',
+                'description' => 'Bayar faktur supplier dan terima pelunasan pelanggan atau instansi dengan jurnal keuangan serta saldo sumber yang selalu sinkron.',
+                'icon' => 'mdi-swap-horizontal-bold',
+                'view' => 'medcare.menu.keuangan.sections.obligations',
+            ],
         ];
 
         return view('medcare.menu.keuangan.index', [
@@ -94,7 +107,53 @@ class FinanceController extends Controller
             'categories' => FinanceService::CATEGORIES,
             'paymentMethods' => FinanceService::PAYMENT_METHODS,
             'sources' => FinanceService::SOURCES,
+            'settlementPaymentMethods' => FinanceService::SETTLEMENT_PAYMENT_METHODS,
         ]);
+    }
+
+    public function obligationsData(Request $request): JsonResponse
+    {
+        $this->authorizeFinance($request);
+        $validated = $request->validate([
+            'branch_id' => ['nullable', 'integer'],
+            'kind' => ['nullable', Rule::in(['payable', 'receivable'])],
+            'due_status' => ['nullable', Rule::in(['overdue', 'due_soon'])],
+            'search' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'obligations' => $this->finance->obligations($request->user(), [
+                'branch_id' => isset($validated['branch_id']) ? (int) $validated['branch_id'] : null,
+                'kind' => (string) ($validated['kind'] ?? ''),
+                'due_status' => (string) ($validated['due_status'] ?? ''),
+                'search' => trim((string) ($validated['search'] ?? '')),
+            ]),
+        ]);
+    }
+
+    public function paySupplier(Request $request, int $receipt): JsonResponse
+    {
+        $this->authorizeFinance($request);
+        $transaction = $this->finance->paySupplier($request->user(), $receipt, $this->settlementPayload($request));
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pembayaran supplier berhasil dicatat melalui Keuangan.',
+            'transaction_number' => $transaction->number,
+        ], 201);
+    }
+
+    public function collectReceivable(Request $request, int $sale): JsonResponse
+    {
+        $this->authorizeFinance($request);
+        $transaction = $this->finance->collectReceivable($request->user(), $sale, $this->settlementPayload($request));
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Penerimaan piutang berhasil dicatat melalui Keuangan.',
+            'transaction_number' => $transaction->number,
+        ], 201);
     }
 
     public function data(Request $request): JsonResponse
@@ -204,6 +263,17 @@ class FinanceController extends Controller
             'payment_method' => (string) ($validated['payment_method'] ?? ''),
             'search' => trim((string) ($validated['search'] ?? '')),
         ];
+    }
+
+    private function settlementPayload(Request $request): array
+    {
+        return $request->validate([
+            'payment_method' => ['required', Rule::in(array_keys(FinanceService::SETTLEMENT_PAYMENT_METHODS))],
+            'amount' => ['required', 'numeric', 'gt:0', 'max:999999999999.99'],
+            'occurred_at' => ['required', 'date'],
+            'reference_no' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
     }
 
     private function authorizeFinance(Request $request): void

@@ -2,6 +2,7 @@
 
 namespace App\Models\Menu\Penjualan;
 
+use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,11 @@ class PenjualanPaymentModel extends Model
     public function transaction()
     {
         return $this->belongsTo(PenjualanTransactionModel::class, 'penjualan_transaction_id');
+    }
+
+    public function financeTransaction()
+    {
+        return $this->belongsTo(FinanceTransactionModel::class, 'finance_transaction_id');
     }
 
     public function receivedBy()

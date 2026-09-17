@@ -6,12 +6,14 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\SatuansModel;
 use App\Models\User;
+use App\Support\SidebarPermissions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
@@ -274,6 +276,21 @@ class ReturPembelianCompensationTrackingTest extends TestCase
         $this->assertEquals(100000, (float) $receipt->total_faktur);
         $this->assertEquals(100000, (float) $receipt->grand_total);
         $this->assertEquals(40000, (float) $receipt->supplier_compensation_discount);
+        $this->assertEquals(0, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(60000, (float) $receipt->sisa_hutang);
+        $this->assertSame('belum_dibayar', $receipt->status_pembayaran);
+
+        $receipt->update(['status' => 'posted']);
+        $user->givePermissionTo(SidebarPermissions::KEUANGAN);
+        $this->actingAs($user)
+            ->postJson(route('keuangan.payables.pay', $receipt->id), [
+                'payment_method' => 'transfer',
+                'amount' => 10000,
+                'occurred_at' => now()->format('Y-m-d H:i:s'),
+            ])
+            ->assertCreated();
+
+        $receipt->refresh();
         $this->assertEquals(10000, (float) $receipt->jumlah_dibayar);
         $this->assertEquals(50000, (float) $receipt->sisa_hutang);
         $this->assertSame('sebagian', $receipt->status_pembayaran);
@@ -287,8 +304,12 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             ->assertJsonPath('header.sisa_hutang', 50000);
 
         $this->actingAs($user)
-            ->putJson(route('faktur.markPaid', $receipt->id))
-            ->assertOk();
+            ->postJson(route('keuangan.payables.pay', $receipt->id), [
+                'payment_method' => 'transfer',
+                'amount' => 50000,
+                'occurred_at' => now()->format('Y-m-d H:i:s'),
+            ])
+            ->assertCreated();
 
         $receipt->refresh();
         $this->assertEquals(100000, (float) $receipt->total_faktur);
@@ -296,9 +317,18 @@ class ReturPembelianCompensationTrackingTest extends TestCase
         $this->assertEquals(0, (float) $receipt->sisa_hutang);
         $this->assertSame('lunas', $receipt->status_pembayaran);
 
-        $this->actingAs($user)
-            ->putJson(route('faktur.resetPayment', $receipt->id))
-            ->assertOk();
+        FinanceTransactionModel::query()
+            ->where('source_type', 'supplier_payable')
+            ->where('source_id', $receipt->id)
+            ->orderByDesc('id')
+            ->get()
+            ->each(function (FinanceTransactionModel $transaction) use ($user) {
+                $this->actingAs($user)
+                    ->putJson(route('keuangan.transactions.void', $transaction->id), [
+                        'reason' => 'Membatalkan pembayaran pengujian.',
+                    ])
+                    ->assertOk();
+            });
 
         $receipt->refresh();
         $this->assertEquals(100000, (float) $receipt->total_faktur);
