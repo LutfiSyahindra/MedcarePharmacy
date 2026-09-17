@@ -55,6 +55,7 @@
     $financeLedgerActive = request()->routeIs("keuangan.ledger");
     $financeCashierActive = request()->routeIs("keuangan.cashier");
     $financeObligationsActive = request()->routeIs("keuangan.obligations*") || request()->routeIs("keuangan.payables.*") || request()->routeIs("keuangan.receivables.*");
+    $salesMenuActive = request()->routeIs("penjualan.*", "returPenjualan.*");
     $reportMenuActive = request()->routeIs("laporan.*");
     $stockOpnameAccess = app(\App\Support\StockOpnameAccess::class);
     $activeStockOpnameLock = $stockOpnameAccess->activeLock();
@@ -414,14 +415,14 @@
             @endif
 
             @if ($sidebarCan(\App\Support\SidebarPermissions::PENJUALAN))
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="collapse" href="#penjualan" role="button"
-                    aria-expanded="false" aria-controls="penjualan">
+            <li class="nav-item {{ $salesMenuActive ? 'active' : '' }}">
+                <a class="nav-link {{ $salesMenuActive ? 'active' : '' }}" data-bs-toggle="collapse" href="#penjualan" role="button"
+                    aria-expanded="{{ $salesMenuActive ? 'true' : 'false' }}" aria-controls="penjualan">
                     <i class="link-icon" data-feather="shopping-cart"></i>
                     <span class="link-title">Penjualan</span>
                     <i class="link-arrow" data-feather="chevron-down"></i>
                 </a>
-                <div class="collapse" id="penjualan">
+                <div class="collapse {{ $salesMenuActive ? 'show' : '' }}" id="penjualan">
                     <ul class="nav sub-menu">
                         <li class="nav-item">
                             @if ($cashierOpnameLock)
@@ -434,13 +435,16 @@
                             @endif
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route("penjualan.pos.history") }}" class="nav-link">Riwayat Transaksi Kasir</a>
+                            <a href="{{ route("penjualan.pos.history") }}" class="nav-link {{ request()->routeIs('penjualan.pos.history') ? 'active' : '' }}">Riwayat Transaksi Kasir</a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route("penjualan.pos.shifts") }}" class="nav-link">Riwayat Shift Kasir</a>
+                            <a href="{{ route("penjualan.pos.shifts") }}" class="nav-link {{ request()->routeIs('penjualan.pos.shifts*') ? 'active' : '' }}">Riwayat Shift Kasir</a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route("returPenjualan.index") }}" class="nav-link">Retur Penjualan</a>
+                            <a href="{{ route("returPenjualan.index") }}" class="nav-link {{ request()->routeIs('returPenjualan.*') ? 'active' : '' }}">Retur Penjualan</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('penjualan.targets.index') }}" class="nav-link {{ request()->routeIs('penjualan.targets.*') ? 'active' : '' }}">Target &amp; Pencapaian</a>
                         </li>
                     </ul>
                 </div>

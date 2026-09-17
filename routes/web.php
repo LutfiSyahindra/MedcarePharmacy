@@ -31,6 +31,7 @@ use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\ReturPembelian\Retu
 use App\Http\Controllers\Medcare\Menu\Penjualan\CashierShiftController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\PenjualanPosController;
 use App\Http\Controllers\Medcare\Menu\Penjualan\ReturPenjualanController;
+use App\Http\Controllers\Medcare\Menu\Penjualan\SalesTargetController;
 use App\Http\Controllers\Medcare\Menu\Stok\StockOpnameController;
 use App\Http\Controllers\Medcare\Menu\Stok\StokController;
 use App\Http\Controllers\Medcare\Notifikasi\MainController;
@@ -356,6 +357,13 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('medcare/menu/penjualan')->group(function () {
+        Route::get('/target', [SalesTargetController::class, 'index'])->name('penjualan.targets.index');
+        Route::get('/target/data', [SalesTargetController::class, 'data'])->name('penjualan.targets.data');
+        Route::post('/target', [SalesTargetController::class, 'store'])->name('penjualan.targets.store');
+        Route::delete('/target/{target}', [SalesTargetController::class, 'destroy'])
+            ->whereNumber('target')
+            ->name('penjualan.targets.destroy');
+
         Route::get('/retur-penjualan', [ReturPenjualanController::class, 'index'])->name('returPenjualan.index');
         Route::get('/retur-penjualan/table', [ReturPenjualanController::class, 'table'])->name('returPenjualan.table');
         Route::get('/retur-penjualan/transactions', [ReturPenjualanController::class, 'transactions'])->name('returPenjualan.transactions');
