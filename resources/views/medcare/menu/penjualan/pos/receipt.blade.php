@@ -19,7 +19,7 @@
         }
 
         @page {
-            size: 80mm auto;
+            size: 80mm 80mm;
             margin: 0;
         }
 
@@ -38,7 +38,7 @@
             position: relative;
             width: 80mm;
             margin: 0 auto;
-            padding: 5mm 4mm 6mm;
+            padding: 4mm 4mm 5mm;
             overflow: hidden;
             background: var(--paper);
             box-shadow: 0 12px 32px rgba(16, 24, 40, 0.14);
@@ -623,26 +623,43 @@
             html,
             body {
                 width: 80mm;
+                height: auto !important;
+                min-height: 0 !important;
                 background: #fff;
             }
 
             body {
                 padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+                -webkit-print-color-adjust: economy;
+                print-color-adjust: economy;
             }
 
             .receipt {
                 width: 80mm;
                 margin: 0;
                 padding: 4mm 4mm 5mm;
+                background: #fff !important;
                 box-shadow: none;
+            }
+
+            .receipt,
+            .receipt *,
+            .receipt *::before,
+            .receipt *::after {
+                color: #000 !important;
+                border-color: #000 !important;
+                text-shadow: none !important;
+            }
+
+            .receipt * {
+                background-color: transparent !important;
+                background-image: none !important;
             }
 
             .receipt + .receipt {
                 margin-top: 0;
-                break-before: page;
-                page-break-before: always;
+                break-before: auto;
+                page-break-before: auto;
             }
 
             .print-button {
@@ -689,9 +706,7 @@
         $pharmacyName = $apotekProfile
             ? $apotekProfile->name
             : ($transaction->branch?->name ?: 'Medcare Pharmacy');
-        $pharmacyLogo = $apotekProfile
-            ? $apotekProfile->logo_url
-            : asset('assets/apotek/LogoResmi.png');
+        $pharmacyLogo = $apotekProfile?->logo_url ?: asset('assets/apotek/LogoResmi.png');
         $pharmacyAddress = $apotekProfile?->address ?: $transaction->branch?->address;
         $pharmacyPhone = $apotekProfile ? $apotekProfile->phone : $transaction->branch?->phone;
         $pharmacyEmail = $apotekProfile ? $apotekProfile->email : $transaction->branch?->email;
@@ -1058,6 +1073,38 @@
             <div class="footer-mark"></div>
         </footer>
     </main>
+
+    <style id="receiptDynamicPageSize"></style>
+    <script>
+        (function () {
+            const pixelsPerMillimeter = 96 / 25.4;
+
+            function fitPrintedPageToReceipt() {
+                const receipts = [...document.querySelectorAll('main.receipt')];
+                const pageStyle = document.getElementById('receiptDynamicPageSize');
+                if (!receipts.length || !pageStyle) return;
+
+                const contentHeight = receipts.reduce((height, receipt) => (
+                    height + receipt.getBoundingClientRect().height
+                ), 0);
+                const pageHeight = Math.max(30, Math.ceil(contentHeight / pixelsPerMillimeter) + 1);
+
+                pageStyle.textContent = `@page { size: 80mm ${pageHeight}mm; margin: 0; }`;
+            }
+
+            window.addEventListener('beforeprint', fitPrintedPageToReceipt);
+            window.addEventListener('load', function () {
+                const images = [...document.images].map(image => (
+                    image.complete ? Promise.resolve() : new Promise(resolve => {
+                        image.addEventListener('load', resolve, { once: true });
+                        image.addEventListener('error', resolve, { once: true });
+                    })
+                ));
+
+                Promise.all(images).then(fitPrintedPageToReceipt);
+            });
+        })();
+    </script>
 
     @if ($autoPrint)
         <script>

@@ -112,7 +112,10 @@ class PenjualanPosHistoryTest extends TestCase
             ->assertSee('Resep Racikan')
             ->assertSee('history-summary-grid', false)
             ->assertSee('history-filter-panel', false)
-            ->assertSee('transactionDrawer', false);
+            ->assertSee('transactionDrawer', false)
+            ->assertSee('posPrinterButton', false)
+            ->assertSee('posPrinterModal', false)
+            ->assertSee('printHistoryDocument', false);
     }
 
     public function test_history_table_returns_scoped_rows_and_filtered_summary(): void
@@ -521,7 +524,8 @@ class PenjualanPosHistoryTest extends TestCase
             ->assertDontSee('Vitamin C 500 mg');
 
         $this->assertSame(2, substr_count($labels->getContent(), 'class="label-sheet"'));
-        $this->assertStringContainsString('size: 80mm auto;', $labels->getContent());
+        $this->assertStringContainsString('size: 80mm 80mm;', $labels->getContent());
+        $this->assertStringContainsString('fitPrintedPageToLabels', $labels->getContent());
     }
 
     public function test_completed_non_compound_prescriptions_have_one_label_per_medicine(): void

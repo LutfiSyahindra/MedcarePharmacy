@@ -81,6 +81,16 @@ class PenjualanPosReceiptViewTest extends TestCase
             && strpos($pharmacyHtml, 'CTM 4 mg') < strpos($pharmacyHtml, 'Racikan 2')
             && strpos($pharmacyHtml, 'Racikan 2') < strpos($pharmacyHtml, 'Vitamin C 500 mg')
         );
+        $this->assertStringContainsString('print-color-adjust: economy;', $html);
+        $this->assertStringContainsString(asset('assets/apotek/LogoResmi.png'), $html);
+        $this->assertStringContainsString('.receipt *::before', $html);
+        $this->assertStringContainsString('color: #000 !important;', $html);
+        $this->assertStringContainsString('background-color: transparent !important;', $html);
+        $this->assertStringContainsString('size: 80mm 80mm;', $html);
+        $this->assertStringContainsString('id="receiptDynamicPageSize"', $html);
+        $this->assertStringContainsString('fitPrintedPageToReceipt', $html);
+        $this->assertStringContainsString('Math.ceil(contentHeight / pixelsPerMillimeter) + 1', $html);
+        $this->assertStringNotContainsString('size: 80mm auto;', $html);
     }
 
     public function test_compound_labels_use_the_same_thermal_print_configuration_as_receipts(): void
@@ -121,9 +131,14 @@ class PenjualanPosReceiptViewTest extends TestCase
         $html = view('medcare.menu.penjualan.pos.labels', $viewData)->render();
 
         $this->assertSame(2, substr_count($html, 'class="label-sheet"'));
-        $this->assertStringContainsString('size: 80mm auto;', $html);
+        $this->assertStringContainsString('size: 80mm 80mm;', $html);
         $this->assertStringContainsString('width: 80mm;', $html);
-        $this->assertStringContainsString('page-break-before: always;', $html);
+        $this->assertStringContainsString('page-break-before: auto;', $html);
+        $this->assertStringContainsString('print-color-adjust: economy;', $html);
+        $this->assertStringContainsString('id="labelDynamicPageSize"', $html);
+        $this->assertStringContainsString('fitPrintedPageToLabels', $html);
+        $this->assertStringContainsString('Math.ceil(contentHeight / pixelsPerMillimeter) + 1', $html);
+        $this->assertStringNotContainsString('size: 80mm auto;', $html);
         $this->assertStringContainsString('Apotek Medcare Profesional', $html);
         $this->assertStringContainsString('storage/apotek-logos/logo-branch-uji.png', $html);
         $this->assertStringContainsString('Logo branch Apotek Medcare Profesional', $html);

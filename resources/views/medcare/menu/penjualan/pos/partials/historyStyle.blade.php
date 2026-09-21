@@ -102,6 +102,30 @@
 
     .history-hero-actions { gap: 8px; align-self: center; }
 
+    .history-printer-button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 11px;
+        color: #eef3ff;
+        border: 1px solid rgba(255, 255, 255, .2);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, .08);
+        transition: .18s ease;
+    }
+
+    .history-printer-button:hover { color: #fff; background: rgba(255, 255, 255, .15); transform: translateY(-1px); }
+    .history-printer-button > i { color: #b9c7ff; font-size: 20px; }
+    .history-printer-button > span { display: grid; min-width: 0; text-align: left; }
+    .history-printer-button small { color: #afbbe0; font-size: .65rem; font-weight: 700; line-height: 1.1; text-transform: uppercase; }
+    .history-printer-button strong { max-width: 135px; overflow: hidden; color: #fff; font-size: .76rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .history-printer-button.is-connected { border-color: rgba(93, 235, 184, .5); background: rgba(20, 151, 108, .2); }
+    .history-printer-button.is-connected > i { color: #73edc1; }
+    .history-printer-button.is-connecting > i { animation: history-printer-pulse 1s ease-in-out infinite; color: #ffd27d; }
+
+    @keyframes history-printer-pulse { 50% { opacity: .35; } }
+
     .history-icon-button,
     .history-drawer-close {
         display: inline-flex;
@@ -414,7 +438,10 @@
         .history-hero-main { align-items: flex-start; }
         .history-hero-icon { width: 46px; height: 46px; border-radius: 14px; font-size: 23px; }
         .history-hero p { font-size: 10px; }
-        .history-hero-actions { display: grid; grid-template-columns: 42px 1fr; }
+        .history-hero-actions { display: grid; grid-template-columns: minmax(0, 1fr) 42px; }
+        .history-printer-button { min-width: 0; }
+        .history-printer-button strong { max-width: none; }
+        .history-primary-button { grid-column: 1 / -1; }
         .history-hero-context { display: grid; grid-column: auto; gap: 7px; }
         .history-summary-grid { grid-template-columns: 1fr; }
         .history-summary-card { min-height: 93px; }

@@ -28,6 +28,8 @@
         let selectedTransaction = null;
         let drawerTrigger = null;
 
+        @include("medcare.menu.penjualan.pos.partials.printerScript")
+
         $.ajaxSetup({
             headers: {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -452,6 +454,102 @@
             reloadHistory(true);
         });
 
+        function historyPrintUrl(id, documentType = 'receipt', embedded = true, autoPrint = false) {
+            const baseUrl = (documentType === 'labels' ? urls.labels : urls.receipt).replace(':id', id);
+            const documentUrl = new URL(baseUrl, window.location.href);
+            documentUrl.searchParams.set('embedded', embedded ? '1' : '0');
+            documentUrl.searchParams.set('autoprint', autoPrint ? '1' : '0');
+
+            return documentUrl.toString();
+        }
+
+        function loadHistoryPrintFrame(id, documentType) {
+            return new Promise((resolve, reject) => {
+                const frame = document.createElement('iframe');
+                const timeout = window.setTimeout(() => {
+                    frame.remove();
+                    reject(new Error('Dokumen cetak terlalu lama dimuat.'));
+                }, 15000);
+
+                frame.setAttribute('aria-hidden', 'true');
+                frame.setAttribute('title', documentType === 'labels' ? 'Etiket untuk dicetak' : 'Struk untuk dicetak');
+                Object.assign(frame.style, {
+                    position: 'fixed',
+                    left: '-10000px',
+                    top: '0',
+                    width: '80mm',
+                    height: '1px',
+                    border: '0',
+                    opacity: '0',
+                    pointerEvents: 'none'
+                });
+                frame.addEventListener('load', () => {
+                    window.clearTimeout(timeout);
+                    resolve(frame);
+                }, { once: true });
+                frame.addEventListener('error', () => {
+                    window.clearTimeout(timeout);
+                    frame.remove();
+                    reject(new Error('Dokumen cetak tidak dapat dimuat.'));
+                }, { once: true });
+                frame.src = historyPrintUrl(id, documentType, true, false);
+                document.body.appendChild(frame);
+            });
+        }
+
+        async function printHistoryDocument(id, documentType, trigger) {
+            const isLabels = documentType === 'labels';
+            const button = $(trigger);
+            const normalHtml = button.html();
+            let printFrame = null;
+            let directPrint = false;
+
+            button.prop('disabled', true).html('<i class="mdi mdi-loading mdi-spin"></i>');
+
+            try {
+                printFrame = await loadHistoryPrintFrame(id, documentType);
+                const frameWindow = printFrame.contentWindow;
+                if (!frameWindow) throw new Error('Jendela dokumen cetak tidak tersedia.');
+
+                directPrint = posThermalPrinter.isDirectReady();
+                if (directPrint) {
+                    await posThermalPrinter.printReceiptFrame(frameWindow);
+                    Swal.fire({
+                        icon: 'success',
+                        title: isLabels ? 'Etiket dicetak ulang' : 'Struk dicetak ulang',
+                        toast: true,
+                        position: 'top-end',
+                        timer: 1800,
+                        showConfirmButton: false
+                    });
+                } else {
+                    await posThermalPrinter.printBrowserFrame(frameWindow);
+                }
+            } catch (error) {
+                const result = await Swal.fire({
+                    icon: 'error',
+                    title: isLabels ? 'Cetak ulang etiket gagal' : 'Cetak ulang struk gagal',
+                    text: error?.message || 'Dokumen belum dapat dicetak.',
+                    showCancelButton: true,
+                    confirmButtonText: directPrint ? 'Gunakan dialog browser' : 'Buka halaman cetak',
+                    cancelButtonText: 'Tutup'
+                });
+
+                if (result.isConfirmed && directPrint && printFrame?.contentWindow) {
+                    try {
+                        await posThermalPrinter.printBrowserFrame(printFrame.contentWindow);
+                    } catch (browserError) {
+                        window.open(historyPrintUrl(id, documentType, false, true), '_blank', 'noopener');
+                    }
+                } else if (result.isConfirmed) {
+                    window.open(historyPrintUrl(id, documentType, false, true), '_blank', 'noopener');
+                }
+            } finally {
+                printFrame?.remove();
+                button.html(normalHtml).prop('disabled', false);
+            }
+        }
+
         $('#tablePenjualanPos tbody').on('click', 'tr[data-transaction-id]', function(event) {
             if ($(event.target).closest('button, a').length) return;
             showTransaction($(this).data('transaction-id'), this);
@@ -469,8 +567,8 @@
 
             if (action === 'detail') showTransaction(id, this);
             if (action === 'resume') window.location.href = `${urls.pos}?draft_id=${encodeURIComponent(id)}`;
-            if (action === 'print') window.open(urls.receipt.replace(':id', id), '_blank', 'noopener');
-            if (action === 'labels') window.open(urls.labels.replace(':id', id), '_blank', 'noopener');
+            if (action === 'print') printHistoryDocument(id, 'receipt', this);
+            if (action === 'labels') printHistoryDocument(id, 'labels', this);
             if (action === 'return') window.location.href = `${urls.salesReturn}?transaction=${encodeURIComponent(id)}`;
             if (action === 'cancel') cancelTransaction(id);
         });

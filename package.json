@@ -19,6 +19,7 @@
         "vite": "^7.0.4"
     },
     "dependencies": {
+        "html2canvas": "^1.4.1",
         "laravel-echo": "^2.2.7",
         "pusher-js": "^8.4.0"
     }

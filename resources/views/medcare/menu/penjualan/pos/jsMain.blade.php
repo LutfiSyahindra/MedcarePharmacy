@@ -31,6 +31,7 @@
         let lastReceiptId = null;
         let lastReceiptCanPrintLabels = false;
         let activeReceiptDocument = 'receipt';
+        let pendingDocumentPrint = false;
         let activeBranchId = @json($selectedPosBranchId);
         let activeCompoundGroup = 'R/ 1';
         let savedCompoundGroups = new Set();
@@ -456,6 +457,7 @@
 
             activeReceiptDocument = documentType;
             const isLabels = documentType === 'labels';
+            pendingDocumentPrint = Boolean(autoPrint);
             $('[data-receipt-document]')
                 .removeClass('is-active')
                 .attr('aria-selected', 'false')
@@ -469,7 +471,8 @@
             $('.pos-receipt-modal-icon').html(`<i class="mdi ${isLabels ? 'mdi-label-multiple-outline' : 'mdi-receipt-text-check-outline'}"></i>`);
             $('#printReceiptModalBtn').prop('disabled', true).find('span').text(isLabels ? 'Cetak etiket' : 'Cetak struk');
             $('#posReceiptLoading').removeClass('is-hidden').find('span').text(isLabels ? 'Menyiapkan etiket...' : 'Menyiapkan struk...');
-            $('#posReceiptFrame').attr('src', receiptPreviewUrl(lastReceiptId, documentType, autoPrint));
+            $('#posReceiptFrame').attr('src', receiptPreviewUrl(lastReceiptId, documentType, false));
+            window.posThermalPrinter?.updatePrintButton();
         }
 
         function showReceiptModal(id, autoPrint = false, canPrintLabels = lastReceiptCanPrintLabels) {
@@ -503,6 +506,11 @@
             if ($(this).attr('src') !== 'about:blank') {
                 $('#posReceiptLoading').addClass('is-hidden');
                 $('#printReceiptModalBtn').prop('disabled', false);
+                window.posThermalPrinter?.updatePrintButton();
+                if (pendingDocumentPrint) {
+                    pendingDocumentPrint = false;
+                    window.setTimeout(() => $('#printReceiptModalBtn').trigger('click'), 0);
+                }
             }
         });
 
@@ -510,13 +518,16 @@
             $('#posReceiptFrame').attr('src', 'about:blank');
             $('#posReceiptLoading').removeClass('is-hidden');
             $('#printReceiptModalBtn').prop('disabled', true);
+            pendingDocumentPrint = false;
         });
 
         $('[data-receipt-document]').on('click', function() {
             loadReceiptDocument($(this).data('receipt-document'), false);
         });
 
-        $('#printReceiptModalBtn').on('click', function() {
+        @include("medcare.menu.penjualan.pos.partials.printerScript")
+
+        $('#printReceiptModalBtn').on('click', async function() {
             const receiptWindow = document.getElementById('posReceiptFrame')?.contentWindow;
 
             if (!receiptWindow) {
@@ -524,8 +535,60 @@
                 return;
             }
 
-            receiptWindow.focus();
-            receiptWindow.print();
+            if (posThermalPrinter.isDirectReady()) {
+                const button = $(this);
+                const normalHtml = button.html();
+                const isLabels = activeReceiptDocument === 'labels';
+                button.prop('disabled', true).html(`<i class="mdi mdi-loading mdi-spin"></i> <span>Menyiapkan ${isLabels ? 'etiket' : 'struk'}...</span>`);
+
+                try {
+                    await posThermalPrinter.printReceiptFrame(receiptWindow);
+                    Swal.fire({
+                        icon: 'success',
+                        title: isLabels ? 'Etiket dikirim ke printer' : 'Struk sesuai preview dikirim',
+                        toast: true,
+                        position: 'top-end',
+                        timer: 1800,
+                        showConfirmButton: false
+                    });
+                } catch (error) {
+                    const result = await Swal.fire({
+                        icon: 'error',
+                        title: 'Cetak langsung gagal',
+                        text: error?.message || 'Koneksi printer terputus.',
+                        showCancelButton: true,
+                        confirmButtonText: 'Buka dialog cetak',
+                        cancelButtonText: 'Tutup'
+                    });
+                    if (result.isConfirmed) {
+                        try {
+                            await posThermalPrinter.printBrowserFrame(receiptWindow);
+                        } catch (browserError) {
+                            receiptWindow.focus();
+                            receiptWindow.print();
+                        }
+                    }
+                } finally {
+                    button.html(normalHtml).prop('disabled', false);
+                    posThermalPrinter.updatePrintButton();
+                }
+                return;
+            }
+
+            const button = $(this);
+            const normalHtml = button.html();
+            const isLabels = activeReceiptDocument === 'labels';
+            button.prop('disabled', true).html(`<i class="mdi mdi-loading mdi-spin"></i> <span>Menyiapkan ${isLabels ? 'etiket' : 'struk'}...</span>`);
+
+            try {
+                await posThermalPrinter.printBrowserFrame(receiptWindow);
+            } catch (error) {
+                receiptWindow.focus();
+                receiptWindow.print();
+            } finally {
+                button.html(normalHtml).prop('disabled', false);
+                posThermalPrinter.updatePrintButton();
+            }
         });
 
         function escapeHtml(value) {

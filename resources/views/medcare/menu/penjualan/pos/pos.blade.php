@@ -75,6 +75,11 @@
                 <a href="{{ route("penjualan.pos.history") }}" class="btn pos-btn-quiet" title="Riwayat transaksi">
                     <i class="mdi mdi-history"></i><span>Riwayat</span>
                 </a>
+                <button type="button" class="btn pos-btn-quiet pos-printer-button" id="posPrinterButton"
+                    title="Cari dan hubungkan printer thermal 80 mm">
+                    <i class="mdi mdi-bluetooth-connect"></i>
+                    <span><small>Printer</small><strong id="posPrinterStatus">Belum terhubung</strong></span>
+                </button>
                 <button type="button" class="btn pos-btn-quiet" id="printLastReceiptBtn" disabled title="Cetak struk transaksi terakhir">
                     <i class="mdi mdi-printer-outline"></i><span>Struk terakhir</span>
                 </button>
@@ -842,6 +847,8 @@
         </div>
     </div>
 
+    @include("medcare.menu.penjualan.pos.partials.printerModal")
+
     <div class="modal fade pos-receipt-modal" id="posReceiptModal" tabindex="-1"
         aria-labelledby="posReceiptModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -874,6 +881,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn pos-receipt-close" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn pos-receipt-printer-settings" id="receiptPrinterSettingsBtn">
+                        <i class="mdi mdi-bluetooth-connect"></i> <span>Atur printer</span>
+                    </button>
                     <button type="button" class="btn pos-receipt-print" id="printReceiptModalBtn" disabled>
                         <i class="mdi mdi-printer-outline"></i> <span>Cetak struk</span>
                     </button>

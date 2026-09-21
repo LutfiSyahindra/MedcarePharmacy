@@ -20,7 +20,7 @@
         html, body { margin: 0; min-height: 100%; }
 
         @page {
-            size: 80mm auto;
+            size: 80mm 80mm;
             margin: 0;
         }
 
@@ -147,6 +147,8 @@
             html,
             body {
                 width: 80mm;
+                height: auto !important;
+                min-height: 0 !important;
                 background: #fff;
             }
 
@@ -160,6 +162,7 @@
             .label-sheet {
                 width: 80mm;
                 margin: 0;
+                background: #fff !important;
                 border-right: 0;
                 border-bottom: 0;
                 border-left: 0;
@@ -169,11 +172,25 @@
 
             .label-sheet + .label-sheet {
                 margin-top: 0;
-                break-before: page;
-                page-break-before: always;
+                break-before: auto;
+                page-break-before: auto;
             }
 
-            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .label-sheet,
+            .label-sheet *,
+            .label-sheet *::before,
+            .label-sheet *::after {
+                color: #000 !important;
+                border-color: #000 !important;
+                text-shadow: none !important;
+            }
+
+            .label-sheet * {
+                background-color: transparent !important;
+                background-image: none !important;
+            }
+
+            * { -webkit-print-color-adjust: economy; print-color-adjust: economy; }
         }
     </style>
 </head>
@@ -285,6 +302,38 @@
             </div>
         </article>
     @endforeach
+
+    <style id="labelDynamicPageSize"></style>
+    <script>
+        (function () {
+            const pixelsPerMillimeter = 96 / 25.4;
+
+            function fitPrintedPageToLabels() {
+                const labels = [...document.querySelectorAll('article.label-sheet')];
+                const pageStyle = document.getElementById('labelDynamicPageSize');
+                if (!labels.length || !pageStyle) return;
+
+                const contentHeight = labels.reduce((height, label) => (
+                    height + label.getBoundingClientRect().height
+                ), 0);
+                const pageHeight = Math.max(30, Math.ceil(contentHeight / pixelsPerMillimeter) + 1);
+
+                pageStyle.textContent = `@page { size: 80mm ${pageHeight}mm; margin: 0; }`;
+            }
+
+            window.addEventListener('beforeprint', fitPrintedPageToLabels);
+            window.addEventListener('load', function () {
+                const images = [...document.images].map(image => (
+                    image.complete ? Promise.resolve() : new Promise(resolve => {
+                        image.addEventListener('load', resolve, { once: true });
+                        image.addEventListener('error', resolve, { once: true });
+                    })
+                ));
+
+                Promise.all(images).then(fitPrintedPageToLabels);
+            });
+        })();
+    </script>
 
     @if ($autoPrint)
         <script>

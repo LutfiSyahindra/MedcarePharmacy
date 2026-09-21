@@ -6,6 +6,7 @@
     @include("template.AddOn.sweetAlert")
     @include("medcare.menu.penjualan.pos.partials.style")
     @include("medcare.menu.penjualan.pos.partials.historyStyle")
+    @include("medcare.menu.penjualan.pos.partials.printerStyle")
 @endpush
 
 @section("content")
@@ -27,6 +28,11 @@
                 </div>
             </div>
             <div class="history-hero-actions">
+                <button type="button" class="history-printer-button pos-printer-button" id="posPrinterButton"
+                    title="Atur printer resi thermal 80 mm">
+                    <i class="mdi mdi-bluetooth-connect"></i>
+                    <span><small>Printer resi</small><strong id="posPrinterStatus">Belum terhubung</strong></span>
+                </button>
                 <button type="button" class="history-icon-button" id="refreshHistoryBtn" title="Muat ulang data"
                     aria-label="Muat ulang data">
                     <i class="mdi mdi-refresh"></i>
@@ -235,6 +241,8 @@
         <div class="history-drawer-body" id="transactionDrawerBody" hidden></div>
         <footer class="history-drawer-footer" id="transactionDrawerFooter" hidden></footer>
     </aside>
+
+    @include("medcare.menu.penjualan.pos.partials.printerModal")
 @endsection
 
 @push("scripts")
