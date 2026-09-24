@@ -1177,17 +1177,16 @@
 
     .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:first-child {
         grid-column: 1 / -1;
-        padding: 8px 48px 8px 8px !important;
+        padding: 8px !important;
         border-color: #dce5e1 !important;
         background: #fff !important;
     }
 
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:first-child::before,
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:last-child::before {
+    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:first-child::before {
         display: none;
     }
 
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(6) {
+    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(5) {
         display: flex;
         grid-column: 1 / -1;
         align-items: center;
@@ -1197,29 +1196,18 @@
         background: #f3f9f6 !important;
     }
 
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(6)::before {
+    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(5)::before {
         margin: 0 auto 0 0;
         color: #527164;
     }
 
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(6) .pos-money {
+    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(5) .pos-money {
         color: var(--rx-primary);
         font-size: 14px !important;
     }
 
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(6) .pos-money-note {
+    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:nth-child(5) .pos-money-note {
         margin: 0;
-    }
-
-    .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row > td:last-child {
-        position: absolute;
-        z-index: 2;
-        top: 14px;
-        right: 14px;
-        width: auto;
-        padding: 0 !important;
-        border: 0 !important;
-        background: transparent !important;
     }
 
     .rx-simple .pos-prescription-modal-editor .pos-cart-table .pos-product-row .pos-discount-editor {

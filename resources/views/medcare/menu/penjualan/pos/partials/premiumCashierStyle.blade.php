@@ -47,7 +47,7 @@
         z-index: 30;
         display: grid;
         min-height: 72px;
-        grid-template-columns: minmax(260px, 300px) minmax(480px, 1fr) auto;
+        grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
         align-items: center;
         gap: 14px;
         overflow: visible;
@@ -720,7 +720,7 @@
     .pos-shift-back { color: #59697e; border: 1px solid #dfe4eb; background: #fff; }
 
     @media (max-width: 1480px) {
-        .pos-premium .pos-appbar { grid-template-columns: minmax(175px, .55fr) minmax(430px, 1.45fr) auto; gap: 9px; }
+        .pos-premium .pos-appbar { grid-template-columns: minmax(175px, 260px) minmax(0, 1fr); gap: 9px; }
         .pos-premium .pos-brand-title > span { display: none; }
         .pos-premium .pos-flow-step { min-width: 82px; padding: 5px 6px; }
         .pos-premium .pos-flow-summary { min-width: 132px; }
@@ -732,7 +732,7 @@
     }
 
     @media (max-width: 1240px) {
-        .pos-premium .pos-appbar { grid-template-columns: auto minmax(390px, 1fr) auto; }
+        .pos-premium .pos-appbar { grid-template-columns: auto minmax(0, 1fr); }
         .pos-premium .pos-brand-meta { display: none; }
         .pos-premium .pos-brand-title { display: block; }
         .pos-premium .pos-branch-button { min-width: 42px; width: 42px; justify-content: center; padding: 0; }
@@ -748,7 +748,7 @@
     @media (max-width: 1080px) {
         .pos-shift-modal .modal-dialog { max-width: calc(100% - 28px); }
         .pos-shift-dashboard { grid-template-columns: minmax(0, 1fr) 280px; }
-        .pos-premium .pos-appbar { grid-template-columns: auto minmax(360px, 1fr) auto; }
+        .pos-premium .pos-appbar { grid-template-columns: auto minmax(0, 1fr); }
         .pos-premium .pos-brand-mark { width: 40px; height: 40px; flex-basis: 40px; }
         .pos-premium .pos-brand-copy { display: none; }
         .pos-premium .pos-flow-summary { display: none; }
@@ -791,18 +791,13 @@
         .pos-shift-command-heading, .pos-shift-formula, .pos-shift-command-panel .is-close { grid-column: 1 / -1; }
         .pos-shift-command-panel > .btn:not(.is-close) { margin-top: 0; }
         .pos-premium { gap: 7px; padding: 7px; }
-        .pos-premium .pos-appbar { min-height: 108px; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 6px; padding: 7px; border-radius: 13px; }
+        .pos-premium .pos-appbar { min-height: 72px; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto; gap: 6px; padding: 7px; border-radius: 13px; }
         .pos-premium .pos-brand { grid-column: 1; grid-row: 1; }
         .pos-premium .pos-brand-copy { display: block; }
         .pos-premium .pos-brand-title > span,
         .pos-premium .pos-brand-meta { display: none; }
         .pos-premium .pos-appbar-actions { grid-column: 2; grid-row: 1; }
         .pos-premium .pos-cashier-profile { display: none; }
-        .pos-premium .pos-appbar-center { width: 100%; min-width: 0; grid-column: 1 / -1; grid-row: 2; }
-        .pos-premium .pos-flow { min-width: 0; max-width: none; min-height: 45px; padding: 3px; }
-        .pos-premium .pos-flow-step { min-width: 0; min-height: 37px; justify-content: center; padding: 3px; }
-        .pos-premium .pos-flow-step > span:last-child { display: none; }
-        .pos-premium .pos-flow-icon { width: 29px; height: 29px; flex-basis: 29px; }
         .pos-premium .pos-product-panel { display: block; }
         .pos-premium .pos-product-panel > .pos-search-box,
         .pos-premium .pos-product-panel > .pos-catalog-block { margin-right: 9px; margin-left: 9px; }

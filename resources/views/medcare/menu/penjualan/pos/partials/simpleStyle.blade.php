@@ -490,11 +490,7 @@
         background: #f7f8fa;
         box-shadow: none;
     }
-    .pos-simple .pos-cart-table { min-width: 720px; border-spacing: 0 5px; }
-    .pos-simple .pos-cart-table th:nth-child(3),
-    .pos-simple .pos-cart-table td:nth-child(3),
-    .pos-simple .pos-cart-table th:nth-child(5),
-    .pos-simple .pos-cart-table td:nth-child(5) { display: none; }
+    .pos-simple .pos-cart-table { min-width: 820px; border-spacing: 0 5px; }
     .pos-simple .pos-cart-table td { padding-top: 8px; padding-bottom: 8px; }
     .pos-simple .pos-cart-unit-editor { max-width: 260px; }
     .pos-simple .pos-cart-unit-editor select.form-select { height: 31px; font-size: .72rem; }

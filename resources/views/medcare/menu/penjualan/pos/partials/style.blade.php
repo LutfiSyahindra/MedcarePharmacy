@@ -939,14 +939,15 @@
     .pos-item-cell { display: flex; min-width: 0; align-items: center; gap: 8px; }
     .pos-item-symbol { display: inline-flex; width: 34px; height: 34px; flex: 0 0 auto; align-items: center; justify-content: center; color: #586bd1; border: 1px solid #e0e5fa; border-radius: 10px; background: linear-gradient(145deg, #f4f6ff, #e9edff); font-size: 17px; }
     .is-unavailable .pos-item-symbol { color: #c34d5d; border-color: #f1d1d6; background: #fff0f2; }
-    .pos-item-copy { display: grid; min-width: 0; }
-    .pos-item-copy strong { overflow: hidden; max-width: 230px; color: #26344f; font-size: 10px; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+    .pos-item-copy { display: grid; min-width: 0; flex: 1; }
+    .pos-item-copy strong { max-width: none; color: #26344f; font-size: 10px; line-height: 1.25; overflow-wrap: anywhere; white-space: normal; }
     .pos-item-copy > small { margin-top: 2px; color: #8c96a8; font-size: 8px; }
     .pos-cart-unit-editor { display: flex; max-width: 230px; align-items: center; gap: 5px; margin: 5px 0 0; }
     .pos-cart-unit-editor > i { flex: 0 0 auto; color: #6374c8; font-size: 13px; }
     .pos-cart-unit-editor select.form-select { min-width: 0; height: 29px; padding: 3px 27px 3px 7px; border-color: #d8deeb; border-radius: 7px; background-color: #f9faff; color: #45536d; font-size: 8px; font-weight: 750; box-shadow: none; }
     .pos-cart-unit-editor select.form-select:focus { border-color: #8492d6; box-shadow: 0 0 0 2px rgba(92, 110, 201, .1); }
     .pos-cart-unit-editor select.form-select:disabled { color: #788398; background-color: #f1f3f6; opacity: .72; cursor: not-allowed; }
+    .pos-conversion-caption { display: block; margin-top: 4px; color: #68758b; font-size: 8px; line-height: 1.35; }
     .pos-item-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .pos-item-badges span { padding: 2px 5px; color: #68758b; border: 1px solid #e4e7ed; border-radius: 5px; background: #f8f9fb; font-size: 7px; }
     .pos-money { display: block; color: #283750; font-size: 10px; font-weight: 850; white-space: nowrap; }

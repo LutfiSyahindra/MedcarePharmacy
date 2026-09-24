@@ -1106,10 +1106,19 @@
         }
 
         function updateClock() {
-            $('#posClock').text(new Intl.DateTimeFormat('id-ID', {
-                dateStyle: 'medium',
+            const now = new Date();
+            const compactDateTime = new Intl.DateTimeFormat('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(now).replace(' pukul ', ' · ').replace('.', ':');
+            const fullDateTime = new Intl.DateTimeFormat('id-ID', {
+                dateStyle: 'full',
                 timeStyle: 'short'
-            }).format(new Date()));
+            }).format(now);
+
+            $('#posClock').text(compactDateTime).attr('title', fullDateTime);
         }
 
         updateClock();
@@ -1182,27 +1191,6 @@
         }
 
         function updateFlow() {
-            const hasItems = cart.length > 0;
-            const canSettle = hasItems && (isCreditTransaction() || lastTotals.diff >= -0.01) && !cart.some(item => !item.is_available);
-
-            $('#posFlowProduct, #posFlowCart, #posFlowPayment').removeClass('is-active is-complete');
-            if (cashierStage === 'payment') {
-                $('#posFlowProduct, #posFlowCart').addClass('is-complete');
-                $('#posFlowPayment').addClass('is-active');
-            } else if (cashierStage === 'cart') {
-                $('#posFlowProduct').addClass('is-complete');
-                $('#posFlowCart').addClass('is-active');
-            } else {
-                $('#posFlowProduct').addClass('is-active');
-                $('#posFlowCart').toggleClass('is-complete', hasItems);
-            }
-            $('#posFlowProduct, #posFlowCart, #posFlowPayment').each(function() {
-                $(this).attr('aria-current', $(this).hasClass('is-active') ? 'step' : null);
-            });
-            $('#posFlowProgress').css('width', `${cashierStage === 'payment' ? (canSettle ? 96 : 69) : (cashierStage === 'cart' ? 48 : 8)}%`);
-
-            $('#headerCartCount').text(formatNumber(cart.length));
-            $('#headerGrandTotal').text(formatCurrency(lastTotals.grandTotal));
             $('.pos-quick-payment[data-amount="exact"] span').text(
                 lastTotals.grandTotal > 0 ? `Bayar pas · ${formatCurrency(lastTotals.grandTotal)}` : 'Bayar pas'
             );
@@ -1214,6 +1202,8 @@
         function updateCatalogFlow() {
             const hasSelection = Boolean(selectedProduct);
             const hasQuote = Boolean(currentQuote);
+
+            $('.pos-catalog').toggleClass('has-selection', hasSelection);
 
             $('#catalogPhaseSearch, #catalogPhaseConfigure, #catalogPhaseStock').removeClass('is-active is-complete');
             $('#catalogPhaseSearch').toggleClass('is-active', !hasSelection).toggleClass('is-complete', hasSelection);
@@ -1424,7 +1414,9 @@
             populateUnits();
             requestQuote();
             updateFlow();
-            $('#qtyInput').trigger('focus').select();
+            if (!openPrescriptionProductPreview()) {
+                $('#qtyInput').trigger('focus').select();
+            }
         });
 
         $('#productSearch').on('select2:clear', function() {
@@ -1531,6 +1523,7 @@
         }
 
         function resetProductWorkspace() {
+            closePrescriptionProductPreview();
             clearTimeout(quoteTimer);
             quoteTimer = null;
             selectedProduct = null;
@@ -1672,8 +1665,14 @@
                 recalculatedItems.forEach(refreshCartQuote);
             }
 
-            $('#qtyInput').val(1);
-            requestQuote();
+            resetProductWorkspace();
+            if (!compound && isPrescriptionTransaction() && prescriptionWorkspaceMounted) {
+                window.setTimeout(() => {
+                    $('.cart-prescription-input[data-field="aturan_pakai"]').filter(function() {
+                        return String($(this).data('id')) === String(cartItem.uid);
+                    }).first().trigger('focus').select();
+                }, 100);
+            }
         });
 
         $('#qtyInput').on('keydown', function(event) {
@@ -1763,7 +1762,7 @@
                     && Math.abs(componentCalculation.calculatedTake - componentCalculation.dispensedTake) > 0.001;
                 return `
                     <tr class="pos-prescription-detail-row">
-                        <td colspan="7">
+                        <td colspan="5">
                             <div class="pos-prescription-item-editor pos-compound-component-editor ${isComplete ? 'is-complete' : ''} ${locked ? 'is-locked' : ''}">
                                 <div class="pos-prescription-item-head">
                                     <span><i class="mdi mdi-pill"></i></span>
@@ -1805,7 +1804,7 @@
 
             return `
                 <tr class="pos-prescription-detail-row">
-                    <td colspan="7">
+                    <td colspan="5">
                         <div class="pos-prescription-item-editor ${isComplete ? 'is-complete' : ''}">
                             <div class="pos-prescription-item-head">
                                 <span><i class="mdi mdi-clipboard-text-outline"></i></span>
@@ -1861,7 +1860,7 @@
 
             return `
                 <tr class="pos-compound-group-row">
-                    <td colspan="7">
+                    <td colspan="5">
                         <section class="pos-compound-group-card ${saved ? 'is-complete is-saved' : ''} ${active ? 'is-active' : ''}" data-group-card="${escapeHtml(group)}">
                             <div class="pos-compound-group-head">
                                 <span class="pos-compound-group-mark"><small>${escapeHtml(group)}</small><b>${escapeHtml(compoundGroupLabel(group))}</b></span>
@@ -1931,7 +1930,7 @@
         function compoundWorkspaceEmptyRow(group) {
             return `
                 <tr class="pos-cart-empty-row">
-                    <td colspan="7">
+                    <td colspan="5">
                         <div class="pos-cart-empty pos-compound-workspace-empty">
                             <span class="pos-cart-empty-visual">
                                 <i class="mdi mdi-flask-plus-outline"></i>
@@ -1954,14 +1953,14 @@
             if (cart.length === 0) {
                 $('#cartBody').html(compound ? compoundWorkspaceEmptyRow(activeCompoundGroup) : `
                     <tr class="pos-cart-empty-row">
-                        <td colspan="7">
+                        <td colspan="5">
                             <div class="pos-cart-empty">
                                 <span class="pos-cart-empty-visual">
                                     <i class="mdi mdi-cart-outline"></i>
                                     <b><i class="mdi mdi-plus"></i></b>
                                 </span>
                                 <strong>Keranjang siap diisi</strong>
-                                <small>Cari produk di panel kiri, tentukan satuan dan jumlah, lalu tambahkan ke transaksi.</small>
+                                <small>Cari produk di header, tentukan satuan dan jumlah, lalu tambahkan ke transaksi.</small>
                                 <button type="button" class="btn pos-empty-search-button" id="focusProductSearchBtn">
                                     <i class="mdi mdi-magnify"></i> Cari produk pertama <kbd>F2</kbd>
                                 </button>
@@ -2008,37 +2007,29 @@
                             <span class="pos-item-copy">
                                 <strong title="${escapeHtml(item.nama_obat)}">${escapeHtml(item.nama_obat)}</strong>
                                 <small>${escapeHtml(item.kode_obat)}</small>
-                                <label class="pos-cart-unit-editor" title="Ubah satuan jual dan konversi ${escapeHtml(item.nama_obat)}">
-                                    <i class="mdi mdi-swap-horizontal-bold" aria-hidden="true"></i>
-                                    <span class="visually-hidden">Satuan jual ${escapeHtml(item.nama_obat)}</span>
-                                    <select class="form-select form-select-sm cart-unit-select" data-id="${escapeHtml(item.uid)}"
-                                        aria-label="Satuan jual ${escapeHtml(item.nama_obat)}"
-                                        ${lockAttribute}>${itemUnitOptions(item)}</select>
-                                </label>
-                                <span class="pos-item-badges">
-                                    <span>1 ${escapeHtml(item.satuan)} = ${formatNumber(item.konversi)} ${escapeHtml(item.satuan_stok)}</span>
-                                    ${compound ? `<span class="pos-item-group-badge">${escapeHtml(group)} &middot; Komponen ${componentPosition}/${groupItems.length}</span>` : ''}
-                                </span>
-                                <span class="pos-item-quick-meta">
-                                    <span>${formatCurrency(item.harga_jual)} / ${escapeHtml(item.satuan)}</span>
-                                    <span class="${item.is_available ? '' : 'is-warning'}"><i class="mdi ${item.is_available ? 'mdi-autorenew' : 'mdi-alert-circle-outline'}"></i> ${item.is_available ? 'FEFO otomatis' : 'Stok tidak cukup'}</span>
-                                </span>
+                                ${compound ? `<span class="pos-item-badges"><span class="pos-item-group-badge">${escapeHtml(group)} &middot; Komponen ${componentPosition}/${groupItems.length}</span></span>` : ''}
                             </span>
+                            <button type="button" class="btn btn-sm pos-remove-item remove-cart-item" data-id="${escapeHtml(item.uid)}" title="Hapus ${escapeHtml(item.nama_obat)}" aria-label="Hapus ${escapeHtml(item.nama_obat)}" ${lockAttribute}>
+                                <i class="mdi mdi-trash-can-outline"></i>
+                            </button>
                         </div>
                     </td>
-                    <td data-label="${compound ? 'Stok keluar' : 'Jumlah'}">
+                    <td data-label="Konversi Satuan">
+                        <label class="pos-cart-unit-editor" title="Ubah satuan jual dan konversi ${escapeHtml(item.nama_obat)}">
+                            <span class="visually-hidden">Satuan jual ${escapeHtml(item.nama_obat)}</span>
+                            <select class="form-select form-select-sm cart-unit-select" data-id="${escapeHtml(item.uid)}"
+                                aria-label="Satuan jual ${escapeHtml(item.nama_obat)}"
+                                ${lockAttribute}>${itemUnitOptions(item)}</select>
+                        </label>
+                    </td>
+                    <td data-label="Qty">
                         <div class="pos-qty-stepper">
                             <button type="button" class="cart-qty-step" data-id="${escapeHtml(item.uid)}" data-delta="-1" title="Kurangi jumlah" aria-label="Kurangi ${escapeHtml(item.nama_obat)}" ${lockAttribute}><i class="mdi mdi-minus"></i></button>
                             <input type="number" class="form-control form-control-sm cart-qty" data-id="${escapeHtml(item.uid)}" min="0.01" step="0.01" value="${item.qty}" aria-label="Jumlah ${escapeHtml(item.nama_obat)}" ${lockAttribute}>
                             <button type="button" class="cart-qty-step" data-id="${escapeHtml(item.uid)}" data-delta="1" title="Tambah jumlah" aria-label="Tambah ${escapeHtml(item.nama_obat)}" ${lockAttribute}><i class="mdi mdi-plus"></i></button>
                         </div>
-                        <small class="pos-stock-caption"><i class="mdi mdi-package-variant"></i> ${formatNumber(item.qty_stok)} ${escapeHtml(item.satuan_stok)} stok</small>
                     </td>
-                    <td data-label="Harga">
-                        <span class="pos-money">${formatCurrency(item.harga_jual)}</span>
-                        <small class="pos-money-note">per ${escapeHtml(item.satuan)}</small>
-                    </td>
-                    <td data-label="Diskon item">
+                    <td data-label="Diskon">
                         <div class="pos-discount-editor">
                             <label class="pos-discount-control" title="Diskon persen">
                                 <input type="number" class="form-control form-control-sm cart-discount-percent" data-id="${escapeHtml(item.uid)}" min="0" max="100" step="0.01" value="${item.diskon_percent}" aria-label="Diskon persen ${escapeHtml(item.nama_obat)}">
@@ -2049,17 +2040,9 @@
                                 <span>Rp</span>
                             </label>
                         </div>
-                        <small class="pos-discount-result"><i class="mdi mdi-arrow-down-thin"></i> Hemat ${formatCurrency(itemDiscount(item))}</small>
                     </td>
-                    <td data-label="Alokasi FEFO">${fefoCell(item)}</td>
-                    <td data-label="Nilai akhir">
+                    <td data-label="Total Harga">
                         <span class="pos-money pos-line-total">${formatCurrency(itemNet(item))}</span>
-                        <small class="pos-money-note">setelah diskon</small>
-                    </td>
-                    <td class="text-center" data-label="Aksi">
-                        <button type="button" class="btn btn-sm pos-remove-item remove-cart-item" data-id="${escapeHtml(item.uid)}" title="Hapus ${escapeHtml(item.nama_obat)}" aria-label="Hapus ${escapeHtml(item.nama_obat)}" ${lockAttribute}>
-                            <i class="mdi mdi-trash-can-outline"></i>
-                        </button>
                     </td>
                 </tr>
                 ${prescriptionItemEditor(item)}
@@ -2840,8 +2823,14 @@
 
             $('#prescriptionWorkspace').toggleClass('d-none', !prescription);
             $('#compoundSetup').toggleClass('d-none', !compound);
-            $('#prescriptionCashierStep').attr('data-prescription-mode', compound ? 'compound' : 'standard');
+            $('#prescriptionCashierStep')
+                .attr({
+                    'data-prescription-mode': 'standard',
+                    'data-prescription-kind': compound ? 'compound' : 'standard'
+                })
+                .toggleClass('is-compound-prescription', compound);
             $('#prescriptionTypeModal').attr('data-prescription-mode', compound ? 'compound' : 'standard');
+            syncPrescriptionProductSearchPlacement();
             $('.pos-institution-field').toggleClass('d-none', type !== 'penjualan_instansi');
             $('.pos-prescription-type-option')
                 .removeClass('is-active')
@@ -2852,7 +2841,7 @@
             $('#prescriptionModeSummary').toggleClass('is-compound', compound);
             $('#prescriptionModeIcon').html(`<i class="mdi ${compound ? 'mdi-mortar-pestle-plus' : 'mdi-pill-multiple'}"></i>`);
             $('#prescriptionModeLabel').text(compound ? 'Racikan' : 'Non Racikan');
-            $('#cartQtyHeaderLabel').text(compound ? 'Stok Keluar' : 'Jumlah');
+            $('#cartQtyHeaderLabel').text('Qty');
             $('#prescriptionModeSummaryCopy').text(compound
                 ? 'Komponen obat disusun dalam kelompok R/ dengan satu etiket bersama.'
                 : 'Etiket dan aturan pakai dicatat untuk setiap obat.');
@@ -2924,12 +2913,75 @@
             return bootstrap.Modal.getOrCreateInstance(document.getElementById('prescriptionTypeModal'));
         }
 
+        function syncPrescriptionProductSearchPlacement() {
+            if (!prescriptionWorkspaceMounted) {
+                return;
+            }
+
+            const searchBox = $('#productSearchBox');
+            const productPreview = $('#prescriptionProductPreview');
+            productPreview.attr('aria-hidden', productPreview.hasClass('is-open') ? 'false' : 'true');
+            productPreview.find('.pos-rx-product-preview-dialog').attr({
+                role: 'dialog',
+                'aria-modal': 'true'
+            });
+            $('#prescriptionHeaderSearchSlot').append(searchBox);
+        }
+
+        function openPrescriptionProductPreview() {
+            if (!selectedProduct
+                || !prescriptionWorkspaceMounted
+                || $('#prescriptionCashierStep').hasClass('d-none')) {
+                return false;
+            }
+
+            const stockLabel = `${formatNumber(selectedProduct.total_stok || 0)} ${selectedProduct.satuan_stok || 'satuan'}`;
+            $('#prescriptionProductPreviewTitle').text(selectedProduct.nama_obat || 'Detail produk terpilih');
+            $('#prescriptionProductPreviewCopy').text(
+                `${selectedProduct.kode_obat || 'Tanpa kode'} · Stok ${stockLabel} · Atur satuan dan jumlah penjualan.`
+            );
+            $('#prescriptionProductPreviewKicker').text(
+                isCompoundPrescription() ? `TAMBAH KE ${compoundGroupLabel(activeCompoundGroup).toUpperCase()}` : 'PREVIEW PRODUK RESEP'
+            );
+            $('#prescriptionProductPreview')
+                .addClass('is-open')
+                .attr('aria-hidden', 'false');
+            $('body').addClass('pos-rx-product-preview-open');
+
+            window.setTimeout(() => $('#qtyInput').trigger('focus').select(), 100);
+            return true;
+        }
+
+        function closePrescriptionProductPreview() {
+            const preview = $('#prescriptionProductPreview');
+            preview.removeClass('is-open');
+            $('body').removeClass('pos-rx-product-preview-open');
+
+            preview.attr('aria-hidden', 'true');
+        }
+
+        function dismissPrescriptionProductPreview() {
+            closePrescriptionProductPreview();
+            resetProductWorkspace();
+            window.setTimeout(() => {
+                if ($('#prescriptionTypeModal').hasClass('show')) {
+                    $('#productSearch').select2('open');
+                }
+            }, 100);
+        }
+
+        $('#closePrescriptionProductPreviewBtn, #closePrescriptionProductPreviewBackdrop')
+            .on('click', dismissPrescriptionProductPreview);
+
         function mountPrescriptionWorkspace() {
             if (prescriptionWorkspaceMounted) {
                 return;
             }
 
-            $('#prescriptionModalCatalogSlot').append($('.pos-catalog').first());
+            $('#prescriptionModalCatalogSlot').append(
+                $('#productSearchBox'),
+                $('.pos-catalog').first()
+            );
             $('#prescriptionModalDetailsSlot').append($('.pos-transaction-details').first().prop('open', true));
             $('#prescriptionModalCompoundSlot').append($('#compoundSetup'));
             $('#prescriptionModalCartSlot').append(
@@ -2938,6 +2990,7 @@
                 $('.pos-cart-footnote').first()
             );
             prescriptionWorkspaceMounted = true;
+            syncPrescriptionProductSearchPlacement();
         }
 
         function restorePrescriptionWorkspace() {
@@ -2945,6 +2998,8 @@
                 return;
             }
 
+            closePrescriptionProductPreview();
+            $('#posSearchHomeAnchor').after($('#productSearchBox'));
             $('#posCatalogHomeAnchor').after($('#prescriptionModalCatalogSlot > .pos-catalog'));
             $('#compoundSetupHomeAnchor').after($('#prescriptionModalCompoundSlot > #compoundSetup'));
             $('#posDetailsHomeAnchor').after($('#prescriptionModalDetailsSlot > .pos-transaction-details'));
@@ -2973,6 +3028,7 @@
         }
 
         function showPrescriptionTypeStep() {
+            closePrescriptionProductPreview();
             $('.pos-prescription-type-option')
                 .removeClass('is-active')
                 .attr('aria-pressed', 'false')
@@ -3125,6 +3181,7 @@
         }
 
         function showCompoundPreviewStep() {
+            closePrescriptionProductPreview();
             renderCompoundPreview();
             compoundPreviewApproved = false;
             $('#prescriptionTypeStep, #prescriptionCashierStep').addClass('d-none');
@@ -3856,9 +3913,21 @@
             const prescriptionFlowOpen = $('#prescriptionTypeModal').hasClass('show');
             const prescriptionTypeSelectionOpen = prescriptionFlowOpen && !$('#prescriptionTypeStep').hasClass('d-none');
             const compoundPreviewOpen = prescriptionFlowOpen && !$('#compoundPreviewStep').hasClass('d-none');
+            const productPreviewOpen = $('#prescriptionProductPreview').hasClass('is-open');
+
+            if (event.key === 'Escape' && productPreviewOpen) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                dismissPrescriptionProductPreview();
+                return;
+            }
 
             if ((event.key === 'F2' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')) && !event.altKey) {
                 event.preventDefault();
+                if (productPreviewOpen) {
+                    dismissPrescriptionProductPreview();
+                    return;
+                }
                 if (prescriptionTypeSelectionOpen) {
                     return;
                 }
