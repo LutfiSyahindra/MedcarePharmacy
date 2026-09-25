@@ -15,6 +15,7 @@ class SuratPesananRegulerService
         private readonly SuratPesananNarkotikaService $narcoticOrders,
         private readonly SuratPesananPsikotropikaService $psychotropicOrders,
         private readonly SuratPesananPrekursorService $precursorOrders,
+        private readonly SuratPesananOotService $ootOrders,
     ) {}
 
     /**
@@ -32,7 +33,7 @@ class SuratPesananRegulerService
         ]);
 
         foreach ($purchaseOrder->details as $detail) {
-            $isRegular = ! (bool) $detail->is_oot
+            $isRegular = ! $this->ootOrders->isOotDrug($detail->obat)
                 && $this->isRegularDrug($detail->obat);
 
             $detail->setAttribute('is_regular', $isRegular);

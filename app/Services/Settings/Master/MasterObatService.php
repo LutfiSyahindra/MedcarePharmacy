@@ -60,6 +60,10 @@ class MasterObatService
                 'golongan_id'   => $r->golongan->nama ?? '-',
                 'main_golongan_id' => $r->mainGolongan->nama ?? '-',
                 'sub_golongan_id' => $r->subGolongan->nama ?? '-',
+                'golongan_display' => $r->subGolongan->nama
+                    ?? $r->mainGolongan->nama
+                    ?? $r->golongan->nama
+                    ?? '-',
                 'satuan_id'   => $r->satuan->nama ?? '-',
                 'sediaan_id'   => $r->sediaan->nama ?? '-',
                 'pabrikan_id'   => $r->pabrikan->nama ?? '-',

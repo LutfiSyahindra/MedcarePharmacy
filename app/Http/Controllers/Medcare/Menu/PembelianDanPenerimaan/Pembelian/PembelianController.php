@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
+use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService;
@@ -204,8 +205,6 @@ class PembelianController extends Controller
             'diskon_3.*' => 'nullable|numeric|min:0|max:100',
             'subtotal.*' => 'required|numeric|min:0',
             'satuan_id.*' => 'required|integer|min:1',
-            'is_oot' => 'nullable|array',
-            'is_oot.*' => 'boolean',
         ]);
 
         $detailRows = $this->purchaseDetailRows($request);
@@ -388,7 +387,7 @@ class PembelianController extends Controller
         abort_if(
             $ootDetails->isEmpty(),
             422,
-            'Purchase order ini tidak memiliki obat yang ditandai OOT oleh apoteker.'
+            'Purchase order ini tidak memiliki obat dengan klasifikasi OOT.'
         );
 
         return view('medcare.menu.pembelianPenerimaan.pembelian.suratPesananOot', [
@@ -404,7 +403,7 @@ class PembelianController extends Controller
         abort_if(
             $this->suratPesananOot->ootDetails($purchaseOrder)->isNotEmpty(),
             422,
-            'Purchase order yang ditandai OOT hanya dapat menghasilkan Surat Pesanan OOT.'
+            'Purchase order dengan obat berklasifikasi OOT hanya dapat menghasilkan Surat Pesanan OOT.'
         );
     }
 
@@ -582,8 +581,6 @@ class PembelianController extends Controller
             'diskon_3.*' => 'nullable|numeric|min:0|max:100',
             'subtotal.*' => 'required|numeric|min:0',
             'satuan_id.*' => 'required|integer|min:1',
-            'is_oot' => 'nullable|array',
-            'is_oot.*' => 'boolean',
         ]);
 
         $detailRows = $this->purchaseDetailRows($request);
@@ -690,6 +687,20 @@ class PembelianController extends Controller
     private function purchaseDetailRows(Request $request): array
     {
         $rows = [];
+        $medicineIds = collect($request->input('obat_id', []))
+            ->map(fn ($medicineId) => (int) $medicineId)
+            ->filter()
+            ->unique()
+            ->values();
+        $medicines = MasterObatModel::query()
+            ->with([
+                'golongan',
+                'mainGolongan.golongan',
+                'subGolongan.mainGolongan.golongan',
+            ])
+            ->whereKey($medicineIds)
+            ->get()
+            ->keyBy('id');
 
         foreach ($request->input('obat_id', []) as $index => $obatId) {
             $qty = (float) $request->input('qty.'.$index, 0);
@@ -714,7 +725,9 @@ class PembelianController extends Controller
                     $discount3
                 ),
                 'satuan_konversi' => (int) $request->input('satuan_id.'.$index),
-                'is_oot' => $request->boolean('is_oot.'.$index),
+                'is_oot' => $this->suratPesananOot->isOotDrug(
+                    $medicines->get((int) $obatId)
+                ),
             ];
         }
 

@@ -6,6 +6,7 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -80,7 +81,7 @@ class DocumentArchiveServiceTest extends TestCase
         $this->assertSame('PO-DOC-001/OOT', $documents->first()['document_number']);
         $this->assertSame(1, $documents->first()['item_count']);
         $this->assertSame('Dextromethorphan 15 mg', $documents->first()['items'][0]['name']);
-        $this->assertSame('Ditentukan manual oleh apoteker pada PO', $documents->first()['items'][0]['classification']);
+        $this->assertSame('Main Golongan: OOT Keras', $documents->first()['items'][0]['classification']);
         $this->assertStringContainsString('surat-pesanan-oot', $documents->first()['print_url']);
 
         $this->assertSame([
@@ -134,7 +135,7 @@ class DocumentArchiveServiceTest extends TestCase
 
         if ($includeOot) {
             $details->push(
-                $this->detail($this->medicine('OBK', 'Obat Keras', 'Dextromethorphan 15 mg', $unit), $conversion, 8, true)
+                $this->detail($this->medicine('OBK', 'Obat Keras', 'Dextromethorphan 15 mg', $unit, true), $conversion, 8)
             );
         }
 
@@ -157,11 +158,24 @@ class DocumentArchiveServiceTest extends TestCase
         return $purchaseOrder;
     }
 
-    private function medicine(string $code, string $classification, string $name, SatuansModel $unit): MasterObatModel
-    {
+    private function medicine(
+        string $code,
+        string $classification,
+        string $name,
+        SatuansModel $unit,
+        bool $isOot = false,
+    ): MasterObatModel {
         $medicine = (new MasterObatModel)->forceFill(['nama_obat' => $name]);
-        $medicine->setRelation('golongan', new GolonganModel(['kode' => $code, 'nama' => $classification]));
-        $medicine->setRelation('mainGolongan', null);
+        $medicineClassification = new GolonganModel(['kode' => $code, 'nama' => $classification]);
+        $mainClassification = null;
+
+        if ($isOot) {
+            $mainClassification = new MainGolonganModel(['kode' => 'OTK', 'nama' => 'OOT Keras']);
+            $mainClassification->setRelation('golongan', $medicineClassification);
+        }
+
+        $medicine->setRelation('golongan', $medicineClassification);
+        $medicine->setRelation('mainGolongan', $mainClassification);
         $medicine->setRelation('subGolongan', null);
         $medicine->setRelation('sediaan', new SediaanModel(['nama' => 'Tablet']));
         $medicine->setRelation('satuan', $unit);

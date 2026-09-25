@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\BranchModel;
 use App\Models\DistributorModel;
+use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -18,7 +20,7 @@ class PurchaseOrderOotSelectionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_pharmacist_can_select_and_change_oot_items_per_purchase_order_detail(): void
+    public function test_oot_items_are_automatically_derived_from_medicine_classification(): void
     {
         Notification::fake();
 
@@ -40,21 +42,43 @@ class PurchaseOrderOotSelectionTest extends TestCase
             'nama' => 'Distributor OOT',
             'is_active' => true,
         ]);
+        $classification = GolonganModel::create([
+            'kode' => 'OBK-OOT-PO',
+            'nama' => 'Obat Keras',
+            'is_active' => true,
+        ]);
+        $ootClassification = MainGolonganModel::create([
+            'golongan_id' => $classification->id,
+            'kode' => 'OTK-OOT-PO',
+            'nama' => 'OOT Keras',
+        ]);
 
-        [$firstMedicine, $firstConversion] = $this->createMedicine('OBT-OOT-1', 'Obat Pilihan OOT', $unit, $distributor);
-        [$secondMedicine, $secondConversion] = $this->createMedicine('OBT-OOT-2', 'Obat Biasa', $unit, $distributor);
+        [$firstMedicine, $firstConversion] = $this->createMedicine(
+            'OBT-OOT-1',
+            'Obat OOT',
+            $unit,
+            $distributor,
+            $classification,
+            $ootClassification,
+        );
+        [$secondMedicine, $secondConversion] = $this->createMedicine(
+            'OBT-OOT-2',
+            'Obat Biasa',
+            $unit,
+            $distributor,
+            $classification,
+        );
 
         $this->actingAs($user)
             ->postJson(route('pembelian.store'), $this->payload(
-                'PO-OOT-MANUAL-001',
+                'PO-OOT-AUTO-001',
                 $distributor,
                 [$firstMedicine, $secondMedicine],
                 [$firstConversion, $secondConversion],
-                [1, 0],
             ))
             ->assertOk();
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-OOT-MANUAL-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::where('no_po', 'PO-OOT-AUTO-001')->firstOrFail();
         $details = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)
             ->orderBy('id')
             ->get();
@@ -88,13 +112,15 @@ class PurchaseOrderOotSelectionTest extends TestCase
             ->assertJsonPath('details.0.is_oot', true)
             ->assertJsonPath('details.1.is_oot', false);
 
+        $firstMedicine->update(['main_golongan_id' => null]);
+        $secondMedicine->update(['main_golongan_id' => $ootClassification->id]);
+
         $this->actingAs($user)
             ->putJson(route('pembelian.update', $purchaseOrder->id), $this->payload(
-                'PO-OOT-MANUAL-001',
+                'PO-OOT-AUTO-001',
                 $distributor,
                 [$firstMedicine, $secondMedicine],
                 [$firstConversion, $secondConversion],
-                [0, 1],
             ))
             ->assertOk();
 
@@ -114,12 +140,16 @@ class PurchaseOrderOotSelectionTest extends TestCase
         string $name,
         SatuansModel $unit,
         DistributorModel $distributor,
+        GolonganModel $classification,
+        ?MainGolonganModel $mainClassification = null,
     ): array {
         $medicine = MasterObatModel::create([
             'kode_obat' => $code,
             'nama_obat' => $name,
             'satuan_id' => $unit->id,
             'distributor_id' => $distributor->id,
+            'golongan_id' => $classification->id,
+            'main_golongan_id' => $mainClassification?->id,
             'is_active' => true,
         ]);
         $conversion = KonversiSatuanModel::create([
@@ -135,7 +165,6 @@ class PurchaseOrderOotSelectionTest extends TestCase
     /**
      * @param  array<int, MasterObatModel>  $medicines
      * @param  array<int, KonversiSatuanModel>  $conversions
-     * @param  array<int, int>  $ootSelections
      * @return array<string, mixed>
      */
     private function payload(
@@ -143,13 +172,12 @@ class PurchaseOrderOotSelectionTest extends TestCase
         DistributorModel $distributor,
         array $medicines,
         array $conversions,
-        array $ootSelections,
     ): array {
         return [
             'no_po' => $purchaseOrderNumber,
             'distributor_id' => $distributor->id,
             'tanggal' => '20-08-2026',
-            'catatan' => 'Pemilihan OOT dilakukan apoteker.',
+            'catatan' => 'Klasifikasi OOT mengikuti master obat.',
             'total_estimasi' => 20000,
             'obat_id' => array_map(fn (MasterObatModel $medicine) => $medicine->id, $medicines),
             'qty' => [1, 1],
@@ -159,7 +187,6 @@ class PurchaseOrderOotSelectionTest extends TestCase
             'diskon_3' => [0, 0],
             'subtotal' => [10000, 10000],
             'satuan_id' => array_map(fn (KonversiSatuanModel $conversion) => $conversion->id, $conversions),
-            'is_oot' => $ootSelections,
         ];
     }
 }

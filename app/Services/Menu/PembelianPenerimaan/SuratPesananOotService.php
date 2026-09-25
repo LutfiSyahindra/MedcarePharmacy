@@ -2,7 +2,9 @@
 
 namespace App\Services\Menu\PembelianPenerimaan;
 
+use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Support\ControlledDrugClassification;
 use App\Support\IndonesianNumber;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -11,27 +13,25 @@ class SuratPesananOotService
     public const COPY_COUNT = 4;
 
     /**
-     * OOT tidak ditentukan dari golongan master obat. Hanya pilihan manual
-     * apoteker pada setiap detail PO yang menjadi sumber surat pesanan ini.
-     *
      * @return Collection<int, \App\Models\Menu\PembelianPenerimaan\PembelianDetailModel>
      */
     public function ootDetails(PembelianModel $purchaseOrder): Collection
     {
         $purchaseOrder->loadMissing([
+            'details.obat.golongan',
+            'details.obat.mainGolongan.golongan',
+            'details.obat.subGolongan.mainGolongan.golongan',
             'details.obat.sediaan',
             'details.obat.satuan',
             'details.satuanKonversi.satuan',
         ]);
 
         foreach ($purchaseOrder->details as $detail) {
-            $isOot = (bool) $detail->is_oot;
+            $classification = $this->matchedClassification($detail->obat);
+            $isOot = $classification !== null;
 
             $detail->setAttribute('is_oot', $isOot);
-            $detail->setAttribute(
-                'oot_classification',
-                $isOot ? 'Ditentukan manual oleh apoteker pada PO' : null
-            );
+            $detail->setAttribute('oot_classification', $classification);
 
             if ($isOot) {
                 $detail->setAttribute('quantity_in_words', IndonesianNumber::spell((int) $detail->qty));
@@ -46,5 +46,19 @@ class SuratPesananOotService
         return $purchaseOrder->details
             ->filter(fn ($detail) => (bool) $detail->getAttribute('is_oot'))
             ->values();
+    }
+
+    public function isOotDrug(?MasterObatModel $medicine): bool
+    {
+        return $this->matchedClassification($medicine) !== null;
+    }
+
+    public function matchedClassification(?MasterObatModel $medicine): ?string
+    {
+        return ControlledDrugClassification::matchedClassification(
+            $medicine,
+            ['oot', 'obat-obat tertentu', 'obat tertentu'],
+            ['ot', 'otk', 'oot']
+        );
     }
 }

@@ -331,7 +331,7 @@ class DocumentArchiveService
             self::TYPE_OOT => [
                 'label' => 'Surat Pesanan OOT',
                 'short_label' => 'OOT',
-                'description' => 'Surat pesanan Obat-Obat Tertentu yang dipilih manual oleh apoteker pada PO.',
+                'description' => 'Surat pesanan Obat-Obat Tertentu berdasarkan klasifikasi master obat.',
             ],
         };
     }

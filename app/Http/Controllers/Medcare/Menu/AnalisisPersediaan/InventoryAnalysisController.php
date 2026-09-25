@@ -7,6 +7,7 @@ use App\Models\DistributorModel;
 use App\Models\MasterObatModel;
 use App\Services\Menu\AnalisisPersediaan\InventoryAnalysisService;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
+use App\Services\Menu\PembelianPenerimaan\SuratPesananOotService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Support\BranchAccess;
 use App\Support\TieredDiscount;
@@ -23,6 +24,7 @@ class InventoryAnalysisController extends Controller
     public function __construct(
         private readonly InventoryAnalysisService $analysis,
         private readonly PembelianService $purchases,
+        private readonly SuratPesananOotService $ootOrders,
         private readonly TransactionNotificationService $transactionNotifications,
     ) {}
 
@@ -114,11 +116,17 @@ class InventoryAnalysisController extends Controller
 
         $result = DB::transaction(function () use ($user, $branchId, $filters, $medicineIds, $purchaseItems) {
             // Serialisasi pembuatan dari saran yang sama agar klik berulang menghitung PO berjalan terbaru.
-            MasterObatModel::query()
+            $medicines = MasterObatModel::query()
+                ->with([
+                    'golongan',
+                    'mainGolongan.golongan',
+                    'subGolongan.mainGolongan.golongan',
+                ])
                 ->whereIn('id', $medicineIds)
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->get(['id']);
+                ->get()
+                ->keyBy('id');
 
             $freshAnalysis = $this->analysis->build($user, 'saran-pembelian', $filters);
             $suggestions = collect($freshAnalysis['rows'])
@@ -154,7 +162,7 @@ class InventoryAnalysisController extends Controller
             );
 
             foreach ($suggestionsByDistributor as $distributorId => $distributorSuggestions) {
-                $details = $distributorSuggestions->map(function (array $row) use ($purchaseItems) {
+                $details = $distributorSuggestions->map(function (array $row) use ($purchaseItems, $medicines) {
                     $conversionFactor = max(1, (int) $row['purchase_conversion_factor']);
                     $purchaseQty = (float) ceil((float) $row['suggested_qty'] / $conversionFactor);
                     $item = $purchaseItems->get((int) $row['id'], []);
@@ -179,7 +187,9 @@ class InventoryAnalysisController extends Controller
                             $discount3,
                         ),
                         'satuan_konversi' => (int) $row['purchase_conversion_id'],
-                        'is_oot' => false,
+                        'is_oot' => $this->ootOrders->isOotDrug(
+                            $medicines->get((int) $row['id'])
+                        ),
                     ];
                 })->values();
                 $total = round($details->sum('subtotal'), 2);
@@ -192,7 +202,7 @@ class InventoryAnalysisController extends Controller
                     'status' => 'waiting_approval',
                     'catatan' => 'Dibuat dari Saran Pembelian periode '.$period
                         .' (target '.$filters['cover_days'].' hari, lead time '.$filters['lead_days'].' hari). '
-                        .'Tinjau satuan, jumlah, harga, dan penandaan OOT sebelum approval.',
+                        .'Tinjau satuan, jumlah, harga, dan klasifikasi obat sebelum approval.',
                     'created_by' => $user->id,
                     'approved_by' => null,
                 ]);

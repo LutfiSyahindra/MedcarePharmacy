@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian\PembelianController;
 use App\Models\ApotekProfile;
 use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -15,36 +15,23 @@ use App\Models\SatuansModel;
 use App\Models\SediaanModel;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananOotService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Request;
-use ReflectionMethod;
 use Tests\TestCase;
 
 class SuratPesananOotTest extends TestCase
 {
-    public function test_purchase_detail_mapping_keeps_manual_oot_selection_aligned_per_item(): void
+    public function test_oot_classification_is_derived_from_the_medicine_master(): void
     {
-        $request = Request::create('/purchase-orders', 'POST', [
-            'obat_id' => [11, 22],
-            'qty' => [2, 3],
-            'harga_estimasi' => [10000, 20000],
-            'diskon_1' => [0, 0],
-            'diskon_2' => [0, 0],
-            'diskon_3' => [0, 0],
-            'satuan_id' => [101, 202],
-            'is_oot' => [1, 0],
-        ]);
-        $method = new ReflectionMethod(PembelianController::class, 'purchaseDetailRows');
-        $method->setAccessible(true);
+        $service = app(SuratPesananOotService::class);
+        $tablet = new SatuansModel(['nama' => 'Tablet']);
+        $ootMedicine = $this->medicine('Dextromethorphan 15 mg', 'Box 10 strip', $tablet, true);
+        $regularMedicine = $this->medicine('Paracetamol 500 mg', 'Box 10 strip', $tablet);
 
-        $rows = $method->invoke(app(PembelianController::class), $request);
-
-        $this->assertTrue($rows[0]['is_oot']);
-        $this->assertFalse($rows[1]['is_oot']);
-        $this->assertSame(11, $rows[0]['obat_id']);
-        $this->assertSame(22, $rows[1]['obat_id']);
+        $this->assertTrue($service->isOotDrug($ootMedicine));
+        $this->assertFalse($service->isOotDrug($regularMedicine));
+        $this->assertSame('Main Golongan: OOT Keras', $service->matchedClassification($ootMedicine));
     }
 
-    public function test_oot_items_follow_the_pharmacist_selection_instead_of_medicine_classification(): void
+    public function test_oot_items_follow_medicine_classification(): void
     {
         $service = app(SuratPesananOotService::class);
         $purchaseOrder = $this->purchaseOrderForView();
@@ -54,7 +41,7 @@ class SuratPesananOotTest extends TestCase
         $this->assertCount(1, $ootDetails);
         $this->assertSame('Dextromethorphan 15 mg', $ootDetails->first()->obat->nama_obat);
         $this->assertTrue($ootDetails->first()->is_oot);
-        $this->assertSame('Ditentukan manual oleh apoteker pada PO', $ootDetails->first()->oot_classification);
+        $this->assertSame('Main Golongan: OOT Keras', $ootDetails->first()->oot_classification);
         $this->assertSame('PO-OOT-001/OOT', $purchaseOrder->oot_document_number);
     }
 
@@ -113,7 +100,7 @@ class SuratPesananOotTest extends TestCase
         $conversion = new KonversiSatuanModel;
         $conversion->setRelation('satuan', $tablet);
 
-        $ootMedicine = $this->medicine('Dextromethorphan 15 mg', 'Box 10 strip', $tablet);
+        $ootMedicine = $this->medicine('Dextromethorphan 15 mg', 'Box 10 strip', $tablet, true);
         $regularMedicine = $this->medicine('Paracetamol 500 mg', 'Box 10 strip', $tablet);
 
         $selectedDetail = (new PembelianDetailModel)->forceFill([
@@ -122,7 +109,7 @@ class SuratPesananOotTest extends TestCase
             'diskon_1' => 7.5,
             'diskon_2' => 2,
             'diskon_3' => 0,
-            'is_oot' => true,
+            'is_oot' => false,
         ]);
         $selectedDetail->setRelation('obat', $ootMedicine);
         $selectedDetail->setRelation('satuanKonversi', $conversion);
@@ -146,15 +133,27 @@ class SuratPesananOotTest extends TestCase
         return $purchaseOrder;
     }
 
-    private function medicine(string $name, string $packaging, SatuansModel $unit): MasterObatModel
-    {
+    private function medicine(
+        string $name,
+        string $packaging,
+        SatuansModel $unit,
+        bool $isOot = false,
+    ): MasterObatModel {
         $medicine = (new MasterObatModel)->forceFill([
             'nama_obat' => $name,
             'komposisi' => $name,
             'kemasan' => $packaging,
         ]);
-        $medicine->setRelation('golongan', new GolonganModel(['kode' => 'OBK', 'nama' => 'Obat Keras']));
-        $medicine->setRelation('mainGolongan', null);
+        $classification = new GolonganModel(['kode' => 'OBK', 'nama' => 'Obat Keras']);
+        $mainClassification = null;
+
+        if ($isOot) {
+            $mainClassification = new MainGolonganModel(['kode' => 'OTK', 'nama' => 'OOT Keras']);
+            $mainClassification->setRelation('golongan', $classification);
+        }
+
+        $medicine->setRelation('golongan', $classification);
+        $medicine->setRelation('mainGolongan', $mainClassification);
         $medicine->setRelation('subGolongan', null);
         $medicine->setRelation('sediaan', new SediaanModel(['nama' => 'Tablet']));
         $medicine->setRelation('satuan', $unit);

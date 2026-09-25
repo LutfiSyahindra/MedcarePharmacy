@@ -35,12 +35,11 @@
         function detailItemTemplate(options = {}) {
             let selectClass = options.selectClass ? ` ${options.selectClass}` : '';
             let satuanAttr = options.satuanTerpilih ? ` data-satuan-terpilih="${options.satuanTerpilih}"` : '';
-            let isOot = options.isOot === true || Number(options.isOot) === 1;
             let loadingOption = options.loadingOption ?
                 `<option value="${options.obatId || ''}">Loading...</option>` : '';
 
             return `
-                <div class="detail-item purchase-detail-card${isOot ? ' is-oot' : ''}"${satuanAttr}>
+                <div class="detail-item purchase-detail-card"${satuanAttr}>
                     <div class="purchase-detail-card-head">
                         <div>
                             <span class="purchase-detail-number">1</span>
@@ -95,18 +94,6 @@
                         <div class="col-lg-2 col-md-4">
                             <label class="form-label">Diskon 3 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_3[]" min="0" max="100" step="0.01" value="${options.diskon3 ?? 0}">
-                        </div>
-
-                        <div class="col-lg-3 col-md-6">
-                            <label class="form-label">Surat Pesanan Khusus</label>
-                            <div class="purchase-oot-option">
-                                <input type="hidden" class="oot-value" name="is_oot[]" value="${isOot ? 1 : 0}">
-                                <div class="form-check form-switch mb-0">
-                                    <input type="checkbox" class="form-check-input oot-toggle" ${isOot ? 'checked' : ''}>
-                                    <label class="form-check-label">Tandai sebagai OOT</label>
-                                </div>
-                                <small>Jika salah satu item dipilih, PO hanya menghasilkan Surat Pesanan OOT.</small>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -179,7 +166,7 @@
                 .prop('disabled', true)
                 .removeClass('btn-outline-info btn-outline-primary btn-outline-warning btn-outline-success btn-outline-dark')
                 .addClass('btn-outline-danger')
-                .attr('title', 'Surat pesanan mengikuti golongan obat; penandaan OOT memiliki prioritas untuk seluruh PO')
+                .attr('title', 'Surat pesanan mengikuti klasifikasi obat; OOT memiliki prioritas untuk seluruh PO')
                 .find('span').text('Cetak Surat Pesanan');
         });
 
@@ -230,17 +217,6 @@
                 refreshDetailNumbers();
                 hitungTotal();
             }
-        });
-
-        $(document).on('change', '.oot-toggle', function() {
-            const row = $(this).closest('.detail-item');
-            row.find('.oot-value').val(this.checked ? 1 : 0);
-            row.toggleClass('is-oot', this.checked);
-        });
-
-        $(document).on('click', '.purchase-oot-option .form-check-label', function() {
-            const toggle = $(this).siblings('.oot-toggle');
-            toggle.prop('checked', !toggle.prop('checked')).trigger('change');
         });
 
         function normalizedDiscount(value) {
@@ -1184,7 +1160,6 @@
                             diskon2: item.diskon_2,
                             diskon3: item.diskon_3,
                             subtotal: item.subtotal,
-                            isOot: item.is_oot,
                             selectClass: 'obatSelect',
                             loadingOption: true
                         });
@@ -1332,7 +1307,7 @@
                             ? `<span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
                             : '';
                         const ootBadge = item.is_oot
-                            ? `<span class="badge bg-success bg-opacity-10 text-success ms-2" title="Ditentukan manual oleh apoteker pada PO">OOT</span>`
+                            ? `<span class="badge bg-success bg-opacity-10 text-success ms-2" title="${escapeHtml(item.oot_classification ?? 'Klasifikasi OOT dari master obat')}">OOT</span>`
                             : '';
 
                         $('#detailObatTable tbody').append(`

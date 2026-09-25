@@ -595,7 +595,7 @@
                 await loadData(true);
                 const orderNumbers = (result.orders || []).map(order => order.no_po).join(', ');
                 const successText = `${result.message}${orderNumbers ? ` Nomor PO: ${orderNumbers}.` : ''} `
-                    + 'Tinjau satuan, jumlah, harga, dan penandaan OOT sebelum approval.';
+                    + 'Tinjau satuan, jumlah, harga, dan klasifikasi obat sebelum approval.';
 
                 if (window.Swal) {
                     const success = await Swal.fire({

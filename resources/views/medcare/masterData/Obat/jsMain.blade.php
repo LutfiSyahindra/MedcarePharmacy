@@ -240,7 +240,7 @@
                     data: 'category_id',
                     name: 'category_id',
                     render: function(data, type, row) {
-                        return MasterObatUI.miniStack(row.category_id, row.golongan_id);
+                        return MasterObatUI.miniStack(row.category_id, row.golongan_display);
                     }
                 },
                 {

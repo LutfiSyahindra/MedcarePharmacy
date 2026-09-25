@@ -7,6 +7,7 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
+use App\Models\MainGolonganModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -87,7 +88,7 @@ class SuratPesananRegulerTest extends TestCase
 
         $regular = $this->medicine('OBK', 'Obat Keras', 'Paracetamol 500 mg', $tablet);
         $narcotic = $this->medicine('NAR', 'Narkotika', 'Morphine 10 mg', $tablet);
-        $oot = $this->medicine('OBK', 'Obat Keras', 'Dextromethorphan 15 mg', $tablet);
+        $oot = $this->medicine('OBK', 'Obat Keras', 'Dextromethorphan 15 mg', $tablet, true);
 
         $purchaseOrder = (new PembelianModel)->forceFill([
             'no_po' => 'PO-REG-001',
@@ -113,14 +114,23 @@ class SuratPesananRegulerTest extends TestCase
         string $classification,
         string $name,
         SatuansModel $unit,
+        bool $isOot = false,
     ): MasterObatModel {
         $medicine = (new MasterObatModel)->forceFill([
             'nama_obat' => $name,
             'komposisi' => $name,
             'kemasan' => 'Box 10 strip',
         ]);
-        $medicine->setRelation('golongan', new GolonganModel(['kode' => $code, 'nama' => $classification]));
-        $medicine->setRelation('mainGolongan', null);
+        $medicineClassification = new GolonganModel(['kode' => $code, 'nama' => $classification]);
+        $mainClassification = null;
+
+        if ($isOot) {
+            $mainClassification = new MainGolonganModel(['kode' => 'OTK', 'nama' => 'OOT Keras']);
+            $mainClassification->setRelation('golongan', $medicineClassification);
+        }
+
+        $medicine->setRelation('golongan', $medicineClassification);
+        $medicine->setRelation('mainGolongan', $mainClassification);
         $medicine->setRelation('subGolongan', null);
         $medicine->setRelation('sediaan', new SediaanModel(['nama' => 'Tablet']));
         $medicine->setRelation('satuan', $unit);
