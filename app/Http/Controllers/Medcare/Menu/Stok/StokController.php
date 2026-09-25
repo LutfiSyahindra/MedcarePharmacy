@@ -13,13 +13,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
 class StokController extends Controller
 {
     private const DEFAULT_EXPIRED_WARNING_DAYS = 90;
+
+    private array $batchMarginPreviews = [];
 
     public function __construct(private readonly StockService $stockService) {}
 
@@ -39,49 +40,114 @@ class StokController extends Controller
     public function stockTable(Request $request)
     {
         $warningDays = $this->warningDays($request);
-        $today = Carbon::today();
-        $warningDate = Carbon::today()->addDays($warningDays);
+        $today = Carbon::today()->toDateString();
+        $warningDate = Carbon::today()->addDays($warningDays)->toDateString();
         $branchIds = BranchAccess::userBranchIds();
-        $rows = collect();
-
-        if (! empty($branchIds)) {
-            $rows = MasterObatModel::with([
-                'satuan',
-                'stokBatches' => function ($query) use ($branchIds) {
-                    $this->scopeStockBatchBranch($query, $branchIds);
-                    $query->orderBy('expired_date')->orderBy('no_batch');
-                },
+        $batchNumberExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "GROUP_CONCAT(CASE WHEN qty > 0 THEN no_batch END, ', ')"
+            : "GROUP_CONCAT(CASE WHEN qty > 0 THEN no_batch END SEPARATOR ', ')";
+        $batchTotals = DB::table('stok_batches')
+            ->whereIn('branch_id', $branchIds)
+            ->groupBy('obat_id')
+            ->select('obat_id')
+            ->selectRaw('COALESCE(SUM(CASE WHEN qty > 0 THEN qty ELSE 0 END), 0) as total_stok')
+            ->selectRaw('COALESCE(SUM(CASE WHEN qty > 0 THEN qty * harga_beli ELSE 0 END), 0) as nilai_stok')
+            ->selectRaw('SUM(CASE WHEN qty > 0 THEN 1 ELSE 0 END) as batch_count')
+            ->selectRaw('SUM(CASE WHEN qty > 0 AND expired_date IS NOT NULL AND expired_date < ? THEN 1 ELSE 0 END) as expired_count', [$today])
+            ->selectRaw('SUM(CASE WHEN qty > 0 AND expired_date IS NOT NULL AND expired_date >= ? AND expired_date <= ? THEN 1 ELSE 0 END) as near_expired_count', [$today, $warningDate])
+            ->selectRaw('MIN(CASE WHEN qty > 0 AND expired_date IS NOT NULL THEN expired_date ELSE NULL END) as nearest_expired_date')
+            ->selectRaw("{$batchNumberExpression} as batch_numbers");
+        $latestPrice = DB::table('stok_batches as latest_batches')
+            ->select('latest_batches.harga_beli')
+            ->whereColumn('latest_batches.obat_id', 'medicines.id')
+            ->whereIn('latest_batches.branch_id', $branchIds)
+            ->orderByRaw('COALESCE(latest_batches.last_movement_at, latest_batches.created_at) DESC')
+            ->orderByDesc('latest_batches.id')
+            ->limit(1);
+        $baseQuery = DB::table('master_obats as medicines')
+            ->leftJoin('satuans as units', 'units.id', '=', 'medicines.satuan_id')
+            ->leftJoinSub($batchTotals, 'batch_totals', fn ($join) => $join->on('batch_totals.obat_id', '=', 'medicines.id'))
+            ->when(empty($branchIds), fn ($query) => $query->whereRaw('1 = 0'))
+            ->select([
+                'medicines.id',
+                'medicines.kode_obat',
+                'medicines.nama_obat',
+                'medicines.stok_minimum',
+                DB::raw("COALESCE(units.nama, '-') as satuan"),
+                DB::raw("COALESCE(batch_totals.batch_numbers, '') as batch_numbers"),
+                DB::raw('COALESCE(batch_totals.total_stok, 0) as total_stok'),
+                DB::raw('COALESCE(batch_totals.nilai_stok, 0) as nilai_stok'),
+                DB::raw('COALESCE(batch_totals.batch_count, 0) as batch_count'),
+                DB::raw('COALESCE(batch_totals.expired_count, 0) as expired_count'),
+                DB::raw('COALESCE(batch_totals.near_expired_count, 0) as near_expired_count'),
+                'batch_totals.nearest_expired_date',
             ])
-                ->orderBy('nama_obat')
-                ->get()
-                ->map(fn ($obat) => $this->stockRow($obat, $today, $warningDate));
-        }
+            ->selectSub($latestPrice, 'harga_beli_terakhir')
+            ->selectRaw('CASE WHEN medicines.stok_minimum > 0 AND COALESCE(batch_totals.total_stok, 0) <= medicines.stok_minimum THEN 1 ELSE 0 END as is_low_stock')
+            ->selectRaw("CASE
+                WHEN COALESCE(batch_totals.total_stok, 0) <= 0 THEN 'kosong'
+                WHEN COALESCE(batch_totals.expired_count, 0) > 0 THEN 'expired'
+                WHEN COALESCE(batch_totals.near_expired_count, 0) > 0 THEN 'akan_expired'
+                WHEN medicines.stok_minimum > 0 AND COALESCE(batch_totals.total_stok, 0) <= medicines.stok_minimum THEN 'menipis'
+                ELSE 'aman'
+            END as status");
+        $labeledQuery = DB::query()
+            ->fromSub($baseQuery, 'stock_base')
+            ->select('stock_base.*')
+            ->selectRaw("CASE stock_base.status
+                WHEN 'kosong' THEN 'Stok Kosong'
+                WHEN 'menipis' THEN 'Stok Menipis'
+                WHEN 'expired' THEN 'Expired'
+                WHEN 'akan_expired' THEN 'Akan Expired'
+                ELSE 'Aman'
+            END as status_label");
+        $rows = DB::query()->fromSub($labeledQuery, 'stock_rows')->select('stock_rows.*');
 
         $search = $this->stockSearchTerm($request);
-        $totalAvailable = $rows->count();
+        $totalAvailable = (clone $rows)->count();
 
         if ($search !== '') {
-            $rows = $this->filterStockRows($rows, $search);
+            foreach (preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) as $term) {
+                $rows->where(function ($query) use ($term) {
+                    $like = '%'.$term.'%';
+                    $query->where('kode_obat', 'like', $like)
+                        ->orWhere('nama_obat', 'like', $like)
+                        ->orWhere('satuan', 'like', $like)
+                        ->orWhere('batch_numbers', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhere('status_label', 'like', $like);
+                });
+            }
         }
 
-        $totalSearchMatched = $rows->count();
-        $statusCounts = $this->stockStatusCounts($rows);
+        $searchSummary = $this->stockQuerySummary($rows);
+        $totalSearchMatched = (int) ($searchSummary->total_item ?? 0);
+        $statusCounts = [
+            'all' => $totalSearchMatched,
+            'aman' => (int) ($searchSummary->status_aman ?? 0),
+            'menipis' => (int) ($searchSummary->status_menipis ?? 0),
+            'kosong' => (int) ($searchSummary->status_kosong ?? 0),
+            'expired' => (int) ($searchSummary->status_expired ?? 0),
+            'akan_expired' => (int) ($searchSummary->status_akan_expired ?? 0),
+        ];
         $alertStatus = $this->stockStatusFilter($request);
 
         if ($alertStatus !== '') {
-            $rows = $rows->where('status', $alertStatus)->values();
+            $rows->where('status', $alertStatus);
         }
 
+        $filteredSummary = $alertStatus === '' ? $searchSummary : $this->stockQuerySummary($rows);
+
         $summary = [
-            'total_item' => $rows->count(),
+            'total_item' => (int) ($filteredSummary->total_item ?? 0),
             'total_available' => $totalAvailable,
             'total_search_matched' => $totalSearchMatched,
-            'total_stok' => $rows->sum('total_stok'),
-            'nilai_stok' => $rows->sum('nilai_stok'),
-            'stok_menipis' => $rows->where('is_low_stock', true)->count(),
-            'expired' => $rows->where('expired_count', '>', 0)->count(),
-            'akan_expired' => $rows->where('near_expired_count', '>', 0)->count(),
-            'stok_kosong' => $rows->where('total_stok', '<=', 0)->count(),
+            'total_stok' => (float) ($filteredSummary->total_stok ?? 0),
+            'nilai_stok' => (float) ($filteredSummary->nilai_stok ?? 0),
+            'stok_menipis' => (int) ($filteredSummary->stok_menipis ?? 0),
+            'expired' => (int) ($filteredSummary->expired ?? 0),
+            'akan_expired' => (int) ($filteredSummary->akan_expired ?? 0),
+            'stok_kosong' => (int) ($filteredSummary->stok_kosong ?? 0),
             'status_counts' => $statusCounts,
             'active_search' => $search,
             'active_status' => $alertStatus,
@@ -89,11 +155,12 @@ class StokController extends Controller
             'expired_warning_days' => $warningDays,
         ];
 
-        return DataTables::of($rows)
+        return DataTables::of($rows->orderBy('nama_obat'))
             ->addIndexColumn()
+            ->editColumn('harga_beli_terakhir', fn ($row) => (float) ($row->harga_beli_terakhir ?? 0))
             ->addColumn('actions', function ($row) {
-                $batchButton = '<button type="button" class="btn btn-sm btn-info" onclick="filterBatchObat('.$row['id'].')"><i class="mdi mdi-package-variant-closed"></i></button>';
-                $cardButton = '<a class="btn btn-sm btn-primary" href="'.route('kartuStok.kartuStok', ['obat_id' => $row['id']]).'"><i class="mdi mdi-card-bulleted-outline"></i></a>';
+                $batchButton = '<button type="button" class="btn btn-sm btn-info" onclick="filterBatchObat('.$row->id.')"><i class="mdi mdi-package-variant-closed"></i></button>';
+                $cardButton = '<a class="btn btn-sm btn-primary" href="'.route('kartuStok.kartuStok', ['obat_id' => $row->id]).'"><i class="mdi mdi-card-bulleted-outline"></i></a>';
 
                 return $batchButton.' '.$cardButton;
             })
@@ -107,7 +174,7 @@ class StokController extends Controller
         $warningDays = $this->warningDays($request);
         $today = Carbon::today();
         $warningDate = Carbon::today()->addDays($warningDays);
-        $query = StokBatchModel::with(['obat.satuan', 'obat.golongan'])
+        $query = StokBatchModel::with(['obat.satuan', 'obat.golongan', 'obat.mainGolongan', 'obat.subGolongan'])
             ->where('qty', '>', 0)
             ->orderBy('expired_date')
             ->orderBy('no_batch');
@@ -118,52 +185,60 @@ class StokController extends Controller
             $query->where('obat_id', $request->obat_id);
         }
 
-        $rows = $query->get()
-            ->map(function ($batch) use ($today, $warningDate) {
-                $status = $this->batchStatus($batch, $today, $warningDate);
-                $marginPrice = $this->stockService->batchSellingPriceMarginPreview($batch);
+        $this->applyBatchExpiryFilter($query, (string) $request->input('expiry_status'), $today, $warningDate);
 
-                return [
-                    'id' => $batch->id,
-                    'obat_id' => $batch->obat_id,
-                    'kode_obat' => $batch->obat->kode_obat ?? '-',
-                    'nama_obat' => $batch->obat->nama_obat ?? '-',
-                    'satuan' => $batch->obat->satuan->nama ?? '-',
-                    'no_batch' => $batch->no_batch,
-                    'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
-                    'qty' => (float) $batch->qty,
-                    'harga_beli' => (float) $batch->harga_beli,
-                    'harga_jual' => (float) $batch->harga_jual,
-                    'harga_jual_margin' => (float) $marginPrice['harga_jual'],
-                    'margin_harga_beli_dasar' => (float) $marginPrice['harga_beli_dasar'],
-                    'margin_harga_beli_include_ppn' => (float) $marginPrice['harga_beli_include_ppn'],
-                    'margin_faktor_jual' => (float) $marginPrice['faktor_jual'],
-                    'margin_ppn' => (float) $marginPrice['ppn'],
-                    'margin_has_margin' => (bool) $marginPrice['has_margin'],
-                    'margin_reference' => $marginPrice['margin_reference'],
-                    'diskon' => (float) ($batch->diskon ?? 0),
-                    'ppn' => (float) ($batch->ppn ?? 0),
-                    'nilai_stok' => (float) $batch->qty * (float) $batch->harga_beli,
-                    'status' => $status,
-                    'status_label' => $this->statusLabel($status),
-                    'last_movement_at' => optional($batch->last_movement_at)->format('Y-m-d H:i'),
-                ];
-            });
-
-        if ($request->filled('expiry_status')) {
-            $rows = $rows->where('status', $request->expiry_status)->values();
-        }
+        $batchSummary = (clone $query)
+            ->reorder()
+            ->selectRaw('COUNT(*) as total_batch')
+            ->selectRaw('COALESCE(SUM(qty), 0) as total_stok')
+            ->selectRaw('COALESCE(SUM(qty * harga_beli), 0) as nilai_stok')
+            ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date < ? THEN 1 ELSE 0 END) as expired', [$today->toDateString()])
+            ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date >= ? AND expired_date <= ? THEN 1 ELSE 0 END) as akan_expired', [$today->toDateString(), $warningDate->toDateString()])
+            ->first();
 
         $summary = [
-            'total_batch' => $rows->count(),
-            'total_stok' => $rows->sum('qty'),
-            'nilai_stok' => $rows->sum('nilai_stok'),
-            'expired' => $rows->where('status', 'expired')->count(),
-            'akan_expired' => $rows->where('status', 'akan_expired')->count(),
+            'total_batch' => (int) ($batchSummary->total_batch ?? 0),
+            'total_stok' => (float) ($batchSummary->total_stok ?? 0),
+            'nilai_stok' => (float) ($batchSummary->nilai_stok ?? 0),
+            'expired' => (int) ($batchSummary->expired ?? 0),
+            'akan_expired' => (int) ($batchSummary->akan_expired ?? 0),
         ];
 
-        return DataTables::of($rows)
+        return DataTables::eloquent($query)
             ->addIndexColumn()
+            ->filter(function ($query) use ($request) {
+                $keyword = trim((string) $request->input('search.value', ''));
+
+                if ($keyword !== '') {
+                    $query->where(function ($query) use ($keyword) {
+                        $query->where('no_batch', 'like', '%'.$keyword.'%')
+                            ->orWhereHas('obat', fn ($obat) => $obat
+                                ->where('kode_obat', 'like', '%'.$keyword.'%')
+                                ->orWhere('nama_obat', 'like', '%'.$keyword.'%'));
+                    });
+                }
+            })
+            ->addColumn('kode_obat', fn (StokBatchModel $batch) => $batch->obat->kode_obat ?? '-')
+            ->addColumn('nama_obat', fn (StokBatchModel $batch) => $batch->obat->nama_obat ?? '-')
+            ->addColumn('satuan', fn (StokBatchModel $batch) => $batch->obat->satuan->nama ?? '-')
+            ->editColumn('expired_date', fn (StokBatchModel $batch) => optional($batch->expired_date)->format('Y-m-d'))
+            ->editColumn('qty', fn (StokBatchModel $batch) => (float) $batch->qty)
+            ->editColumn('harga_beli', fn (StokBatchModel $batch) => (float) $batch->harga_beli)
+            ->editColumn('harga_jual', fn (StokBatchModel $batch) => (float) $batch->harga_jual)
+            ->editColumn('diskon', fn (StokBatchModel $batch) => (float) ($batch->diskon ?? 0))
+            ->editColumn('ppn', fn (StokBatchModel $batch) => (float) ($batch->ppn ?? 0))
+            ->addColumn('nilai_stok', fn (StokBatchModel $batch) => (float) $batch->qty * (float) $batch->harga_beli)
+            ->addColumn('status', fn (StokBatchModel $batch) => $this->batchStatus($batch, $today, $warningDate))
+            ->addColumn('status_label', fn (StokBatchModel $batch) => $this->statusLabel($this->batchStatus($batch, $today, $warningDate)))
+            ->editColumn('last_movement_at', fn (StokBatchModel $batch) => optional($batch->last_movement_at)->format('Y-m-d H:i'))
+            ->addColumn('harga_jual_margin', fn (StokBatchModel $batch) => (float) $this->batchMarginPreview($batch)['harga_jual'])
+            ->addColumn('margin_harga_beli_dasar', fn (StokBatchModel $batch) => (float) $this->batchMarginPreview($batch)['harga_beli_dasar'])
+            ->addColumn('margin_harga_beli_include_ppn', fn (StokBatchModel $batch) => (float) $this->batchMarginPreview($batch)['harga_beli_include_ppn'])
+            ->addColumn('margin_faktor_jual', fn (StokBatchModel $batch) => (float) $this->batchMarginPreview($batch)['faktor_jual'])
+            ->addColumn('margin_ppn', fn (StokBatchModel $batch) => (float) $this->batchMarginPreview($batch)['ppn'])
+            ->addColumn('margin_has_margin', fn (StokBatchModel $batch) => (bool) $this->batchMarginPreview($batch)['has_margin'])
+            ->addColumn('margin_reference', fn (StokBatchModel $batch) => $this->batchMarginPreview($batch)['margin_reference'])
+            ->removeColumn('obat')
             ->with(['summary' => $summary])
             ->make(true);
     }
@@ -180,90 +255,126 @@ class StokController extends Controller
             ->latest('created_at')
             ->latest('id');
 
-        $rows = $query->get()
-            ->map(function ($riwayat) {
-                $hargaLama = (float) $riwayat->harga_jual_lama;
-                $hargaBaru = (float) $riwayat->harga_jual_baru;
-
-                return [
-                    'id' => $riwayat->id,
-                    'created_at' => optional($riwayat->created_at)->format('Y-m-d H:i'),
-                    'obat_id' => $riwayat->obat_id,
-                    'stok_batch_id' => $riwayat->stok_batch_id,
-                    'kode_obat' => $riwayat->obat->kode_obat ?? '-',
-                    'nama_obat' => $riwayat->obat->nama_obat ?? '-',
-                    'satuan' => $riwayat->obat->satuan->nama ?? '-',
-                    'no_batch' => $riwayat->batch->no_batch ?? '-',
-                    'expired_date' => optional($riwayat->batch?->expired_date)->format('Y-m-d'),
-                    'harga_jual_lama' => $hargaLama,
-                    'harga_jual_baru' => $hargaBaru,
-                    'selisih' => $hargaBaru - $hargaLama,
-                    'alasan' => $riwayat->alasan ?? '-',
-                    'user' => $riwayat->changedBy->name ?? '-',
-                ];
-            });
-
-        $latestRow = $rows->first();
+        $historySummary = (clone $query)
+            ->reorder()
+            ->selectRaw('COUNT(*) as total_riwayat')
+            ->selectRaw('SUM(CASE WHEN harga_jual_baru > harga_jual_lama THEN 1 ELSE 0 END) as kenaikan')
+            ->selectRaw('SUM(CASE WHEN harga_jual_baru < harga_jual_lama THEN 1 ELSE 0 END) as penurunan')
+            ->selectRaw('MAX(created_at) as terakhir')
+            ->first();
 
         $summary = [
-            'total_riwayat' => $rows->count(),
-            'kenaikan' => $rows->where('selisih', '>', 0)->count(),
-            'penurunan' => $rows->where('selisih', '<', 0)->count(),
-            'terakhir' => $latestRow['created_at'] ?? null,
+            'total_riwayat' => (int) ($historySummary->total_riwayat ?? 0),
+            'kenaikan' => (int) ($historySummary->kenaikan ?? 0),
+            'penurunan' => (int) ($historySummary->penurunan ?? 0),
+            'terakhir' => $historySummary?->terakhir ? Carbon::parse($historySummary->terakhir)->format('Y-m-d H:i') : null,
         ];
 
-        return DataTables::of($rows)
+        return DataTables::eloquent($query)
             ->addIndexColumn()
+            ->filter(function ($query) use ($request) {
+                $keyword = trim((string) $request->input('search.value', ''));
+
+                if ($keyword !== '') {
+                    $query->where(function ($query) use ($keyword) {
+                        $query->where('alasan', 'like', '%'.$keyword.'%')
+                            ->orWhereHas('obat', fn ($obat) => $obat
+                                ->where('kode_obat', 'like', '%'.$keyword.'%')
+                                ->orWhere('nama_obat', 'like', '%'.$keyword.'%'))
+                            ->orWhereHas('batch', fn ($batch) => $batch->where('no_batch', 'like', '%'.$keyword.'%'))
+                            ->orWhereHas('changedBy', fn ($user) => $user->where('name', 'like', '%'.$keyword.'%'));
+                    });
+                }
+            })
+            ->editColumn('created_at', fn (RiwayatHargaModel $history) => optional($history->created_at)->format('Y-m-d H:i'))
+            ->addColumn('kode_obat', fn (RiwayatHargaModel $history) => $history->obat->kode_obat ?? '-')
+            ->addColumn('nama_obat', fn (RiwayatHargaModel $history) => $history->obat->nama_obat ?? '-')
+            ->addColumn('satuan', fn (RiwayatHargaModel $history) => $history->obat->satuan->nama ?? '-')
+            ->addColumn('no_batch', fn (RiwayatHargaModel $history) => $history->batch->no_batch ?? '-')
+            ->addColumn('expired_date', fn (RiwayatHargaModel $history) => optional($history->batch?->expired_date)->format('Y-m-d'))
+            ->editColumn('harga_jual_lama', fn (RiwayatHargaModel $history) => (float) $history->harga_jual_lama)
+            ->editColumn('harga_jual_baru', fn (RiwayatHargaModel $history) => (float) $history->harga_jual_baru)
+            ->addColumn('selisih', fn (RiwayatHargaModel $history) => (float) $history->harga_jual_baru - (float) $history->harga_jual_lama)
+            ->editColumn('alasan', fn (RiwayatHargaModel $history) => $history->alasan ?? '-')
+            ->addColumn('user', fn (RiwayatHargaModel $history) => $history->changedBy->name ?? '-')
+            ->removeColumn('obat')
+            ->removeColumn('batch')
+            ->removeColumn('changed_by')
             ->with(['summary' => $summary])
             ->make(true);
     }
 
     public function kartuTable(Request $request)
     {
+        $request->validate([
+            'obat_id' => ['nullable', 'integer'],
+            'stok_batch_id' => ['nullable', 'integer'],
+            'jenis_mutasi' => ['nullable', 'string', 'max:40'],
+            'date_start' => ['nullable', 'date_format:Y-m-d'],
+            'date_end' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
         $query = KartuStokModel::with(['obat.satuan', 'createdBy'])
             ->when($request->filled('obat_id'), fn ($query) => $query->where('obat_id', $request->obat_id))
             ->when($request->filled('stok_batch_id'), fn ($query) => $query->where('stok_batch_id', $request->stok_batch_id))
             ->when($request->filled('jenis_mutasi'), fn ($query) => $query->where('jenis_mutasi', $request->jenis_mutasi))
-            ->when($request->filled('date_start'), fn ($query) => $query->whereDate('tanggal_mutasi', '>=', $request->date_start))
-            ->when($request->filled('date_end'), fn ($query) => $query->whereDate('tanggal_mutasi', '<=', $request->date_end))
+            ->when($request->filled('date_start'), fn ($query) => $query->where('tanggal_mutasi', '>=', $request->date_start.' 00:00:00'))
+            ->when($request->filled('date_end'), fn ($query) => $query->where('tanggal_mutasi', '<', Carbon::createFromFormat('Y-m-d', $request->date_end)->addDay()->startOfDay()))
             ->latest('tanggal_mutasi')
             ->latest('id');
 
         $this->scopeKartuStokBranch($query);
 
-        $rows = $query->get()->map(function ($mutasi) {
-            return [
-                'id' => $mutasi->id,
-                'tanggal_mutasi' => optional($mutasi->tanggal_mutasi)->format('Y-m-d H:i'),
-                'obat_id' => $mutasi->obat_id,
-                'kode_obat' => $mutasi->obat->kode_obat ?? '-',
-                'nama_obat' => $mutasi->obat->nama_obat ?? '-',
-                'satuan' => $mutasi->obat->satuan->nama ?? '-',
-                'no_batch' => $mutasi->no_batch ?? '-',
-                'expired_date' => optional($mutasi->expired_date)->format('Y-m-d'),
-                'jenis_mutasi' => $mutasi->jenis_mutasi,
-                'jenis_label' => $this->mutationLabel($mutasi->jenis_mutasi),
-                'qty_masuk' => (float) $mutasi->qty_masuk,
-                'qty_keluar' => (float) $mutasi->qty_keluar,
-                'saldo_batch' => (float) $mutasi->saldo_batch,
-                'saldo_total' => (float) $mutasi->saldo_total,
-                'harga_beli' => (float) $mutasi->harga_beli,
-                'nomor_referensi' => $mutasi->nomor_referensi ?? '-',
-                'keterangan' => $mutasi->keterangan ?? '-',
-                'user' => $mutasi->createdBy->name ?? '-',
-            ];
-        });
+        $movementSummary = (clone $query)
+            ->reorder()
+            ->selectRaw('COUNT(*) as jumlah_mutasi')
+            ->selectRaw('COALESCE(SUM(qty_masuk), 0) as total_masuk')
+            ->selectRaw('COALESCE(SUM(qty_keluar), 0) as total_keluar')
+            ->selectRaw("COALESCE(SUM(CASE WHEN jenis_mutasi = 'expired' THEN qty_keluar ELSE 0 END), 0) as total_expired")
+            ->first();
 
         $summary = [
-            'jumlah_mutasi' => $rows->count(),
-            'total_masuk' => $rows->sum('qty_masuk'),
-            'total_keluar' => $rows->sum('qty_keluar'),
-            'total_expired' => $rows->where('jenis_mutasi', 'expired')->sum('qty_keluar'),
+            'jumlah_mutasi' => (int) ($movementSummary->jumlah_mutasi ?? 0),
+            'total_masuk' => (float) ($movementSummary->total_masuk ?? 0),
+            'total_keluar' => (float) ($movementSummary->total_keluar ?? 0),
+            'total_expired' => (float) ($movementSummary->total_expired ?? 0),
             'saldo_tercatat' => $this->saldoTercatat($request),
         ];
 
-        return DataTables::of($rows)
+        return DataTables::eloquent($query)
             ->addIndexColumn()
+            ->filter(function ($query) use ($request) {
+                $keyword = trim((string) $request->input('search.value', ''));
+
+                if ($keyword !== '') {
+                    $query->where(function ($query) use ($keyword) {
+                        $query->where('no_batch', 'like', '%'.$keyword.'%')
+                            ->orWhere('nomor_referensi', 'like', '%'.$keyword.'%')
+                            ->orWhere('keterangan', 'like', '%'.$keyword.'%')
+                            ->orWhere('jenis_mutasi', 'like', '%'.$keyword.'%')
+                            ->orWhereHas('obat', fn ($obat) => $obat
+                                ->where('kode_obat', 'like', '%'.$keyword.'%')
+                                ->orWhere('nama_obat', 'like', '%'.$keyword.'%'))
+                            ->orWhereHas('createdBy', fn ($user) => $user->where('name', 'like', '%'.$keyword.'%'));
+                    });
+                }
+            })
+            ->editColumn('tanggal_mutasi', fn (KartuStokModel $movement) => optional($movement->tanggal_mutasi)->format('Y-m-d H:i'))
+            ->addColumn('kode_obat', fn (KartuStokModel $movement) => $movement->obat->kode_obat ?? '-')
+            ->addColumn('nama_obat', fn (KartuStokModel $movement) => $movement->obat->nama_obat ?? '-')
+            ->addColumn('satuan', fn (KartuStokModel $movement) => $movement->obat->satuan->nama ?? '-')
+            ->editColumn('expired_date', fn (KartuStokModel $movement) => optional($movement->expired_date)->format('Y-m-d'))
+            ->addColumn('jenis_label', fn (KartuStokModel $movement) => $this->mutationLabel($movement->jenis_mutasi))
+            ->editColumn('qty_masuk', fn (KartuStokModel $movement) => (float) $movement->qty_masuk)
+            ->editColumn('qty_keluar', fn (KartuStokModel $movement) => (float) $movement->qty_keluar)
+            ->editColumn('saldo_batch', fn (KartuStokModel $movement) => (float) $movement->saldo_batch)
+            ->editColumn('saldo_total', fn (KartuStokModel $movement) => (float) $movement->saldo_total)
+            ->editColumn('harga_beli', fn (KartuStokModel $movement) => (float) $movement->harga_beli)
+            ->editColumn('nomor_referensi', fn (KartuStokModel $movement) => $movement->nomor_referensi ?? '-')
+            ->editColumn('keterangan', fn (KartuStokModel $movement) => $movement->keterangan ?? '-')
+            ->addColumn('user', fn (KartuStokModel $movement) => $movement->createdBy->name ?? '-')
+            ->removeColumn('obat')
+            ->removeColumn('created_by')
             ->with(['summary' => $summary])
             ->make(true);
     }
@@ -421,66 +532,41 @@ class StokController extends Controller
         ]);
     }
 
-    private function stockRow(MasterObatModel $obat, Carbon $today, Carbon $warningDate): array
+    private function stockQuerySummary($query): object
     {
-        $activeBatches = $obat->stokBatches->filter(fn ($batch) => (float) $batch->qty > 0)->values();
-        $totalBatchStock = (float) $activeBatches->sum(fn ($batch) => (float) $batch->qty);
-        $totalStock = $totalBatchStock;
-        $nearestBatch = $activeBatches->filter(fn ($batch) => $batch->expired_date)->sortBy('expired_date')->first();
-        $latestBatch = $obat->stokBatches
-            ->sortByDesc(fn ($batch) => $batch->last_movement_at ? $batch->last_movement_at->timestamp : $batch->id)
+        return DB::query()
+            ->fromSub((clone $query)->reorder(), 'stock_summary_rows')
+            ->selectRaw('COUNT(*) as total_item')
+            ->selectRaw('COALESCE(SUM(total_stok), 0) as total_stok')
+            ->selectRaw('COALESCE(SUM(nilai_stok), 0) as nilai_stok')
+            ->selectRaw('SUM(CASE WHEN is_low_stock = 1 THEN 1 ELSE 0 END) as stok_menipis')
+            ->selectRaw('SUM(CASE WHEN expired_count > 0 THEN 1 ELSE 0 END) as expired')
+            ->selectRaw('SUM(CASE WHEN near_expired_count > 0 THEN 1 ELSE 0 END) as akan_expired')
+            ->selectRaw('SUM(CASE WHEN total_stok <= 0 THEN 1 ELSE 0 END) as stok_kosong')
+            ->selectRaw("SUM(CASE WHEN status = 'aman' THEN 1 ELSE 0 END) as status_aman")
+            ->selectRaw("SUM(CASE WHEN status = 'menipis' THEN 1 ELSE 0 END) as status_menipis")
+            ->selectRaw("SUM(CASE WHEN status = 'kosong' THEN 1 ELSE 0 END) as status_kosong")
+            ->selectRaw("SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as status_expired")
+            ->selectRaw("SUM(CASE WHEN status = 'akan_expired' THEN 1 ELSE 0 END) as status_akan_expired")
             ->first();
-        $expiredCount = $activeBatches
-            ->filter(fn ($batch) => $batch->expired_date && $batch->expired_date->lt($today))
-            ->count();
-        $nearExpiredCount = $activeBatches
-            ->filter(fn ($batch) => $batch->expired_date && $batch->expired_date->gte($today) && $batch->expired_date->lte($warningDate))
-            ->count();
-        $minimumStock = (float) $obat->stok_minimum;
-        $isLowStock = $minimumStock > 0 && $totalStock <= $minimumStock;
-        $status = $this->stockStatus($totalStock, $isLowStock, $expiredCount, $nearExpiredCount);
-        $lastPrice = (float) ($latestBatch->harga_beli ?? $obat->harga_beli ?? 0);
-        $stockValue = (float) $activeBatches->sum(fn ($batch) => (float) $batch->qty * (float) $batch->harga_beli);
-
-        return [
-            'id' => $obat->id,
-            'kode_obat' => $obat->kode_obat,
-            'nama_obat' => $obat->nama_obat,
-            'satuan' => $obat->satuan->nama ?? '-',
-            'batch_numbers' => $activeBatches->pluck('no_batch')->filter()->implode(', '),
-            'total_stok' => $totalStock,
-            'stok_minimum' => $minimumStock,
-            'batch_count' => $activeBatches->count(),
-            'expired_count' => $expiredCount,
-            'near_expired_count' => $nearExpiredCount,
-            'nearest_expired_date' => $this->formatDateValue($nearestBatch?->expired_date),
-            'harga_beli_terakhir' => $lastPrice,
-            'nilai_stok' => $stockValue,
-            'is_low_stock' => $isLowStock,
-            'status' => $status,
-            'status_label' => $this->statusLabel($status),
-        ];
     }
 
-    private function stockStatus(float $totalStock, bool $isLowStock, int $expiredCount, int $nearExpiredCount): string
+    private function applyBatchExpiryFilter($query, string $status, Carbon $today, Carbon $warningDate): void
     {
-        if ($totalStock <= 0) {
-            return 'kosong';
-        }
+        match ($status) {
+            'expired' => $query->whereNotNull('expired_date')->where('expired_date', '<', $today->toDateString()),
+            'akan_expired' => $query->whereNotNull('expired_date')->whereBetween('expired_date', [$today->toDateString(), $warningDate->toDateString()]),
+            'aman' => $query->where(function ($query) use ($warningDate) {
+                $query->whereNull('expired_date')->orWhere('expired_date', '>', $warningDate->toDateString());
+            }),
+            default => null,
+        };
+    }
 
-        if ($expiredCount > 0) {
-            return 'expired';
-        }
-
-        if ($nearExpiredCount > 0) {
-            return 'akan_expired';
-        }
-
-        if ($isLowStock) {
-            return 'menipis';
-        }
-
-        return 'aman';
+    private function batchMarginPreview(StokBatchModel $batch): array
+    {
+        return $this->batchMarginPreviews[$batch->id]
+            ??= $this->stockService->batchSellingPriceMarginPreview($batch);
     }
 
     private function batchStatus(StokBatchModel $batch, Carbon $today, Carbon $warningDate): string
@@ -529,54 +615,6 @@ class StokController extends Controller
         return in_array($status, ['aman', 'menipis', 'kosong', 'expired', 'akan_expired'], true)
             ? $status
             : '';
-    }
-
-    private function filterStockRows($rows, string $search)
-    {
-        $terms = collect(preg_split('/\s+/', Str::lower($search), -1, PREG_SPLIT_NO_EMPTY));
-
-        if ($terms->isEmpty()) {
-            return $rows->values();
-        }
-
-        return $rows->filter(function (array $row) use ($terms) {
-            $haystack = Str::lower(implode(' ', array_filter([
-                $row['kode_obat'] ?? '',
-                $row['nama_obat'] ?? '',
-                $row['satuan'] ?? '',
-                $row['status'] ?? '',
-                $row['status_label'] ?? '',
-                $row['nearest_expired_date'] ?? '',
-                $row['batch_numbers'] ?? '',
-            ], fn ($value) => $value !== null && $value !== '')));
-
-            return $terms->every(fn ($term) => Str::contains($haystack, $term));
-        })->values();
-    }
-
-    private function stockStatusCounts($rows): array
-    {
-        return [
-            'all' => $rows->count(),
-            'aman' => $rows->where('status', 'aman')->count(),
-            'menipis' => $rows->where('status', 'menipis')->count(),
-            'kosong' => $rows->where('status', 'kosong')->count(),
-            'expired' => $rows->where('status', 'expired')->count(),
-            'akan_expired' => $rows->where('status', 'akan_expired')->count(),
-        ];
-    }
-
-    private function formatDateValue($date): ?string
-    {
-        if (! $date) {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($date)->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     private function mutationLabel(string $jenisMutasi): string

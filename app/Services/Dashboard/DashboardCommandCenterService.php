@@ -234,14 +234,8 @@ class DashboardCommandCenterService
             ->whereBetween('tanggal_transaksi', [$start, $end])
             ->selectRaw('DATE(tanggal_transaksi) as date_key, COALESCE(SUM(grand_total), 0) as total, COUNT(*) as transactions')
             ->groupByRaw('DATE(tanggal_transaksi)')
-            ->pluck('total', 'date_key');
-        $transactions = DB::table('penjualan_transactions')
-            ->whereIn('branch_id', $branchIds)
-            ->where('status', 'completed')
-            ->whereBetween('tanggal_transaksi', [$start, $end])
-            ->selectRaw('DATE(tanggal_transaksi) as date_key, COUNT(*) as total')
-            ->groupByRaw('DATE(tanggal_transaksi)')
-            ->pluck('total', 'date_key');
+            ->get()
+            ->keyBy('date_key');
         $returns = DB::table('retur_penjualan')
             ->whereIn('branch_id', $branchIds)
             ->where('status', 'posted')
@@ -258,8 +252,8 @@ class DashboardCommandCenterService
         while ($cursor->lte($end)) {
             $key = $cursor->toDateString();
             $labels[] = $key;
-            $values[] = round((float) ($sales[$key] ?? 0) - (float) ($returns[$key] ?? 0), 2);
-            $counts[] = (int) ($transactions[$key] ?? 0);
+            $values[] = round((float) ($sales[$key]->total ?? 0) - (float) ($returns[$key] ?? 0), 2);
+            $counts[] = (int) ($sales[$key]->transactions ?? 0);
             $cursor->addDay();
         }
 
@@ -268,41 +262,29 @@ class DashboardCommandCenterService
 
     private function paymentMix(array $branchIds, Carbon $start, Carbon $end): array
     {
-        $rows = DB::table('penjualan_payments as payments')
+        $paymentTotals = DB::table('penjualan_payments')
+            ->groupBy('penjualan_transaction_id', 'metode')
+            ->select('penjualan_transaction_id', 'metode')
+            ->selectRaw('SUM(amount) as total');
+        $rows = DB::query()
+            ->fromSub($paymentTotals, 'payments')
             ->join('penjualan_transactions as sales', 'sales.id', '=', 'payments.penjualan_transaction_id')
             ->whereIn('sales.branch_id', $branchIds)
             ->where('sales.status', 'completed')
             ->whereBetween('sales.tanggal_transaksi', [$start, $end])
             ->groupBy('payments.metode')
             ->select('payments.metode')
-            ->selectRaw('COALESCE(SUM(payments.amount), 0) as total')
+            ->selectRaw("COALESCE(SUM(payments.total - CASE WHEN payments.metode = 'tunai' THEN sales.kembalian ELSE 0 END), 0) as total")
             ->orderByDesc('total')
             ->get();
 
-        $cashChange = DB::table('penjualan_transactions as sales')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.tanggal_transaksi', [$start, $end])
-            ->whereExists(function ($query) {
-                $query->selectRaw('1')
-                    ->from('penjualan_payments as cash_payments')
-                    ->whereColumn('cash_payments.penjualan_transaction_id', 'sales.id')
-                    ->where('cash_payments.metode', 'tunai');
-            })
-            ->sum('sales.kembalian');
-
         $labels = PenjualanPosService::PAYMENT_METHODS;
 
-        return $rows->map(function ($row) use ($labels, $cashChange) {
-            $total = (float) $row->total;
-            if ($row->metode === 'tunai') {
-                $total = max(0, $total - (float) $cashChange);
-            }
-
+        return $rows->map(function ($row) use ($labels) {
             return [
                 'key' => $row->metode,
                 'label' => $labels[$row->metode] ?? ucfirst(str_replace('_', ' ', $row->metode)),
-                'value' => round($total, 2),
+                'value' => round(max(0, (float) $row->total), 2),
             ];
         })->values()->all();
     }

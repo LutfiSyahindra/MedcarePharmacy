@@ -15,11 +15,11 @@
     .medcare-tab-shell {
         position: fixed;
         top: var(--medcare-navbar-height, 78px);
-        right: auto;
+        right: 0;
         left: var(--medcare-tab-sidebar-width);
         z-index: 970;
         display: grid;
-        width: calc(100vw - var(--medcare-tab-sidebar-width));
+        width: auto;
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
         gap: .8rem;
@@ -33,9 +33,9 @@
             radial-gradient(circle at 90% 150%, rgba(6, 182, 212, .08), transparent 30%),
             rgba(255, 255, 255, .965);
         box-shadow: 0 14px 34px rgba(31, 57, 91, .075), inset 0 1px 0 rgba(255, 255, 255, .95);
-        -webkit-backdrop-filter: blur(18px) saturate(145%);
-        backdrop-filter: blur(18px) saturate(145%);
-        transition: left .24s ease, width .24s ease, padding .18s ease, opacity .18s ease,
+        -webkit-backdrop-filter: blur(10px) saturate(125%);
+        backdrop-filter: blur(10px) saturate(125%);
+        transition: left var(--medcare-sidebar-motion, .22s cubic-bezier(.22, 1, .36, 1)), padding .18s ease, opacity .18s ease,
             transform .18s ease, box-shadow .2s ease;
     }
 
@@ -58,12 +58,12 @@
     @media (min-width: 992px) {
         .sidebar-folded:not(.open-sidebar-folded) .medcare-tab-shell {
             left: var(--medcare-tab-sidebar-folded-width);
-            width: calc(100vw - var(--medcare-tab-sidebar-folded-width));
+            width: auto;
         }
 
         .sidebar-folded.open-sidebar-folded .medcare-tab-shell {
-            left: var(--medcare-tab-sidebar-width);
-            width: calc(100vw - var(--medcare-tab-sidebar-width));
+            left: var(--medcare-tab-sidebar-folded-width);
+            width: auto;
         }
     }
 

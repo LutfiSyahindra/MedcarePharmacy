@@ -45,9 +45,11 @@
     })
 
 
-    // Applying perfect-scrollbar 
-    if ($('.sidebar .sidebar-body').length) {
-      const sidebarBodyScroll = new PerfectScrollbar('.sidebar-body');
+    // Keep the application sidebar on the browser's native scrolling path.
+    // PerfectScrollbar observes and recalculates a very long menu on every
+    // interaction, which is noticeably more expensive on lower-end devices.
+    if ($('.sidebar .sidebar-body').length && !sidebar.hasClass('medcare-sidebar')) {
+      new PerfectScrollbar('.sidebar-body');
     }
     // commented beacuse of hang (scroll from  dropdown.html with small height)
     // if ($('.content-nav-wrapper').length) {
@@ -182,17 +184,31 @@
     activateNavigation($('.horizontal-menu .nav li a'));
 
 
-    //  open sidebar-folded when hover
-    $(".sidebar .sidebar-body").hover(
-    function () {
-      if (body.hasClass('sidebar-folded')){
-        body.addClass("open-sidebar-folded");
-      }
-    },
-    function () {
-      if (body.hasClass('sidebar-folded')){
-        body.removeClass("open-sidebar-folded");
-      }
+    // Open the folded sidebar only after clear pointer intent. The small delay
+    // prevents repeated full sidebar transitions while the cursor merely
+    // crosses the navigation edge.
+    var foldedHoverTimer = null;
+    var foldedHoverMedia = window.matchMedia('(min-width: 992px) and (hover: hover)');
+
+    function queueFoldedSidebar(open) {
+      window.clearTimeout(foldedHoverTimer);
+
+      foldedHoverTimer = window.setTimeout(function() {
+        if (!foldedHoverMedia.matches || !body.hasClass('sidebar-folded')) {
+          body.removeClass('open-sidebar-folded');
+          return;
+        }
+
+        window.requestAnimationFrame(function() {
+          body.toggleClass('open-sidebar-folded', open);
+        });
+      }, open ? 90 : 140);
+    }
+
+    sidebar.on('mouseenter', function() {
+      queueFoldedSidebar(true);
+    }).on('mouseleave', function() {
+      queueFoldedSidebar(false);
     });
 
 
@@ -240,12 +256,15 @@
     });
 
 
-    // Prevent body scrolling while sidebar scroll
-    $('.sidebar .sidebar-body').hover(function () {
-      $('body').addClass('overflow-hidden');
-    }, function () {
-      $('body').removeClass('overflow-hidden');
-    });
+    // Native overscroll containment handles the Medcare sidebar without
+    // removing the page scrollbar (which previously caused a visible jump).
+    if (!sidebar.hasClass('medcare-sidebar')) {
+      $('.sidebar .sidebar-body').hover(function () {
+        body.addClass('overflow-hidden');
+      }, function () {
+        body.removeClass('overflow-hidden');
+      });
+    }
    
 
   });

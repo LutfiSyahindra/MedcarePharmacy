@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\BranchModel;
 use App\Models\User;
 use App\Services\Settings\Auth\RoleSettingService;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,11 +18,10 @@ class BranchAccess
             return [];
         }
 
-        if (app(RoleSettingService::class)->userCanViewAllBranches($user)) {
-            return BranchModel::query()
-                ->pluck('id')
-                ->map(fn ($branchId) => (int) $branchId)
-                ->all();
+        $roleSettings = app(RoleSettingService::class);
+
+        if ($roleSettings->userCanViewAllBranches($user)) {
+            return $roleSettings->allBranchIds();
         }
 
         return self::assignedUserBranchIds($user);
@@ -37,7 +35,8 @@ class BranchAccess
             return [];
         }
 
-        $branchIds = $user->branches()->pluck('branches.id')->all();
+        $user->loadMissing('branches:id');
+        $branchIds = $user->branches->pluck('id')->all();
 
         if (! empty($user->branch_id)) {
             $branchIds[] = $user->branch_id;

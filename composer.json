@@ -61,6 +61,12 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "optimize": [
+            "@php artisan optimize --ansi"
+        ],
+        "optimize-clear": [
+            "@php artisan optimize:clear --ansi"
         ]
     },
     "extra": {

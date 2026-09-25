@@ -7,6 +7,21 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Medcare production deployment
+
+Build and warm the application caches after each release:
+
+```bash
+composer install --no-dev --classmap-authoritative
+npm ci
+npm run build
+php artisan migrate --force
+composer run optimize
+php artisan queue:work --sleep=1 --tries=3 --max-time=3600
+```
+
+Use `APP_ENV=production`, `APP_DEBUG=false`, and a production web server with PHP OPcache enabled. For multi-server or higher-traffic installations, use Redis for `CACHE_STORE`, `SESSION_DRIVER`, and `QUEUE_CONNECTION`. Run `composer run optimize-clear` before troubleshooting cached configuration or routes.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

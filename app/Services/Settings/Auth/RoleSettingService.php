@@ -17,6 +17,27 @@ class RoleSettingService
 
     public const ALL_BRANCHES = 'all_branches';
 
+    /** @var array<int, Collection> */
+    private array $userSettingsCache = [];
+
+    /** @var array<string, list<int>> */
+    private array $branchIdsCache = [];
+
+    public function allBranchIds(bool $activeOnly = false): array
+    {
+        $cacheKey = $activeOnly ? 'active' : 'all';
+
+        if (isset($this->branchIdsCache[$cacheKey])) {
+            return $this->branchIdsCache[$cacheKey];
+        }
+
+        return $this->branchIdsCache[$cacheKey] = BranchModel::query()
+            ->when($activeOnly, fn ($query) => $query->where('is_active', true))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     public function rolesWithSettings(bool $includeUserCount = true): Collection
     {
         $query = Role::query()->orderBy('name');
@@ -164,7 +185,7 @@ class RoleSettingService
         }
 
         if ($this->userCanApproveAllBranches($user)) {
-            return BranchModel::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+            return $this->allBranchIds();
         }
 
         return BranchAccess::assignedUserBranchIds($user);
@@ -244,10 +265,16 @@ class RoleSettingService
             return collect();
         }
 
-        $roles = $user->roles()->get();
+        if (isset($this->userSettingsCache[$user->id])) {
+            return $this->userSettingsCache[$user->id];
+        }
+
+        $user->loadMissing('roles');
+        $roles = $user->roles;
         $stored = $this->storedSettings($roles->pluck('id')->all());
 
-        return $roles->map(fn (Role $role) => $this->resolveSetting($role, $stored->get($role->id)));
+        return $this->userSettingsCache[$user->id] = $roles
+            ->map(fn (Role $role) => $this->resolveSetting($role, $stored->get($role->id)));
     }
 
     private function storedSettings(array $roleIds): Collection

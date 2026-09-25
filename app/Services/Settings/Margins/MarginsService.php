@@ -5,11 +5,12 @@ namespace App\Services\Settings\Margins;
 use App\Models\CategoryModel;
 use App\Models\GolonganModel;
 use App\Models\MainGolonganModel;
-use App\Models\MarginsModel;
 use App\Models\MarginSetting;
+use App\Models\MarginsModel;
 use App\Models\MasterObatModel;
 use App\Models\SubGolonganModel;
 use App\Repositories\Settings\Margins\MarginsRepository;
+use Illuminate\Support\Collection;
 
 class MarginsService
 {
@@ -27,39 +28,68 @@ class MarginsService
         'golongan' => 'Golongan',
     ];
 
+    private ?array $marginPriorityCache = null;
+
+    /** @var array<int, MarginsModel|null> */
+    private array $activeMarginCache = [];
+
+    private ?Collection $activeMargins = null;
+
     /**
      * Create a new class instance.
      */
-     protected $MarginsRepository;
+    protected $MarginsRepository;
 
     public function __construct(MarginsRepository $MarginsRepository)
     {
         $this->MarginsRepository = $MarginsRepository;
     }
+
     /**
      * Create a new class instance.
      */
     public function getMargins()
     {
         $dataMargins = $this->MarginsRepository->getMargins();
+
         return $dataMargins;
     }
 
     public function getMarginsTable()
     {
         $Margins = $this->MarginsRepository->getMargins();
+        $referenceModels = [
+            'kategori' => CategoryModel::class,
+            'golongan' => GolonganModel::class,
+            'main_golongan' => MainGolonganModel::class,
+            'sub_golongan' => SubGolonganModel::class,
+            'obat' => MasterObatModel::class,
+        ];
+        $references = collect();
+
+        foreach ($referenceModels as $level => $model) {
+            $referenceIds = $Margins->where('tingkat', $level)
+                ->pluck('reference_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($referenceIds->isNotEmpty()) {
+                $references->put($level, $model::query()->whereIn('id', $referenceIds)->get()->keyBy('id'));
+            }
+        }
 
         $dataMargins = [];
         foreach ($Margins as $r) {
-            $reference = $r->getReference();
+            $reference = $references->get($r->tingkat)?->get($r->reference_id);
             $persentase = ($r->faktor_jual - 1) * 100;
             $dataMargins[] = [
-                'id'            => $r->id,
-                'reference_id'  => $reference?->name ?? $reference?->nama ?? $reference?->nama_obat ?? '-',
-                'faktor_jual'   => $r->faktor_jual,
-                'persentase'    => number_format($persentase) . '%',
-                'tingkat'       => $r->tingkat,
-                'is_active'     => $r->is_active,
+                'id' => $r->id,
+                'reference_id' => $reference?->name ?? $reference?->nama ?? $reference?->nama_obat ?? '-',
+                'faktor_jual' => $r->faktor_jual,
+                'persentase' => number_format($persentase).'%',
+                'tingkat' => $r->tingkat,
+                'is_active' => $r->is_active,
             ];
         }
 
@@ -73,12 +103,16 @@ class MarginsService
 
     public function marginPriority(): array
     {
+        if ($this->marginPriorityCache !== null) {
+            return $this->marginPriorityCache;
+        }
+
         $setting = MarginSetting::firstOrCreate(
             ['key' => self::PRIORITY_KEY],
             ['value' => ['priority' => self::DEFAULT_PRIORITY]]
         );
 
-        return $this->sanitizePriority($setting->value['priority'] ?? []);
+        return $this->marginPriorityCache = $this->sanitizePriority($setting->value['priority'] ?? []);
     }
 
     public function updateMarginPriority(array $priority): array
@@ -90,30 +124,37 @@ class MarginsService
             ['value' => ['priority' => $priority]]
         );
 
+        $this->marginPriorityCache = $priority;
+        $this->activeMarginCache = [];
+
         return $priority;
     }
 
     public function activeMarginForObat(MasterObatModel $obat): ?MarginsModel
     {
-        foreach ($this->marginPriority() as $tingkat) {
-            $referenceId = $this->referenceIdForObat($obat, $tingkat);
+        $cacheKey = (int) $obat->getKey();
 
-            if (! $referenceId) {
-                continue;
-            }
+        if (array_key_exists($cacheKey, $this->activeMarginCache)) {
+            return $this->activeMarginCache[$cacheKey];
+        }
 
-            $margin = MarginsModel::where('tingkat', $tingkat)
-                ->where('reference_id', $referenceId)
-                ->where('is_active', true)
-                ->latest('id')
-                ->first();
+        $activeMargins = $this->activeMargins ??= MarginsModel::query()
+            ->where('is_active', true)
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (MarginsModel $margin) => $margin->tingkat.':'.$margin->reference_id);
+        $margin = null;
 
-            if ($margin) {
-                return $margin;
+        foreach ($this->marginPriority() as $level) {
+            $referenceId = $this->referenceIdForObat($obat, $level);
+
+            if ($referenceId && ($candidate = $activeMargins->get($level.':'.$referenceId)?->first())) {
+                $margin = $candidate;
+                break;
             }
         }
 
-        return null;
+        return $this->activeMarginCache[$cacheKey] = $margin;
     }
 
     public function marginReferenceLabelForObat(MasterObatModel $obat, ?MarginsModel $margin): ?string
@@ -122,26 +163,28 @@ class MarginsService
             return null;
         }
 
-        $reference = $margin->getReference();
-
         return match ($margin->tingkat) {
             'sub_golongan' => $obat->subGolongan->nama ?? null,
             'main_golongan' => $obat->mainGolongan->nama ?? null,
             'golongan' => $obat->golongan->nama ?? null,
-            default => $reference?->nama ?? $reference?->name ?? $reference?->nama_obat ?? null,
+            default => ($reference = $margin->getReference())
+                ? ($reference->nama ?? $reference->name ?? $reference->nama_obat ?? null)
+                : null,
         };
     }
-
 
     public function createMargins(array $data)
     {
         $dataMargins = $this->MarginsRepository->createMargins($data);
+        $this->forgetMarginLookupCache();
+
         return $dataMargins;
     }
 
     public function findByIdMargins($id)
     {
         $Margins = $this->MarginsRepository->findByIdMargins($id);
+
         return $Margins;
     }
 
@@ -150,12 +193,17 @@ class MarginsService
         $Margins = $this->MarginsRepository->findByIdMargins($id);
         unset($Margins->reference_text);
         $Margins->update($data);
+        $this->forgetMarginLookupCache();
+
         return $Margins;
     }
 
     public function deleteMargins($id)
     {
-        return $this->MarginsRepository->findByIdMargins($id)->delete();
+        $deleted = $this->MarginsRepository->findByIdMargins($id)->delete();
+        $this->forgetMarginLookupCache();
+
+        return $deleted;
     }
 
     public function getReferences($tingkat)
@@ -180,12 +228,16 @@ class MarginsService
                 $data = collect();
                 break;
         }
+
         return $data;
     }
 
     public function updateStatus($id, $status)
     {
-        return $this->MarginsRepository->updateStatus($id, $status);
+        $updated = $this->MarginsRepository->updateStatus($id, $status);
+        $this->forgetMarginLookupCache();
+
+        return $updated;
     }
 
     private function sanitizePriority(array $priority): array
@@ -219,4 +271,9 @@ class MarginsService
         return $referenceId ? (int) $referenceId : null;
     }
 
+    private function forgetMarginLookupCache(): void
+    {
+        $this->activeMargins = null;
+        $this->activeMarginCache = [];
+    }
 }
