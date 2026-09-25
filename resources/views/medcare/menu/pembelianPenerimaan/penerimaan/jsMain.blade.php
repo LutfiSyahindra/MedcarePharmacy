@@ -137,45 +137,11 @@
             input.val(formatRupiah(value)).data('raw-value', formatMoneyInputValue(value));
         }
 
-        function paymentStatusMeta(status) {
-            const meta = {
-                belum_dibayar: {
-                    className: 'is-unpaid',
-                    icon: 'mdi-clock-alert-outline',
-                    label: 'Belum Dibayar',
-                    hint: 'Belum ada pembayaran tercatat untuk faktur ini.'
-                },
-                sebagian: {
-                    className: 'is-partial',
-                    icon: 'mdi-progress-check',
-                    label: 'Sebagian',
-                    hint: 'Pembayaran sebagian tersimpan, sisa hutang masih aktif.'
-                },
-                lunas: {
-                    className: 'is-paid',
-                    icon: 'mdi-check-decagram-outline',
-                    label: 'Lunas',
-                    hint: 'Faktur sudah lunas dan tidak menyisakan hutang.'
-                }
-            };
-
-            return meta[status] || meta.belum_dibayar;
-        }
-
-        function updateInvoicePaymentUi(payableTotal, paid, debt, status) {
-            let paidPercent = payableTotal > 0 ? Math.min(100, (paid / payableTotal) * 100) : (status === 'lunas' ? 100 : 0);
-            let meta = paymentStatusMeta(status);
-
-            $('#invoicePaymentStatusBadge')
-                .removeClass('is-unpaid is-partial is-paid')
-                .addClass(meta.className)
-                .html(`<i class="mdi ${meta.icon}"></i> ${meta.label}`);
+        function updateInvoicePaymentUi(payableTotal, status) {
             $('#invoiceBoardTotal').text(formatRupiah(payableTotal));
-            $('#invoiceBoardPaid').text(formatRupiah(paid));
-            $('#invoiceBoardDebt').text(formatRupiah(debt));
-            $('#invoicePaidPercent').text(`${paidPercent.toFixed(0)}%`);
-            $('#invoicePaidMeter').css('width', `${paidPercent}%`);
-            $('#invoiceBoardHint').text(payableTotal > 0 || status === 'lunas' ? meta.hint : 'Isi item penerimaan untuk menghitung tagihan.');
+            $('#invoiceBoardHint').text(payableTotal > 0
+                ? 'Pembayaran dilakukan setelah stok diposting.'
+                : 'Nilai dihitung otomatis dari item yang diterima.');
 
             $('.receive-payment-action').removeClass('is-active');
             if (status === 'belum_dibayar') {
@@ -432,94 +398,30 @@
             step.find('small').text(text);
         }
 
-        function setStateClass(element, state) {
-            element.removeClass('is-active is-complete is-warning');
-            if (state) {
-                element.addClass(state);
-            }
-        }
-
-        function setStatusPill(selector, state, icon, label) {
-            let element = $(selector);
-            setStateClass(element, state);
-            element.html(`<i class="mdi ${icon}"></i> ${label}`);
-        }
-
-        function setRequirementState(selector, state, icon) {
-            let element = $(selector);
-            setStateClass(element, state);
-            element.find('i').attr('class', `mdi ${icon}`);
-        }
-
-        function updateReceiveGuidance(hasPo, itemStats, hasInvoice, hasValidItem) {
-            let title = 'Mulai dari PO approved';
-            let text = 'Pilih nomor PO untuk memuat supplier, sisa qty, dan detail obat.';
-            let icon = 'mdi-cursor-default-click-outline';
+        function updateReceiveGuidance(hasPo, itemStats, hasInvoice) {
             let headerIcon = 'mdi-file-clock-outline';
             let headerLabel = 'Draft sebelum posting stok';
-            let issueCount = 0;
 
             if (!hasPo) {
-                issueCount = 1;
-            } else if (itemStats.itemCount <= 0) {
-                title = 'Isi qty barang yang diterima';
-                text = 'Gunakan tombol Max per baris atau Terima Semua Sisa jika barang datang lengkap.';
-                icon = 'mdi-format-list-checks';
+                $('#receiveHeaderStatus').html(`<i class="mdi ${headerIcon}"></i> ${headerLabel}`);
+                return;
+            }
+
+            if (itemStats.itemCount <= 0) {
                 headerIcon = 'mdi-package-variant-closed';
                 headerLabel = 'Menunggu detail barang';
-                issueCount = 1;
             } else if (itemStats.invalidRows > 0) {
-                title = 'Lengkapi batch atau expired date';
-                text = `${itemStats.invalidRows} item sudah punya qty, tetapi belum lengkap untuk disimpan.`;
-                icon = 'mdi-alert-circle-outline';
                 headerIcon = 'mdi-alert-circle-outline';
                 headerLabel = 'Perlu cek detail barang';
-                issueCount = itemStats.invalidRows;
             } else if (!hasInvoice) {
-                title = 'Detail barang siap, lanjut faktur';
-                text = 'Isi nomor faktur dan tanggal faktur untuk membuka tombol simpan draft.';
-                icon = 'mdi-receipt-text-plus-outline';
                 headerIcon = 'mdi-receipt-text-outline';
                 headerLabel = 'Menunggu faktur';
-                issueCount = 1;
             } else {
-                title = 'Penerimaan siap disimpan';
-                text = 'PO, detail barang, batch, expired date, dan faktur sudah lengkap.';
-                icon = 'mdi-check-decagram-outline';
                 headerIcon = 'mdi-check-decagram-outline';
                 headerLabel = 'Siap simpan draft';
             }
 
-            $('#receiveGuidanceTitle').text(title);
-            $('#receiveGuidanceText').text(text);
-            $('#receiveGuidanceIcon').html(`<i class="mdi ${icon}"></i>`);
             $('#receiveHeaderStatus').html(`<i class="mdi ${headerIcon}"></i> ${headerLabel}`);
-
-            setStateClass($('#receiveProblemCount'), issueCount > 0 ? (itemStats.invalidRows > 0 ? 'is-warning' : 'is-active') : 'is-complete');
-            $('#receiveProblemCount').html(
-                `<i class="mdi ${issueCount > 0 ? 'mdi-information-outline' : 'mdi-check-circle-outline'}"></i> ${issueCount} catatan`
-            );
-
-            setRequirementState('#receiveRequirementPo', hasPo ? 'is-complete' : 'is-active',
-                hasPo ? 'mdi-check-circle-outline' : 'mdi-file-check-outline');
-            setRequirementState('#receiveRequirementItems',
-                hasValidItem ? 'is-complete' : (itemStats.invalidRows > 0 ? 'is-warning' : (hasPo ? 'is-active' : '')),
-                hasValidItem ? 'mdi-check-circle-outline' : (itemStats.invalidRows > 0 ? 'mdi-alert-circle-outline' : 'mdi-barcode-scan'));
-            setRequirementState('#receiveRequirementInvoice',
-                hasInvoice && hasValidItem ? 'is-complete' : (hasValidItem ? 'is-active' : ''),
-                hasInvoice && hasValidItem ? 'mdi-check-circle-outline' : 'mdi-receipt-text-outline');
-
-            setStatusPill('#receiveInfoSectionStatus', hasPo ? 'is-complete' : 'is-active',
-                hasPo ? 'mdi-check-circle-outline' : 'mdi-cursor-default-click-outline',
-                hasPo ? 'PO siap' : 'Pilih PO');
-            setStatusPill('#receiveDetailSectionStatus',
-                hasValidItem ? 'is-complete' : (itemStats.invalidRows > 0 ? 'is-warning' : (hasPo ? 'is-active' : '')),
-                hasValidItem ? 'mdi-check-circle-outline' : (itemStats.invalidRows > 0 ? 'mdi-alert-circle-outline' : 'mdi-timer-sand'),
-                hasValidItem ? `${itemStats.itemCount} item siap` : (itemStats.invalidRows > 0 ? `${itemStats.invalidRows} perlu cek` : (hasPo ? 'Isi qty' : 'Menunggu PO')));
-            setStatusPill('#receiveInvoiceSectionStatus',
-                hasInvoice && hasValidItem ? 'is-complete' : (hasValidItem ? 'is-active' : ''),
-                hasInvoice && hasValidItem ? 'mdi-check-circle-outline' : (hasValidItem ? 'mdi-receipt-text-plus-outline' : 'mdi-lock-clock-outline'),
-                hasInvoice && hasValidItem ? 'Faktur siap' : (hasValidItem ? 'Lengkapi faktur' : 'Terkunci'));
         }
 
         function invoiceLockMessage(hasPo, itemStats) {
@@ -585,8 +487,7 @@
                 'disabled',
                 !canUseCompensation || !$('#applySupplierCompensation').is(':checked')
             );
-            $('#receiveInvoicePrompt').toggleClass('d-none', !hasValidItem || hasInvoice);
-            updateReceiveGuidance(hasPo, itemStats, hasInvoice, hasValidItem);
+            updateReceiveGuidance(hasPo, itemStats, hasInvoice);
 
             $('#submitPenerimaanForm')
                 .toggleClass('btn-primary', hasValidItem && hasInvoice)
@@ -613,14 +514,14 @@
             $('#summaryItemPo, #summaryOutstandingQty, #summaryFilledQty').text('0');
             $('#summaryReceivePercent').text('0%');
             $('#summaryReceiveMeter').css('width', '0%');
-            $('#receiveModalSubtotal, #receiveModalDiscount, #receiveModalTax, #receiveGrandTotal').text(formatRupiah(0));
+            $('#receiveGrandTotal').text(formatRupiah(0));
             ['subtotal', 'diskon', 'pajak', 'biaya_lain', 'supplier_compensation_discount', 'total_faktur', 'jumlah_dibayar', 'sisa_hutang'].forEach(function(field) {
                 setMoneyInput(field, 0);
             });
             $('input[name="tanggal_faktur"]').val(moment().format('DD-MM-YYYY'));
             $('input[name="tanggal_jatuh_tempo"]').val('');
             $('select[name="status_pembayaran"]').val('belum_dibayar');
-            updateInvoicePaymentUi(0, 0, 0, 'belum_dibayar');
+            updateInvoicePaymentUi(0, 'belum_dibayar');
             $('#penerimaanModalLabel').text('Form Penerimaan Barang');
             $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Simpan Draft');
             form.find('.is-invalid').removeClass('is-invalid');
@@ -706,7 +607,6 @@
             $('#supplierCompensationDiscount').prop('disabled', true);
             setMoneyInput('supplier_compensation_discount', 0);
             $('#supplierCompensationAvailable, #supplierCompensationMax').text(formatRupiah(0));
-            $('#receiveModalCompensationDiscount').text(formatRupiah(0));
         }
 
         function supplierCompensationStatus(status) {
@@ -1026,39 +926,6 @@
             $('#receiveLiveValue').text(formatRupiah(stats.grandTotal || 0));
         }
 
-        function updateReceiveCockpit(stats, invoice, receivePercent) {
-            let hasPo = Boolean($('#purchase_order_id').val());
-            let poNumber = hasPo ? ($('#summaryNoPo').text() || '-') : '-';
-            let supplier = hasPo ? ($('#receive_supplier').val() || '-') : 'Pilih PO approved';
-            let rowCount = Number(stats.rowCount || 0);
-            let readyRows = Number(stats.readyRows || 0);
-            let invalidRows = Number(stats.invalidRows || 0);
-            let filledRows = Number(stats.itemCount || 0);
-            let qtyText = Number(stats.totalQty || 0).toLocaleString('id-ID');
-            let invoiceStatus = paymentStatusLabel(invoice.status);
-            let itemHint = 'Belum ada detail barang.';
-
-            if (rowCount > 0 && filledRows <= 0) {
-                itemHint = 'Isi qty pada barang yang diterima.';
-            } else if (invalidRows > 0) {
-                itemHint = `${invalidRows.toLocaleString('id-ID')} item perlu batch atau expired date.`;
-            } else if (filledRows > 0) {
-                itemHint = 'Detail barang sudah siap untuk faktur.';
-            }
-
-            $('#cockpitGrandTotal').text(formatRupiah(invoice.total || 0));
-            $('#cockpitSubtitle').text(hasPo
-                ? `${filledRows.toLocaleString('id-ID')} item diterima, total qty ${qtyText}.`
-                : 'Pilih PO approved untuk memulai penerimaan barang.');
-            $('#cockpitReceiveMeter').css('width', `${Math.max(0, Math.min(100, receivePercent || 0))}%`);
-            $('#cockpitPo').text(poNumber);
-            $('#cockpitSupplier').text(supplier);
-            $('#cockpitReadyItems').text(`${readyRows.toLocaleString('id-ID')}/${rowCount.toLocaleString('id-ID')}`);
-            $('#cockpitItemHint').text(itemHint);
-            $('#cockpitInvoiceStatus').text(invoiceStatus);
-            $('#cockpitDebt').text(`Sisa hutang ${formatRupiah(invoice.debt || 0)}`);
-        }
-
         function syncInvoiceTotals(stats) {
             let subtotal = Number(stats.totalSubtotal) || 0;
             let discount = Number(stats.totalDiscount) || 0;
@@ -1122,9 +989,8 @@
                 paidInput.data('raw-value', formatMoneyInputValue(paid));
             }
 
-            updateInvoicePaymentUi(payableTotal, paid, debt, paymentStatus);
+            updateInvoicePaymentUi(payableTotal, paymentStatus);
             $('#supplierCompensationMax').text(formatRupiah(maxCompensationDiscount));
-            $('#receiveModalCompensationDiscount').text(formatRupiah(compensationDiscount));
             $('#invoiceBoardFormula').text(compensationDiscount > 0
                 ? `${formatRupiah(grossTotal)} - ganti rugi ${formatRupiah(compensationDiscount)}`
                 : 'Sama dengan total asli faktur');
@@ -1146,12 +1012,8 @@
                 100) : 0;
 
             updateReceiveDetailSummary(stats);
-            updateReceiveCockpit(stats, invoice, receivePercent);
             $('#receiveModalItemCount').text(stats.itemCount.toLocaleString('id-ID'));
             $('#receiveModalQtyCount, #summaryFilledQty').text(stats.totalQty.toLocaleString('id-ID'));
-            $('#receiveModalSubtotal').text(formatRupiah(stats.totalSubtotal));
-            $('#receiveModalDiscount').text(formatRupiah(stats.totalDiscount));
-            $('#receiveModalTax').text(formatRupiah(stats.totalTax));
             $('#receiveGrandTotal').text(formatRupiah(invoice.total));
             $('#summaryReceivePercent').text(`${receivePercent.toFixed(0)}%`);
             $('#summaryReceiveMeter').css('width', `${receivePercent}%`);
@@ -1278,26 +1140,6 @@
         $('#clearAllQty').on('click', function() {
             $('.receive-detail-row .receive-qty').val(0);
             recalculateReceiveTotals();
-        });
-
-        $('#goToInvoiceSection').on('click', function() {
-            document.getElementById('receiveInvoiceSection')?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-            setTimeout(function() {
-                $('input[name="nomor_faktur"]').trigger('focus');
-            }, 250);
-        });
-
-        $('.receive-jump-link').on('click', function() {
-            let targetId = $(this).data('target');
-            if (!targetId) return;
-
-            document.getElementById(targetId)?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
         });
 
         $('#purchase_order_id').on('change', function() {

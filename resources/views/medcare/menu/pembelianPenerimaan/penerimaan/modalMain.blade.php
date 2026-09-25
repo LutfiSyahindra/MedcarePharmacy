@@ -7,7 +7,7 @@
                     <span class="modal-title-icon"><i class="mdi mdi-truck-check-outline"></i></span>
                     <div>
                         <h5 class="modal-title" id="penerimaanModalLabel">Form Penerimaan Barang</h5>
-                        <p class="modal-subtitle">Pilih PO approved, isi detail barang, lalu lengkapi faktur.</p>
+                        <p class="modal-subtitle">Catat barang yang diterima dari purchase order.</p>
                     </div>
                 </div>
                 <div class="purchase-modal-header-meta">
@@ -23,30 +23,6 @@
                 <form id="penerimaanForm">
                     @csrf
                     <input type="hidden" name="penerimaan_id" id="penerimaan_id">
-
-                    <div class="purchase-modal-overview" aria-label="Ringkasan proses penerimaan">
-                        <div class="purchase-overview-item">
-                            <span><i class="mdi mdi-shield-check-outline"></i></span>
-                            <div>
-                                <strong>PO Approved</strong>
-                                <small>Dropdown hanya memuat PO yang sudah disetujui.</small>
-                            </div>
-                        </div>
-                        <div class="purchase-overview-item">
-                            <span><i class="mdi mdi-barcode"></i></span>
-                            <div>
-                                <strong>Detail Barang</strong>
-                                <small>Qty, batch, expired, harga, dan PPN diisi; diskon mengikuti PO.</small>
-                            </div>
-                        </div>
-                        <div class="purchase-overview-item">
-                            <span><i class="mdi mdi-warehouse"></i></span>
-                            <div>
-                                <strong>Faktur</strong>
-                                <small>Nilai tagihan dihitung dari detail barang yang diterima.</small>
-                            </div>
-                        </div>
-                    </div>
 
                     <div class="receive-form-progress" aria-label="Progress kelengkapan form">
                         <div class="receive-progress-step is-active" id="receiveStepPo">
@@ -74,82 +50,6 @@
                         </div>
                     </div>
 
-                    <div class="receive-command-center" aria-live="polite">
-                        <div class="receive-command-status">
-                            <span class="receive-command-icon" id="receiveGuidanceIcon">
-                                <i class="mdi mdi-cursor-default-click-outline"></i>
-                            </span>
-                            <div>
-                                <strong id="receiveGuidanceTitle">Mulai dari PO approved</strong>
-                                <small id="receiveGuidanceText">Pilih nomor PO untuk memuat supplier, sisa qty, dan detail obat.</small>
-                            </div>
-                        </div>
-                        <div class="receive-requirements" aria-label="Checklist kelengkapan penerimaan">
-                            <button type="button" class="receive-requirement is-active receive-jump-link"
-                                id="receiveRequirementPo" data-target="receiveInfoSection">
-                                <i class="mdi mdi-file-check-outline"></i>
-                                <span>PO</span>
-                            </button>
-                            <button type="button" class="receive-requirement receive-jump-link"
-                                id="receiveRequirementItems" data-target="receiveDetailSection">
-                                <i class="mdi mdi-barcode-scan"></i>
-                                <span>Item</span>
-                            </button>
-                            <button type="button" class="receive-requirement receive-jump-link"
-                                id="receiveRequirementInvoice" data-target="receiveInvoiceSection">
-                                <i class="mdi mdi-receipt-text-outline"></i>
-                                <span>Faktur</span>
-                            </button>
-                        </div>
-                        <div class="receive-command-actions">
-                            <span class="receive-problem-pill" id="receiveProblemCount">
-                                <i class="mdi mdi-information-outline"></i>
-                                0 catatan
-                            </span>
-                            <button type="button" class="btn btn-light btn-sm receive-jump-link"
-                                data-target="receiveDetailSection">
-                                <i class="mdi mdi-format-list-checks"></i>
-                                Detail
-                            </button>
-                            <button type="button" class="btn btn-primary btn-sm receive-jump-link"
-                                data-target="receiveInvoiceSection">
-                                <i class="mdi mdi-receipt-text-plus-outline"></i>
-                                Faktur
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="receive-cockpit" aria-live="polite">
-                        <div class="receive-cockpit-main">
-                            <span class="receive-cockpit-eyebrow">
-                                <i class="mdi mdi-radar"></i>
-                                Live Receipt
-                            </span>
-                            <strong id="cockpitGrandTotal">Rp 0</strong>
-                            <small id="cockpitSubtitle">Pilih PO approved untuk memulai penerimaan barang.</small>
-                            <div class="receive-cockpit-meter" aria-label="Progress qty diterima">
-                                <span id="cockpitReceiveMeter"></span>
-                            </div>
-                        </div>
-                        <div class="receive-cockpit-grid">
-                            <div class="receive-cockpit-card">
-                                <span><i class="mdi mdi-file-document-check-outline"></i> PO</span>
-                                <strong id="cockpitPo">-</strong>
-                                <small id="cockpitSupplier">Pilih PO approved</small>
-                            </div>
-                            <div class="receive-cockpit-card">
-                                <span><i class="mdi mdi-package-variant-closed-check"></i> Item Siap</span>
-                                <strong id="cockpitReadyItems">0/0</strong>
-                                <small id="cockpitItemHint">Belum ada detail barang.</small>
-                            </div>
-                            <div class="receive-cockpit-card">
-                                <span><i class="mdi mdi-receipt-text-check-outline"></i> Faktur</span>
-                                <strong id="cockpitInvoiceStatus">Belum diisi</strong>
-                                <small id="cockpitDebt">Sisa hutang Rp 0</small>
-                            </div>
-                        </div>
-                    </div>
-
                     <section class="purchase-form-section receive-info-section" id="receiveInfoSection">
                         <div class="purchase-form-section-header">
                             <div class="purchase-form-section-title">
@@ -159,10 +59,6 @@
                                     <small>Nomor penerimaan, PO, supplier, surat jalan, dan tanggal transaksi.</small>
                                 </div>
                             </div>
-                            <span class="receive-section-status is-active" id="receiveInfoSectionStatus">
-                                <i class="mdi mdi-cursor-default-click-outline"></i>
-                                Pilih PO
-                            </span>
                         </div>
 
                         <div class="purchase-form-section-body">
@@ -185,12 +81,12 @@
                                     <label class="form-label">Supplier</label>
                                     <input type="text" class="form-control" id="receive_supplier" readonly>
                                 </div>
-                                <div class="col-lg-4 col-md-6">
+                                <div class="col-lg-3 col-md-6">
                                     <label class="form-label">Nomor Surat Jalan</label>
                                     <input type="text" class="form-control" name="nomor_surat_jalan"
                                         placeholder="Opsional">
                                 </div>
-                                <div class="col-lg-4 col-md-6">
+                                <div class="col-lg-3 col-md-6">
                                     <label class="form-label">Tanggal Penerimaan</label>
                                     <div class="input-group flatpickr" id="receive-date" data-wrap="true"
                                         data-click-opens="true">
@@ -201,10 +97,10 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-lg-6">
                                     <label class="form-label">Catatan</label>
-                                    <textarea class="form-control" name="catatan" rows="2"
-                                        placeholder="Catatan penerimaan, kondisi barang, atau instruksi khusus..."></textarea>
+                                    <textarea class="form-control" name="catatan" rows="1"
+                                        placeholder="Kondisi barang atau catatan tambahan (opsional)"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -264,23 +160,43 @@
                     <section class="purchase-form-section receive-po-summary d-none" id="receivePoSummary">
                         <div class="purchase-form-section-header">
                             <div class="purchase-form-section-title">
-                                <i class="mdi mdi-file-search-outline"></i>
+                                <i class="mdi mdi-file-check-outline"></i>
                                 <div>
                                     <strong>Ringkasan PO Terpilih</strong>
-                                    <small>Gunakan sisa qty sebagai batas penerimaan.</small>
+                                    <small class="receive-summary-reference">
+                                        <span id="summaryNoPo">-</span>
+                                        <i aria-hidden="true"></i>
+                                        <span id="summaryTanggalPo">-</span>
+                                    </small>
                                 </div>
+                            </div>
+                            <div class="receive-summary-progress" aria-label="Progress penerimaan">
+                                <span>Progress</span>
+                                <strong id="summaryReceivePercent">0%</strong>
                             </div>
                         </div>
                         <div class="purchase-form-section-body">
                             <div class="receive-summary-grid">
-                                <div><span>Nomor PO</span><strong id="summaryNoPo">-</strong></div>
-                                <div><span>Tanggal PO</span><strong id="summaryTanggalPo">-</strong></div>
-                                <div><span>Branch</span><strong id="summaryBranch">-</strong></div>
-                                <div><span>Total Estimasi</span><strong id="summaryTotalEstimasi">Rp 0</strong></div>
-                                <div><span>Total Item PO</span><strong id="summaryItemPo">0</strong></div>
-                                <div><span>Sisa Qty PO</span><strong id="summaryOutstandingQty">0</strong></div>
-                                <div><span>Qty Diisi</span><strong id="summaryFilledQty">0</strong></div>
-                                <div><span>Progress Terima</span><strong id="summaryReceivePercent">0%</strong></div>
+                                <div class="receive-summary-metric receive-summary-metric--branch">
+                                    <span class="receive-summary-label">Branch tujuan</span>
+                                    <strong id="summaryBranch">-</strong>
+                                </div>
+                                <div class="receive-summary-metric">
+                                    <span class="receive-summary-label">Total estimasi</span>
+                                    <strong id="summaryTotalEstimasi">Rp 0</strong>
+                                </div>
+                                <div class="receive-summary-metric">
+                                    <span class="receive-summary-label">Item PO</span>
+                                    <strong id="summaryItemPo">0</strong>
+                                </div>
+                                <div class="receive-summary-metric">
+                                    <span class="receive-summary-label">Diterima / sisa</span>
+                                    <strong class="receive-summary-quantity">
+                                        <span id="summaryFilledQty">0</span>
+                                        <span class="receive-summary-quantity-divider">/</span>
+                                        <span id="summaryOutstandingQty">0</span>
+                                    </strong>
+                                </div>
                             </div>
                             <div class="receive-progress-meter" aria-label="Progress qty diterima">
                                 <span id="summaryReceiveMeter"></span>
@@ -298,11 +214,7 @@
                                 </div>
                             </div>
                             <div class="receive-detail-actions">
-                                <span class="receive-section-status" id="receiveDetailSectionStatus">
-                                    <i class="mdi mdi-timer-sand"></i>
-                                    Menunggu PO
-                                </span>
-                                <span class="badge bg-primary bg-opacity-10 text-primary fw-semibold px-3 py-2">
+                                <span class="receive-item-count">
                                     <span id="receiveLineCount">0</span> item PO
                                 </span>
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="fillAllOutstanding">
@@ -359,16 +271,6 @@
                                     <tbody id="receiveDetailRows"></tbody>
                                 </table>
                             </div>
-                            <div class="receive-next-step d-none" id="receiveInvoicePrompt">
-                                <div>
-                                    <strong>Detail barang siap</strong>
-                                    <small>Total tagihan sudah terbentuk dari item yang diterima.</small>
-                                </div>
-                                <button type="button" class="btn btn-primary btn-sm" id="goToInvoiceSection">
-                                    <i class="mdi mdi-receipt-text-plus-outline"></i>
-                                    Isi Faktur
-                                </button>
-                            </div>
                         </div>
                     </section>
 
@@ -381,16 +283,6 @@
                                     <small>Tanggal faktur, nilai tagihan, status bayar, dan sisa hutang.</small>
                                 </div>
                             </div>
-                            <div class="receive-invoice-header-actions">
-                                <span class="receive-section-status" id="receiveInvoiceSectionStatus">
-                                    <i class="mdi mdi-lock-clock-outline"></i>
-                                    Terkunci
-                                </span>
-                                <span class="receive-invoice-status-pill is-unpaid" id="invoicePaymentStatusBadge">
-                                    <i class="mdi mdi-clock-alert-outline"></i>
-                                    Belum Dibayar
-                                </span>
-                            </div>
                         </div>
 
                         <div class="purchase-form-section-body">
@@ -401,34 +293,12 @@
 
                             <div class="receive-invoice-board">
                                 <div class="receive-invoice-main">
-                                    <span>Tagihan Setelah Ganti Rugi</span>
+                                    <span>Estimasi Tagihan</span>
                                     <strong id="invoiceBoardTotal">Rp 0</strong>
                                     <small id="invoiceBoardFormula">Subtotal - diskon + PPN + biaya lain</small>
                                 </div>
-                                <div class="receive-payment-summary">
-                                    <div>
-                                        <span>Dibayar</span>
-                                        <strong id="invoiceBoardPaid">Rp 0</strong>
-                                    </div>
-                                    <div>
-                                        <span>Sisa Hutang</span>
-                                        <strong id="invoiceBoardDebt">Rp 0</strong>
-                                    </div>
-                                    <div>
-                                        <span>Progress</span>
-                                        <strong id="invoicePaidPercent">0%</strong>
-                                    </div>
-                                </div>
-                                <div class="receive-payment-meter" aria-label="Progress pembayaran faktur">
-                                    <span id="invoicePaidMeter"></span>
-                                </div>
-                                <div class="alert alert-info mb-2 py-2 px-3 small">
-                                    <i class="mdi mdi-bank-transfer me-1"></i>
-                                    Penerimaan membuat hutang supplier. Pembayarannya dilakukan setelah posting melalui
-                                    <strong>Keuangan → Hutang & Piutang</strong>.
-                                </div>
                                 <small class="receive-payment-hint" id="invoiceBoardHint">
-                                    Isi item penerimaan untuk menghitung tagihan.
+                                    Pembayaran dilakukan setelah stok diposting.
                                 </small>
                             </div>
 
@@ -515,11 +385,7 @@
                                     </div>
                                     <small class="purchase-field-hint">Tambahkan ongkir, admin, atau biaya supplier.</small>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Total Faktur (Asli)</label>
-                                    <input type="text" class="form-control invoice-money fw-bold" name="total_faktur"
-                                        value="Rp 0" inputmode="numeric" readonly>
-                                </div>
+                                <input type="hidden" class="invoice-money" name="total_faktur" value="Rp 0">
                                 <input type="hidden" name="status_pembayaran" value="belum_dibayar">
                                 <input type="hidden" name="jumlah_dibayar" value="Rp 0">
                                 <input type="hidden" name="sisa_hutang" value="Rp 0">
@@ -527,31 +393,21 @@
                         </div>
                     </section>
 
-                    <div class="purchase-total-panel">
-                        <div class="purchase-total-copy">
-                            <span>Total Faktur</span>
-                            <small>Nilai asli dari detail barang, diskon, PPN, dan biaya lain; tidak dikurangi ganti rugi.</small>
+                    <div class="receive-form-actions">
+                        <div class="receive-form-total">
+                            <span>Total Penerimaan</span>
+                            <strong id="receiveGrandTotal">Rp 0</strong>
+                            <small><span id="receiveModalItemCount">0</span> item · Qty <span id="receiveModalQtyCount">0</span></small>
                         </div>
-                        <div class="purchase-total-stats">
-                            <span><strong id="receiveModalItemCount">0</strong> item</span>
-                            <span>Qty <strong id="receiveModalQtyCount">0</strong></span>
-                            <span>Subtotal <strong id="receiveModalSubtotal">Rp 0</strong></span>
-                            <span>Diskon <strong id="receiveModalDiscount">Rp 0</strong></span>
-                            <span>PPN <strong id="receiveModalTax">Rp 0</strong></span>
-                            <span>Ganti Rugi <strong id="receiveModalCompensationDiscount">Rp 0</strong></span>
+                        <div class="receive-form-buttons">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                                Batal
+                            </button>
+                            <button type="submit" id="submitPenerimaanForm" class="btn btn-primary">
+                                <i class="mdi mdi-content-save-outline"></i>
+                                Simpan Draft
+                            </button>
                         </div>
-                        <strong id="receiveGrandTotal">Rp 0</strong>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                            <i class="mdi mdi-close-circle-outline"></i>
-                            Batal
-                        </button>
-                        <button type="submit" id="submitPenerimaanForm" class="btn btn-primary">
-                            <i class="mdi mdi-content-save-outline"></i>
-                            Simpan Draft
-                        </button>
                     </div>
                 </form>
             </div>
