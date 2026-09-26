@@ -46,6 +46,143 @@ class MasterObatService
         return $this->MasterObatRepository->getSubGolongan($mainGolongan);
     }
 
+    public function getFilterOptions(): array
+    {
+        $summary = MasterObatModel::query()
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN category_id IS NULL THEN 1 ELSE 0 END) as categories_without_value')
+            ->selectRaw('SUM(CASE WHEN golongan_id IS NULL THEN 1 ELSE 0 END) as golongan_without_value')
+            ->selectRaw('SUM(CASE WHEN main_golongan_id IS NULL THEN 1 ELSE 0 END) as main_golongan_without_value')
+            ->selectRaw('SUM(CASE WHEN sub_golongan_id IS NULL THEN 1 ELSE 0 END) as sub_golongan_without_value')
+            ->first();
+
+        $categories = CategoryModel::query()
+            ->join('master_obats', 'master_obats.category_id', '=', 'categories.id')
+            ->select('categories.id', 'categories.code', 'categories.name')
+            ->selectRaw('COUNT(master_obats.id) as item_count')
+            ->groupBy('categories.id', 'categories.code', 'categories.name')
+            ->orderBy('categories.name')
+            ->get()
+            ->map(fn ($item) => [
+                'id' => (string) $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'count' => (int) $item->item_count,
+            ])
+            ->values()
+            ->all();
+
+        $golongan = GolonganModel::query()
+            ->join('master_obats', 'master_obats.golongan_id', '=', 'golongan_obats.id')
+            ->select('golongan_obats.id', 'golongan_obats.kode', 'golongan_obats.nama')
+            ->selectRaw('COUNT(master_obats.id) as item_count')
+            ->groupBy('golongan_obats.id', 'golongan_obats.kode', 'golongan_obats.nama')
+            ->orderBy('golongan_obats.nama')
+            ->get()
+            ->map(fn ($item) => [
+                'id' => (string) $item->id,
+                'code' => $item->kode,
+                'name' => $item->nama,
+                'count' => (int) $item->item_count,
+            ])
+            ->values()
+            ->all();
+
+        $mainGolongan = MainGolonganModel::query()
+            ->join('master_obats', 'master_obats.main_golongan_id', '=', 'main_golongan_obats.id')
+            ->leftJoin('golongan_obats', 'golongan_obats.id', '=', 'main_golongan_obats.golongan_id')
+            ->select(
+                'main_golongan_obats.id',
+                'main_golongan_obats.kode',
+                'main_golongan_obats.nama',
+                'golongan_obats.nama as golongan_name'
+            )
+            ->selectRaw('COUNT(master_obats.id) as item_count')
+            ->groupBy(
+                'main_golongan_obats.id',
+                'main_golongan_obats.kode',
+                'main_golongan_obats.nama',
+                'golongan_obats.nama'
+            )
+            ->orderBy('golongan_obats.nama')
+            ->orderBy('main_golongan_obats.nama')
+            ->get()
+            ->map(fn ($item) => [
+                'id' => (string) $item->id,
+                'code' => $item->kode,
+                'name' => $item->nama,
+                'golongan_name' => $item->golongan_name,
+                'count' => (int) $item->item_count,
+            ])
+            ->values()
+            ->all();
+
+        $subGolongan = SubGolonganModel::query()
+            ->join('master_obats', 'master_obats.sub_golongan_id', '=', 'sub_golongan_obats.id')
+            ->leftJoin('main_golongan_obats', 'main_golongan_obats.id', '=', 'sub_golongan_obats.main_golongan_id')
+            ->leftJoin('golongan_obats', 'golongan_obats.id', '=', 'main_golongan_obats.golongan_id')
+            ->select(
+                'sub_golongan_obats.id',
+                'sub_golongan_obats.kode',
+                'sub_golongan_obats.nama',
+                'main_golongan_obats.nama as main_golongan_name',
+                'golongan_obats.nama as golongan_name'
+            )
+            ->selectRaw('COUNT(master_obats.id) as item_count')
+            ->groupBy(
+                'sub_golongan_obats.id',
+                'sub_golongan_obats.kode',
+                'sub_golongan_obats.nama',
+                'main_golongan_obats.nama',
+                'golongan_obats.nama'
+            )
+            ->orderBy('golongan_obats.nama')
+            ->orderBy('main_golongan_obats.nama')
+            ->orderBy('sub_golongan_obats.nama')
+            ->get()
+            ->map(fn ($item) => [
+                'id' => (string) $item->id,
+                'code' => $item->kode,
+                'name' => $item->nama,
+                'golongan_name' => $item->golongan_name,
+                'main_golongan_name' => $item->main_golongan_name,
+                'count' => (int) $item->item_count,
+            ])
+            ->values()
+            ->all();
+
+        $this->appendEmptyClassificationOption(
+            $categories,
+            (int) ($summary?->categories_without_value ?? 0),
+            'Tanpa kategori'
+        );
+        $this->appendEmptyClassificationOption(
+            $golongan,
+            (int) ($summary?->golongan_without_value ?? 0),
+            'Tanpa golongan'
+        );
+        $this->appendEmptyClassificationOption(
+            $mainGolongan,
+            (int) ($summary?->main_golongan_without_value ?? 0),
+            'Tanpa main golongan'
+        );
+        $this->appendEmptyClassificationOption(
+            $subGolongan,
+            (int) ($summary?->sub_golongan_without_value ?? 0),
+            'Tanpa sub golongan'
+        );
+
+        return [
+            'total' => (int) ($summary?->total ?? 0),
+            'filters' => [
+                'categories' => $categories,
+                'golongan' => $golongan,
+                'main_golongan' => $mainGolongan,
+                'sub_golongan' => $subGolongan,
+            ],
+        ];
+    }
+
     public function getMasterObatTable()
     {
         $MasterObat = $this->MasterObatRepository->getMasterObat()->load(['kategori', 'golongan', 'mainGolongan', 'subGolongan', 'satuan', 'sediaan', 'pabrikan', 'distributor', 'rakPenyimpanan']);
@@ -79,6 +216,10 @@ class MasterObatService
                 'no_batch'   => $r->no_batch ?? '-',
                 'jenis'   => $r->is_generik == 1 ? 'Generik' : 'Paten',
                 'is_active' => $r->is_active,
+                'category_filter' => $this->classificationFilterToken('category', $r->category_id),
+                'golongan_filter' => $this->classificationFilterToken('golongan', $r->golongan_id),
+                'main_golongan_filter' => $this->classificationFilterToken('main_golongan', $r->main_golongan_id),
+                'sub_golongan_filter' => $this->classificationFilterToken('sub_golongan', $r->sub_golongan_id),
             ];
         }
 
@@ -241,5 +382,25 @@ class MasterObatService
         }
 
         return $default;
+    }
+
+    private function appendEmptyClassificationOption(array &$options, int $count, string $name): void
+    {
+        if ($count === 0) {
+            return;
+        }
+
+        $options[] = [
+            'id' => '__none__',
+            'code' => null,
+            'name' => $name,
+            'count' => $count,
+            'is_empty' => true,
+        ];
+    }
+
+    private function classificationFilterToken(string $classification, $id): string
+    {
+        return sprintf('|%s:%s|', $classification, $id ?: 'none');
     }
 }

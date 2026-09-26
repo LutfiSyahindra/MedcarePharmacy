@@ -124,6 +124,9 @@
                                         id="purchaseModalLineCount">1</strong> baris obat</span>
                                 <span><i class="mdi mdi-package-variant-closed"></i> <strong
                                         id="purchaseModalQtyCount">1</strong> total qty</span>
+                                <span id="purchaseUnitLoadingNotice" class="d-none">
+                                    <i class="mdi mdi-loading mdi-spin"></i> Memuat satuan obat...
+                                </span>
                             </div>
                             <div id="detail-wrapper">
                                 <div class="detail-item purchase-detail-card">
@@ -196,14 +199,53 @@
                         </div>
                     </section>
 
+                    <section class="purchase-form-section">
+                        <div class="purchase-form-section-header">
+                            <div class="purchase-form-section-title">
+                                <i class="mdi mdi-truck-delivery-outline"></i>
+                                <div>
+                                    <strong>Biaya Tambahan</strong>
+                                    <small>Isi biaya asuransi dan pengiriman bila dibebankan pada PO.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="purchase-form-section-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Biaya Asuransi <span class="text-muted">(Opsional)</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rp</span>
+                                        <input type="number" class="form-control purchase-additional-cost"
+                                            name="biaya_asuransi" min="0" max="9999999999999.99" step="0.01"
+                                            value="0">
+                                    </div>
+                                    <small class="purchase-field-hint">Biaya perlindungan barang selama proses pengiriman.</small>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Biaya Pengiriman <span class="text-muted">(Opsional)</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rp</span>
+                                        <input type="number" class="form-control purchase-additional-cost"
+                                            name="biaya_pengiriman" min="0" max="9999999999999.99" step="0.01"
+                                            value="0">
+                                    </div>
+                                    <small class="purchase-field-hint">Ongkos kirim atau biaya logistik dari distributor.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     <div class="purchase-total-panel">
                         <div class="purchase-total-copy">
                             <span>Total Estimasi Purchase Order</span>
-                            <small>Nilai diperbarui otomatis dari seluruh rincian obat.</small>
+                            <small>Subtotal obat ditambah biaya asuransi dan pengiriman.</small>
                         </div>
                         <div class="purchase-total-stats">
                             <span><strong id="purchaseModalItemCount">1</strong> item</span>
-                            <span>Rata-rata <strong id="purchaseModalAverage">Rp 0</strong></span>
+                            <span>Subtotal obat <strong id="purchaseModalMedicineSubtotal">Rp 0</strong></span>
+                            <span>Biaya tambahan <strong id="purchaseModalAdditionalCost">Rp 0</strong></span>
                         </div>
                         <strong id="total_estimasi">Rp 0</strong>
                         <input type="hidden" name="total_estimasi" id="total_estimasi_input" value="0">

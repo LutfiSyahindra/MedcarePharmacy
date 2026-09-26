@@ -381,9 +381,9 @@
                                         <i class="mdi mdi-cash-plus"></i>
                                         <input type="text" class="form-control invoice-money" name="biaya_lain"
                                             value="Rp 0" inputmode="numeric" autocomplete="off"
-                                            placeholder="Rp 0">
+                                            placeholder="Rp 0" readonly>
                                     </div>
-                                    <small class="purchase-field-hint">Tambahkan ongkir, admin, atau biaya supplier.</small>
+                                    <small class="purchase-field-hint">Terisi otomatis dari biaya asuransi dan pengiriman PO, sesuai proporsi qty yang diterima.</small>
                                 </div>
                                 <input type="hidden" class="invoice-money" name="total_faktur" value="Rp 0">
                                 <input type="hidden" name="status_pembayaran" value="belum_dibayar">

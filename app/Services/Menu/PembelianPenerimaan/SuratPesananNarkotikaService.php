@@ -4,6 +4,7 @@ namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Models\SuratPesananSetting;
 use App\Support\ControlledDrugClassification;
 use App\Support\IndonesianNumber;
 use Illuminate\Database\Eloquent\Collection;
@@ -55,10 +56,9 @@ class SuratPesananNarkotikaService
 
     public function matchedClassification(?MasterObatModel $medicine): ?string
     {
-        return ControlledDrugClassification::matchedClassification(
+        return ControlledDrugClassification::matchedClassificationForType(
             $medicine,
-            ['narkot'],
-            ['nar', 'nark', 'narkotika']
+            SuratPesananSetting::TYPE_NARCOTIC
         );
     }
 

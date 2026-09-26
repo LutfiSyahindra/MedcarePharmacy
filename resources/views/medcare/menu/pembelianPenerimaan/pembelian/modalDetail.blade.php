@@ -88,9 +88,14 @@
                 </section>
 
                 <div class="purchase-total-panel">
-                    <div>
+                    <div class="purchase-total-copy">
                         <span>Total Estimasi Purchase Order</span>
-                        <small>Akumulasi seluruh item obat pada transaksi ini.</small>
+                        <small>Akumulasi item obat dan biaya tambahan pada transaksi ini.</small>
+                    </div>
+                    <div class="purchase-total-stats">
+                        <span>Subtotal obat <strong id="detail_subtotal_obat">Rp 0</strong></span>
+                        <span>Asuransi <strong id="detail_biaya_asuransi">Rp 0</strong></span>
+                        <span>Pengiriman <strong id="detail_biaya_pengiriman">Rp 0</strong></span>
                     </div>
                     <strong id="detail_total_estimasi">Rp 0</strong>
                 </div>

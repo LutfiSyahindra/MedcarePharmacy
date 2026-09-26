@@ -261,6 +261,123 @@
         color: var(--obat-text);
     }
 
+    .obat-filter-panel {
+        padding: 1rem;
+        border-bottom: 1px solid var(--obat-border);
+        background: #f8fbff;
+    }
+
+    .obat-filter-panel.has-active-filter {
+        background: linear-gradient(180deg, #f0fdfa, #f8fbff);
+        box-shadow: inset 3px 0 0 var(--obat-primary);
+    }
+
+    .obat-filter-heading,
+    .obat-filter-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+    }
+
+    .obat-filter-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        color: var(--obat-primary-strong);
+        font-size: .8rem;
+        font-weight: 800;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+    }
+
+    .obat-filter-heading p {
+        margin: .2rem 0 0;
+        color: var(--obat-muted);
+        font-size: .82rem;
+    }
+
+    .obat-filter-status > span {
+        padding: .35rem .6rem;
+        border-radius: 999px;
+        color: var(--obat-muted);
+        background: #fff;
+        font-size: .76rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .obat-filter-panel.has-active-filter .obat-filter-status > span {
+        color: var(--obat-primary-strong);
+        background: var(--obat-soft);
+    }
+
+    .obat-filter-status .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border-radius: 8px;
+        font-size: .78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .obat-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+        margin-top: .85rem;
+    }
+
+    .obat-filter-field {
+        display: grid;
+        gap: .4rem;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .obat-filter-field > span {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        color: var(--obat-text);
+        font-size: .78rem;
+        font-weight: 800;
+    }
+
+    .obat-filter-field > span i {
+        color: var(--obat-primary);
+        font-size: .95rem;
+    }
+
+    .obat-filter-field .select2-container {
+        width: 100% !important;
+    }
+
+    .obat-filter-field .select2-container--default .select2-selection--single {
+        height: 42px;
+        border-color: var(--obat-border);
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .obat-filter-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+        padding-left: .75rem;
+        padding-right: 2rem;
+        color: var(--obat-text);
+        font-size: .82rem;
+        line-height: 40px;
+    }
+
+    .obat-filter-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 40px;
+        right: .3rem;
+    }
+
+    .obat-filter-field .select2-container--default.select2-container--disabled .select2-selection--single {
+        background: #f1f5f9;
+    }
+
     .obat-table-section .table-responsive {
         padding: 0 1rem 1rem;
     }
@@ -907,6 +1024,10 @@
         .obat-form-grid {
             grid-template-columns: 1fr;
         }
+
+        .obat-filter-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 991.98px) {
@@ -920,6 +1041,8 @@
 
         .obat-table-toolbar,
         .obat-table-tools,
+        .obat-filter-heading,
+        .obat-filter-status,
         .obat-table-meta,
         .obat-table-footer,
         .obat-import-panel {
@@ -933,6 +1056,12 @@
 
         .obat-search {
             min-width: 100%;
+        }
+
+        .obat-filter-heading,
+        .obat-filter-status {
+            align-items: stretch;
+            flex-direction: column;
         }
 
         .obat-field,
@@ -957,6 +1086,10 @@
 
         .obat-table-section .table-responsive {
             padding: 0 .75rem .75rem;
+        }
+
+        .obat-filter-grid {
+            grid-template-columns: 1fr;
         }
 
         .obat-modal .modal-body {

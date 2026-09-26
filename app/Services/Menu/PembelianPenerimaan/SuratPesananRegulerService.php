@@ -4,6 +4,8 @@ namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Models\SuratPesananSetting;
+use App\Support\ControlledDrugClassification;
 use App\Support\IndonesianNumber;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -60,8 +62,6 @@ class SuratPesananRegulerService
     public function isRegularDrug(?MasterObatModel $medicine): bool
     {
         return $medicine !== null
-            && ! $this->narcoticOrders->isNarcoticDrug($medicine)
-            && ! $this->psychotropicOrders->isPsychotropicDrug($medicine)
-            && ! $this->precursorOrders->isPrecursorDrug($medicine);
+            && ControlledDrugClassification::matchesType($medicine, SuratPesananSetting::TYPE_REGULAR);
     }
 }

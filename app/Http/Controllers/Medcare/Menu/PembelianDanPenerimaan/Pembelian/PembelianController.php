@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
+use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
@@ -21,6 +22,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Yajra\DataTables\Facades\DataTables;
 
 class PembelianController extends Controller
@@ -161,7 +163,7 @@ class PembelianController extends Controller
 
     public function getObat()
     {
-        $obat = $this->MasterObatService->getMasterObat();
+        $obat = $this->MasterObatService->getMasterObat()->loadMissing('satuan');
 
         return response()->json($obat);
     }
@@ -187,28 +189,15 @@ class PembelianController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'no_po' => 'required|string|max:50|unique:purchase_orders,no_po',
-            'distributor_id' => 'required|integer',
-            'tanggal' => 'required|string',
-            'catatan' => 'nullable|string',
-            'total_estimasi' => 'required|numeric',
-
-            'obat_id.*' => 'required|integer',
-            'qty.*' => 'required|numeric|min:1',
-            'harga_estimasi.*' => 'required|numeric|min:0',
-            'diskon_1' => 'required|array',
-            'diskon_1.*' => 'nullable|numeric|min:0|max:100',
-            'diskon_2' => 'required|array',
-            'diskon_2.*' => 'nullable|numeric|min:0|max:100',
-            'diskon_3' => 'required|array',
-            'diskon_3.*' => 'nullable|numeric|min:0|max:100',
-            'subtotal.*' => 'required|numeric|min:0',
-            'satuan_id.*' => 'required|integer|min:1',
-        ]);
+        $this->validatePurchaseRequest($request);
 
         $detailRows = $this->purchaseDetailRows($request);
-        $totalEstimasi = round(collect($detailRows)->sum('subtotal'), 2);
+        $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
+        $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
+        $totalEstimasi = round(
+            collect($detailRows)->sum('subtotal') + $biayaAsuransi + $biayaPengiriman,
+            2
+        );
 
         DB::beginTransaction();
 
@@ -226,6 +215,8 @@ class PembelianController extends Controller
                 'branch_id' => $branchId,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $totalEstimasi,
+                'biaya_asuransi' => $biayaAsuransi,
+                'biaya_pengiriman' => $biayaPengiriman,
                 'catatan' => $request->catatan,
                 'created_by' => $user->id,
 
@@ -563,28 +554,15 @@ class PembelianController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'no_po' => 'required|string|max:50|unique:purchase_orders,no_po,'.$id,
-            'distributor_id' => 'required|integer',
-            'tanggal' => 'required|string',
-            'catatan' => 'nullable|string',
-            'total_estimasi' => 'required|numeric',
-
-            'obat_id.*' => 'required|integer',
-            'qty.*' => 'required|numeric|min:1',
-            'harga_estimasi.*' => 'required|numeric|min:0',
-            'diskon_1' => 'required|array',
-            'diskon_1.*' => 'nullable|numeric|min:0|max:100',
-            'diskon_2' => 'required|array',
-            'diskon_2.*' => 'nullable|numeric|min:0|max:100',
-            'diskon_3' => 'required|array',
-            'diskon_3.*' => 'nullable|numeric|min:0|max:100',
-            'subtotal.*' => 'required|numeric|min:0',
-            'satuan_id.*' => 'required|integer|min:1',
-        ]);
+        $this->validatePurchaseRequest($request, (int) $id);
 
         $detailRows = $this->purchaseDetailRows($request);
-        $totalEstimasi = round(collect($detailRows)->sum('subtotal'), 2);
+        $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
+        $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
+        $totalEstimasi = round(
+            collect($detailRows)->sum('subtotal') + $biayaAsuransi + $biayaPengiriman,
+            2
+        );
 
         DB::beginTransaction();
 
@@ -620,6 +598,8 @@ class PembelianController extends Controller
                 'branch_id' => $existingPo->branch_id,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
                 'total_estimasi' => $totalEstimasi,
+                'biaya_asuransi' => $biayaAsuransi,
+                'biaya_pengiriman' => $biayaPengiriman,
                 'catatan' => $request->catatan,
                 'approved_by' => null,
                 'status' => 'waiting_approval',
@@ -705,6 +685,7 @@ class PembelianController extends Controller
         foreach ($request->input('obat_id', []) as $index => $obatId) {
             $qty = (float) $request->input('qty.'.$index, 0);
             $price = (float) $request->input('harga_estimasi.'.$index, 0);
+            $conversionId = (int) $request->input('satuan_id.'.$index, 0);
             [$discount1, $discount2, $discount3] = TieredDiscount::percentages(
                 $request->input('diskon_1.'.$index, 0),
                 $request->input('diskon_2.'.$index, 0),
@@ -724,7 +705,7 @@ class PembelianController extends Controller
                     $discount2,
                     $discount3
                 ),
-                'satuan_konversi' => (int) $request->input('satuan_id.'.$index),
+                'satuan_konversi' => $conversionId > 0 ? $conversionId : null,
                 'is_oot' => $this->suratPesananOot->isOotDrug(
                     $medicines->get((int) $obatId)
                 ),
@@ -732,5 +713,131 @@ class PembelianController extends Controller
         }
 
         return $rows;
+    }
+
+    private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): void
+    {
+        $purchaseOrderUniqueRule = 'unique:purchase_orders,no_po';
+
+        if ($ignorePurchaseOrderId !== null) {
+            $purchaseOrderUniqueRule .= ','.$ignorePurchaseOrderId;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'no_po' => ['required', 'string', 'max:50', $purchaseOrderUniqueRule],
+            'distributor_id' => ['required', 'integer', 'exists:distributors,id'],
+            'tanggal' => ['required', 'date_format:d-m-Y'],
+            'catatan' => ['nullable', 'string'],
+            'total_estimasi' => ['required', 'numeric', 'min:0'],
+            'biaya_asuransi' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
+            'biaya_pengiriman' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
+
+            'obat_id' => ['required', 'array', 'min:1'],
+            'obat_id.*' => ['required', 'integer', 'exists:master_obats,id'],
+            'qty' => ['required', 'array'],
+            'qty.*' => ['required', 'numeric', 'min:1'],
+            'harga_estimasi' => ['required', 'array'],
+            'harga_estimasi.*' => ['required', 'numeric', 'min:0'],
+            'diskon_1' => ['required', 'array'],
+            'diskon_1.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'diskon_2' => ['required', 'array'],
+            'diskon_2.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'diskon_3' => ['required', 'array'],
+            'diskon_3.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'subtotal' => ['required', 'array'],
+            'subtotal.*' => ['required', 'numeric', 'min:0'],
+            'satuan_id' => ['required', 'array'],
+            'satuan_id.*' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'satuan_id.required' => 'Satuan setiap item obat belum selesai dimuat. Silakan tunggu lalu simpan kembali.',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            $medicineIds = $request->input('obat_id', []);
+
+            if (! is_array($medicineIds)) {
+                return;
+            }
+
+            $detailFields = [
+                'qty',
+                'harga_estimasi',
+                'diskon_1',
+                'diskon_2',
+                'diskon_3',
+                'subtotal',
+                'satuan_id',
+            ];
+            $itemCount = count($medicineIds);
+
+            foreach ($detailFields as $field) {
+                $values = $request->input($field, []);
+
+                if (! is_array($values) || count($values) !== $itemCount) {
+                    $validator->errors()->add(
+                        $field,
+                        'Data '.str_replace('_', ' ', $field).' harus lengkap untuk seluruh '.$itemCount.' item obat.'
+                    );
+                }
+            }
+
+            $conversionValues = $request->input('satuan_id', []);
+
+            if (! is_array($conversionValues)) {
+                return;
+            }
+
+            $conversionIds = collect($conversionValues)
+                ->map(fn ($conversionId) => (int) $conversionId)
+                ->filter(fn (int $conversionId) => $conversionId > 0)
+                ->unique()
+                ->values();
+            $conversions = KonversiSatuanModel::query()
+                ->whereKey($conversionIds)
+                ->get(['id', 'obat_id'])
+                ->keyBy('id');
+            $medicinesWithConversions = KonversiSatuanModel::query()
+                ->whereIn('obat_id', collect($medicineIds)->map(fn ($medicineId) => (int) $medicineId)->filter())
+                ->pluck('obat_id')
+                ->map(fn ($medicineId) => (int) $medicineId)
+                ->unique()
+                ->flip();
+
+            foreach ($medicineIds as $index => $medicineId) {
+                if (! array_key_exists($index, $conversionValues)) {
+                    $validator->errors()->add(
+                        'satuan_id.'.$index,
+                        'Satuan item obat ke-'.((int) $index + 1).' belum selesai dimuat.'
+                    );
+
+                    continue;
+                }
+
+                $medicineId = (int) $medicineId;
+                $conversionId = (int) $conversionValues[$index];
+
+                if ($conversionId <= 0) {
+                    if ($medicinesWithConversions->has($medicineId)) {
+                        $validator->errors()->add(
+                            'satuan_id.'.$index,
+                            'Pilih satuan yang tersedia untuk item obat ke-'.((int) $index + 1).'.'
+                        );
+                    }
+
+                    continue;
+                }
+
+                $conversion = $conversions->get($conversionId);
+
+                if (! $conversion || (int) $conversion->obat_id !== $medicineId) {
+                    $validator->errors()->add(
+                        'satuan_id.'.$index,
+                        'Satuan item obat ke-'.((int) $index + 1).' tidak valid atau tidak sesuai dengan obat.'
+                    );
+                }
+            }
+        });
+
+        $validator->validate();
     }
 }

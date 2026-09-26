@@ -44,6 +44,7 @@ use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
 use App\Http\Controllers\Medcare\Settings\Notification\NotificationSettingController;
+use App\Http\Controllers\Medcare\Settings\SuratPesanan\SuratPesananSettingController;
 use App\Http\Controllers\ProfileController;
 use App\Services\Menu\Dokumen\DocumentArchiveService;
 use Illuminate\Support\Facades\Route;
@@ -129,6 +130,10 @@ Route::middleware('auth')->group(function () {
         // Notification configuration
         Route::get('/notifikasi', [NotificationSettingController::class, 'index'])->name('settings.notifikasi.index');
         Route::put('/notifikasi/update', [NotificationSettingController::class, 'update'])->name('settings.notifikasi.update');
+
+        // Surat Pesanan classification
+        Route::get('/surat-pesanan', [SuratPesananSettingController::class, 'index'])->name('settings.surat-pesanan.index');
+        Route::put('/surat-pesanan', [SuratPesananSettingController::class, 'update'])->name('settings.surat-pesanan.update');
     });
 
     Route::prefix('medcare/masterData')->group(function () {
@@ -242,6 +247,7 @@ Route::middleware('auth')->group(function () {
         // -- MasterObat
         Route::get('/masterObat', [MasterObatController::class, 'MasterObat'])->name('masterObat.MasterObat');
         Route::get('/masterObat/table', [MasterObatController::class, 'table'])->name('masterObat.table');
+        Route::get('/masterObat/filter-options', [MasterObatController::class, 'filterOptions'])->name('masterObat.filterOptions');
         Route::post('/masterObat/store', [MasterObatController::class, 'store'])->name('masterObat.store');
         Route::get('/masterObat/{id}/edit', [MasterObatController::class, 'edit'])->name('masterObat.edit');
         Route::put('/masterObat/{id}/update', [MasterObatController::class, 'update'])->name('masterObat.update');

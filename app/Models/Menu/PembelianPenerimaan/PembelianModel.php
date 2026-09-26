@@ -18,6 +18,12 @@ class PembelianModel extends Model
     // ✅ Semua kolom bisa diisi (gunakan guarded kosong)
     protected $guarded = [];
 
+    protected $casts = [
+        'total_estimasi' => 'decimal:2',
+        'biaya_asuransi' => 'decimal:2',
+        'biaya_pengiriman' => 'decimal:2',
+    ];
+
     /**
      * Relasi ke detail purchase order
      */

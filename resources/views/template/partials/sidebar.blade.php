@@ -227,6 +227,15 @@
                     </div>
                 </li>
             @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_SURAT_PESANAN))
+                <li class="nav-item">
+                    <a href="{{ route("settings.surat-pesanan.index") }}"
+                        class="nav-link {{ request()->routeIs("settings.surat-pesanan.*") ? "active" : "" }}">
+                        <i class="link-icon" data-feather="file-text"></i>
+                        <span class="link-title">Setting SP</span>
+                    </a>
+                </li>
+            @endif
 
             {{-- Master Data --}}
             @if ($sidebarCan(\App\Support\SidebarPermissions::MASTER_DATA))

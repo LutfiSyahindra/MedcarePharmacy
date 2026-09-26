@@ -59,6 +59,48 @@
                 </div>
             </div>
 
+            <div class="obat-filter-panel" id="obatFilterPanel">
+                <div class="obat-filter-heading">
+                    <div>
+                        <span class="obat-filter-kicker"><i class="mdi mdi-filter-variant"></i> Filter klasifikasi</span>
+                        <p>Pilih satu atau beberapa klasifikasi. Angka pada pilihan menunjukkan jumlah obat dalam kelompok tersebut.</p>
+                    </div>
+                    <div class="obat-filter-status">
+                        <span id="obatFilterActiveCount">Belum ada filter aktif</span>
+                        <button type="button" class="btn btn-outline-secondary" id="obatFilterReset" disabled>
+                            <i class="mdi mdi-filter-remove-outline"></i>
+                            Reset Filter
+                        </button>
+                    </div>
+                </div>
+                <div class="obat-filter-grid">
+                    <label class="obat-filter-field" for="obatCategoryFilter">
+                        <span><i class="mdi mdi-folder-outline"></i>Kategori</span>
+                        <select id="obatCategoryFilter" class="form-select master-obat-filter" data-placeholder="Semua kategori" disabled>
+                            <option value="">Memuat kategori...</option>
+                        </select>
+                    </label>
+                    <label class="obat-filter-field" for="obatGolonganFilter">
+                        <span><i class="mdi mdi-flask-outline"></i>Golongan</span>
+                        <select id="obatGolonganFilter" class="form-select master-obat-filter" data-placeholder="Semua golongan" disabled>
+                            <option value="">Memuat golongan...</option>
+                        </select>
+                    </label>
+                    <label class="obat-filter-field" for="obatMainGolonganFilter">
+                        <span><i class="mdi mdi-shape-plus-outline"></i>Main Golongan</span>
+                        <select id="obatMainGolonganFilter" class="form-select master-obat-filter" data-placeholder="Semua main golongan" disabled>
+                            <option value="">Memuat main golongan...</option>
+                        </select>
+                    </label>
+                    <label class="obat-filter-field" for="obatSubGolonganFilter">
+                        <span><i class="mdi mdi-source-branch"></i>Sub Golongan</span>
+                        <select id="obatSubGolonganFilter" class="form-select master-obat-filter" data-placeholder="Semua sub golongan" disabled>
+                            <option value="">Memuat sub golongan...</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
             <div class="table-responsive">
                 <table id="tableObat" class="table obat-table align-middle">
                     <thead>

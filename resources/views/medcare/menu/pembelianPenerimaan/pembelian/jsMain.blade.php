@@ -7,6 +7,8 @@
         let editMode = false;
         let detailPurchaseOrderId = null;
         let detailPrintDocuments = [];
+        let unitRequestSequence = 0;
+        const pendingUnitRequests = new Set();
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
@@ -106,6 +108,13 @@
             });
         }
 
+        function updateUnitLoadingState() {
+            const isLoading = pendingUnitRequests.size > 0;
+
+            $('#submitForm').prop('disabled', isLoading);
+            $('#purchaseUnitLoadingNotice').toggleClass('d-none', !isLoading);
+        }
+
         $(document).on('select2:opening', '#pembelianModal select[name="obat_id[]"]', function() {
             let modalBody = $('#pembelianModal .modal-body');
             let row = $(this).closest('.detail-item');
@@ -129,6 +138,7 @@
             $('#total_estimasi').text(formatRupiah(0));
             $('#total_estimasi_input').val(0);
             $('#pembelian_id').val('');
+            updateUnitLoadingState();
 
             // Reset error state
             form.find('.invalid-feedback').text('');
@@ -241,31 +251,39 @@
         }
 
         // --- Hitung subtotal bersih setelah Diskon 1, 2, dan 3
-        $(document).on('input', '.harga_estimasi, [name="qty[]"], .purchase-discount', function() {
+        $(document).on('input', '.harga_estimasi, [name="qty[]"], .purchase-discount, .purchase-additional-cost', function() {
             const row = $(this).closest('.detail-item');
-            recalculatePurchaseRow(row);
+
+            if (row.length) {
+                recalculatePurchaseRow(row);
+            }
+
             hitungTotal();
         });
 
         // --- Fungsi hitung total estimasi keseluruhan
         function hitungTotal() {
-            let total = 0;
+            let medicineSubtotal = 0;
             let totalQty = 0;
             $('.subtotal').each(function() {
-                total += parseFloat($(this).val()) || 0;
+                medicineSubtotal += parseFloat($(this).val()) || 0;
             });
             $('[name="qty[]"]').each(function() {
                 totalQty += parseFloat($(this).val()) || 0;
             });
+            let insuranceCost = parseFloat($('[name="biaya_asuransi"]').val()) || 0;
+            let shippingCost = parseFloat($('[name="biaya_pengiriman"]').val()) || 0;
+            let additionalCost = insuranceCost + shippingCost;
+            let total = medicineSubtotal + additionalCost;
             let itemCount = $('.detail-item').length;
-            let average = itemCount > 0 ? total / itemCount : 0;
 
             refreshDetailNumbers();
             $('#total_estimasi').text(formatRupiah(total));
-            $('#total_estimasi_input').val(total);
+            $('#total_estimasi_input').val(total.toFixed(2));
             $('#purchaseModalLineCount, #purchaseModalItemCount').text(itemCount.toLocaleString('id-ID'));
             $('#purchaseModalQtyCount').text(totalQty.toLocaleString('id-ID'));
-            $('#purchaseModalAverage').text(formatRupiah(average));
+            $('#purchaseModalMedicineSubtotal').text(formatRupiah(medicineSubtotal));
+            $('#purchaseModalAdditionalCost').text(formatRupiah(additionalCost));
         }
 
         // --- Get data distributor
@@ -339,6 +357,7 @@
 
                                 // Simpan harga beli
                                 $(option).attr('data-harga', item.harga_beli || 0);
+                                $(option).attr('data-satuan', item.satuan?.nama || 'Satuan dasar');
 
                                 s.append(option);
                             });
@@ -396,6 +415,8 @@
             let selectedOption = $(this).find('option:selected');
 
             let $satuanSelect = row.find('.satuan-select');
+            const requestId = ++unitRequestSequence;
+            row.data('unit-request-id', requestId);
 
             // reset
             $satuanSelect
@@ -410,6 +431,9 @@
                 return;
             }
 
+            pendingUnitRequests.add(requestId);
+            updateUnitLoadingState();
+
             $.ajax({
                 url: "{{ route("pembelian.getKonversiSatuan") }}",
                 type: 'GET',
@@ -417,12 +441,17 @@
                 data: {
                     obat_id: obatId
                 },
+                timeout: 15000,
                 success: function(data) {
+                    if (row.data('unit-request-id') !== requestId) {
+                        return;
+                    }
+
                     // ===== NORMALISASI (OBJECT / ARRAY) =====
                     let list = Array.isArray(data) ? data : [data];
 
                     if (!list.length || !list[0]?.satuan) {
-                        fallbackHargaDefault();
+                        useBaseUnit();
                         return;
                     }
 
@@ -444,27 +473,43 @@
                         .html(options)
                         .prop('disabled', false);
 
-                    // ================= EDIT MODE =================
-                    if (editMode) {
-                        let satuanLama = row.data('satuan-terpilih');
-                        if (satuanLama) {
-                            $satuanSelect.val(satuanLama).trigger('change');
-                        }
-                    }
-                    // ================= TAMBAH MODE =================
-                    else {
+                    let satuanLama = row.data('satuan-terpilih');
+
+                    if (satuanLama && $satuanSelect.find(`option[value="${satuanLama}"]`).length) {
+                        $satuanSelect.val(satuanLama).trigger('change');
+                    } else {
                         $satuanSelect.prop('selectedIndex', 1).trigger('change');
                     }
                 },
                 error: function() {
-                    fallbackHargaDefault();
+                    if (row.data('unit-request-id') !== requestId) {
+                        return;
+                    }
+
+                    $satuanSelect
+                        .html('<option value="">-- Gagal memuat satuan --</option>')
+                        .prop('disabled', false);
+                    applyDefaultPrice();
+                },
+                complete: function() {
+                    pendingUnitRequests.delete(requestId);
+                    updateUnitLoadingState();
                 }
             });
 
-            // ===== FALLBACK JIKA TIDAK ADA KONVERSI =====
-            function fallbackHargaDefault() {
+            // Obat lama dapat belum memiliki data konversi. Gunakan satuan stok dengan faktor 1.
+            function useBaseUnit() {
+                let unitName = selectedOption.data('satuan') || 'Satuan dasar';
+
+                $satuanSelect
+                    .html(`<option value="0" data-konversi="1">${escapeHtml(unitName)} (dasar)</option>`)
+                    .prop('disabled', false)
+                    .val('0');
+                applyDefaultPrice();
+            }
+
+            function applyDefaultPrice() {
                 let harga = parseFloat(selectedOption.data('harga')) || 0;
-                let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
 
                 row.find('.harga_estimasi').val(harga);
                 recalculatePurchaseRow(row);
@@ -915,6 +960,16 @@
         $('#pembelianForm').on('submit', function(e) {
             e.preventDefault();
 
+            if (pendingUnitRequests.size > 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Satuan obat masih dimuat',
+                    text: 'Tunggu hingga seluruh satuan obat selesai dimuat, lalu simpan kembali.',
+                });
+
+                return;
+            }
+
             let formData = $(this).serialize();
             let pembelian_id = $('#pembelian_id').val();
 
@@ -949,12 +1004,12 @@
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
-                        let errors = xhr.responseJSON.errors;
+                        let errors = xhr.responseJSON?.errors || {};
                         let errorMessages = [];
 
                         // reset semua error dulu
                         $('#pembelianForm').find('.invalid-feedback').text('');
-                        $('#pembelianForm').find('.form-control').removeClass(
+                        $('#pembelianForm').find('.form-control, .form-select').removeClass(
                             'is-invalid');
 
                         for (let key in errors) {
@@ -968,9 +1023,16 @@
                             let index = parts[1]; // index array
 
                             // ambil row ke-index lalu kasih error
-                            let row = $('#input-wrapper .input-group-item').eq(index);
-                            row.find(`input[name="${field}[]"]`).addClass('is-invalid');
-                            row.find('.invalid-feedback').first().text(messages[0]);
+                            if (index !== undefined) {
+                                let row = $('#detail-wrapper .detail-item').eq(Number(index));
+                                row.find(`[name="${field}[]"]`).addClass('is-invalid');
+                            } else {
+                                $(`[name="${field}"]`).addClass('is-invalid');
+                            }
+                        }
+
+                        if (errorMessages.length === 0) {
+                            errorMessages.push(xhr.responseJSON?.message || 'Periksa kembali data purchase order.');
                         }
 
                         // tampilkan semua error di toast juga
@@ -983,6 +1045,12 @@
                             timer: 4000,
                             timerProgressBar: true,
                             showConfirmButton: false,
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Purchase order gagal disimpan',
+                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat menyimpan purchase order.',
                         });
                     }
                 }
@@ -1146,6 +1214,8 @@
                     );
 
                     $('textarea[name="catatan"]').val(header.catatan ?? '');
+                    $('input[name="biaya_asuransi"]').val(header.biaya_asuransi ?? 0);
+                    $('input[name="biaya_pengiriman"]').val(header.biaya_pengiriman ?? 0);
 
                     $('#detail-wrapper').empty();
 
@@ -1291,6 +1361,7 @@
 
 
                     // Detail obat
+                    let medicineSubtotal = 0;
                     detail.forEach(item => {
                         const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
 
@@ -1322,12 +1393,14 @@
                         <td>Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
                     </tr>
                 `);
+                        medicineSubtotal += Number(item.subtotal ?? 0);
                     });
 
                     // Total Estimasi
-                    $('#detail_total_estimasi').text(
-                        "Rp " + Number(po.total_estimasi).toLocaleString("id-ID")
-                    );
+                    $('#detail_subtotal_obat').text(formatRupiah(medicineSubtotal));
+                    $('#detail_biaya_asuransi').text(formatRupiah(po.biaya_asuransi));
+                    $('#detail_biaya_pengiriman').text(formatRupiah(po.biaya_pengiriman));
+                    $('#detail_total_estimasi').text(formatRupiah(po.total_estimasi));
 
                     // Tampilkan modal
                     $('#pembelianModalDetail').modal('show');

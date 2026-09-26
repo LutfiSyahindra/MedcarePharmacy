@@ -18,6 +18,8 @@ final class SidebarPermissions
 
     public const SETTINGS_NOTIFIKASI = 'MEDCARE.SETTINGS.NOTIFIKASI';
 
+    public const SETTINGS_SURAT_PESANAN = 'MEDCARE.SETTINGS.SURAT_PESANAN';
+
     public const MASTER_DATA = 'MEDCARE.MASTER_DATA';
 
     public const NOTIFIKASI = 'MEDCARE.MENU.NOTIFIKASI';
@@ -69,6 +71,7 @@ final class SidebarPermissions
             self::SETTINGS_BRANCH,
             self::SETTINGS_MARGIN,
             self::SETTINGS_NOTIFIKASI,
+            self::SETTINGS_SURAT_PESANAN,
         ];
     }
 

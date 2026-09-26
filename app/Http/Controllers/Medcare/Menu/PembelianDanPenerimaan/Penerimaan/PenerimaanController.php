@@ -614,7 +614,7 @@ class PenerimaanController extends Controller
             (float) $computed['subtotal']
                 - (float) $computed['total_diskon']
                 + (float) $computed['total_ppn']
-                + $this->moneyValue($request->biaya_lain)
+                + $this->allocatedPurchaseOrderAdditionalCost($po, (float) $computed['total_qty'])
         );
 
         if ($requestedDiscount > $grossTotalFaktur + 0.009) {
@@ -755,7 +755,7 @@ class PenerimaanController extends Controller
         $subtotal = (float) $computed['subtotal'];
         $diskon = (float) $computed['total_diskon'];
         $pajak = (float) $computed['total_ppn'];
-        $biayaLain = $this->moneyValue($request->biaya_lain);
+        $biayaLain = $this->allocatedPurchaseOrderAdditionalCost($po, (float) $computed['total_qty']);
         $grossTotalFaktur = max(0, $subtotal - $diskon + $pajak + $biayaLain);
         $supplierCompensationDiscount = min(
             $this->moneyValue($supplierCompensationDiscount),
@@ -882,6 +882,10 @@ class PenerimaanController extends Controller
             'branch' => $po->branch->name ?? '-',
             'tanggal_po' => $po->tanggal_po,
             'total_estimasi' => $po->total_estimasi,
+            'biaya_asuransi' => $this->moneyValue($po->biaya_asuransi),
+            'biaya_pengiriman' => $this->moneyValue($po->biaya_pengiriman),
+            'total_biaya_tambahan' => $this->purchaseOrderAdditionalCost($po),
+            'total_qty_po' => round((float) $po->details->sum('qty'), 4),
             'catatan' => $po->catatan,
             'supplier_compensation_alert' => $this->supplierCompensationAlert((int) $po->distributor_id),
             'details' => $details,
@@ -1057,6 +1061,25 @@ class PenerimaanController extends Controller
         return round(max(0, (float) ($value ?: 0)), 2);
     }
 
+    private function purchaseOrderAdditionalCost(PembelianModel $po): float
+    {
+        return $this->moneyValue(
+            $this->moneyValue($po->biaya_asuransi) + $this->moneyValue($po->biaya_pengiriman)
+        );
+    }
+
+    private function allocatedPurchaseOrderAdditionalCost(PembelianModel $po, float $receivedQty): float
+    {
+        $additionalCost = $this->purchaseOrderAdditionalCost($po);
+        $orderedQty = (float) $po->details->sum('qty');
+
+        if ($additionalCost <= 0 || $orderedQty <= 0 || $receivedQty <= 0) {
+            return 0;
+        }
+
+        return $this->moneyValue($additionalCost * min($receivedQty, $orderedQty) / $orderedQty);
+    }
+
     private function sameDiscount(float $left, float $right): bool
     {
         return $this->samePercent($left, $right);
@@ -1110,8 +1133,12 @@ class PenerimaanController extends Controller
 
     private function sellingPricePayload(PenerimaanBarangModel $penerimaan): array
     {
+        $otherCostAllocations = $this->otherCostAllocationsByDetailId($penerimaan);
         $details = $penerimaan->details
-            ->map(fn (PenerimaanBarangDetailModel $detail) => $this->sellingPriceRow($detail))
+            ->map(fn (PenerimaanBarangDetailModel $detail) => $this->sellingPriceRow(
+                $detail,
+                $otherCostAllocations[$detail->id] ?? 0
+            ))
             ->values();
 
         return [
@@ -1121,6 +1148,7 @@ class PenerimaanController extends Controller
                 'no_po' => $penerimaan->purchaseOrder->no_po ?? '-',
                 'supplier' => $penerimaan->distributor->nama ?? '-',
                 'tanggal_penerimaan' => optional($penerimaan->tanggal_penerimaan)->format('Y-m-d'),
+                'biaya_lain' => round((float) $penerimaan->biaya_lain, 2),
             ],
             'details' => $details,
             'summary' => [
@@ -1132,14 +1160,19 @@ class PenerimaanController extends Controller
 
     private function sellingPriceRowsByDetailId(PenerimaanBarangModel $penerimaan): array
     {
+        $otherCostAllocations = $this->otherCostAllocationsByDetailId($penerimaan);
+
         return $penerimaan->details
             ->mapWithKeys(fn (PenerimaanBarangDetailModel $detail) => [
-                $detail->id => $this->sellingPriceRow($detail),
+                $detail->id => $this->sellingPriceRow(
+                    $detail,
+                    $otherCostAllocations[$detail->id] ?? 0
+                ),
             ])
             ->all();
     }
 
-    private function sellingPriceRow(PenerimaanBarangDetailModel $detail): array
+    private function sellingPriceRow(PenerimaanBarangDetailModel $detail, float $allocatedOtherCost = 0): array
     {
         $detail->loadMissing([
             'obat.satuan',
@@ -1176,9 +1209,12 @@ class PenerimaanController extends Controller
         }
 
         $nilaiDiskon = $this->detailDiscountValue($detail, $totalHargaBeli, $diskon);
-        $totalHargaJual = max(0, $totalHargaBeli * $faktorJual);
+        $totalHargaJualSebelumBiayaLain = max(0, $totalHargaBeli * $faktorJual);
+        $allocatedOtherCost = $this->moneyValue($allocatedOtherCost);
+        $totalHargaJual = $totalHargaJualSebelumBiayaLain + $allocatedOtherCost;
         $hargaJual = round($totalHargaJual / $qtySatuanTerkecil, 2);
         $hargaBeliTerkecil = $totalHargaBeli / $qtySatuanTerkecil;
+        $biayaLainPerSatuanBeli = $allocatedOtherCost / max(1, (float) $detail->qty_diterima);
         $satuanBeli = $detail->satuan_beli
             ?: ($detail->purchaseOrderDetail?->satuanKonversi?->satuan?->nama ?? ($obat->satuan->nama ?? 'satuan'));
         $satuanTerkecil = $detail->satuan_stok ?: ($obat->satuan->nama ?? 'satuan terkecil');
@@ -1209,9 +1245,47 @@ class PenerimaanController extends Controller
             'nilai_diskon_beli' => round($nilaiDiskon, 2),
             'nilai_diskon_jual' => round($nilaiDiskon, 2),
             'total_harga_beli_include_ppn' => round($totalHargaBeli, 2),
+            'alokasi_biaya_lain' => $allocatedOtherCost,
+            'biaya_lain_satuan_beli' => round($biayaLainPerSatuanBeli, 2),
+            'total_harga_jual_sebelum_biaya_lain' => round($totalHargaJualSebelumBiayaLain, 2),
             'total_harga_jual' => round($totalHargaJual, 2),
             'harga_jual' => $hargaJual,
         ];
+    }
+
+    /**
+     * @return array<int, float>
+     */
+    private function otherCostAllocationsByDetailId(PenerimaanBarangModel $penerimaan): array
+    {
+        $details = $penerimaan->details
+            ->filter(fn (PenerimaanBarangDetailModel $detail) => (float) $detail->qty_diterima > 0)
+            ->sortBy('id')
+            ->values();
+        $totalOtherCost = $this->moneyValue($penerimaan->biaya_lain);
+        $totalQty = (float) $details->sum('qty_diterima');
+
+        if ($details->isEmpty() || $totalOtherCost <= 0 || $totalQty <= 0) {
+            return [];
+        }
+
+        $remainingCost = $totalOtherCost;
+        $remainingQty = $totalQty;
+        $allocations = [];
+
+        foreach ($details as $index => $detail) {
+            $qty = (float) $detail->qty_diterima;
+            $isLast = $index === $details->count() - 1;
+            $allocation = $isLast
+                ? $remainingCost
+                : $this->moneyValue($remainingCost * $qty / $remainingQty);
+
+            $allocations[$detail->id] = $allocation;
+            $remainingCost = $this->moneyValue($remainingCost - $allocation);
+            $remainingQty = max(0, $remainingQty - $qty);
+        }
+
+        return $allocations;
     }
 
     private function detailConversionFactor(PenerimaanBarangDetailModel $detail): float

@@ -25,9 +25,9 @@ License: For each use you must have a valid license purchased only from above li
                 @include("template.partials.navbar")
                 <!-- partial -->
 
-                @unless (request()->routeIs("penjualan.pos"))
+                {{-- @unless (request()->routeIs("penjualan.pos"))
                     @include("template.partials.page-tabs")
-                @endunless
+                @endunless --}}
 
                 <div class="page-content">
 

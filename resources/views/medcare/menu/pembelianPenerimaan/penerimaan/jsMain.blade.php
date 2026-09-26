@@ -7,6 +7,8 @@
         let receiveDatePicker = null;
         let paymentPreset = 'none';
         let supplierCompensationAvailable = 0;
+        let currentPoAdditionalCost = 0;
+        let currentPoTotalQty = 0;
 
         $.ajaxSetup({
             headers: {
@@ -498,6 +500,8 @@
             let form = $('#penerimaanForm');
             form.trigger('reset');
             paymentPreset = 'none';
+            currentPoAdditionalCost = 0;
+            currentPoTotalQty = 0;
             $('#penerimaan_id').val('');
             $('#purchase_order_id').val('').trigger('change');
             $('#receive_supplier').val('');
@@ -577,6 +581,8 @@
         }
 
         function renderPoSummary(po) {
+            currentPoAdditionalCost = Number(po.total_biaya_tambahan || 0);
+            currentPoTotalQty = Number(po.total_qty_po || 0);
             $('#receivePoSummary').removeClass('d-none');
             $('#summaryNoPo').text(po.no_po || '-');
             $('#summaryTanggalPo').text(formatDateDisplay(po.tanggal_po));
@@ -932,7 +938,11 @@
             let tax = Number(stats.totalTax) || 0;
             let otherCostInput = $('input[name="biaya_lain"]');
             let paidInput = $('input[name="jumlah_dibayar"]');
-            let otherCost = getMoneyInput('biaya_lain');
+            let receivedQty = Number(stats.totalQty) || 0;
+            let otherCost = currentPoTotalQty > 0
+                ? Math.round((currentPoAdditionalCost * Math.min(receivedQty, currentPoTotalQty) / currentPoTotalQty) * 100) / 100
+                : 0;
+            setMoneyInput('biaya_lain', otherCost);
             let grossTotal = Math.max(0, subtotal - discount + tax + otherCost);
             let compensationEnabled = $('#applySupplierCompensation').is(':checked') && supplierCompensationAvailable > 0;
             let compensationInput = $('#supplierCompensationDiscount');
@@ -1146,6 +1156,8 @@
             let poId = $(this).val();
 
             if (!poId) {
+                currentPoAdditionalCost = 0;
+                currentPoTotalQty = 0;
                 $('#receive_supplier').val('');
                 hideSupplierCompensationAlert();
                 $('#receivePoSummary').addClass('d-none');
@@ -1602,6 +1614,10 @@
                             <small class="d-block text-muted">Dasar ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
                         </td>
                         <td class="text-end">
+                            <strong>${formatRupiah(item.alokasi_biaya_lain)}</strong>
+                            <small class="d-block text-muted">${formatRupiah(item.biaya_lain_satuan_beli)}/${escapeHtml(item.satuan_beli)}</small>
+                        </td>
+                        <td class="text-end">
                             <strong>${formatDecimal(item.qty_satuan_terkecil, 0, 2)}</strong>
                             <small class="d-block text-muted">${escapeHtml(item.satuan_terkecil)}</small>
                             <small class="d-block text-muted">Konversi ${formatDecimal(item.konversi_satuan, 0, 2)}</small>
@@ -1625,6 +1641,7 @@
                             <strong>${formatRupiah(item.harga_jual)}</strong>
                             <small class="d-block text-muted">/${escapeHtml(item.satuan_terkecil)}</small>
                             <small class="d-block text-muted">Total ${formatRupiah(item.total_harga_jual)}</small>
+                            <small class="d-block text-muted">Termasuk alokasi biaya lain</small>
                         </td>
                     </tr>
                 `;
@@ -1633,7 +1650,7 @@
             if (!rows) {
                 rows = `
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">Tidak ada detail harga jual.</td>
+                            <td colspan="8" class="text-center text-muted py-4">Tidak ada detail harga jual.</td>
                     </tr>
                 `;
             }
@@ -1647,6 +1664,9 @@
                         </div>
                         <span class="badge bg-primary bg-opacity-10 text-primary align-self-start">${details.length} item</span>
                     </div>
+                    <div class="alert alert-info py-2 mb-3">
+                        Biaya lain ${formatRupiah(header.biaya_lain)} dialokasikan berdasarkan total qty item diterima dan ditambahkan ke harga jual.
+                    </div>
                     ${missingMargin > 0 ? `
                         <div class="alert alert-warning py-2 mb-3">
                             ${missingMargin} item belum memiliki margin aktif sesuai prioritas, sehingga faktor 1.000 dipakai.
@@ -1658,6 +1678,7 @@
                                 <tr>
                                     <th>Obat</th>
                                     <th class="text-end">Total Beli + PPN</th>
+                                    <th class="text-end">Alokasi Biaya Lain</th>
                                     <th class="text-end">Qty Terkecil</th>
                                     <th class="text-center">PPN</th>
                                     <th class="text-center">Faktor</th>

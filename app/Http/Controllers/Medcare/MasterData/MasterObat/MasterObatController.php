@@ -53,11 +53,31 @@ class MasterObatController extends Controller
         return view('medcare.masterData.Obat.obat');
     }
 
-    public function table()
+    public function table(Request $request)
     {
-        $MasterObat = $this->MasterObatService->getMasterObatTable();
+        $masterObat = collect($this->MasterObatService->getMasterObatTable());
+        $totalMasterObat = $masterObat->count();
+        $classificationFilters = array_filter([
+            'category_filter' => trim((string) $request->input('classification_filters.category', '')),
+            'golongan_filter' => trim((string) $request->input('classification_filters.golongan', '')),
+            'main_golongan_filter' => trim((string) $request->input('classification_filters.main_golongan', '')),
+            'sub_golongan_filter' => trim((string) $request->input('classification_filters.sub_golongan', '')),
+        ]);
 
-        return DataTables::of($MasterObat)
+        if ($classificationFilters !== []) {
+            $masterObat = $masterObat->filter(function (array $row) use ($classificationFilters) {
+                foreach ($classificationFilters as $field => $expectedValue) {
+                    if (($row[$field] ?? null) !== $expectedValue) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        }
+
+        return DataTables::of($masterObat)
+            ->setTotalRecords($totalMasterObat)
             ->addIndexColumn()
             ->addColumn('actions', function ($dataMasterObat) {
                 return '
@@ -74,6 +94,11 @@ class MasterObatController extends Controller
 
             ->rawColumns(['actions'])
             ->make(true);
+    }
+
+    public function filterOptions()
+    {
+        return response()->json($this->MasterObatService->getFilterOptions());
     }
 
     public function getMainGolongan($golongan)

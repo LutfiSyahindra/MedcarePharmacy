@@ -14,8 +14,34 @@
         const golonganSelector = '[name="golongan_id"]';
         const mainGolonganSelector = '[name="main_golongan_id"]';
         const subGolonganSelector = '[name="sub_golongan_id"]';
+        const classificationFilters = [{
+                key: 'category',
+                source: 'categories',
+                selector: '#obatCategoryFilter',
+                allLabel: 'kategori'
+            },
+            {
+                key: 'golongan',
+                source: 'golongan',
+                selector: '#obatGolonganFilter',
+                allLabel: 'golongan'
+            },
+            {
+                key: 'main_golongan',
+                source: 'main_golongan',
+                selector: '#obatMainGolonganFilter',
+                allLabel: 'main golongan'
+            },
+            {
+                key: 'sub_golongan',
+                source: 'sub_golongan',
+                selector: '#obatSubGolonganFilter',
+                allLabel: 'sub golongan'
+            }
+        ];
         let modalMode = 'create';
         let isHydratingEdit = false;
+        let isHydratingFilters = false;
         let lookupRequest = null;
 
         if ($.fn.dropify) {
@@ -191,7 +217,15 @@
         const masterObatTable = $('#tableObat').DataTable(MasterObatUI.dataTableOptions({
             ajax: {
                 url: "{{ route("masterObat.table") }}",
-                type: "GET"
+                type: "GET",
+                data: function(data) {
+                    data.classification_filters = {};
+
+                    classificationFilters.forEach(function(config) {
+                        const value = String($(config.selector).val() || '');
+                        data.classification_filters[config.key] = classificationFilterToken(config, value);
+                    });
+                }
             },
             columns: [{
                     data: null,
@@ -297,6 +331,146 @@
             selectedTarget: '#obatSelected'
         });
 
+        $('.master-obat-filter').select2({
+            width: '100%',
+            minimumResultsForSearch: 6,
+            language: {
+                noResults: function() {
+                    return 'Pilihan tidak ditemukan';
+                }
+            }
+        });
+
+        function classificationOptionText(item) {
+            const hierarchy = [
+                item.golongan_name,
+                item.main_golongan_name,
+                item.name
+            ].filter(Boolean).join(' › ');
+            const identity = item.code && !item.is_empty ? `${item.code} — ${hierarchy}` : hierarchy;
+            const count = Number(item.count || 0).toLocaleString('id-ID');
+
+            return `${identity} · ${count} item`;
+        }
+
+        function classificationFilterToken(config, value) {
+            if (!value) return '';
+
+            return `|${config.key}:${value === '__none__' ? 'none' : value}|`;
+        }
+
+        function updateClassificationFilterState() {
+            const activeCount = classificationFilters.filter(function(config) {
+                return Boolean($(config.selector).val());
+            }).length;
+
+            $('#obatFilterPanel').toggleClass('has-active-filter', activeCount > 0);
+            $('#obatFilterReset').prop('disabled', activeCount === 0);
+            $('#obatFilterActiveCount').text(
+                activeCount > 0 ? `${activeCount} filter aktif` : 'Belum ada filter aktif'
+            );
+        }
+
+        function syncClassificationFilters(drawTable = true) {
+            updateClassificationFilterState();
+
+            if (drawTable) {
+                masterObatTable.ajax.reload(null, true);
+            }
+        }
+
+        function loadClassificationFilterOptions(preserveSelections = true) {
+            const previousValues = {};
+
+            classificationFilters.forEach(function(config) {
+                previousValues[config.key] = preserveSelections ? String($(config.selector).val() || '') : '';
+                $(config.selector)
+                    .prop('disabled', true)
+                    .empty()
+                    .append(new Option(`Memuat ${config.allLabel}...`, '', false, false))
+                    .trigger('change.select2');
+            });
+
+            isHydratingFilters = true;
+
+            return $.ajax({
+                url: "{{ route("masterObat.filterOptions") }}",
+                type: 'GET',
+                dataType: 'json'
+            }).done(function(response) {
+                const total = Number(response.total || 0).toLocaleString('id-ID');
+                const filters = response.filters || {};
+
+                classificationFilters.forEach(function(config) {
+                    const $select = $(config.selector);
+                    const items = Array.isArray(filters[config.source]) ? filters[config.source] : [];
+                    const previousValue = previousValues[config.key];
+                    const canRestore = previousValue && items.some(function(item) {
+                        return String(item.id) === previousValue;
+                    });
+
+                    $select.empty().append(
+                        new Option(`Semua ${config.allLabel} · ${total} item`, '', false, false)
+                    );
+
+                    items.forEach(function(item) {
+                        $select.append(
+                            new Option(classificationOptionText(item), String(item.id), false, false)
+                        );
+                    });
+
+                    $select
+                        .prop('disabled', false)
+                        .val(canRestore ? previousValue : '')
+                        .trigger('change.select2');
+                });
+
+                syncClassificationFilters(false);
+            }).fail(function() {
+                classificationFilters.forEach(function(config) {
+                    $(config.selector)
+                        .empty()
+                        .append(new Option(`Gagal memuat ${config.allLabel}`, '', false, false))
+                        .prop('disabled', true)
+                        .trigger('change.select2');
+                });
+
+                MasterObatUI.toast(
+                    'error',
+                    'Filter Tidak Tersedia',
+                    'Jumlah item klasifikasi belum dapat dimuat. Silakan refresh data.'
+                );
+            }).always(function() {
+                isHydratingFilters = false;
+            });
+        }
+
+        function refreshMasterObatData() {
+            loadClassificationFilterOptions(true).always(function() {
+                masterObatTable.ajax.reload(null, false);
+            });
+        }
+
+        $('.master-obat-filter').on('change.obatClassification', function() {
+            if (isHydratingFilters) return;
+            syncClassificationFilters(true);
+        });
+
+        $('#obatFilterReset').on('click', function() {
+            isHydratingFilters = true;
+            classificationFilters.forEach(function(config) {
+                $(config.selector).val('').trigger('change.select2');
+            });
+            isHydratingFilters = false;
+            syncClassificationFilters(true);
+        });
+
+        $('.obat-refresh-table').on('click.obatFilterRefresh', function() {
+            loadClassificationFilterOptions(true);
+        });
+
+        loadClassificationFilterOptions(false);
+
         $('#tableObat tbody').on('click', '.obat-detail-toggle', function(event) {
             event.preventDefault();
             event.stopPropagation();
@@ -392,7 +566,7 @@
                     if (response.status === 'success') {
                         $(modalSelector).modal('hide');
                         MasterObatUI.toast('success', response.message);
-                        masterObatTable.ajax.reload(null, false);
+                        refreshMasterObatData();
                     }
                 },
                 error: function(xhr) {
@@ -491,7 +665,7 @@
                     success: function(response) {
                         if (response.success) {
                             MasterObatUI.toast('success', 'Berhasil Dihapus', response.message);
-                            masterObatTable.ajax.reload(null, false);
+                            refreshMasterObatData();
                             return;
                         }
 
@@ -590,7 +764,7 @@
                             showConfirmButton: false,
                             willClose: function() {
                                 $(excelModalSelector).modal('hide');
-                                masterObatTable.ajax.reload(null, false);
+                                refreshMasterObatData();
                             }
                         });
                         return;

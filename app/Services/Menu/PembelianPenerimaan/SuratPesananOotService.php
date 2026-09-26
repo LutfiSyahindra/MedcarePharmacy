@@ -4,6 +4,7 @@ namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\MasterObatModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Models\SuratPesananSetting;
 use App\Support\ControlledDrugClassification;
 use App\Support\IndonesianNumber;
 use Illuminate\Database\Eloquent\Collection;
@@ -55,10 +56,9 @@ class SuratPesananOotService
 
     public function matchedClassification(?MasterObatModel $medicine): ?string
     {
-        return ControlledDrugClassification::matchedClassification(
+        return ControlledDrugClassification::matchedClassificationForType(
             $medicine,
-            ['oot', 'obat-obat tertentu', 'obat tertentu'],
-            ['ot', 'otk', 'oot']
+            SuratPesananSetting::TYPE_OOT
         );
     }
 }
