@@ -248,6 +248,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/masterObat', [MasterObatController::class, 'MasterObat'])->name('masterObat.MasterObat');
         Route::get('/masterObat/table', [MasterObatController::class, 'table'])->name('masterObat.table');
         Route::get('/masterObat/filter-options', [MasterObatController::class, 'filterOptions'])->name('masterObat.filterOptions');
+        Route::get('/masterObat/code-prefixes', [MasterObatController::class, 'codePrefixes'])->name('masterObat.codePrefixes');
+        Route::get('/masterObat/next-code', [MasterObatController::class, 'nextCode'])->name('masterObat.nextCode');
         Route::post('/masterObat/store', [MasterObatController::class, 'store'])->name('masterObat.store');
         Route::get('/masterObat/{id}/edit', [MasterObatController::class, 'edit'])->name('masterObat.edit');
         Route::put('/masterObat/{id}/update', [MasterObatController::class, 'update'])->name('masterObat.update');
@@ -308,6 +310,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/penerimaan/po/{id}', [PenerimaanController::class, 'purchaseOrderDetail'])->name('penerimaan.purchaseOrderDetail');
         Route::post('/penerimaan/store', [PenerimaanController::class, 'store'])->name('penerimaan.store');
         Route::get('/penerimaan/{id}/show', [PenerimaanController::class, 'show'])->name('penerimaan.show');
+        Route::get('/penerimaan/{id}/print', [PenerimaanController::class, 'printReceipt'])->name('penerimaan.print');
         Route::get('/penerimaan/{id}/edit', [PenerimaanController::class, 'edit'])->name('penerimaan.edit');
         Route::get('/penerimaan/{id}/harga-jual-preview', [PenerimaanController::class, 'hargaJualPreview'])->name('penerimaan.hargaJualPreview');
         Route::put('/penerimaan/{id}/update', [PenerimaanController::class, 'update'])->name('penerimaan.update');

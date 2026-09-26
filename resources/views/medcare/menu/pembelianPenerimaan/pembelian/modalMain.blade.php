@@ -112,13 +112,89 @@
                                     <small>Tambahkan obat, satuan, jumlah, harga, dan tiga diskon bertingkatnya.</small>
                                 </div>
                             </div>
-                            <button type="button" id="addDetail" class="btn btn-success btn-sm purchase-add-detail">
-                                <i class="mdi mdi-plus-circle-outline"></i>
-                                Tambah Obat
-                            </button>
+                            <div class="purchase-detail-actions">
+                                <button type="button" id="toggleMedicinePicker"
+                                    class="btn btn-primary btn-sm purchase-add-detail" aria-expanded="false"
+                                    aria-controls="medicinePicker">
+                                    <i class="mdi mdi-checkbox-multiple-marked-outline"></i>
+                                    Pilih Banyak Obat
+                                </button>
+                                <button type="button" id="addDetail"
+                                    class="btn btn-outline-success btn-sm purchase-add-detail">
+                                    <i class="mdi mdi-plus-circle-outline"></i>
+                                    Tambah Baris Manual
+                                </button>
+                            </div>
                         </div>
 
                         <div class="purchase-form-section-body">
+                            <div id="medicinePicker" class="purchase-medicine-picker d-none" aria-hidden="true">
+                                <div class="purchase-medicine-picker-head">
+                                    <div>
+                                        <strong><i class="mdi mdi-format-list-checks"></i> Pilih Item Obat</strong>
+                                        <small>Cari lalu centang beberapa obat untuk dimasukkan sekaligus ke rincian PO.</small>
+                                    </div>
+                                    <button type="button" id="closeMedicinePicker"
+                                        class="btn btn-sm btn-light purchase-picker-close" aria-label="Tutup daftar obat"
+                                        title="Tutup daftar obat">
+                                        <i class="mdi mdi-close"></i>
+                                    </button>
+                                </div>
+
+                                <div class="purchase-medicine-picker-toolbar">
+                                    <div class="purchase-picker-search">
+                                        <i class="mdi mdi-magnify"></i>
+                                        <input type="search" id="medicinePickerSearch"
+                                            placeholder="Cari kode, nama, atau satuan obat..." autocomplete="off"
+                                            aria-label="Cari item obat">
+                                        <button type="button" id="clearMedicinePickerSearch"
+                                            aria-label="Hapus pencarian obat" title="Hapus pencarian">
+                                            <i class="mdi mdi-close"></i>
+                                        </button>
+                                    </div>
+                                    <span id="medicinePickerResultCount" class="purchase-picker-result-count">
+                                        Memuat daftar obat...
+                                    </span>
+                                </div>
+
+                                <div class="purchase-picker-table-wrap">
+                                    <table class="table table-hover align-middle purchase-picker-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="purchase-picker-check-cell">
+                                                    <input type="checkbox" class="form-check-input"
+                                                        id="selectAllVisibleMedicines"
+                                                        aria-label="Pilih semua hasil pencarian">
+                                                </th>
+                                                <th>Kode</th>
+                                                <th>Nama Obat</th>
+                                                <th>Satuan Dasar</th>
+                                                <th class="text-end">Harga Beli</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="medicinePickerList">
+                                            <tr>
+                                                <td colspan="6" class="purchase-picker-state">
+                                                    <i class="mdi mdi-loading mdi-spin"></i> Memuat daftar obat...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="purchase-medicine-picker-footer">
+                                    <span>
+                                        <strong id="medicinePickerSelectedCount">0</strong> obat dipilih
+                                    </span>
+                                    <button type="button" id="addSelectedMedicines" class="btn btn-primary btn-sm"
+                                        disabled>
+                                        <i class="mdi mdi-playlist-plus"></i>
+                                        Masukkan ke Rincian
+                                    </button>
+                                </div>
+                            </div>
+
                             <div class="purchase-detail-summary">
                                 <span><i class="mdi mdi-format-list-numbered"></i> <strong
                                         id="purchaseModalLineCount">1</strong> baris obat</span>

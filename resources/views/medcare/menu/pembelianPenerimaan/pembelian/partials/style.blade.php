@@ -1074,6 +1074,266 @@
         line-height: 1.35;
     }
 
+    .purchase-detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: .45rem;
+    }
+
+    .purchase-medicine-picker {
+        margin-bottom: 1rem;
+        border: 1px solid rgba(37, 99, 235, .2);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 12px 30px rgba(37, 99, 235, .08);
+        overflow: hidden;
+    }
+
+    .purchase-medicine-picker-head,
+    .purchase-medicine-picker-toolbar,
+    .purchase-medicine-picker-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .8rem .9rem;
+    }
+
+    .purchase-medicine-picker-head {
+        color: #1e3a8a;
+        background: linear-gradient(135deg, #eff6ff, #ecfeff);
+    }
+
+    .purchase-medicine-picker-head strong,
+    .purchase-medicine-picker-head small {
+        display: block;
+    }
+
+    .purchase-medicine-picker-head strong {
+        font-weight: 900;
+    }
+
+    .purchase-medicine-picker-head strong i {
+        margin-right: .3rem;
+    }
+
+    .purchase-medicine-picker-head small {
+        margin-top: .12rem;
+        color: #52637d;
+    }
+
+    .purchase-picker-close {
+        display: inline-grid !important;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        place-items: center;
+        border: 1px solid rgba(37, 99, 235, .14) !important;
+        border-radius: 8px !important;
+        color: #1e40af !important;
+        padding: 0 !important;
+    }
+
+    .purchase-medicine-picker-toolbar {
+        border-top: 1px solid rgba(37, 99, 235, .08);
+        border-bottom: 1px solid var(--purchase-border);
+        background: #fff;
+    }
+
+    .purchase-picker-search {
+        display: flex;
+        align-items: center;
+        width: min(100%, 520px);
+        border: 1px solid var(--purchase-border);
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .purchase-picker-search:focus-within {
+        border-color: rgba(37, 99, 235, .4);
+        box-shadow: 0 0 0 .18rem rgba(37, 99, 235, .08);
+    }
+
+    .purchase-picker-search > i {
+        padding-left: .75rem;
+        color: var(--purchase-muted);
+    }
+
+    .purchase-picker-search input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        padding: .62rem .65rem;
+        color: var(--purchase-text);
+        background: transparent;
+    }
+
+    .purchase-picker-search button {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        margin-right: .2rem;
+        border: 0;
+        border-radius: 8px;
+        color: var(--purchase-muted);
+        background: transparent;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .purchase-picker-search button.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .purchase-picker-result-count {
+        color: var(--purchase-muted);
+        font-size: .78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .purchase-picker-table-wrap {
+        max-height: 330px;
+        overflow: auto;
+    }
+
+    .purchase-picker-table {
+        min-width: 760px;
+        margin: 0;
+    }
+
+    .purchase-picker-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .purchase-picker-table thead th {
+        padding: .65rem .75rem;
+        border-bottom-color: var(--purchase-border);
+        color: #52637d;
+        background: #f7faff;
+        font-size: .72rem;
+        font-weight: 900;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .purchase-picker-table tbody td {
+        padding: .62rem .75rem;
+        border-bottom-color: #edf2f8;
+        color: #52637d;
+        font-size: .8rem;
+    }
+
+    .purchase-picker-table tbody tr.is-added td {
+        background: #f8fafc;
+        opacity: .72;
+    }
+
+    .purchase-picker-check-cell {
+        width: 44px;
+        text-align: center;
+    }
+
+    .purchase-picker-table .form-check-input {
+        width: 1.05rem;
+        height: 1.05rem;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .purchase-picker-table .form-check-input:disabled {
+        cursor: not-allowed;
+    }
+
+    .purchase-picker-code {
+        display: inline-block;
+        border-radius: 6px;
+        padding: .24rem .42rem;
+        color: #1d4ed8;
+        background: #eff6ff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: .74rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .purchase-picker-name {
+        display: block;
+        color: var(--purchase-text);
+        font-weight: 800;
+    }
+
+    .purchase-picker-price {
+        color: var(--purchase-text) !important;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .purchase-picker-status {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+        border-radius: 999px;
+        padding: .28rem .48rem;
+        color: #1d4ed8;
+        background: #eff6ff;
+        font-size: .7rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .purchase-picker-status.is-added {
+        color: #15803d;
+        background: #ecfdf3;
+    }
+
+    .purchase-picker-state {
+        height: 120px;
+        color: var(--purchase-muted) !important;
+        text-align: center;
+    }
+
+    .purchase-picker-state i {
+        margin-right: .3rem;
+        font-size: 1.05rem;
+    }
+
+    .purchase-picker-state.is-error {
+        color: var(--purchase-danger) !important;
+    }
+
+    .purchase-medicine-picker-footer {
+        border-top: 1px solid var(--purchase-border);
+        background: #fbfdff;
+    }
+
+    .purchase-medicine-picker-footer > span {
+        color: var(--purchase-muted);
+        font-size: .8rem;
+    }
+
+    .purchase-medicine-picker-footer > span strong {
+        color: var(--purchase-accent);
+        font-size: 1rem;
+    }
+
+    .purchase-medicine-picker-footer .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border-radius: 8px;
+        font-weight: 800;
+    }
+
     .purchase-detail-summary {
         display: flex;
         flex-wrap: wrap;
@@ -1403,6 +1663,29 @@
 
         .purchase-detail-card-head {
             flex-direction: column;
+        }
+
+        .purchase-detail-actions,
+        .purchase-detail-actions .btn {
+            width: 100%;
+        }
+
+        .purchase-detail-actions .btn {
+            justify-content: center;
+        }
+
+        .purchase-medicine-picker-toolbar,
+        .purchase-medicine-picker-footer {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .purchase-picker-search {
+            width: 100%;
+        }
+
+        .purchase-medicine-picker-footer .btn {
+            justify-content: center;
         }
     }
 

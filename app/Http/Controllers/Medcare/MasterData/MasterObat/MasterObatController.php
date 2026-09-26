@@ -129,6 +129,26 @@ class MasterObatController extends Controller
         return response()->json($sediaan);
     }
 
+    public function nextCode(Request $request)
+    {
+        $request->merge([
+            'prefix' => strtoupper(trim((string) $request->input('prefix'))),
+        ]);
+
+        $validated = $request->validate([
+            'prefix' => ['required', 'string', 'regex:/^[A-Z]{3}$/'],
+        ]);
+
+        return response()->json([
+            'kode_obat' => $this->MasterObatService->previewNextCode($validated['prefix']),
+        ]);
+    }
+
+    public function codePrefixes()
+    {
+        return response()->json($this->MasterObatService->getCodePrefixes());
+    }
+
     public function getGolongan()
     {
         $golongan = $this->GolonganService->getGolongan();
@@ -179,9 +199,13 @@ class MasterObatController extends Controller
     {
         $validated = $this->validateMasterObat($request);
 
-        $this->MasterObatService->createMasterObat($validated);
+        $dataMasterObat = $this->MasterObatService->createMasterObat($validated);
 
-        return response()->json(['status' => 'success', 'message' => 'Master Obat berhasil ditambahkan']);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Master Obat berhasil ditambahkan dengan kode '.$dataMasterObat->kode_obat,
+            'data' => $dataMasterObat,
+        ]);
     } //
 
     /**
@@ -220,13 +244,7 @@ class MasterObatController extends Controller
 
     private function validateMasterObat(Request $request, ?string $id = null): array
     {
-        $validated = $request->validate([
-            'kode_obat' => [
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('master_obats', 'kode_obat')->ignore($id),
-            ],
+        $rules = [
             'nama_obat' => 'required|string|max:150',
             'sediaan_id' => 'required|exists:sediaan_obats,id',
             'category_id' => 'required|exists:categories,id',
@@ -256,7 +274,16 @@ class MasterObatController extends Controller
 
             'is_generik' => 'required|boolean',
             'is_active' => 'required|boolean',
-        ]);
+        ];
+
+        if ($id === null) {
+            $request->merge([
+                'kode_prefix' => strtoupper(trim((string) $request->input('kode_prefix'))),
+            ]);
+            $rules['kode_prefix'] = ['required', 'string', 'regex:/^[A-Z]{3}$/'];
+        }
+
+        $validated = $request->validate($rules);
 
         // Select yang disabled tidak dikirim browser. Tetap sertakan nilai NULL
         // agar klasifikasi lama tidak tertinggal saat hierarki dikosongkan.

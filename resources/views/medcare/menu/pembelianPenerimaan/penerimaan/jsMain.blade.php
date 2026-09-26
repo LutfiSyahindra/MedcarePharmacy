@@ -1279,6 +1279,7 @@
             drawCallback: function() {
                 let table = $('#tablePenerimaan');
                 table.find('.btn-info').attr('title', 'Lihat detail penerimaan');
+                table.find('.btn-print-receipt').attr('title', 'Cetak penerimaan');
                 table.find('.btn-success').attr('title', 'Edit draft penerimaan');
                 table.find('.btn-primary').attr('title', 'Posting penerimaan ke stok');
                 table.find('.btn-warning').attr('title', 'Batalkan penerimaan');
@@ -1551,6 +1552,10 @@
                 $('#detailCatatan').val(header.catatan || '-');
                 $('#detailReceiveItemCount').text(Number(header.total_barang || 0).toLocaleString('id-ID'));
                 $('#detailGrandTotal').text(formatRupiah(header.total_faktur ?? header.grand_total));
+                $('#detailPrintPenerimaan').attr(
+                    'href',
+                    '{{ route("penerimaan.print", ":id") }}'.replace(':id', header.id)
+                );
 
                 $('#detailReceiveTable tbody').empty();
                 (header.details || []).forEach(function(item) {

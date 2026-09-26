@@ -77,6 +77,7 @@ class PenerimaanController extends Controller
                     $row->purchaseOrder?->branch_id ? (int) $row->purchaseOrder->branch_id : null
                 );
                 $detailButton = '<button class="btn btn-sm btn-info" onclick="lihatPenerimaan('.$row->id.')"><i class="mdi mdi-eye"></i></button>';
+                $printButton = '<a class="btn btn-sm btn-secondary btn-print-receipt" href="'.route('penerimaan.print', $row->id).'" target="_blank" rel="noopener"><i class="mdi mdi-printer-outline"></i></a>';
                 $editButton = $row->status === 'draft'
                     ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan('.$row->id.')"><i class="mdi mdi-pencil"></i></button>'
                     : '';
@@ -90,7 +91,7 @@ class PenerimaanController extends Controller
                     ? '<button class="btn btn-sm btn-danger" onclick="deletePenerimaan('.$row->id.')"><i class="mdi mdi-delete"></i></button>'
                     : '';
 
-                return $detailButton.' '.$editButton.' '.$postButton.' '.$cancelButton.' '.$deleteButton;
+                return $detailButton.' '.$printButton.' '.$editButton.' '.$postButton.' '.$cancelButton.' '.$deleteButton;
             })
             ->rawColumns(['actions'])
             ->with(['summary' => $summary])
@@ -190,6 +191,24 @@ class PenerimaanController extends Controller
     public function show($id)
     {
         return response()->json($this->penerimaanPayload($id, false));
+    }
+
+    public function printReceipt(Request $request, $id)
+    {
+        $penerimaan = $this->penerimaanQueryForBranch([
+            'purchaseOrder.branch.apotekProfile',
+            'distributor',
+            'details.obat.satuan',
+            'details.purchaseOrderDetail.satuanKonversi.satuan',
+            'createdBy',
+            'postedBy',
+            'cancelledBy',
+        ])->findOrFail($id);
+
+        return view('medcare.menu.pembelianPenerimaan.penerimaan.print', [
+            'penerimaan' => $penerimaan,
+            'autoPrint' => $request->boolean('print'),
+        ]);
     }
 
     public function edit($id)

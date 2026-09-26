@@ -226,10 +226,40 @@ class MasterObatService
         return $dataMasterObat;
     }
 
-    public function createMasterObat($data)
+    public function createMasterObat(array $data)
     {
-        $dataMasterObat = $this->MasterObatRepository->createMasterObat($data);
-        return $dataMasterObat;
+        return DB::transaction(function () use ($data) {
+            $prefix = $this->normalizeCodePrefix((string) $data['kode_prefix']);
+            unset($data['kode_prefix']);
+            $data['kode_obat'] = $this->nextMedicineCode($prefix, true);
+
+            return $this->MasterObatRepository->createMasterObat($data);
+        }, 5);
+    }
+
+    public function previewNextCode(string $prefix): string
+    {
+        return $this->nextMedicineCode($this->normalizeCodePrefix($prefix));
+    }
+
+    public function getCodePrefixes(): array
+    {
+        return MasterObatModel::query()
+            ->pluck('kode_obat')
+            ->map(function ($code) {
+                return preg_match('/^([A-Z]{3})/i', trim((string) $code), $matches)
+                    ? strtoupper($matches[1])
+                    : null;
+            })
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->map(fn ($prefix) => [
+                'id' => $prefix,
+                'text' => $prefix,
+            ])
+            ->all();
     }
 
     public function findByIdMasterObat($id)
@@ -382,6 +412,51 @@ class MasterObatService
         }
 
         return $default;
+    }
+
+    private function normalizeCodePrefix(string $prefix): string
+    {
+        $prefix = strtoupper(trim($prefix));
+
+        if (! preg_match('/^[A-Z]{3}$/', $prefix)) {
+            throw new \InvalidArgumentException('Awalan kode obat harus terdiri dari tepat 3 huruf.');
+        }
+
+        return $prefix;
+    }
+
+    private function nextMedicineCode(string $prefix, bool $lockForUpdate = false): string
+    {
+        $query = MasterObatModel::query()
+            ->where('kode_obat', 'like', $prefix.'%');
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $highestNumber = 0;
+        $numberWidth = 3;
+        $pattern = '/^'.preg_quote($prefix, '/').'-?(\d+)$/';
+
+        foreach ($query->pluck('kode_obat') as $code) {
+            if (! preg_match($pattern, (string) $code, $matches)) {
+                continue;
+            }
+
+            $number = (int) $matches[1];
+
+            if ($number > $highestNumber) {
+                $highestNumber = $number;
+                $numberWidth = max(3, strlen($matches[1]));
+            } elseif ($number === $highestNumber) {
+                $numberWidth = max($numberWidth, strlen($matches[1]));
+            }
+        }
+
+        $nextNumber = $highestNumber + 1;
+        $numberWidth = max($numberWidth, strlen((string) $nextNumber));
+
+        return $prefix.'-'.str_pad((string) $nextNumber, $numberWidth, '0', STR_PAD_LEFT);
     }
 
     private function appendEmptyClassificationOption(array &$options, int $count, string $name): void

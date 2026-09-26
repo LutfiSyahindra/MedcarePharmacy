@@ -188,6 +188,10 @@
             </div>
 
             <div class="modal-footer">
+                <a href="#" class="btn btn-primary px-4" id="detailPrintPenerimaan" target="_blank" rel="noopener">
+                    <i class="mdi mdi-printer-outline"></i>
+                    <span>Cetak Penerimaan</span>
+                </a>
                 <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">
                     <i class="mdi mdi-close-circle-outline"></i>
                     <span>Tutup</span>

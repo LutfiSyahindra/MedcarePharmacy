@@ -11,6 +11,8 @@
         const submitSelector = '#submitObatForm';
         const excelModalSelector = '#obatModalExcell';
         const categorySelector = '[name="category_id"]';
+        const codePrefixSelector = '[name="kode_prefix"]';
+        const codePreviewSelector = '#obatCodePreview';
         const golonganSelector = '[name="golongan_id"]';
         const mainGolonganSelector = '[name="main_golongan_id"]';
         const subGolonganSelector = '[name="sub_golongan_id"]';
@@ -43,6 +45,7 @@
         let isHydratingEdit = false;
         let isHydratingFilters = false;
         let lookupRequest = null;
+        let codePreviewRequest = null;
 
         if ($.fn.dropify) {
             $('#obatExcelInput').dropify();
@@ -55,6 +58,28 @@
             allowClear: true,
             width: '100%',
             dropdownParent: $(modalSelector)
+        });
+
+        $(codePrefixSelector).select2({
+            placeholder: $(codePrefixSelector).data('placeholder'),
+            allowClear: true,
+            width: '100%',
+            dropdownParent: $(modalSelector),
+            tags: true,
+            createTag: function(params) {
+                const prefix = String(params.term || '')
+                    .trim()
+                    .replace(/[^a-z]/gi, '')
+                    .toUpperCase();
+
+                if (prefix.length !== 3) return null;
+
+                return {
+                    id: prefix,
+                    text: prefix,
+                    newTag: true
+                };
+            }
         });
 
         function normalizeList(response) {
@@ -156,6 +181,58 @@
             );
         }
 
+        function loadMedicineCodePreview(prefix) {
+            const normalizedPrefix = String(prefix || '').trim().toUpperCase();
+
+            if (codePreviewRequest) {
+                codePreviewRequest.abort();
+                codePreviewRequest = null;
+            }
+
+            if (!normalizedPrefix) {
+                $(codePreviewSelector).text('pilih awalan kode');
+                return;
+            }
+
+            $(codePreviewSelector).text('menghitung...');
+            codePreviewRequest = $.ajax({
+                url: "{{ route("masterObat.nextCode") }}",
+                type: 'GET',
+                dataType: 'json',
+                data: {
+                    prefix: normalizedPrefix
+                }
+            }).done(function(response) {
+                $(codePreviewSelector).text(response.kode_obat || 'dibuat saat disimpan');
+            }).fail(function(xhr, status) {
+                if (status !== 'abort') {
+                    $(codePreviewSelector).text('awalan harus tepat 3 huruf');
+                }
+            }).always(function() {
+                codePreviewRequest = null;
+            });
+        }
+
+        function loadCodePrefixes() {
+            const $prefix = $(codePrefixSelector);
+
+            return $.ajax({
+                url: "{{ route("masterObat.codePrefixes") }}",
+                type: 'GET',
+                dataType: 'json'
+            }).then(function(response) {
+                normalizeList(response).forEach(function(item) {
+                    const value = String(item.id || item.text || '').toUpperCase();
+
+                    if (value && !$prefix.find(`option[value="${value}"]`).length) {
+                        $prefix.append(new Option(value, value, false, false));
+                    }
+                });
+
+                return response;
+            });
+        }
+
         function loadLookupOptions() {
             const requests = [
                 loadOptions($(categorySelector), "{{ route("masterObat.getKategori") }}", 'Memuat kategori...', 'Tidak ada kategori tersedia'),
@@ -164,7 +241,8 @@
                 loadOptions($('[name="satuan_id"]'), "{{ route("masterObat.getSatuan") }}", 'Memuat satuan...', 'Tidak ada satuan tersedia'),
                 loadOptions($('[name="pabrikan_id"]'), "{{ route("masterObat.getPabrikan") }}", 'Memuat pabrikan...', 'Tidak ada pabrikan tersedia'),
                 loadOptions($('[name="distributor_id"]'), "{{ route("masterObat.getDistributor") }}", 'Memuat distributor...', 'Tidak ada distributor tersedia'),
-                loadOptions($('[name="rak_id"]'), "{{ route("masterObat.getRak") }}", 'Memuat rak...', 'Tidak ada rak tersedia')
+                loadOptions($('[name="rak_id"]'), "{{ route("masterObat.getRak") }}", 'Memuat rak...', 'Tidak ada rak tersedia'),
+                loadCodePrefixes()
             ];
 
             $(mainGolonganSelector).prop('disabled', true);
@@ -185,6 +263,11 @@
             loadSubGolongan($(this).val());
         });
 
+        $(codePrefixSelector).on('change', function() {
+            if (modalMode !== 'create' || isHydratingEdit) return;
+            loadMedicineCodePreview($(this).val());
+        });
+
         function resetFormForCreate() {
             const $form = $(formSelector);
             $form[0].reset();
@@ -192,6 +275,8 @@
             $('#obatModalSubtitle').text('Lengkapi identitas, klasifikasi, pemasok, stok minimum, harga beli, dan status obat.');
             $(submitSelector).html('<i class="mdi mdi-content-save-outline"></i>Simpan');
             $('#obatId').val('');
+            $(codePrefixSelector).prop('disabled', false).val('').trigger('change.select2');
+            $(codePreviewSelector).text('pilih awalan kode');
             MasterObatUI.clearValidation(formSelector);
             $('.master-obat-select').val('').trigger('change.select2');
             resetSelect($(mainGolonganSelector));
@@ -586,7 +671,6 @@
 
         function setInputValues(response) {
             [
-                'kode_obat',
                 'nama_obat',
                 'komposisi',
                 'indikasi',
@@ -600,6 +684,18 @@
 
             $('[name="is_generik"]').val(String(Number(response.is_generik ?? 1)));
             $('[name="is_active"]').val(String(Number(response.is_active ?? 1)));
+            $(codePreviewSelector).text(response.kode_obat || '-');
+        }
+
+        function setCodePrefixFromMedicineCode(code) {
+            const prefix = String(code || '').slice(0, 3).toUpperCase();
+            const $prefix = $(codePrefixSelector);
+
+            if (prefix && !$prefix.find(`option[value="${prefix}"]`).length) {
+                $prefix.append(new Option(prefix, prefix, true, true));
+            }
+
+            $prefix.val(prefix).prop('disabled', true).trigger('change.select2');
         }
 
         function setSelectValue(selector, value) {
@@ -624,6 +720,7 @@
 
                     lookupRequest.always(function() {
                         isHydratingEdit = true;
+                        setCodePrefixFromMedicineCode(response.kode_obat);
                         setSelectValue('[name="sediaan_id"]', response.sediaan_id);
                         setSelectValue('[name="satuan_id"]', response.satuan_id);
                         setSelectValue('[name="pabrikan_id"]', response.pabrikan_id);
