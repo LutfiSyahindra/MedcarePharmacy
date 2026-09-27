@@ -209,7 +209,9 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
         $purchaseOrder->update(['status' => 'waiting_approval']);
 
         $this->actingAs($user)
-            ->putJson(route('penerimaan.post', $receipt->id))
+            ->putJson(route('penerimaan.post', $receipt->id), [
+                'diskon_untuk' => 'pasien',
+            ])
             ->assertOk()
             ->assertJsonPath('selling_prices.0.harga_jual', 1100)
             ->assertJsonPath('selling_prices.1.harga_jual', 2100);

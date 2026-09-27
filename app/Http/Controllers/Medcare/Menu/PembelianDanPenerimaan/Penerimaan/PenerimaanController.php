@@ -225,8 +225,12 @@ class PenerimaanController extends Controller
         return response()->json($this->penerimaanPayload($id));
     }
 
-    public function hargaJualPreview($id)
+    public function hargaJualPreview(Request $request, $id)
     {
+        $validated = $request->validate([
+            'diskon_untuk' => ['nullable', 'in:pasien,apotek'],
+        ]);
+
         $penerimaan = PenerimaanBarangModel::with([
             'purchaseOrder',
             'distributor',
@@ -248,7 +252,10 @@ class PenerimaanController extends Controller
             ], 422);
         }
 
-        return response()->json($this->sellingPricePayload($penerimaan));
+        return response()->json($this->sellingPricePayload(
+            $penerimaan,
+            $validated['diskon_untuk'] ?? 'pasien'
+        ));
     }
 
     public function update(Request $request, $id)
@@ -298,7 +305,7 @@ class PenerimaanController extends Controller
         });
     }
 
-    public function post($id)
+    public function post(Request $request, $id)
     {
         if (! $this->transactionNotifications->isApprovalRole(Auth::user())) {
             return response()->json([
@@ -307,7 +314,14 @@ class PenerimaanController extends Controller
             ], 403);
         }
 
-        return DB::transaction(function () use ($id) {
+        $validated = $request->validate([
+            'diskon_untuk' => ['required', 'in:pasien,apotek'],
+        ], [
+            'diskon_untuk.required' => 'Pilih diskon diberikan ke pasien atau diambil apotek.',
+            'diskon_untuk.in' => 'Pilihan penerima diskon tidak valid.',
+        ]);
+
+        return DB::transaction(function () use ($id, $validated) {
             $penerimaan = $this->penerimaanQueryForBranch([
                 'purchaseOrder',
                 'details.obat.satuan',
@@ -325,9 +339,25 @@ class PenerimaanController extends Controller
                 ], 422);
             }
 
+            $penerimaan->forceFill([
+                'diskon_untuk' => $validated['diskon_untuk'],
+            ])->save();
+            $this->applyDiscountRecipientToStockCosts($penerimaan, $validated['diskon_untuk']);
+
             $this->finalizeSupplierCompensationDiscount($penerimaan);
 
             $sellingPricesByDetailId = $this->sellingPriceRowsByDetailId($penerimaan);
+            $postedAt = now();
+
+            // A draft may originate from a previously cancelled receipt during recovery/rework.
+            // Refresh its posting metadata before stock movements are recorded so the ledger
+            // never reuses an old posted_at value or retains stale cancellation metadata.
+            $penerimaan->forceFill([
+                'posted_by' => Auth::id(),
+                'posted_at' => $postedAt,
+                'cancelled_by' => null,
+                'cancelled_at' => null,
+            ])->save();
 
             foreach ($penerimaan->details as $detail) {
                 $this->stockService->recordReceipt(
@@ -341,8 +371,6 @@ class PenerimaanController extends Controller
 
             $penerimaan->update([
                 'status' => 'posted',
-                'posted_by' => Auth::id(),
-                'posted_at' => now(),
             ]);
 
             $this->syncPurchaseOrderReceivingStatus($penerimaan->purchase_order_id);
@@ -354,6 +382,7 @@ class PenerimaanController extends Controller
                 'message' => (float) $penerimaan->supplier_compensation_discount > 0
                     ? 'Penerimaan berhasil diposting, stok diperbarui, dan potongan ganti rugi supplier direalisasikan.'
                     : 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.',
+                'diskon_untuk' => $penerimaan->diskon_untuk,
                 'selling_prices' => $sellingPrices,
             ]);
         });
@@ -1150,13 +1179,28 @@ class PenerimaanController extends Controller
         }
     }
 
-    private function sellingPricePayload(PenerimaanBarangModel $penerimaan): array
-    {
+    private function applyDiscountRecipientToStockCosts(
+        PenerimaanBarangModel $penerimaan,
+        string $diskonUntuk
+    ): void {
+        foreach ($penerimaan->details as $detail) {
+            $detail->forceFill([
+                'harga_beli_stok' => $this->detailStockPurchasePrice($detail, $diskonUntuk),
+            ])->save();
+        }
+    }
+
+    private function sellingPricePayload(
+        PenerimaanBarangModel $penerimaan,
+        ?string $diskonUntuk = null
+    ): array {
+        $diskonUntuk = $diskonUntuk ?: ($penerimaan->diskon_untuk ?: 'pasien');
         $otherCostAllocations = $this->otherCostAllocationsByDetailId($penerimaan);
         $details = $penerimaan->details
             ->map(fn (PenerimaanBarangDetailModel $detail) => $this->sellingPriceRow(
                 $detail,
-                $otherCostAllocations[$detail->id] ?? 0
+                $otherCostAllocations[$detail->id] ?? 0,
+                $diskonUntuk
             ))
             ->values();
 
@@ -1168,6 +1212,8 @@ class PenerimaanController extends Controller
                 'supplier' => $penerimaan->distributor->nama ?? '-',
                 'tanggal_penerimaan' => optional($penerimaan->tanggal_penerimaan)->format('Y-m-d'),
                 'biaya_lain' => round((float) $penerimaan->biaya_lain, 2),
+                'diskon_untuk' => $diskonUntuk,
+                'diskon_untuk_label' => $diskonUntuk === 'pasien' ? 'Diberikan ke Pasien' : 'Diambil Apotek',
             ],
             'details' => $details,
             'summary' => [
@@ -1179,20 +1225,25 @@ class PenerimaanController extends Controller
 
     private function sellingPriceRowsByDetailId(PenerimaanBarangModel $penerimaan): array
     {
+        $diskonUntuk = $penerimaan->diskon_untuk ?: 'pasien';
         $otherCostAllocations = $this->otherCostAllocationsByDetailId($penerimaan);
 
         return $penerimaan->details
             ->mapWithKeys(fn (PenerimaanBarangDetailModel $detail) => [
                 $detail->id => $this->sellingPriceRow(
                     $detail,
-                    $otherCostAllocations[$detail->id] ?? 0
+                    $otherCostAllocations[$detail->id] ?? 0,
+                    $diskonUntuk
                 ),
             ])
             ->all();
     }
 
-    private function sellingPriceRow(PenerimaanBarangDetailModel $detail, float $allocatedOtherCost = 0): array
-    {
+    private function sellingPriceRow(
+        PenerimaanBarangDetailModel $detail,
+        float $allocatedOtherCost = 0,
+        string $diskonUntuk = 'pasien'
+    ): array {
         $detail->loadMissing([
             'obat.satuan',
             'obat.golongan',
@@ -1211,7 +1262,8 @@ class PenerimaanController extends Controller
 
         $conversion = $this->detailConversionFactor($detail);
         $qtySatuanTerkecil = $this->detailStockQuantity($detail, $conversion);
-        $totalHargaBeli = $this->detailTotalPurchasePriceIncludingTax($detail);
+        $totalHargaBeli = $this->detailPricingPurchaseTotalIncludingTax($detail, $diskonUntuk);
+        $hargaBeliStok = $this->detailStockPurchasePrice($detail, $diskonUntuk);
         $ppn = (float) ($detail->ppn ?? 0);
         $diskon = (float) ($detail->diskon ?? 0);
         $diskon1 = (float) ($detail->diskon_1 ?? 0);
@@ -1250,6 +1302,7 @@ class PenerimaanController extends Controller
             'qty_diterima' => round((float) $detail->qty_diterima, 4),
             'qty_satuan_terkecil' => round($qtySatuanTerkecil, 4),
             'harga_beli' => round((float) $detail->harga_beli, 2),
+            'harga_beli_stok' => $hargaBeliStok,
             'total_harga_beli' => round($totalHargaBeli, 2),
             'harga_beli_satuan_terkecil' => round($hargaBeliTerkecil, 2),
             'ppn' => $ppn,
@@ -1262,7 +1315,8 @@ class PenerimaanController extends Controller
             'diskon_2' => $diskon2,
             'diskon_3' => $diskon3,
             'nilai_diskon_beli' => round($nilaiDiskon, 2),
-            'nilai_diskon_jual' => round($nilaiDiskon, 2),
+            'nilai_diskon_jual' => $diskonUntuk === 'pasien' ? round($nilaiDiskon, 2) : 0,
+            'diskon_untuk' => $diskonUntuk,
             'total_harga_beli_include_ppn' => round($totalHargaBeli, 2),
             'alokasi_biaya_lain' => $allocatedOtherCost,
             'biaya_lain_satuan_beli' => round($biayaLainPerSatuanBeli, 2),
@@ -1342,6 +1396,49 @@ class PenerimaanController extends Controller
         $nilaiPpn = (float) ($detail->nilai_ppn ?? 0);
 
         return max(0, $subtotal - $nilaiDiskon + $nilaiPpn);
+    }
+
+    private function detailPricingPurchaseTotalIncludingTax(
+        PenerimaanBarangDetailModel $detail,
+        string $diskonUntuk
+    ): float {
+        if ($diskonUntuk === 'pasien') {
+            return $this->detailTotalPurchasePriceIncludingTax($detail);
+        }
+
+        $subtotal = (float) ($detail->subtotal
+            ?? ((float) $detail->qty_diterima * (float) $detail->harga_beli));
+        $ppn = $this->discountPercent($detail->ppn ?? 0);
+
+        return round(max(0, $subtotal) * (1 + ($ppn / 100)), 2);
+    }
+
+    private function detailStockPurchasePrice(
+        PenerimaanBarangDetailModel $detail,
+        string $diskonUntuk
+    ): float {
+        $conversion = $this->detailConversionFactor($detail);
+        $qtyStock = $this->detailStockQuantity($detail, $conversion);
+
+        if ($qtyStock <= 0) {
+            return 0;
+        }
+
+        $totalHargaBeli = max(0, (float) ($detail->subtotal
+            ?? ((float) $detail->qty_diterima * (float) $detail->harga_beli)));
+
+        if ($diskonUntuk === 'pasien') {
+            $totalHargaBeli = max(
+                0,
+                $totalHargaBeli - $this->detailDiscountValue(
+                    $detail,
+                    $totalHargaBeli,
+                    (float) ($detail->diskon ?? 0)
+                )
+            );
+        }
+
+        return round($totalHargaBeli / $qtyStock, 2);
     }
 
     private function detailDiscountValue(PenerimaanBarangDetailModel $detail, float $totalHargaBeli, float $diskon): float

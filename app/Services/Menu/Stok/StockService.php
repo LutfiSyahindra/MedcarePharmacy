@@ -39,6 +39,7 @@ class StockService
         $branchId = (int) ($penerimaan->purchaseOrder?->branch_id ?: BranchAccess::requireUserBranchId());
         $qtyStock = $this->receiptStockQuantity($detail);
         $basePrice = $this->receiptBasePrice($detail);
+        $discountAlreadyResolved = in_array($penerimaan->diskon_untuk, ['pasien', 'apotek'], true);
 
         $movement = $this->recordMovement([
             'branch_id' => $branchId,
@@ -50,7 +51,9 @@ class StockService
             'harga_beli' => $basePrice,
             'harga_jual' => $hargaJual,
             'alasan_harga' => $alasanHarga ?: 'Posting penerimaan '.$penerimaan->nomor_penerimaan.' dari PO '.($penerimaan->purchaseOrder->no_po ?? '-'),
-            'diskon' => $detail->diskon ?? 0,
+            // Harga beli stok sudah ditetapkan neto atau bruto saat posting.
+            // Batch tidak boleh mengurangi diskon yang sama untuk kedua kalinya.
+            'diskon' => $discountAlreadyResolved ? 0 : ($detail->diskon ?? 0),
             'ppn' => $detail->ppn ?? 0,
             'jenis_mutasi' => 'masuk',
             'tanggal_mutasi' => $penerimaan->posted_at ?: now(),
@@ -62,7 +65,8 @@ class StockService
             'created_by' => $penerimaan->posted_by ?: Auth::id(),
         ]);
 
-        if (! $detail->stok_batch_id && $movement->stok_batch_id) {
+        if ($movement->stok_batch_id
+            && (int) $detail->stok_batch_id !== (int) $movement->stok_batch_id) {
             $detail->forceFill(['stok_batch_id' => $movement->stok_batch_id])->save();
         }
 

@@ -75,14 +75,22 @@ class StockDataTableTest extends TestCase
             ->assertJsonPath('recordsTotal', 15)
             ->assertJsonPath('recordsFiltered', 15)
             ->assertJsonPath('summary.total_item', 15)
-            ->assertJsonPath('summary.total_stok', 150);
+            ->assertJsonPath('summary.total_stok', 150)
+            ->assertJsonPath('summary.nilai_stok', 150000)
+            ->assertJsonPath('summary.nilai_stok_jual', 225000)
+            ->assertJsonPath('data.0.nilai_stok', 10000)
+            ->assertJsonPath('data.0.nilai_stok_jual', 15000);
 
         $batches = $this->getJson(route('stok.batchTable', $dataTable));
         $batches->assertOk()
             ->assertJsonCount(5, 'data')
             ->assertJsonPath('recordsTotal', 15)
             ->assertJsonPath('summary.total_batch', 15)
-            ->assertJsonPath('summary.total_stok', 150);
+            ->assertJsonPath('summary.total_stok', 150)
+            ->assertJsonPath('summary.nilai_stok', 150000)
+            ->assertJsonPath('summary.nilai_stok_jual', 225000)
+            ->assertJsonPath('data.0.nilai_stok', 10000)
+            ->assertJsonPath('data.0.nilai_stok_jual', 15000);
 
         $cards = $this->getJson(route('kartuStok.table', $dataTable));
         $cards->assertOk()

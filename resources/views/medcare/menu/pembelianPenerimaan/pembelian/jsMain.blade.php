@@ -11,7 +11,17 @@
         const pendingUnitRequests = new Set();
         let medicineCatalog = null;
         let medicineCatalogRequest = null;
+        let medicineCatalogById = new Map();
+        const medicineUnitCache = new Map();
+        const medicineUnitRequests = new Map();
         const selectedMedicineIds = new Set();
+        const medicinePickerPageSize = 100;
+        const medicineSelectPageSize = 50;
+        let medicinePickerSearchTimer = null;
+        let purchaseFormDirty = false;
+        let purchaseFormHydrating = false;
+        let purchaseSaveInProgress = false;
+        let allowPurchaseModalClose = false;
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
@@ -114,7 +124,7 @@
         function updateUnitLoadingState() {
             const isLoading = pendingUnitRequests.size > 0;
 
-            $('#submitForm').prop('disabled', isLoading);
+            $('#submitForm, #saveDraftForm').prop('disabled', isLoading || purchaseSaveInProgress);
             $('#purchaseUnitLoadingNotice').toggleClass('d-none', !isLoading);
         }
 
@@ -136,6 +146,9 @@
                         const data = Array.isArray(response) ? response : (response.data || []);
 
                         medicineCatalog = data.filter(item => item && item.id);
+                        medicineCatalogById = new Map(
+                            medicineCatalog.map(item => [String(item.id), item])
+                        );
                         resolve(medicineCatalog);
                     },
                     error: function(xhr) {
@@ -180,6 +193,10 @@
             });
         }
 
+        function visibleMedicineCatalog() {
+            return filteredMedicineCatalog().slice(0, medicinePickerPageSize);
+        }
+
         function updateMedicinePickerSelectionState(filteredItems, existingIds) {
             const selectableIds = filteredItems
                 .map(item => String(item.id))
@@ -213,11 +230,16 @@
                 }
             });
 
-            const filteredItems = filteredMedicineCatalog();
+            const matchingItems = filteredMedicineCatalog();
+            const filteredItems = matchingItems.slice(0, medicinePickerPageSize);
             const hasQuery = String($('#medicinePickerSearch').val() || '').trim() !== '';
-            const resultLabel = hasQuery
-                ? `${filteredItems.length.toLocaleString('id-ID')} dari ${medicineCatalog.length.toLocaleString('id-ID')} obat`
-                : `${medicineCatalog.length.toLocaleString('id-ID')} obat tersedia`;
+            const shownCount = filteredItems.length.toLocaleString('id-ID');
+            const matchCount = matchingItems.length.toLocaleString('id-ID');
+            const resultLabel = matchingItems.length > filteredItems.length
+                ? `${shownCount} dari ${matchCount} hasil ditampilkan â€” persempit pencarian`
+                : (hasQuery
+                    ? `${matchCount} dari ${medicineCatalog.length.toLocaleString('id-ID')} obat`
+                    : `${matchCount} obat tersedia`);
 
             $('#medicinePickerResultCount').text(resultLabel);
 
@@ -334,10 +356,15 @@
         // --- Reset modal ketika dibuka
         $('#pembelianModal').on('show.bs.modal', function() {
             let form = $('#pembelianForm');
+            purchaseFormHydrating = true;
+            purchaseFormDirty = false;
+            purchaseSaveInProgress = false;
+            allowPurchaseModalClose = false;
             $('#pembelianModalLabel').text('Form Purchase Order');
             form.trigger('reset');
 
             $('#submitForm').html('<i class="mdi mdi-content-save-outline"></i> Simpan Purchase Order');
+            $('#saveDraftForm').html('<i class="mdi mdi-content-save-move-outline"></i> Simpan sebagai Draft');
             $('#total_estimasi').text(formatRupiah(0));
             $('#total_estimasi_input').val(0);
             $('#pembelian_id').val('');
@@ -355,9 +382,12 @@
             // Generate No PO hanya kalau TAMBAH
             $(this).one('shown.bs.modal', function() {
                 if (!editMode) {
-                    $.get('{{ route("pembelian.generateNoPO") }}', function(res) {
-                        form.find('input[name="no_po"]').val(res);
-                    });
+                    purchaseFormHydrating = false;
+                    purchaseFormDirty = false;
+                    $.get('{{ route("pembelian.generateNoPO") }}')
+                        .done(function(res) {
+                            form.find('input[name="no_po"]').val(res);
+                        });
                 }
             });
 
@@ -365,13 +395,38 @@
             loadObatInto($obatSelects);
         });
 
-        // --- Reset modal ketika ditutup
-        $('#pembelianModal').on('hide.bs.modal', function() {
+        $('#pembelianForm').on('input change', 'input, select, textarea', function() {
+            if (!purchaseFormHydrating && $('#pembelianModal').hasClass('show')) {
+                purchaseFormDirty = true;
+            }
+        });
+
+        // Simpan perubahan yang belum disimpan sebagai draft sebelum modal benar-benar ditutup.
+        $('#pembelianModal').on('hide.bs.modal', function(event) {
+            if (allowPurchaseModalClose || !purchaseFormDirty || !hasMeaningfulPurchaseDraft()) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (purchaseSaveInProgress) {
+                return;
+            }
+
+            submitPurchaseOrder(true, true);
+        });
+
+        // --- Reset state modal setelah benar-benar ditutup
+        $('#pembelianModal').on('hidden.bs.modal', function() {
             editMode = false;
             $('#pembelian_id').val('');
             resetMedicinePicker();
-
-        })
+            purchaseFormHydrating = false;
+            purchaseFormDirty = false;
+            purchaseSaveInProgress = false;
+            allowPurchaseModalClose = false;
+            updateUnitLoadingState();
+        });
         // =================== End Inisiasi Modal ===============
 
         $('#pembelianModalDetail').on('hidden.bs.modal', function() {
@@ -422,7 +477,8 @@
 
         $('#medicinePickerSearch').on('input', function() {
             $('#clearMedicinePickerSearch').toggleClass('is-visible', $(this).val().length > 0);
-            renderMedicinePicker();
+            window.clearTimeout(medicinePickerSearchTimer);
+            medicinePickerSearchTimer = window.setTimeout(renderMedicinePicker, 120);
         });
 
         $('#clearMedicinePickerSearch').on('click', function() {
@@ -438,14 +494,14 @@
                 selectedMedicineIds.delete(medicineId);
             }
 
-            updateMedicinePickerSelectionState(filteredMedicineCatalog(), currentDetailMedicineIds());
+            updateMedicinePickerSelectionState(visibleMedicineCatalog(), currentDetailMedicineIds());
         });
 
         $('#selectAllVisibleMedicines').on('change', function() {
             const shouldSelect = $(this).prop('checked');
             const existingIds = currentDetailMedicineIds();
 
-            filteredMedicineCatalog().forEach(function(item) {
+            visibleMedicineCatalog().forEach(function(item) {
                 const medicineId = String(item.id);
 
                 if (existingIds.has(medicineId)) {
@@ -470,7 +526,7 @@
             const existingIds = currentDetailMedicineIds();
             const selectedItems = Array.from(selectedMedicineIds)
                 .filter(id => !existingIds.has(id))
-                .map(id => medicineCatalog.find(item => String(item.id) === id))
+                .map(id => medicineCatalogById.get(id))
                 .filter(Boolean);
 
             if (selectedItems.length === 0) {
@@ -482,6 +538,7 @@
             const emptyRows = $('#detail-wrapper .detail-item').filter(function() {
                 return !String($(this).find('select[name="obat_id[]"]').val() || '');
             }).toArray();
+            const targetRows = [];
 
             setMedicinePickerOpen(false);
 
@@ -495,7 +552,7 @@
                     row = $('#detail-wrapper .detail-item').last();
                 }
 
-                populateMedicineSelect(row.find('select[name="obat_id[]"]'), item.id);
+                targetRows.push(row);
             });
 
             const addedCount = selectedItems.length;
@@ -503,15 +560,31 @@
             refreshDetailNumbers();
             hitungTotal();
 
-            Swal.fire({
-                icon: 'success',
-                title: `${addedCount.toLocaleString('id-ID')} obat masuk ke rincian`,
-                toast: true,
-                position: 'top-end',
-                timer: 2200,
-                timerProgressBar: true,
-                showConfirmButton: false,
-            });
+            preloadMedicineUnits(selectedItems.map(item => item.id))
+                .catch(function() {
+                    // Baris tetap dapat dipakai; pemuatan satuan akan dicoba kembali per pilihan.
+                })
+                .then(function() {
+                    selectedItems.forEach(function(item, index) {
+                        populateMedicineSelect(
+                            targetRows[index].find('select[name="obat_id[]"]'),
+                            item.id
+                        );
+                    });
+
+                    refreshDetailNumbers();
+                    hitungTotal();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: `${addedCount.toLocaleString('id-ID')} obat masuk ke rincian`,
+                        toast: true,
+                        position: 'top-end',
+                        timer: 2200,
+                        timerProgressBar: true,
+                        showConfirmButton: false,
+                    });
+                });
         });
 
         // --- Tambah baris detail obat baru
@@ -531,6 +604,9 @@
         $(document).on('click', '.remove-detail', function() {
             if ($('#detail-wrapper .detail-item').length > 1) {
                 $(this).closest('.detail-item').remove();
+                if (!purchaseFormHydrating) {
+                    purchaseFormDirty = true;
+                }
                 refreshDetailNumbers();
                 hitungTotal();
                 renderMedicinePicker();
@@ -629,8 +705,61 @@
             }
         });
 
-        // --- Get data obat
-        function populateMedicineSelect($select, selectedValue = null) {
+        // --- Get data obat. Setiap baris hanya menyimpan option yang terpilih;
+        // hasil pencarian Select2 dibaca dari satu katalog bersama agar DOM tetap ringan.
+        function medicineOptionText(item) {
+            return (item?.nama_obat || 'Tanpa Nama') +
+                (item?.kode_obat ? ` (${item.kode_obat})` : '');
+        }
+
+        function initializeMedicineSelect($select) {
+            $select.select2({
+                placeholder: "-- Pilih Obat --",
+                width: 'resolve',
+                dropdownParent: PembelianSelect2Parent,
+                ajax: {
+                    delay: 120,
+                    transport: function(params, success) {
+                        const query = String(params.data?.term || '')
+                            .trim()
+                            .toLocaleLowerCase('id-ID');
+                        const page = Math.max(1, Number(params.data?.page) || 1);
+                        const matches = (medicineCatalog || []).filter(function(item) {
+                            if (!query) {
+                                return true;
+                            }
+
+                            return [item.kode_obat, item.nama_obat, item.satuan?.nama]
+                                .filter(Boolean)
+                                .join(' ')
+                                .toLocaleLowerCase('id-ID')
+                                .includes(query);
+                        });
+                        const offset = (page - 1) * medicineSelectPageSize;
+                        const pageItems = matches.slice(offset, offset + medicineSelectPageSize);
+
+                        success({
+                            results: pageItems.map(item => ({
+                                id: String(item.id),
+                                text: medicineOptionText(item)
+                            })),
+                            pagination: {
+                                more: offset + medicineSelectPageSize < matches.length
+                            }
+                        });
+
+                        return {
+                            abort: function() {}
+                        };
+                    },
+                    processResults: function(data) {
+                        return data;
+                    }
+                }
+            });
+        }
+
+        function populateMedicineSelect($select, selectedValue = null, options = {}) {
             if (!$select || $select.length === 0 || !Array.isArray(medicineCatalog)) {
                 return;
             }
@@ -646,42 +775,41 @@
                     .empty()
                     .append('<option value="">-- Pilih Obat --</option>');
 
+                const selectedMedicine = medicineCatalogById.get(String(selectedValue || ''));
+
                 if (medicineCatalog.length === 0) {
                     s.append('<option value="">Tidak ada Obat tersedia</option>');
-                } else {
-                    medicineCatalog.forEach(function(item) {
-                        const text = (item.nama_obat || 'Tanpa Nama') +
-                            (item.kode_obat ? ` (${item.kode_obat})` : '');
-                        const option = new Option(text, item.id, false, false);
-
-                        $(option).attr('data-harga', item.harga_beli || 0);
-                        $(option).attr('data-satuan', item.satuan?.nama || 'Satuan dasar');
-                        s.append(option);
-                    });
+                } else if (selectedMedicine) {
+                    s.append(new Option(
+                        medicineOptionText(selectedMedicine),
+                        selectedMedicine.id,
+                        true,
+                        true
+                    ));
                 }
 
-                s.select2({
-                    placeholder: "-- Pilih Obat --",
-                    width: 'resolve',
-                    dropdownParent: PembelianSelect2Parent
-                });
+                initializeMedicineSelect(s);
 
-                if (selectedValue !== null && selectedValue !== undefined && selectedValue !== '') {
-                    s.val(String(selectedValue)).trigger('change');
+                if (selectedMedicine) {
+                    s.closest('.detail-item').data(
+                        'preserve-purchase-values',
+                        options.preservePurchaseValues === true
+                    );
+                    s.val(String(selectedMedicine.id)).trigger('change');
                 }
             });
         }
 
-        function loadObatInto($select, selectedValue = null) {
-            if (!$select || $select.length === 0) return;
+        function loadObatInto($select, selectedValue = null, options = {}) {
+            if (!$select || $select.length === 0) return Promise.resolve();
 
             $select.each(function() {
                 $(this).prop('disabled', true).html('<option>Memuat data...</option>');
             });
 
-            getMedicineCatalog()
+            return getMedicineCatalog()
                 .then(function() {
-                    populateMedicineSelect($select, selectedValue);
+                    populateMedicineSelect($select, selectedValue, options);
                 })
                 .catch(function(xhr) {
                     console.error('Error Obat:', xhr);
@@ -697,128 +825,152 @@
                             s.select2('destroy');
                         }
 
-                        s.select2({
-                            placeholder: "-- Pilih Obat --",
-                            width: 'resolve',
-                            dropdownParent: PembelianSelect2Parent
-                        });
+                        initializeMedicineSelect(s);
                     });
                 });
         }
 
+        function cacheMedicineUnits(medicineId, data) {
+            const list = (Array.isArray(data) ? data : [])
+                .filter(item => item && item.satuan)
+                .sort((a, b) => Number(a.konversi) - Number(b.konversi));
+
+            medicineUnitCache.set(String(medicineId), list);
+            return list;
+        }
+
+        function preloadMedicineUnits(medicineIds) {
+            const missingIds = Array.from(new Set(medicineIds.map(String)))
+                .filter(id => id && !medicineUnitCache.has(id) && !medicineUnitRequests.has(id));
+
+            if (missingIds.length === 0) {
+                return Promise.resolve();
+            }
+
+            const requestKey = `batch-${++unitRequestSequence}`;
+            pendingUnitRequests.add(requestKey);
+            updateUnitLoadingState();
+
+            const request = new Promise(function(resolve, reject) {
+                $.ajax({
+                    url: "{{ route("pembelian.getKonversiSatuan") }}",
+                    type: 'GET',
+                    dataType: 'json',
+                    data: {
+                        obat_ids: missingIds
+                    },
+                    timeout: 20000,
+                    success: function(data) {
+                        missingIds.forEach(function(id) {
+                            cacheMedicineUnits(id, data?.[id] || []);
+                        });
+                        resolve();
+                    },
+                    error: reject,
+                    complete: function() {
+                        missingIds.forEach(id => medicineUnitRequests.delete(id));
+                        pendingUnitRequests.delete(requestKey);
+                        updateUnitLoadingState();
+                    }
+                });
+            });
+
+            missingIds.forEach(id => medicineUnitRequests.set(id, request));
+            return request;
+        }
+
+        function getMedicineUnits(medicineId) {
+            const id = String(medicineId || '');
+
+            if (medicineUnitCache.has(id)) {
+                return Promise.resolve(medicineUnitCache.get(id));
+            }
+
+            if (medicineUnitRequests.has(id)) {
+                return medicineUnitRequests.get(id).then(() => medicineUnitCache.get(id) || []);
+            }
+
+            return preloadMedicineUnits([id]).then(() => medicineUnitCache.get(id) || []);
+        }
+
         // Ketika pengguna memilih obat
         $(document).on('change', 'select[name="obat_id[]"]', function() {
+            const row = $(this).closest('.detail-item');
+            const obatId = String($(this).val() || '');
+            const medicine = medicineCatalogById.get(obatId);
+            const preservePurchaseValues = row.data('preserve-purchase-values') === true;
+            const $satuanSelect = row.find('.satuan-select');
+            const requestId = ++unitRequestSequence;
 
-            let row = $(this).closest('.detail-item');
-            let obatId = $(this).val();
-            let selectedOption = $(this).find('option:selected');
+            row.data('unit-request-id', requestId);
 
             if (!$('#medicinePicker').hasClass('d-none')) {
                 renderMedicinePicker();
             }
 
-            let $satuanSelect = row.find('.satuan-select');
-            const requestId = ++unitRequestSequence;
-            row.data('unit-request-id', requestId);
-
-            // reset
             $satuanSelect
                 .html('<option value="">-- Pilih Satuan --</option>')
                 .prop('disabled', true);
 
-            row.find('.harga_estimasi').val(0);
-            row.find('.subtotal').val(0);
+            if (!preservePurchaseValues) {
+                row.find('.harga_estimasi, .subtotal').val(0);
+            }
 
             if (!obatId) {
+                row.removeData('preserve-purchase-values');
                 hitungTotal();
                 return;
             }
 
-            pendingUnitRequests.add(requestId);
-            updateUnitLoadingState();
-
-            $.ajax({
-                url: "{{ route("pembelian.getKonversiSatuan") }}",
-                type: 'GET',
-                dataType: 'json',
-                data: {
-                    obat_id: obatId
-                },
-                timeout: 15000,
-                success: function(data) {
+            getMedicineUnits(obatId)
+                .then(function(list) {
                     if (row.data('unit-request-id') !== requestId) {
                         return;
                     }
 
-                    // ===== NORMALISASI (OBJECT / ARRAY) =====
-                    let list = Array.isArray(data) ? data : [data];
+                    if (!list.length) {
+                        const unitName = medicine?.satuan?.nama || 'Satuan dasar';
 
-                    if (!list.length || !list[0]?.satuan) {
-                        useBaseUnit();
-                        return;
-                    }
-
-                    // urutkan konversi terkecil
-                    list.sort((a, b) => a.konversi - b.konversi);
-
-                    let options = '<option value="">-- Pilih Satuan --</option>';
-
-                    list.forEach(item => {
-                        options += `
-                    <option value="${item.id}"
-                            data-konversi="${item.konversi}">
-                        ${item.satuan.nama}
-                    </option>
-                `;
-                    });
-
-                    $satuanSelect
-                        .html(options)
-                        .prop('disabled', false);
-
-                    let satuanLama = row.data('satuan-terpilih');
-
-                    if (satuanLama && $satuanSelect.find(`option[value="${satuanLama}"]`).length) {
-                        $satuanSelect.val(satuanLama).trigger('change');
+                        $satuanSelect
+                            .html(`<option value="0" data-konversi="1">${escapeHtml(unitName)} (dasar)</option>`)
+                            .prop('disabled', false)
+                            .val('0');
                     } else {
-                        $satuanSelect.prop('selectedIndex', 1).trigger('change');
+                        let unitOptions = '<option value="">-- Pilih Satuan --</option>';
+
+                        list.forEach(function(item) {
+                            unitOptions += `<option value="${escapeHtml(item.id)}" data-konversi="${escapeHtml(item.konversi)}">${escapeHtml(item.satuan.nama)}</option>`;
+                        });
+
+                        $satuanSelect.html(unitOptions).prop('disabled', false);
+
+                        const previousUnit = String(row.data('satuan-terpilih') || '');
+                        const hasPreviousUnit = previousUnit &&
+                            $satuanSelect.find(`option[value="${previousUnit}"]`).length > 0;
+
+                        $satuanSelect.val(hasPreviousUnit ? previousUnit : String(list[0].id));
                     }
-                },
-                error: function() {
+
+                    if (preservePurchaseValues) {
+                        row.removeData('preserve-purchase-values');
+                        recalculatePurchaseRow(row);
+                        hitungTotal();
+                    } else {
+                        $satuanSelect.trigger('change');
+                    }
+                })
+                .catch(function() {
                     if (row.data('unit-request-id') !== requestId) {
                         return;
                     }
 
+                    row.removeData('preserve-purchase-values');
                     $satuanSelect
                         .html('<option value="">-- Gagal memuat satuan --</option>')
                         .prop('disabled', false);
-                    applyDefaultPrice();
-                },
-                complete: function() {
-                    pendingUnitRequests.delete(requestId);
-                    updateUnitLoadingState();
-                }
-            });
-
-            // Obat lama dapat belum memiliki data konversi. Gunakan satuan stok dengan faktor 1.
-            function useBaseUnit() {
-                let unitName = selectedOption.data('satuan') || 'Satuan dasar';
-
-                $satuanSelect
-                    .html(`<option value="0" data-konversi="1">${escapeHtml(unitName)} (dasar)</option>`)
-                    .prop('disabled', false)
-                    .val('0');
-                applyDefaultPrice();
-            }
-
-            function applyDefaultPrice() {
-                let harga = parseFloat(selectedOption.data('harga')) || 0;
-
-                row.find('.harga_estimasi').val(harga);
-                recalculatePurchaseRow(row);
-
-                hitungTotal();
-            }
+                    recalculatePurchaseRow(row);
+                    hitungTotal();
+                });
         });
 
         // --- Format Rupiah 
@@ -869,10 +1021,8 @@
 
             let row = $(this).closest('.detail-item');
             let selected = $(this).find(':selected');
-
-            let hargaDasar = parseFloat(
-                row.find('select[name="obat_id[]"] option:selected').data('harga')
-            ) || 0;
+            let medicineId = String(row.find('select[name="obat_id[]"]').val() || '');
+            let hargaDasar = parseFloat(medicineCatalogById.get(medicineId)?.harga_beli) || 0;
 
             let konversi = parseFloat(selected.data('konversi')) || 1;
             let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
@@ -1259,105 +1409,161 @@
         // =================== End Inisiasi DataTable ==================
 
         // =================== Inisiasi Action =========================
-        // --- Submit form
-        $('#pembelianForm').on('submit', function(e) {
-            e.preventDefault();
+        function hasMeaningfulPurchaseDraft() {
+            const hasMedicine = $('#detail-wrapper select[name="obat_id[]"]').toArray()
+                .some(select => String($(select).val() || '').trim() !== '');
+            const hasAdditionalCost = ['biaya_asuransi', 'biaya_pengiriman']
+                .some(name => Number($(`[name="${name}"]`).val() || 0) !== 0);
 
-            if (pendingUnitRequests.size > 0) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Satuan obat masih dimuat',
-                    text: 'Tunggu hingga seluruh satuan obat selesai dimuat, lalu simpan kembali.',
+            return String($('#distributor_id').val() || '').trim() !== '' ||
+                String($('input[name="tanggal"]').val() || '').trim() !== '' ||
+                String($('textarea[name="catatan"]').val() || '').trim() !== '' ||
+                hasMedicine || hasAdditionalCost;
+        }
+
+        function ensurePurchaseOrderNumber() {
+            if (String($('input[name="no_po"]').val() || '').trim() !== '') {
+                return Promise.resolve();
+            }
+
+            return Promise.resolve($.get('{{ route("pembelian.generateNoPO") }}'))
+                .then(function(number) {
+                    $('input[name="no_po"]').val(number);
+                });
+        }
+
+        function waitForPendingUnitRequests() {
+            const requests = Array.from(new Set(medicineUnitRequests.values()));
+
+            return requests.length > 0 ? Promise.allSettled(requests) : Promise.resolve();
+        }
+
+        function showPurchaseSaveError(xhr, automaticSave = false) {
+            if (xhr?.status === 422) {
+                const errors = xhr.responseJSON?.errors || {};
+                const errorMessages = [];
+
+                $('#pembelianForm').find('.invalid-feedback').text('');
+                $('#pembelianForm').find('.form-control, .form-select').removeClass('is-invalid');
+
+                Object.keys(errors).forEach(function(key) {
+                    const messages = errors[key];
+                    const parts = key.split('.');
+                    const field = parts[0];
+                    const index = parts[1];
+
+                    errorMessages.push(messages[0]);
+
+                    if (index !== undefined) {
+                        const row = $('#detail-wrapper .detail-item').eq(Number(index));
+                        row.find(`[name="${field}[]"]`).addClass('is-invalid');
+                    } else {
+                        $(`[name="${field}"]`).addClass('is-invalid');
+                    }
                 });
 
+                if (errorMessages.length === 0) {
+                    errorMessages.push(xhr.responseJSON?.message || 'Periksa kembali data purchase order.');
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: automaticSave ? 'Draft otomatis belum tersimpan' : 'Validasi Gagal',
+                    html: errorMessages.join('<br>'),
+                    toast: true,
+                    position: 'top-end',
+                    timer: 5000,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                });
                 return;
             }
 
-            let formData = $(this).serialize();
-            let pembelian_id = $('#pembelian_id').val();
-
-            let url = pembelian_id ?
-                "{{ route("pembelian.update", ":id") }}".replace(':id', pembelian_id) :
-                "{{ route("pembelian.store") }}";
-
-            let method = pembelian_id ? 'PUT' : 'POST';
-
-            $.ajax({
-                url: url,
-                method: method,
-                data: formData,
-                success: function(response) {
-                    if (response.status === 'success') {
-                        $('#pembelianModal').modal('hide');
-
-                        Swal.fire({
-                            icon: 'success',
-                            title: response.message,
-                            toast: true,
-                            position: 'top-end',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-
-                        $('#pembelianForm')[0].reset();
-                        $('#pembelian_id').val('');
-                        PembelianTable.ajax.reload();
-                    }
-                },
-                error: function(xhr) {
-                    if (xhr.status === 422) {
-                        let errors = xhr.responseJSON?.errors || {};
-                        let errorMessages = [];
-
-                        // reset semua error dulu
-                        $('#pembelianForm').find('.invalid-feedback').text('');
-                        $('#pembelianForm').find('.form-control, .form-select').removeClass(
-                            'is-invalid');
-
-                        for (let key in errors) {
-                            // contoh key: "code.0", "name.1"
-                            let messages = errors[key];
-                            errorMessages.push(messages[0]);
-
-                            // cari input sesuai index
-                            let parts = key.split('.');
-                            let field = parts[0]; // code / name
-                            let index = parts[1]; // index array
-
-                            // ambil row ke-index lalu kasih error
-                            if (index !== undefined) {
-                                let row = $('#detail-wrapper .detail-item').eq(Number(index));
-                                row.find(`[name="${field}[]"]`).addClass('is-invalid');
-                            } else {
-                                $(`[name="${field}"]`).addClass('is-invalid');
-                            }
-                        }
-
-                        if (errorMessages.length === 0) {
-                            errorMessages.push(xhr.responseJSON?.message || 'Periksa kembali data purchase order.');
-                        }
-
-                        // tampilkan semua error di toast juga
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validasi Gagal',
-                            html: errorMessages.join('<br>'),
-                            toast: true,
-                            position: 'top-end',
-                            timer: 4000,
-                            timerProgressBar: true,
-                            showConfirmButton: false,
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Purchase order gagal disimpan',
-                            text: xhr.responseJSON?.message || 'Terjadi kesalahan saat menyimpan purchase order.',
-                        });
-                    }
-                }
+            Swal.fire({
+                icon: 'error',
+                title: automaticSave ? 'Draft otomatis gagal disimpan' : 'Purchase order gagal disimpan',
+                text: xhr?.responseJSON?.message || 'Terjadi kesalahan saat menyimpan purchase order.',
             });
+        }
+
+        function submitPurchaseOrder(saveAsDraft = false, automaticSave = false) {
+            if (purchaseSaveInProgress) {
+                return;
+            }
+
+            purchaseSaveInProgress = true;
+            updateUnitLoadingState();
+
+            Promise.all([
+                    ensurePurchaseOrderNumber(),
+                    waitForPendingUnitRequests()
+                ])
+                .then(function() {
+                    const purchaseOrderId = $('#pembelian_id').val();
+                    const url = purchaseOrderId ?
+                        "{{ route("pembelian.update", ":id") }}".replace(':id', purchaseOrderId) :
+                        "{{ route("pembelian.store") }}";
+                    const method = purchaseOrderId ? 'PUT' : 'POST';
+                    const formData = $('#pembelianForm').serializeArray();
+
+                    formData.push({
+                        name: 'save_as_draft',
+                        value: saveAsDraft ? '1' : '0'
+                    });
+
+                    return new Promise(function(resolve, reject) {
+                        $.ajax({
+                            url: url,
+                            method: method,
+                            data: $.param(formData),
+                            success: resolve,
+                            error: reject
+                        });
+                    });
+                })
+                .then(function(response) {
+                    if (response.status !== 'success') {
+                        throw {
+                            status: 422,
+                            responseJSON: response
+                        };
+                    }
+
+                    purchaseFormDirty = false;
+                    allowPurchaseModalClose = true;
+                    $('#pembelian_id').val(response.data?.id || $('#pembelian_id').val());
+                    $('#pembelianModal').modal('hide');
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: automaticSave ? 'PO otomatis tersimpan sebagai draft.' : response.message,
+                        toast: true,
+                        position: 'top-end',
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false,
+                    });
+
+                    PembelianTable.ajax.reload(null, false);
+                })
+                .catch(function(xhr) {
+                    showPurchaseSaveError(xhr, automaticSave);
+                })
+                .finally(function() {
+                    purchaseSaveInProgress = false;
+                    updateUnitLoadingState();
+                });
+        }
+
+        // --- Submit PO ke alur approval
+        $('#pembelianForm').on('submit', function(event) {
+            event.preventDefault();
+            submitPurchaseOrder(false, false);
+        });
+
+        // --- Simpan eksplisit sebagai draft
+        $('#saveDraftForm').on('click', function() {
+            submitPurchaseOrder(true, false);
         });
 
         // --- Edit Pembelian
@@ -1541,14 +1747,36 @@
                     });
 
 
-                    // load obat + trigger change otomatis
-                    $('.obatSelect').each(function(i) {
-                        loadObatInto($(this), detail[i].obat_id);
-                    });
-
                     hitungTotal();
+
+                    getMedicineCatalog()
+                        .then(function() {
+                            return preloadMedicineUnits(detail.map(item => item.obat_id));
+                        })
+                        .catch(function() {
+                            // Select tetap dirender; satuan yang gagal akan menampilkan status error per baris.
+                        })
+                        .then(function() {
+                            const rowLoads = [];
+
+                            $('.obatSelect').each(function(i) {
+                                rowLoads.push(loadObatInto($(this), detail[i].obat_id, {
+                                    preservePurchaseValues: true
+                                }));
+                            });
+
+                            return Promise.allSettled(rowLoads);
+                        })
+                        .finally(function() {
+                            window.setTimeout(function() {
+                                purchaseFormHydrating = false;
+                                purchaseFormDirty = false;
+                            }, 0);
+                        });
                 },
                 error: function(xhr) {
+                    editMode = false;
+                    purchaseFormHydrating = false;
                     let message = xhr.responseJSON?.message ||
                         'Terjadi kesalahan saat memuat data pembelian.';
 

@@ -25,7 +25,7 @@
                 <span class="stock-toolbar-title-icon"><i class="mdi mdi-warehouse"></i></span>
                 <div>
                     <h4>Stok Barang</h4>
-                    <p>Kontrol stok total, batch, expired date, harga beli terakhir, dan peringatan stok.</p>
+                    <p>Kontrol stok total, batch, expired date, nilai beli dan jual, serta peringatan stok.</p>
                 </div>
             </div>
             <div class="stock-toolbar-actions">
@@ -192,7 +192,11 @@
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-multiple"></i>
-                        Nilai stok: <strong id="stockValueTotal">Rp 0</strong>
+                        Nilai beli: <strong id="stockValueTotal">Rp 0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-cash-plus"></i>
+                        Nilai jual: <strong id="stockSellingValueTotal">Rp 0</strong>
                     </span>
                 </div>
             </div>
@@ -206,6 +210,8 @@
                             <th>Batch</th>
                             <th>ED Terdekat</th>
                             <th>Harga Beli Terakhir</th>
+                            <th>Nilai Beli</th>
+                            <th>Nilai Jual</th>
                             <th>Stok Minimum</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -222,7 +228,7 @@
                     <span class="stock-section-icon"><i class="mdi mdi-package-variant-closed"></i></span>
                     <div>
                         <h5>Stok Per Batch</h5>
-                        <p>Daftar batch aktif, expired date, qty, dan nilai stok per batch.</p>
+                        <p>Daftar batch aktif, expired date, qty, serta nilai beli dan jual per batch.</p>
                     </div>
                 </div>
                 <div class="stock-section-tools">
@@ -237,6 +243,14 @@
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-counter"></i>
                         Qty: <strong id="batchTotalQty">0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-cash-multiple"></i>
+                        Nilai beli: <strong id="batchPurchaseValue">Rp 0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-cash-plus"></i>
+                        Nilai jual: <strong id="batchSellingValue">Rp 0</strong>
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-calendar-alert"></i>
@@ -265,7 +279,8 @@
                             <th>Qty</th>
                             <th>Harga Beli</th>
                             <th>Harga Jual</th>
-                            <th>Nilai Stok</th>
+                            <th>Nilai Beli</th>
+                            <th>Nilai Jual</th>
                             <th>Status</th>
                             <th>Mutasi Terakhir</th>
                             <th>Aksi</th>

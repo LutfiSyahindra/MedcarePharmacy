@@ -248,6 +248,7 @@
             $('#stockLowCount').text(formatNumber(lowCount));
             $('#stockExpiredCount').text(formatNumber(edRiskCount));
             $('#stockValueTotal').text(formatCurrency(summary.nilai_stok));
+            $('#stockSellingValueTotal').text(formatCurrency(summary.nilai_stok_jual));
             $('#stockEmptyInsight').text(formatNumber(emptyCount));
             $('#stockLowInsight').text(formatNumber(lowCount));
             $('#stockEdInsight').text(formatNumber(edRiskCount));
@@ -266,6 +267,8 @@
             const riskCount = (Number(summary.expired) || 0) + (Number(summary.akan_expired) || 0);
             $('#batchTotalCount').text(formatNumber(summary.total_batch));
             $('#batchTotalQty').text(formatNumber(summary.total_stok));
+            $('#batchPurchaseValue').text(formatCurrency(summary.nilai_stok));
+            $('#batchSellingValue').text(formatCurrency(summary.nilai_stok_jual));
             $('#batchRiskCount').text(formatNumber(riskCount));
         }
 
@@ -340,6 +343,14 @@
                     render: data => `<span class="stock-money"><i class="mdi mdi-cash"></i>${formatCurrency(data)}</span>`
                 },
                 {
+                    data: 'nilai_stok',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-multiple"></i>${formatCurrency(data)}</span>`
+                },
+                {
+                    data: 'nilai_stok_jual',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
+                },
+                {
                     data: 'stok_minimum',
                     render: (data, type, row) => `<span class="stock-number">${formatNumber(data)} ${escapeHtml(row.satuan)}</span>`
                 },
@@ -355,7 +366,7 @@
                 }
             ],
             columnDefs: [{
-                targets: [0, 3, 8],
+                targets: [0, 3, 10],
                 className: 'text-center'
             }],
             rowCallback: function(row, data) {
@@ -434,6 +445,10 @@
                 {
                     data: 'nilai_stok',
                     render: data => `<span class="stock-money">${formatCurrency(data)}</span>`
+                },
+                {
+                    data: 'nilai_stok_jual',
+                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
                 },
                 {
                     data: null,

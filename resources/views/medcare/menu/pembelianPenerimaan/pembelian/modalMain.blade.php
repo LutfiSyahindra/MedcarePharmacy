@@ -330,7 +330,11 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">
                             <i class="mdi mdi-close-circle-outline"></i>
-                            Batal
+                            Tutup
+                        </button>
+                        <button type="button" id="saveDraftForm" class="btn btn-outline-primary">
+                            <i class="mdi mdi-content-save-move-outline"></i>
+                            Simpan sebagai Draft
                         </button>
                         <button type="submit" id="submitForm" class="btn btn-primary">
                             <i class="mdi mdi-content-save-outline"></i>

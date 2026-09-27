@@ -52,6 +52,7 @@ class StokController extends Controller
             ->select('obat_id')
             ->selectRaw('COALESCE(SUM(CASE WHEN qty > 0 THEN qty ELSE 0 END), 0) as total_stok')
             ->selectRaw('COALESCE(SUM(CASE WHEN qty > 0 THEN qty * harga_beli ELSE 0 END), 0) as nilai_stok')
+            ->selectRaw('COALESCE(SUM(CASE WHEN qty > 0 THEN qty * COALESCE(harga_jual, 0) ELSE 0 END), 0) as nilai_stok_jual')
             ->selectRaw('SUM(CASE WHEN qty > 0 THEN 1 ELSE 0 END) as batch_count')
             ->selectRaw('SUM(CASE WHEN qty > 0 AND expired_date IS NOT NULL AND expired_date < ? THEN 1 ELSE 0 END) as expired_count', [$today])
             ->selectRaw('SUM(CASE WHEN qty > 0 AND expired_date IS NOT NULL AND expired_date >= ? AND expired_date <= ? THEN 1 ELSE 0 END) as near_expired_count', [$today, $warningDate])
@@ -77,6 +78,7 @@ class StokController extends Controller
                 DB::raw("COALESCE(batch_totals.batch_numbers, '') as batch_numbers"),
                 DB::raw('COALESCE(batch_totals.total_stok, 0) as total_stok'),
                 DB::raw('COALESCE(batch_totals.nilai_stok, 0) as nilai_stok'),
+                DB::raw('COALESCE(batch_totals.nilai_stok_jual, 0) as nilai_stok_jual'),
                 DB::raw('COALESCE(batch_totals.batch_count, 0) as batch_count'),
                 DB::raw('COALESCE(batch_totals.expired_count, 0) as expired_count'),
                 DB::raw('COALESCE(batch_totals.near_expired_count, 0) as near_expired_count'),
@@ -144,6 +146,7 @@ class StokController extends Controller
             'total_search_matched' => $totalSearchMatched,
             'total_stok' => (float) ($filteredSummary->total_stok ?? 0),
             'nilai_stok' => (float) ($filteredSummary->nilai_stok ?? 0),
+            'nilai_stok_jual' => (float) ($filteredSummary->nilai_stok_jual ?? 0),
             'stok_menipis' => (int) ($filteredSummary->stok_menipis ?? 0),
             'expired' => (int) ($filteredSummary->expired ?? 0),
             'akan_expired' => (int) ($filteredSummary->akan_expired ?? 0),
@@ -158,6 +161,8 @@ class StokController extends Controller
         return DataTables::of($rows->orderBy('nama_obat'))
             ->addIndexColumn()
             ->editColumn('harga_beli_terakhir', fn ($row) => (float) ($row->harga_beli_terakhir ?? 0))
+            ->editColumn('nilai_stok', fn ($row) => (float) ($row->nilai_stok ?? 0))
+            ->editColumn('nilai_stok_jual', fn ($row) => (float) ($row->nilai_stok_jual ?? 0))
             ->addColumn('actions', function ($row) {
                 $batchButton = '<button type="button" class="btn btn-sm btn-info" onclick="filterBatchObat('.$row->id.')"><i class="mdi mdi-package-variant-closed"></i></button>';
                 $cardButton = '<a class="btn btn-sm btn-primary" href="'.route('kartuStok.kartuStok', ['obat_id' => $row->id]).'"><i class="mdi mdi-card-bulleted-outline"></i></a>';
@@ -192,6 +197,7 @@ class StokController extends Controller
             ->selectRaw('COUNT(*) as total_batch')
             ->selectRaw('COALESCE(SUM(qty), 0) as total_stok')
             ->selectRaw('COALESCE(SUM(qty * harga_beli), 0) as nilai_stok')
+            ->selectRaw('COALESCE(SUM(qty * COALESCE(harga_jual, 0)), 0) as nilai_stok_jual')
             ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date < ? THEN 1 ELSE 0 END) as expired', [$today->toDateString()])
             ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date >= ? AND expired_date <= ? THEN 1 ELSE 0 END) as akan_expired', [$today->toDateString(), $warningDate->toDateString()])
             ->first();
@@ -200,6 +206,7 @@ class StokController extends Controller
             'total_batch' => (int) ($batchSummary->total_batch ?? 0),
             'total_stok' => (float) ($batchSummary->total_stok ?? 0),
             'nilai_stok' => (float) ($batchSummary->nilai_stok ?? 0),
+            'nilai_stok_jual' => (float) ($batchSummary->nilai_stok_jual ?? 0),
             'expired' => (int) ($batchSummary->expired ?? 0),
             'akan_expired' => (int) ($batchSummary->akan_expired ?? 0),
         ];
@@ -228,6 +235,7 @@ class StokController extends Controller
             ->editColumn('diskon', fn (StokBatchModel $batch) => (float) ($batch->diskon ?? 0))
             ->editColumn('ppn', fn (StokBatchModel $batch) => (float) ($batch->ppn ?? 0))
             ->addColumn('nilai_stok', fn (StokBatchModel $batch) => (float) $batch->qty * (float) $batch->harga_beli)
+            ->addColumn('nilai_stok_jual', fn (StokBatchModel $batch) => (float) $batch->qty * (float) $batch->harga_jual)
             ->addColumn('status', fn (StokBatchModel $batch) => $this->batchStatus($batch, $today, $warningDate))
             ->addColumn('status_label', fn (StokBatchModel $batch) => $this->statusLabel($this->batchStatus($batch, $today, $warningDate)))
             ->editColumn('last_movement_at', fn (StokBatchModel $batch) => optional($batch->last_movement_at)->format('Y-m-d H:i'))
@@ -539,6 +547,7 @@ class StokController extends Controller
             ->selectRaw('COUNT(*) as total_item')
             ->selectRaw('COALESCE(SUM(total_stok), 0) as total_stok')
             ->selectRaw('COALESCE(SUM(nilai_stok), 0) as nilai_stok')
+            ->selectRaw('COALESCE(SUM(nilai_stok_jual), 0) as nilai_stok_jual')
             ->selectRaw('SUM(CASE WHEN is_low_stock = 1 THEN 1 ELSE 0 END) as stok_menipis')
             ->selectRaw('SUM(CASE WHEN expired_count > 0 THEN 1 ELSE 0 END) as expired')
             ->selectRaw('SUM(CASE WHEN near_expired_count > 0 THEN 1 ELSE 0 END) as akan_expired')

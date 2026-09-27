@@ -51,6 +51,11 @@
                                 <input type="text" class="form-control form-control-sm" id="detailNomorSuratJalan"
                                     readonly>
                             </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Diskon Untuk</label>
+                                <input type="text" class="form-control form-control-sm" id="detailDiskonUntuk"
+                                    readonly>
+                            </div>
                             <div class="col-md-6">
                                 <label class="form-label small">Catatan</label>
                                 <input type="text" class="form-control form-control-sm" id="detailCatatan" readonly>

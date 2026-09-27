@@ -1549,6 +1549,11 @@
                 $('#detailJumlahDibayar').val(formatRupiah(header.jumlah_dibayar));
                 $('#detailSisaHutang').val(formatRupiah(header.sisa_hutang));
                 $('#detailNomorSuratJalan').val(header.nomor_surat_jalan || '-');
+                $('#detailDiskonUntuk').val(
+                    header.diskon_untuk === 'pasien'
+                        ? 'Diberikan ke Pasien'
+                        : (header.diskon_untuk === 'apotek' ? 'Diambil Apotek' : '-')
+                );
                 $('#detailCatatan').val(header.catatan || '-');
                 $('#detailReceiveItemCount').text(Number(header.total_barang || 0).toLocaleString('id-ID'));
                 $('#detailGrandTotal').text(formatRupiah(header.total_faktur ?? header.grand_total));
@@ -1576,7 +1581,10 @@
                             </td>
                             <td>${escapeHtml(item.no_batch || '-')}</td>
                             <td>${formatDateDisplay(item.expired_date)}</td>
-                            <td>${formatRupiah(item.harga_beli)}</td>
+                            <td>
+                                ${formatRupiah(item.harga_beli)}
+                                <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)}</small>
+                            </td>
                             <td>${formatDecimal(item.diskon_1, 0, 2)}%</td>
                             <td>${formatDecimal(item.diskon_2, 0, 2)}%</td>
                             <td>${formatDecimal(item.diskon_3, 0, 2)}%</td>
@@ -1594,6 +1602,10 @@
             let header = preview.header || {};
             let details = preview.details || [];
             let missingMargin = Number(preview.summary?.missing_margin_count || 0);
+            let discountForPatient = header.diskon_untuk === 'pasien';
+            let discountExplanation = discountForPatient
+                ? 'Diskon diberikan ke pasien: harga beli stok dan dasar harga jual sudah menggunakan harga setelah diskon.'
+                : 'Diskon diambil apotek: harga beli stok dan dasar harga jual tetap menggunakan harga sebelum diskon.';
             const marginLevelLabels = {
                 sub_golongan: 'Sub Golongan',
                 main_golongan: 'Main Golongan',
@@ -1616,7 +1628,8 @@
                             <strong>${formatRupiah(item.total_harga_beli_include_ppn || item.total_harga_beli)}</strong>
                             <small class="d-block text-muted">${formatDecimal(item.qty_diterima, 0, 2)} ${escapeHtml(item.satuan_beli)} x ${formatRupiah(item.harga_beli)}</small>
                             <small class="d-block text-muted">Sudah termasuk PPN</small>
-                            <small class="d-block text-muted">Dasar ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
+                            <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(item.satuan_terkecil)}</small>
+                            <small class="d-block text-muted">Dasar margin incl. PPN ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
                         </td>
                         <td class="text-end">
                             <strong>${formatRupiah(item.alokasi_biaya_lain)}</strong>
@@ -1640,7 +1653,7 @@
                             <span class="d-block">D1 ${formatDecimal(item.diskon_1, 0, 2)}% · D2 ${formatDecimal(item.diskon_2, 0, 2)}% · D3 ${formatDecimal(item.diskon_3, 0, 2)}%</span>
                             <small class="d-block text-muted">Efektif ${formatDecimal(item.diskon, 0, 2)}%</small>
                             <small class="text-muted">${formatRupiah(item.nilai_diskon_beli || item.nilai_diskon_jual)}</small>
-                            <small class="d-block text-muted">Sudah masuk total</small>
+                            <small class="d-block text-muted">${discountForPatient ? 'Masuk HPP stok' : 'Menjadi margin apotek'}</small>
                         </td>
                         <td class="text-end">
                             <strong>${formatRupiah(item.harga_jual)}</strong>
@@ -1670,7 +1683,8 @@
                         <span class="badge bg-primary bg-opacity-10 text-primary align-self-start">${details.length} item</span>
                     </div>
                     <div class="alert alert-info py-2 mb-3">
-                        Biaya lain ${formatRupiah(header.biaya_lain)} dialokasikan berdasarkan total qty item diterima dan ditambahkan ke harga jual.
+                        <strong>${escapeHtml(header.diskon_untuk_label || '-')}</strong><br>
+                        ${escapeHtml(discountExplanation)} Biaya lain ${formatRupiah(header.biaya_lain)} dialokasikan berdasarkan total qty item diterima dan ditambahkan ke harga jual.
                     </div>
                     ${missingMargin > 0 ? `
                         <div class="alert alert-warning py-2 mb-3">
@@ -1698,10 +1712,34 @@
             `;
         }
 
-        function submitPostPenerimaan(id) {
+        function renderDiscountRecipientChoice(preview) {
+            return `
+                <div class="text-start mb-3">
+                    <label class="form-label fw-semibold d-block">Diskon diberikan kepada</label>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="border rounded-3 p-3 d-flex gap-2 h-100 w-100" for="discountRecipientPatient">
+                                <input class="form-check-input mt-1" type="radio" name="receive_discount_recipient" id="discountRecipientPatient" value="pasien" checked>
+                                <span><strong>Pasien</strong><small class="d-block text-muted">HPP stok memakai harga beli setelah diskon.</small></span>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="border rounded-3 p-3 d-flex gap-2 h-100 w-100" for="discountRecipientPharmacy">
+                                <input class="form-check-input mt-1" type="radio" name="receive_discount_recipient" id="discountRecipientPharmacy" value="apotek">
+                                <span><strong>Apotek</strong><small class="d-block text-muted">HPP stok tetap sebelum diskon; selisih menjadi margin apotek.</small></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div id="receiveSellingPreviewContent">${renderHargaJualPreview(preview)}</div>
+            `;
+        }
+
+        function submitPostPenerimaan(id, diskonUntuk) {
             $.ajax({
                 url: '{{ route("penerimaan.post", ":id") }}'.replace(':id', id),
                 type: 'PUT',
+                data: { diskon_untuk: diskonUntuk },
                 success: function(response) {
                     Swal.fire('Berhasil', response.message, 'success');
                     PenerimaanTable.ajax.reload(null, false);
@@ -1713,20 +1751,50 @@
         }
 
         window.postPenerimaan = function(id) {
-            $.get('{{ route("penerimaan.hargaJualPreview", ":id") }}'.replace(':id', id), function(preview) {
+            const previewUrl = '{{ route("penerimaan.hargaJualPreview", ":id") }}'.replace(':id', id);
+
+            $.get(previewUrl, { diskon_untuk: 'pasien' }, function(preview) {
                 Swal.fire({
-                    title: 'Harga jual saat posting',
-                    html: renderHargaJualPreview(preview),
+                    title: 'Pilih penerima diskon',
+                    html: renderDiscountRecipientChoice(preview),
                     icon: 'info',
                     width: '72rem',
                     showCancelButton: true,
                     confirmButtonText: 'Posting & Simpan Harga Jual Batch',
                     cancelButtonText: 'Batal',
-                    focusConfirm: false
+                    focusConfirm: false,
+                    didOpen: function() {
+                        $(Swal.getHtmlContainer()).on('change', 'input[name="receive_discount_recipient"]', function() {
+                            const diskonUntuk = this.value;
+                            const previewContainer = $('#receiveSellingPreviewContent');
+                            previewContainer.css('opacity', '.45');
+                            Swal.getConfirmButton().disabled = true;
+
+                            $.get(previewUrl, { diskon_untuk: diskonUntuk })
+                                .done(function(updatedPreview) {
+                                    previewContainer.html(renderHargaJualPreview(updatedPreview)).css('opacity', '1');
+                                    Swal.getConfirmButton().disabled = false;
+                                })
+                                .fail(function(xhr) {
+                                    previewContainer.css('opacity', '1');
+                                    Swal.showValidationMessage(xhr.responseJSON?.message || 'Preview harga jual gagal diperbarui.');
+                                });
+                        });
+                    },
+                    preConfirm: function() {
+                        const diskonUntuk = $('input[name="receive_discount_recipient"]:checked').val();
+
+                        if (!diskonUntuk) {
+                            Swal.showValidationMessage('Pilih diskon diberikan ke pasien atau diambil apotek.');
+                            return false;
+                        }
+
+                        return diskonUntuk;
+                    }
                 }).then(function(result) {
                     if (!result.isConfirmed) return;
 
-                    submitPostPenerimaan(id);
+                    submitPostPenerimaan(id, result.value);
                 });
             }).fail(function(xhr) {
                 Swal.fire('Gagal', xhr.responseJSON?.message || 'Harga jual penerimaan gagal dimuat.', 'error');

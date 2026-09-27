@@ -544,6 +544,9 @@
             <div class="summary">
                 <div class="summary-row"><span>Subtotal</span><strong>{{ $formatMoney($penerimaan->subtotal) }}</strong></div>
                 <div class="summary-row is-deduction"><span>Diskon</span><strong>- {{ $formatMoney($penerimaan->diskon ?: $penerimaan->total_diskon) }}</strong></div>
+                @if ($penerimaan->diskon_untuk)
+                    <div class="summary-row"><span>Diskon untuk</span><strong>{{ $penerimaan->diskon_untuk === 'pasien' ? 'Pasien' : 'Apotek' }}</strong></div>
+                @endif
                 <div class="summary-row"><span>PPN</span><strong>{{ $formatMoney($penerimaan->pajak ?: $penerimaan->total_ppn) }}</strong></div>
                 <div class="summary-row"><span>Biaya lain</span><strong>{{ $formatMoney($penerimaan->biaya_lain) }}</strong></div>
                 @if ($compensationDiscount > 0)

@@ -14,7 +14,6 @@ use App\Services\Menu\PembelianPenerimaan\SuratPesananPsikotropikaService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananRegulerService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Master\DistributorService;
-use App\Services\Settings\Master\MasterObatService;
 use App\Support\BranchAccess;
 use App\Support\TieredDiscount;
 use Illuminate\Http\Request;
@@ -31,12 +30,9 @@ class PembelianController extends Controller
 
     protected $DistributorService;
 
-    protected $MasterObatService;
-
     public function __construct(
         PembelianService $PembelianService,
         DistributorService $DistributorService,
-        MasterObatService $MasterObatService,
         private readonly TransactionNotificationService $transactionNotifications,
         private readonly SuratPesananNarkotikaService $suratPesananNarkotika,
         private readonly SuratPesananPsikotropikaService $suratPesananPsikotropika,
@@ -46,7 +42,6 @@ class PembelianController extends Controller
     ) {
         $this->PembelianService = $PembelianService;
         $this->DistributorService = $DistributorService;
-        $this->MasterObatService = $MasterObatService;
     }
 
     /**
@@ -108,12 +103,12 @@ class PembelianController extends Controller
                     $approvalUser,
                     isset($dataPembelian['branch_key']) ? (int) $dataPembelian['branch_key'] : null
                 );
-                $approvalButton = $canApprove && in_array($status, ['draft', 'waiting_approval'], true)
+                $approvalButton = $canApprove && $status === 'waiting_approval'
                     ? '<button class="btn btn-sm btn-success btn-approve-pembelian" onclick="approvePembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-check-circle"></i>
                 </button>'
                     : '';
-                $rejectButton = $canApprove && in_array($status, ['draft', 'waiting_approval'], true)
+                $rejectButton = $canApprove && $status === 'waiting_approval'
                     ? '<button class="btn btn-sm btn-warning btn-reject-pembelian" onclick="rejectPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-close-circle"></i>
                 </button>'
@@ -163,16 +158,46 @@ class PembelianController extends Controller
 
     public function getObat()
     {
-        $obat = $this->MasterObatService->getMasterObat()->loadMissing('satuan');
+        $obat = MasterObatModel::query()
+            ->select(['id', 'kode_obat', 'nama_obat', 'harga_beli', 'satuan_id'])
+            ->with('satuan:id,nama')
+            ->orderBy('nama_obat')
+            ->get();
 
         return response()->json($obat);
     }
 
     public function getKonversiSatuan(Request $request)
     {
-        $KonversiSatuan = $this->PembelianService->getKonversiSatuan($request->obat_id);
+        if ($request->has('obat_ids')) {
+            $validated = $request->validate([
+                'obat_ids' => ['required', 'array', 'max:250'],
+                'obat_ids.*' => ['required', 'integer', 'distinct', 'exists:master_obats,id'],
+            ]);
+            $medicineIds = collect($validated['obat_ids'])
+                ->map(fn ($medicineId) => (int) $medicineId)
+                ->unique()
+                ->values();
+            $conversions = KonversiSatuanModel::query()
+                ->select(['id', 'obat_id', 'satuan_id', 'konversi'])
+                ->with('satuan:id,nama')
+                ->whereIn('obat_id', $medicineIds)
+                ->orderBy('konversi')
+                ->get()
+                ->groupBy(fn (KonversiSatuanModel $conversion) => (string) $conversion->obat_id);
 
-        // Log::info($KonversiSatuan);
+            return response()->json(
+                $medicineIds->mapWithKeys(fn (int $medicineId) => [
+                    (string) $medicineId => $conversions->get((string) $medicineId, collect())->values(),
+                ])
+            );
+        }
+
+        $validated = $request->validate([
+            'obat_id' => ['required', 'integer', 'exists:master_obats,id'],
+        ]);
+        $KonversiSatuan = $this->PembelianService->getKonversiSatuan($validated['obat_id']);
+
         return response()->json($KonversiSatuan);
     }
 
@@ -191,6 +216,7 @@ class PembelianController extends Controller
     {
         $this->validatePurchaseRequest($request);
 
+        $saveAsDraft = $request->boolean('save_as_draft');
         $detailRows = $this->purchaseDetailRows($request);
         $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
         $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
@@ -220,8 +246,8 @@ class PembelianController extends Controller
                 'catatan' => $request->catatan,
                 'created_by' => $user->id,
 
-                'approved_by' => $isApprover ? $user->id : null,
-                'status' => $isApprover ? 'approved' : 'waiting_approval',
+                'approved_by' => ! $saveAsDraft && $isApprover ? $user->id : null,
+                'status' => $saveAsDraft ? 'draft' : ($isApprover ? 'approved' : 'waiting_approval'),
             ]);
 
             // Insert detail
@@ -237,11 +263,19 @@ class PembelianController extends Controller
             // ======================
             // 🔔 KIRIM NOTIFIKASI
             // ======================
-            $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+            if (! $saveAsDraft) {
+                $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Pembelian berhasil ditambahkan',
+                'message' => $saveAsDraft
+                    ? 'Draft purchase order berhasil disimpan.'
+                    : 'Pembelian berhasil ditambahkan',
+                'data' => [
+                    'id' => $po->id,
+                    'status' => $po->status,
+                ],
             ]);
 
         } catch (\Throwable $e) {
@@ -458,6 +492,13 @@ class PembelianController extends Controller
             ], 422);
         }
 
+        if ($po->status === 'draft') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Draft purchase order harus diajukan terlebih dahulu sebelum disetujui.',
+            ], 422);
+        }
+
         $updatedPo = $this->PembelianService->updateStatus($id, 'approved', $user->id, $branchIds);
         $this->transactionNotifications->notifyActionResult('pembelian', $updatedPo, 'approved', $user);
 
@@ -501,6 +542,13 @@ class PembelianController extends Controller
                 'status' => 'info',
                 'message' => 'Purchase order sudah ditolak.',
             ]);
+        }
+
+        if ($po->status === 'draft') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Draft purchase order belum diajukan ke alur approval.',
+            ], 422);
         }
 
         $updatedPo = $this->PembelianService->updateStatus($id, 'rejected', null, $branchIds);
@@ -556,6 +604,7 @@ class PembelianController extends Controller
     {
         $this->validatePurchaseRequest($request, (int) $id);
 
+        $saveAsDraft = $request->boolean('save_as_draft');
         $detailRows = $this->purchaseDetailRows($request);
         $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
         $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
@@ -602,7 +651,7 @@ class PembelianController extends Controller
                 'biaya_pengiriman' => $biayaPengiriman,
                 'catatan' => $request->catatan,
                 'approved_by' => null,
-                'status' => 'waiting_approval',
+                'status' => $saveAsDraft ? 'draft' : 'waiting_approval',
             ], $branchIds);
 
             // =========================== RESET DETAIL ============================
@@ -619,11 +668,19 @@ class PembelianController extends Controller
 
             DB::commit();
 
-            $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+            if (! $saveAsDraft) {
+                $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Pembelian berhasil diperbarui',
+                'message' => $saveAsDraft
+                    ? 'Draft purchase order berhasil diperbarui.'
+                    : 'Pembelian berhasil diperbarui',
+                'data' => [
+                    'id' => $po->id,
+                    'status' => $po->status,
+                ],
             ]);
 
         } catch (\Throwable $e) {
@@ -725,6 +782,7 @@ class PembelianController extends Controller
 
         $validator = Validator::make($request->all(), [
             'no_po' => ['required', 'string', 'max:50', $purchaseOrderUniqueRule],
+            'save_as_draft' => ['sometimes', 'boolean'],
             'distributor_id' => ['required', 'integer', 'exists:distributors,id'],
             'tanggal' => ['required', 'date_format:d-m-Y'],
             'catatan' => ['nullable', 'string'],

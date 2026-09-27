@@ -27,7 +27,22 @@ class PurchaseOrderBulkMedicinePickerTest extends TestCase
         $this->assertIsString($script);
         $this->assertStringContainsString('currentDetailMedicineIds()', $script);
         $this->assertStringContainsString("$('#addSelectedMedicines').on('click'", $script);
-        $this->assertStringContainsString('populateMedicineSelect(row.find', $script);
-        $this->assertStringContainsString("$('#detail-wrapper').append(detailItemTemplate())", $script);
+        $this->assertStringContainsString('populateMedicineSelect(', $script);
+        $this->assertStringContainsString('append(detailItemTemplate())', $script);
+        $this->assertStringContainsString('initializeMedicineSelect($select)', $script);
+        $this->assertStringContainsString('preloadMedicineUnits(selectedItems.map', $script);
+        $this->assertStringNotContainsString('medicineCatalog.forEach(function(item)', $script);
+    }
+
+    public function test_purchase_order_controller_supports_batched_unit_loading(): void
+    {
+        $controller = file_get_contents(app_path(
+            'Http/Controllers/Medcare/Menu/PembelianDanPenerimaan/Pembelian/PembelianController.php'
+        ));
+
+        $this->assertIsString($controller);
+        $this->assertStringContainsString("\$request->has('obat_ids')", $controller);
+        $this->assertStringContainsString("'obat_ids' => ['required', 'array', 'max:250']", $controller);
+        $this->assertStringContainsString("->whereIn('obat_id', \$medicineIds)", $controller);
     }
 }

@@ -189,7 +189,9 @@ class ReturPembelianCompensationTrackingTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->putJson(route('penerimaan.post', $receipt->id))
+            ->putJson(route('penerimaan.post', $receipt->id), [
+                'diskon_untuk' => 'pasien',
+            ])
             ->assertOk();
 
         $allocation->refresh();
@@ -248,7 +250,7 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             'qty' => 1,
             'harga_estimasi' => 100000,
             'subtotal' => 100000,
-            'satuan_id' => $conversion->id,
+            'satuan_konversi' => $conversion->id,
         ]);
 
         $this->actingAs($user)
@@ -363,6 +365,7 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             'nomor_penerimaan' => 'PB-COMP-'.uniqid(),
             'purchase_order_id' => $purchaseOrder->id,
             'distributor_id' => $distributor->id,
+            'nomor_faktur' => 'INV-COMP-'.uniqid(),
             'tanggal_penerimaan' => now()->format('Y-m-d'),
             'grand_total' => 100000,
             'status' => 'posted',
