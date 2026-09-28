@@ -266,20 +266,20 @@
 
                 return `
                     <tr class="${isAlreadyAdded ? 'is-added' : ''}">
-                        <td class="purchase-picker-check-cell">
+                        <td class="purchase-picker-check-cell" data-label="Pilih">
                             <input type="checkbox" class="form-check-input medicine-picker-checkbox"
                                 value="${escapeHtml(id)}"
                                 aria-label="Pilih ${escapeHtml(medicineName)}"
                                 ${isChecked ? 'checked' : ''}
                                 ${isAlreadyAdded ? 'disabled' : ''}>
                         </td>
-                        <td><span class="purchase-picker-code">${escapeHtml(medicineCode)}</span></td>
-                        <td>
+                        <td data-label="Kode"><span class="purchase-picker-code">${escapeHtml(medicineCode)}</span></td>
+                        <td data-label="Nama Obat">
                             <strong class="purchase-picker-name">${escapeHtml(medicineName)}</strong>
                         </td>
-                        <td>${escapeHtml(unitName)}</td>
-                        <td class="text-end purchase-picker-price">${formatRupiah(item.harga_beli || 0)}</td>
-                        <td>
+                        <td data-label="Satuan Dasar">${escapeHtml(unitName)}</td>
+                        <td class="text-end purchase-picker-price" data-label="Harga Beli">${formatRupiah(item.harga_beli || 0)}</td>
+                        <td data-label="Status">
                             ${isAlreadyAdded
                                 ? '<span class="purchase-picker-status is-added"><i class="mdi mdi-check"></i> Sudah masuk</span>'
                                 : '<span class="purchase-picker-status"><i class="mdi mdi-plus"></i> Bisa dipilih</span>'}
@@ -1247,6 +1247,26 @@
             }],
             drawCallback: function() {
                 let table = $('#tablePembelian');
+                const mobileLabels = [
+                    'No',
+                    'Approval',
+                    'Nomor PO',
+                    'Tanggal PO',
+                    'Branch',
+                    'Distributor',
+                    'Total Estimasi',
+                    'Status',
+                    'Catatan',
+                    'User',
+                    'Aksi'
+                ];
+
+                table.find('tbody tr').each(function() {
+                    $(this).children('td').not('[colspan]').each(function(index) {
+                        $(this).attr('data-label', mobileLabels[index] || 'Informasi');
+                    });
+                });
+
                 table.find('.purchase-action-group .btn-approve-pembelian')
                     .attr({
                         title: 'Setujui purchase order',
@@ -1914,14 +1934,14 @@
 
                         $('#detailObatTable tbody').append(`
                     <tr>
-                        <td>${escapeHtml(item.nama_obat ?? '-')}${regularBadge}${narcoticBadge}${psychotropicBadge}${precursorBadge}${ootBadge}</td>
-                        <td>${escapeHtml(unitName)}</td>
-                        <td>${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
-                        <td>Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>
-                        <td>${Number(item.diskon_1 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td>${Number(item.diskon_2 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td>${Number(item.diskon_3 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td>Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
+                        <td data-label="Nama Obat">${escapeHtml(item.nama_obat ?? '-')}${regularBadge}${narcoticBadge}${psychotropicBadge}${precursorBadge}${ootBadge}</td>
+                        <td data-label="Satuan">${escapeHtml(unitName)}</td>
+                        <td data-label="Qty">${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
+                        <td data-label="Harga Estimasi">Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>
+                        <td data-label="Diskon 1">${Number(item.diskon_1 ?? 0).toLocaleString('id-ID')}%</td>
+                        <td data-label="Diskon 2">${Number(item.diskon_2 ?? 0).toLocaleString('id-ID')}%</td>
+                        <td data-label="Diskon 3">${Number(item.diskon_3 ?? 0).toLocaleString('id-ID')}%</td>
+                        <td data-label="Subtotal">Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
                     </tr>
                 `);
                         medicineSubtotal += Number(item.subtotal ?? 0);
