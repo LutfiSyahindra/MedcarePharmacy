@@ -272,6 +272,10 @@
         box-shadow: inset 3px 0 0 var(--obat-primary);
     }
 
+    .obat-filter-mobile-toggle {
+        display: none;
+    }
+
     .obat-filter-heading,
     .obat-filter-status {
         display: flex;
@@ -1036,7 +1040,7 @@
         }
 
         .obat-stats-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
         .obat-table-toolbar,
@@ -1075,17 +1079,773 @@
         }
     }
 
-    @media (max-width: 575.98px) {
+    @media (max-width: 767.98px) {
+        .obat-page {
+            min-width: 0;
+        }
+
+        .obat-page .page-breadcrumb,
+        .obat-page .breadcrumb {
+            margin-bottom: .75rem;
+        }
+
+        .obat-page .breadcrumb {
+            flex-wrap: nowrap;
+            overflow: hidden;
+            font-size: .76rem;
+            white-space: nowrap;
+        }
+
+        .obat-page .breadcrumb-item {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .obat-hero {
+            gap: 0;
             padding: 1rem;
+            border-radius: 12px;
+            background:
+                radial-gradient(circle at 100% 0, rgba(255, 255, 255, .18), transparent 42%),
+                linear-gradient(135deg, rgba(15, 118, 110, .98), rgba(37, 99, 235, .95));
+        }
+
+        .obat-kicker {
+            padding: .3rem .55rem;
+            font-size: .68rem;
         }
 
         .obat-hero h2 {
-            font-size: 1.35rem;
+            margin-top: .65rem;
+            font-size: 1.4rem;
+        }
+
+        .obat-hero p {
+            margin-bottom: .85rem;
+            font-size: .82rem;
+            line-height: 1.55;
+        }
+
+        .obat-flow-panel {
+            display: none;
+        }
+
+        .obat-hero-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .55rem;
+        }
+
+        .obat-hero-actions .btn {
+            min-height: 44px;
+            justify-content: center;
+            padding: .65rem .6rem;
+            font-size: .78rem;
+        }
+
+        .obat-hero-actions .btn:first-child {
+            grid-column: 1 / -1;
+        }
+
+        .obat-stats-grid {
+            gap: .45rem;
+            margin: .75rem 0;
+        }
+
+        .obat-stat {
+            min-width: 0;
+            min-height: 108px;
+            flex-direction: column;
+            justify-content: center;
+            gap: .4rem;
+            padding: .65rem .3rem;
+            text-align: center;
+            border-radius: 10px;
+        }
+
+        .obat-stat-icon {
+            width: 34px;
+            height: 34px;
+            flex-basis: 34px;
+            border-radius: 9px;
+            font-size: 1rem;
+        }
+
+        .obat-stat > div {
+            min-width: 0;
+        }
+
+        .obat-stat strong {
+            font-size: 1.05rem;
+        }
+
+        .obat-stat span {
+            font-size: .62rem;
+            line-height: 1.25;
+        }
+
+        .obat-stat small {
+            display: none;
+        }
+
+        .obat-table-section {
+            border-radius: 12px;
+            overflow: visible;
+        }
+
+        .obat-table-toolbar {
+            gap: .75rem;
+            padding: .85rem;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .obat-table-title {
+            align-items: flex-start;
+        }
+
+        .obat-table-title-icon {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+        }
+
+        .obat-table-title h5 {
+            font-size: .95rem;
+        }
+
+        .obat-table-title p {
+            margin-top: .15rem;
+            font-size: .72rem;
+            line-height: 1.4;
+        }
+
+        .obat-search {
+            min-height: 46px;
+            border-radius: 10px;
+        }
+
+        .obat-search input {
+            min-width: 0;
+            padding-top: .75rem;
+            padding-bottom: .75rem;
+            font-size: 16px;
+        }
+
+        .obat-filter-panel {
+            padding: .85rem;
+        }
+
+        .obat-filter-mobile-toggle {
+            display: flex;
+            width: 100%;
+            min-height: 46px;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            margin: 0;
+            padding: .7rem .8rem;
+            border: 1px solid var(--obat-border);
+            border-radius: 10px;
+            color: var(--obat-primary-strong);
+            background: #fff;
+            font-size: .8rem;
+            font-weight: 800;
+        }
+
+        .obat-filter-mobile-toggle > span {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+        }
+
+        .obat-filter-mobile-chevron {
+            font-size: 1.05rem;
+            transition: transform .18s ease;
+        }
+
+        .obat-filter-panel.is-mobile-expanded .obat-filter-mobile-chevron {
+            transform: rotate(180deg);
+        }
+
+        .obat-filter-heading {
+            display: block;
+        }
+
+        .obat-filter-heading > div:first-child {
+            display: none;
+        }
+
+        .obat-filter-status {
+            flex-direction: row;
+            align-items: center;
+            gap: .5rem;
+            margin-top: .65rem;
+        }
+
+        .obat-filter-status > span {
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .obat-filter-status .btn {
+            min-height: 44px;
+            justify-content: center;
+        }
+
+        .obat-filter-grid {
+            grid-template-columns: 1fr;
+            gap: .65rem;
+            margin-top: .75rem;
+        }
+
+        .obat-filter-panel:not(.is-mobile-expanded) .obat-filter-grid {
+            display: none;
+        }
+
+        .obat-filter-field .select2-container--default .select2-selection--single {
+            height: 46px;
+            border-radius: 10px;
+        }
+
+        .obat-filter-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+            font-size: .78rem;
+            line-height: 44px;
+        }
+
+        .obat-filter-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 44px;
         }
 
         .obat-table-section .table-responsive {
-            padding: 0 .75rem .75rem;
+            overflow: visible;
+            padding: .75rem;
+            background: #f4f8fc;
+        }
+
+        .obat-table-section .dataTables_wrapper,
+        .obat-table-section .dataTables_scroll,
+        .obat-table-section .dataTables_scrollBody {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .obat-table-section .dataTables_scrollHead {
+            display: none !important;
+        }
+
+        .obat-table-section .dataTables_scrollBody {
+            overflow: visible !important;
+            border: 0 !important;
+        }
+
+        .obat-table-section .dataTables_scrollBody > table,
+        .obat-table {
+            display: block;
+            width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+        }
+
+        .obat-table thead {
+            display: none;
+        }
+
+        .obat-table tbody {
+            display: grid;
+            width: 100%;
+            gap: .75rem;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) {
+            display: grid;
+            width: 100%;
+            min-width: 0;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-areas:
+                "identity identity identity identity identity identity"
+                "code code code type type type"
+                "category category category category category category"
+                "stock stock stock price price price"
+                "status status status status status status"
+                "detail detail action action action action";
+            gap: .55rem;
+            padding: .75rem;
+            border: 1px solid var(--obat-border);
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .055);
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row):hover,
+        .obat-table tbody tr:not(.obat-detail-row).is-selected,
+        #tableObat tbody tr.shown {
+            background: #fff;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row).is-selected {
+            border-color: rgba(37, 99, 235, .42);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, .08), 0 8px 22px rgba(15, 23, 42, .055);
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: .35rem;
+            padding: .6rem !important;
+            border: 0 !important;
+            border-radius: 9px;
+            background: #f8fbff !important;
+            white-space: normal !important;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td::before {
+            color: var(--obat-muted);
+            font-size: .62rem;
+            font-weight: 800;
+            letter-spacing: .035em;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(1) {
+            grid-area: detail;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(2) {
+            grid-area: action;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(3) {
+            display: none;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(4) {
+            grid-area: code;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(4)::before {
+            content: "Kode";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(5) {
+            grid-area: identity;
+            padding: .1rem .1rem .65rem !important;
+            border-bottom: 1px solid var(--obat-border) !important;
+            border-radius: 0;
+            background: #fff !important;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(6) {
+            grid-area: category;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(6)::before {
+            content: "Kategori / Golongan";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(7) {
+            grid-area: stock;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(7)::before {
+            content: "Stok minimum";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(8) {
+            grid-area: price;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(8)::before {
+            content: "Harga beli";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(9) {
+            grid-area: type;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(9)::before {
+            content: "Jenis";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(10) {
+            grid-area: status;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(10)::before {
+            content: "Status data";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td.dataTables_empty {
+            display: flex;
+            min-height: 120px;
+            grid-area: 1 / 1 / auto / -1;
+            align-items: center;
+            justify-content: center;
+            color: var(--obat-muted);
+            text-align: center;
+        }
+
+        .obat-identity {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .obat-identity > div {
+            min-width: 0;
+        }
+
+        .obat-identity strong {
+            max-width: none;
+            font-size: .92rem;
+        }
+
+        .obat-avatar {
+            width: 38px;
+            height: 38px;
+            flex-basis: 38px;
+        }
+
+        .obat-code-badge,
+        .obat-tag-badge,
+        .obat-money-badge,
+        .obat-stock-badge,
+        .obat-type-badge {
+            max-width: 100%;
+            padding: .35rem .5rem;
+            font-size: .7rem;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .obat-mini-stack,
+        .obat-price-stack {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .obat-mini-stack strong,
+        .obat-mini-stack small {
+            overflow-wrap: anywhere;
+        }
+
+        .dataTables_wrapper .dataTable th.obat-sticky-detail,
+        .dataTables_wrapper .dataTable td.obat-sticky-detail,
+        .dataTables_wrapper .dataTable th.obat-sticky-action,
+        .dataTables_wrapper .dataTable td.obat-sticky-action,
+        .dataTables_wrapper .dataTable th.obat-sticky-no,
+        .dataTables_wrapper .dataTable td.obat-sticky-no {
+            position: static;
+            box-shadow: none;
+        }
+
+        .obat-detail-toggle,
+        .obat-action-btn {
+            width: 100% !important;
+            min-width: 0;
+            height: 44px;
+            gap: .3rem;
+            font-size: .72rem;
+        }
+
+        .obat-detail-toggle {
+            display: flex !important;
+        }
+
+        .obat-detail-toggle::after {
+            content: "Detail";
+            font-weight: 800;
+        }
+
+        .obat-detail-toggle.is-open::after {
+            content: "Tutup";
+        }
+
+        .obat-action-group {
+            display: grid;
+            width: 100%;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .45rem;
+        }
+
+        .obat-action-btn {
+            display: flex !important;
+            justify-content: center;
+        }
+
+        .obat-action-edit::after {
+            content: "Edit";
+            font-weight: 800;
+        }
+
+        .obat-action-delete::after {
+            content: "Hapus";
+            font-weight: 800;
+        }
+
+        #tableObat tbody tr.obat-detail-row {
+            display: block;
+            width: 100%;
+        }
+
+        #tableObat tbody tr.obat-detail-row td {
+            display: block;
+            width: 100%;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+
+        .obat-detail-panel {
+            gap: .65rem;
+            padding: .7rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .05);
+        }
+
+        .obat-detail-group h6 {
+            padding: .7rem;
+            font-size: .8rem;
+        }
+
+        .obat-detail-grid {
+            gap: .5rem;
+            padding: .65rem;
+        }
+
+        .obat-detail-item {
+            padding: .6rem;
+        }
+
+        .obat-table-meta,
+        .obat-table-footer {
+            gap: .65rem;
+            padding: .75rem;
+            text-align: center;
+        }
+
+        .obat-table-meta .dataTables_length,
+        .obat-table-footer .dataTables_info,
+        .obat-table-footer .dataTables_paginate {
+            width: 100%;
+        }
+
+        .obat-table-meta .dataTables_length label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+        }
+
+        .obat-table-meta select {
+            min-height: 42px;
+        }
+
+        .obat-table-footer .dataTables_paginate {
+            overflow-x: auto;
+            padding-bottom: .1rem;
+        }
+
+        .obat-table-footer .pagination {
+            min-width: max-content;
+            justify-content: center;
+        }
+
+        .obat-table-footer .page-link {
+            min-width: 44px;
+            min-height: 44px;
+            display: grid;
+            place-items: center;
+        }
+
+        .obat-modal .modal-dialog {
+            width: 100%;
+            max-width: none;
+            min-height: 100%;
+            margin: 0;
+        }
+
+        .obat-modal .modal-content {
+            min-height: 100vh;
+            min-height: 100dvh;
+            border-radius: 0;
+        }
+
+        .obat-modal .modal-header {
+            flex: 0 0 auto;
+            padding: .85rem;
+        }
+
+        .obat-modal .modal-title-wrap {
+            min-width: 0;
+            gap: .65rem;
+        }
+
+        .obat-modal .modal-title-wrap > div {
+            min-width: 0;
+        }
+
+        .obat-modal .modal-icon {
+            width: 38px;
+            height: 38px;
+            flex-basis: 38px;
+        }
+
+        .obat-modal .btn-close {
+            width: 44px;
+            height: 44px;
+            flex: 0 0 44px;
+            margin: -.35rem -.35rem 0 0;
+            padding: .8rem;
+            background-size: .8rem;
+        }
+
+        .obat-modal .modal-title {
+            font-size: .95rem;
+        }
+
+        .obat-modal .modal-subtitle {
+            font-size: .7rem;
+            line-height: 1.35;
+        }
+
+        .obat-modal .modal-body {
+            padding: .85rem;
+        }
+
+        .obat-form-grid {
+            gap: .7rem;
+        }
+
+        .obat-form-section {
+            border-radius: 10px;
+        }
+
+        .obat-section-header {
+            padding: .72rem;
+        }
+
+        .obat-section-header i {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+        }
+
+        .obat-section-header strong {
+            font-size: .82rem;
+        }
+
+        .obat-section-header small {
+            font-size: .68rem;
+            line-height: 1.35;
+        }
+
+        .obat-section-body {
+            padding: .75rem;
+        }
+
+        .obat-fields {
+            gap: .7rem;
+        }
+
+        .obat-field .form-label {
+            margin-bottom: .35rem;
+            font-size: .76rem;
+        }
+
+        .obat-input-shell {
+            min-height: 46px;
+            border-radius: 10px;
+        }
+
+        .obat-input-icon {
+            width: 40px;
+            flex-basis: 40px;
+        }
+
+        .obat-input-shell .form-control,
+        .obat-input-shell .form-select {
+            min-height: 44px;
+            font-size: 16px;
+        }
+
+        .obat-field .select2-container--default .select2-selection--single {
+            min-height: 44px;
+        }
+
+        .obat-field .select2-container--default .select2-selection--single .select2-selection__rendered {
+            max-width: calc(100vw - 105px);
+            line-height: 44px;
+        }
+
+        .obat-field .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 44px;
+        }
+
+        .obat-modal .modal-footer {
+            position: sticky;
+            bottom: -.85rem;
+            z-index: 8;
+            flex-wrap: nowrap;
+            gap: .6rem;
+            margin: .8rem -.85rem -.85rem;
+            padding: .75rem .85rem calc(.75rem + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--obat-border);
+            background: rgba(255, 255, 255, .96);
+            box-shadow: 0 -10px 24px rgba(15, 23, 42, .07);
+            backdrop-filter: blur(8px);
+        }
+
+        .obat-modal .modal-footer .btn {
+            min-height: 46px;
+            flex: 1 1 0;
+            justify-content: center;
+        }
+
+        .obat-import-panel {
+            gap: .75rem;
+            padding: .75rem;
+        }
+
+        .obat-import-panel .btn {
+            min-height: 44px;
+            justify-content: center;
+        }
+
+        .obat-page .dropify-wrapper {
+            min-height: 180px;
+        }
+
+        .select2-container--open {
+            max-width: calc(100vw - 1.7rem);
+        }
+
+        .select2-search--dropdown .select2-search__field {
+            min-height: 44px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .select2-results__option {
+            padding: .72rem .75rem;
+            font-size: .82rem;
+            line-height: 1.35;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .obat-table-section .table-responsive {
+            padding: .65rem;
         }
 
         .obat-filter-grid {
@@ -1093,7 +1853,61 @@
         }
 
         .obat-modal .modal-body {
-            padding: 1rem;
+            padding: .75rem;
+        }
+
+        .obat-modal .modal-footer {
+            bottom: -.75rem;
+            margin-right: -.75rem;
+            margin-bottom: -.75rem;
+            margin-left: -.75rem;
+            padding-right: .75rem;
+            padding-left: .75rem;
+        }
+
+        .obat-import-steps {
+            padding-left: 1rem;
+            font-size: .74rem;
+        }
+    }
+
+    @media (max-width: 359.98px) {
+        .obat-hero-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .obat-hero-actions .btn:first-child {
+            grid-column: auto;
+        }
+
+        .obat-stat span {
+            font-size: .58rem;
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) {
+            grid-template-areas:
+                "identity identity identity identity identity identity"
+                "code code code code code code"
+                "type type type status status status"
+                "category category category category category category"
+                "stock stock stock price price price"
+                "detail detail action action action action";
+        }
+
+        .obat-table tbody tr:not(.obat-detail-row) > td:nth-child(10) {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .obat-page *,
+        .obat-page *::before,
+        .obat-page *::after {
+            scroll-behavior: auto !important;
+            transition-duration: .01ms !important;
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
         }
     }
 </style>

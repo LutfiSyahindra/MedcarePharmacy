@@ -550,6 +550,14 @@
             syncClassificationFilters(true);
         });
 
+        $('#obatFilterMobileToggle').on('click', function() {
+            const $panel = $('#obatFilterPanel');
+            const expanded = !$panel.hasClass('is-mobile-expanded');
+
+            $panel.toggleClass('is-mobile-expanded', expanded);
+            $(this).attr('aria-expanded', String(expanded));
+        });
+
         $('.obat-refresh-table').on('click.obatFilterRefresh', function() {
             loadClassificationFilterOptions(true);
         });
@@ -658,6 +666,14 @@
                     if (xhr.status === 422) {
                         const messages = MasterObatUI.markFieldErrors(formSelector, xhr.responseJSON.errors);
                         MasterObatUI.toast('error', 'Validasi Gagal', messages.join('<br>'));
+
+                        const firstInvalidField = document.querySelector(`${formSelector} .obat-field.has-error`);
+                        if (firstInvalidField) {
+                            firstInvalidField.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        }
                         return;
                     }
 

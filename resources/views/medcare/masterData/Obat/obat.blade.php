@@ -54,12 +54,18 @@
                 <div class="obat-table-tools">
                     <label class="obat-search" for="obatSearch">
                         <i class="mdi mdi-magnify"></i>
-                        <input type="text" id="obatSearch" placeholder="Cari kode, nama, kategori, pabrikan...">
+                        <input type="search" id="obatSearch" inputmode="search" autocomplete="off"
+                            placeholder="Cari kode, nama, kategori, pabrikan...">
                     </label>
                 </div>
             </div>
 
             <div class="obat-filter-panel" id="obatFilterPanel">
+                <button type="button" class="obat-filter-mobile-toggle" id="obatFilterMobileToggle"
+                    aria-expanded="false" aria-controls="obatFilterGrid">
+                    <span><i class="mdi mdi-tune-variant"></i> Atur Filter</span>
+                    <i class="mdi mdi-chevron-down obat-filter-mobile-chevron" aria-hidden="true"></i>
+                </button>
                 <div class="obat-filter-heading">
                     <div>
                         <span class="obat-filter-kicker"><i class="mdi mdi-filter-variant"></i> Filter klasifikasi</span>
@@ -73,7 +79,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="obat-filter-grid">
+                <div class="obat-filter-grid" id="obatFilterGrid">
                     <label class="obat-filter-field" for="obatCategoryFilter">
                         <span><i class="mdi mdi-folder-outline"></i>Kategori</span>
                         <select id="obatCategoryFilter" class="form-select master-obat-filter" data-placeholder="Semua kategori" disabled>
@@ -102,7 +108,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="tableObat" class="table obat-table align-middle">
+                <table id="tableObat" class="table obat-table align-middle" aria-label="Daftar master obat">
                     <thead>
                         <tr>
                             <th>Detail</th>

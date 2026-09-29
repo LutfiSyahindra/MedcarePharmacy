@@ -149,12 +149,14 @@
         }
 
         function dataTableOptions(options) {
+            const useHorizontalScroll = !(window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches);
+
             return $.extend(true, {
                 processing: true,
                 serverSide: true,
                 responsive: false,
                 autoWidth: false,
-                scrollX: true,
+                scrollX: useHorizontalScroll,
                 order: [],
                 pageLength: 10,
                 lengthMenu: [

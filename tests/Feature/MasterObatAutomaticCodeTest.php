@@ -81,6 +81,28 @@ class MasterObatAutomaticCodeTest extends TestCase
         ]);
     }
 
+    public function test_creating_master_obat_also_creates_its_default_base_unit_conversion(): void
+    {
+        $user = User::factory()->create();
+        $references = $this->createReferences('SED-002', 'Kapsul');
+
+        $response = $this->actingAs($user)
+            ->postJson(route('masterObat.store'), [
+                ...$this->validPayload($references),
+                'kode_prefix' => 'kps',
+                'nama_obat' => 'Obat Dengan Konversi Dasar',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('obat_satuan_conversions', [
+            'obat_id' => $response->json('data.id'),
+            'satuan_id' => $references['satuan']->id,
+            'konversi' => 1,
+            'is_default' => true,
+        ]);
+        $this->assertDatabaseCount('obat_satuan_conversions', 1);
+    }
+
     private function createReferences(string $sediaanCode, string $sediaanName): array
     {
         return [

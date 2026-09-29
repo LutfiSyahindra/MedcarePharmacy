@@ -233,7 +233,10 @@ class MasterObatService
             unset($data['kode_prefix']);
             $data['kode_obat'] = $this->nextMedicineCode($prefix, true);
 
-            return $this->MasterObatRepository->createMasterObat($data);
+            $masterObat = $this->MasterObatRepository->createMasterObat($data);
+            $this->createBaseUnitConversion($masterObat);
+
+            return $masterObat;
         }, 5);
     }
 
@@ -353,7 +356,7 @@ class MasterObatService
                 if ($exists) {
                     $skipped++;
                 } else {
-                    MasterObatModel::create([
+                    $masterObat = MasterObatModel::create([
                         'kode_obat' => $kode_obat,
                         'nama_obat' => $nama_obat,
                         'category_id' => $category_id?->id,
@@ -374,6 +377,7 @@ class MasterObatService
                         'is_generik' => $is_generik,
                         'is_active' => $is_active,
                     ]);
+                    $this->createBaseUnitConversion($masterObat);
                     $added++;
                 }
             }
@@ -412,6 +416,19 @@ class MasterObatService
         }
 
         return $default;
+    }
+
+    private function createBaseUnitConversion(MasterObatModel $masterObat): void
+    {
+        if (! $masterObat->satuan_id) {
+            return;
+        }
+
+        $masterObat->konversiSatuan()->create([
+            'satuan_id' => $masterObat->satuan_id,
+            'konversi' => 1,
+            'is_default' => true,
+        ]);
     }
 
     private function normalizeCodePrefix(string $prefix): string
