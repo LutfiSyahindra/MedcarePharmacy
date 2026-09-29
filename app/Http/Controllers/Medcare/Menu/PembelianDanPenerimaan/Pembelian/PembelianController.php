@@ -776,6 +776,10 @@ class PembelianController extends Controller
 
     private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): void
     {
+        $request->merge([
+            'no_po' => trim((string) $request->input('no_po')),
+        ]);
+
         $purchaseOrderUniqueRule = 'unique:purchase_orders,no_po';
 
         if ($ignorePurchaseOrderId !== null) {

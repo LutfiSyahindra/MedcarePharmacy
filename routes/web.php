@@ -44,6 +44,7 @@ use App\Http\Controllers\Medcare\Settings\Branch\AssignBranchController;
 use App\Http\Controllers\Medcare\Settings\Branch\BranchController;
 use App\Http\Controllers\Medcare\Settings\Margin\MarginController;
 use App\Http\Controllers\Medcare\Settings\Notification\NotificationSettingController;
+use App\Http\Controllers\Medcare\Settings\PurchaseOrder\PurchaseOrderSettingController;
 use App\Http\Controllers\Medcare\Settings\SuratPesanan\SuratPesananSettingController;
 use App\Http\Controllers\ProfileController;
 use App\Services\Menu\Dokumen\DocumentArchiveService;
@@ -134,6 +135,10 @@ Route::middleware('auth')->group(function () {
         // Surat Pesanan classification
         Route::get('/surat-pesanan', [SuratPesananSettingController::class, 'index'])->name('settings.surat-pesanan.index');
         Route::put('/surat-pesanan', [SuratPesananSettingController::class, 'update'])->name('settings.surat-pesanan.update');
+
+        // Purchase Order numbering per distributor
+        Route::get('/purchase-order', [PurchaseOrderSettingController::class, 'index'])->name('settings.purchase-order.index');
+        Route::put('/purchase-order', [PurchaseOrderSettingController::class, 'update'])->name('settings.purchase-order.update');
     });
 
     Route::prefix('medcare/masterData')->group(function () {

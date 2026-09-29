@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 class DistributorModel extends Model
 {
     use HasFactory;
-    
-    protected $table = "distributors";
+
+    protected $table = 'distributors';
+
     protected $fillable = [
         'kode',
         'nama',
@@ -17,5 +18,11 @@ class DistributorModel extends Model
         'telepon',
         'email',
         'is_active',
+        'uses_manual_po_number',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'uses_manual_po_number' => 'boolean',
     ];
 }

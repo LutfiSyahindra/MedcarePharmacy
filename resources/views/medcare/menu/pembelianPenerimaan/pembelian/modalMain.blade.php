@@ -29,8 +29,8 @@
                         <div class="purchase-overview-item">
                             <span><i class="mdi mdi-identifier"></i></span>
                             <div>
-                                <strong>Nomor Otomatis</strong>
-                                <small>PO dibuat sesuai urutan bulan berjalan.</small>
+                                <strong id="purchaseNumberModeTitle">Nomor Otomatis</strong>
+                                <small id="purchaseNumberModeDescription">PO dibuat sesuai urutan bulan berjalan.</small>
                             </div>
                         </div>
                         <div class="purchase-overview-item">
@@ -67,9 +67,9 @@
                                     <div class="purchase-input-icon">
                                         <i class="mdi mdi-file-document-edit-outline"></i>
                                         <input type="text" class="form-control" name="no_po"
-                                            placeholder="Nomor dibuat otomatis" readonly>
+                                            placeholder="Pilih distributor terlebih dahulu" maxlength="50" readonly required>
                                     </div>
-                                    <small class="purchase-field-hint">Terisi otomatis saat modal tambah dibuka.</small>
+                                    <small class="purchase-field-hint" id="purchaseNumberHint">Nomor PO mengikuti pengaturan distributor.</small>
                                 </div>
 
                                 <div class="col-md-4">

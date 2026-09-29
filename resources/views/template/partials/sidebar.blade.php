@@ -236,6 +236,15 @@
                     </a>
                 </li>
             @endif
+            @if ($sidebarCan(\App\Support\SidebarPermissions::SETTINGS_PURCHASE_ORDER))
+                <li class="nav-item">
+                    <a href="{{ route("settings.purchase-order.index") }}"
+                        class="nav-link {{ request()->routeIs("settings.purchase-order.*") ? "active" : "" }}">
+                        <i class="link-icon" data-feather="shopping-cart"></i>
+                        <span class="link-title">Setting PO</span>
+                    </a>
+                </li>
+            @endif
 
             {{-- Master Data --}}
             @if ($sidebarCan(\App\Support\SidebarPermissions::MASTER_DATA))

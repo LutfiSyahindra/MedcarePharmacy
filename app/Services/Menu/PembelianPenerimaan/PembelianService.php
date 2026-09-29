@@ -30,16 +30,19 @@ class PembelianService
         $now = now();
         $tahun = $now->format('Y');
         $bulan = $now->format('m');
+        $prefix = 'PO-'.$tahun.'-'.$bulan.'-';
+        $lastNumber = PembelianModel::query()
+            ->where('no_po', 'like', $prefix.'%')
+            ->pluck('no_po')
+            ->map(static function (string $number) use ($prefix): int {
+                $sequence = substr($number, strlen($prefix));
 
-        $lastPo = PembelianModel::whereYear('created_at', $tahun)
-            ->whereMonth('created_at', $bulan)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        $lastNumber = $lastPo ? intval(substr($lastPo->no_po, -4)) : 0;
+                return ctype_digit($sequence) ? (int) $sequence : 0;
+            })
+            ->max() ?? 0;
         $nextNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
 
-        $noPo = 'PO-'.$tahun.'-'.$bulan.'-'.$nextNumber;
+        $noPo = $prefix.$nextNumber;
 
         return $noPo;
     }

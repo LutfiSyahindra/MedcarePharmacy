@@ -20,6 +20,8 @@ final class SidebarPermissions
 
     public const SETTINGS_SURAT_PESANAN = 'MEDCARE.SETTINGS.SURAT_PESANAN';
 
+    public const SETTINGS_PURCHASE_ORDER = 'MEDCARE.SETTINGS.PURCHASE_ORDER';
+
     public const MASTER_DATA = 'MEDCARE.MASTER_DATA';
 
     public const NOTIFIKASI = 'MEDCARE.MENU.NOTIFIKASI';
@@ -72,6 +74,7 @@ final class SidebarPermissions
             self::SETTINGS_MARGIN,
             self::SETTINGS_NOTIFIKASI,
             self::SETTINGS_SURAT_PESANAN,
+            self::SETTINGS_PURCHASE_ORDER,
         ];
     }
 
@@ -105,6 +108,7 @@ final class SidebarPermissions
     {
         return [
             self::SETTINGS_ROLE_SETTING,
+            self::SETTINGS_PURCHASE_ORDER,
             self::PASIEN,
             self::DOKUMEN,
             self::KEUANGAN,

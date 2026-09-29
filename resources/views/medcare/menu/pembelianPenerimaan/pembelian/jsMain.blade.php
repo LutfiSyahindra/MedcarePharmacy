@@ -19,6 +19,9 @@
         const medicineSelectPageSize = 50;
         let medicinePickerSearchTimer = null;
         let purchaseSaveInProgress = false;
+        let currentPoNumberMode = null;
+        let currentPoDistributorId = null;
+        let poNumberRequestSequence = 0;
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
@@ -36,6 +39,65 @@
             width: 'resolve',
             dropdownParent: PembelianSelect2Parent
         });
+
+        function selectedDistributorUsesManualPoNumber() {
+            return String(DistributorSelect.find('option:selected').data('manual-po-number') || '0') === '1';
+        }
+
+        function generateAutomaticPurchaseOrderNumber() {
+            const requestSequence = ++poNumberRequestSequence;
+            const field = $('#pembelianForm input[name="no_po"]');
+
+            field.val('').attr('placeholder', 'Sedang membuat nomor PO...');
+
+            return Promise.resolve($.get('{{ route("pembelian.generateNoPO") }}'))
+                .then(function(number) {
+                    if (requestSequence === poNumberRequestSequence && !selectedDistributorUsesManualPoNumber()) {
+                        field.val(number).attr('placeholder', 'Nomor dibuat otomatis');
+                    }
+                });
+        }
+
+        function updatePurchaseOrderNumberMode() {
+            const field = $('#pembelianForm input[name="no_po"]');
+            const hasDistributor = Boolean(DistributorSelect.val());
+            const manual = hasDistributor && selectedDistributorUsesManualPoNumber();
+            const nextMode = !hasDistributor ? null : (manual ? 'manual' : 'automatic');
+            const nextDistributorId = hasDistributor ? String(DistributorSelect.val()) : null;
+            const distributorChanged = currentPoDistributorId !== nextDistributorId;
+
+            poNumberRequestSequence++;
+
+            if (!hasDistributor) {
+                field.prop('readonly', true).val('').attr('placeholder', 'Pilih distributor terlebih dahulu');
+                $('#purchaseNumberModeTitle').text('Pilih Distributor');
+                $('#purchaseNumberModeDescription').text('Mode nomor PO ditentukan oleh distributor.');
+                $('#purchaseNumberHint').text('Nomor PO mengikuti pengaturan distributor.');
+            } else if (manual) {
+                field.prop('readonly', false).attr('placeholder', 'Ketik nomor PO dari distributor');
+                $('#purchaseNumberModeTitle').text('Nomor PO Manual');
+                $('#purchaseNumberModeDescription').text('Nomor PO diketik sesuai dokumen distributor.');
+                $('#purchaseNumberHint').text('Wajib diisi manual dan harus berbeda dari nomor PO lain.');
+
+                if (!editMode && (currentPoNumberMode !== 'manual' || distributorChanged)) {
+                    field.val('');
+                }
+            } else {
+                field.prop('readonly', true).attr('placeholder', 'Nomor dibuat otomatis');
+                $('#purchaseNumberModeTitle').text('Nomor Otomatis');
+                $('#purchaseNumberModeDescription').text('PO dibuat sesuai urutan bulan berjalan.');
+                $('#purchaseNumberHint').text('Terisi otomatis untuk distributor ini.');
+
+                if (!editMode && (currentPoNumberMode !== 'automatic' || !String(field.val() || '').trim())) {
+                    generateAutomaticPurchaseOrderNumber().catch(function() {
+                        field.attr('placeholder', 'Nomor otomatis gagal dibuat');
+                    });
+                }
+            }
+
+            currentPoNumberMode = nextMode;
+            currentPoDistributorId = nextDistributorId;
+        }
 
         // --- Setup CSRF untuk semua AJAX request
         $.ajaxSetup({
@@ -363,6 +425,9 @@
             $('#total_estimasi').text(formatRupiah(0));
             $('#total_estimasi_input').val(0);
             $('#pembelian_id').val('');
+            currentPoNumberMode = null;
+            currentPoDistributorId = null;
+            DistributorSelect.val('').trigger('change');
             updateUnitLoadingState();
             resetMedicinePicker();
 
@@ -374,13 +439,9 @@
             $('#detail-wrapper').html(detailItemTemplate());
             hitungTotal();
 
-            // Generate No PO hanya kalau TAMBAH
             $(this).one('shown.bs.modal', function() {
                 if (!editMode) {
-                    $.get('{{ route("pembelian.generateNoPO") }}')
-                        .done(function(res) {
-                            form.find('input[name="no_po"]').val(res);
-                        });
+                    updatePurchaseOrderNumberMode();
                 }
             });
 
@@ -668,6 +729,7 @@
                 data.forEach(item => {
                     let nama = item.nama || item.name || 'Tanpa Nama';
                     let option = new Option(nama, item.id, false, false);
+                    $(option).attr('data-manual-po-number', item.uses_manual_po_number ? '1' : '0');
                     DistributorSelect.append(option);
                 });
 
@@ -680,6 +742,8 @@
                     .append('<option value="">Gagal memuat data kategori</option>');
             }
         });
+
+        DistributorSelect.on('change', updatePurchaseOrderNumberMode);
 
         // --- Get data obat. Setiap baris hanya menyimpan option yang terpilih;
         // hasil pencarian Select2 dibaca dari satu katalog bersama agar DOM tetap ringan.
@@ -1422,10 +1486,18 @@
                 return Promise.resolve();
             }
 
-            return Promise.resolve($.get('{{ route("pembelian.generateNoPO") }}'))
-                .then(function(number) {
-                    $('input[name="no_po"]').val(number);
+            if (selectedDistributorUsesManualPoNumber()) {
+                return Promise.reject({
+                    status: 422,
+                    responseJSON: {
+                        errors: {
+                            no_po: ['Nomor PO wajib diketik manual untuk distributor yang dipilih.']
+                        }
+                    }
                 });
+            }
+
+            return generateAutomaticPurchaseOrderNumber();
         }
 
         function waitForPendingUnitRequests() {
