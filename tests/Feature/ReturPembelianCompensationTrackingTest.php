@@ -253,24 +253,33 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             'satuan_konversi' => $conversion->id,
         ]);
 
+        $receiptPayload = [
+            'nomor_penerimaan' => 'PB-GROSS-COMP-'.uniqid(),
+            'purchase_order_id' => $receivingPo->id,
+            'nomor_faktur' => 'INV-GROSS-COMP',
+            'tanggal_penerimaan' => now()->format('d-m-Y'),
+            'tanggal_faktur' => now()->format('d-m-Y'),
+            'jumlah_dibayar' => 10000,
+            'supplier_compensation_discount' => 40000,
+            'purchase_order_detail_id' => [$poDetail->id],
+            'obat_id' => [$obat->id],
+            'qty_diterima' => [1],
+            'stok_batch_id' => [null],
+            'no_batch' => ['BATCH-GROSS-COMP'],
+            'expired_date' => [now()->addYear()->format('d-m-Y')],
+            'harga_beli' => [100000],
+            'ppn' => [0],
+        ];
+
         $this->actingAs($user)
-            ->postJson(route('penerimaan.store'), [
-                'nomor_penerimaan' => 'PB-GROSS-COMP-'.uniqid(),
-                'purchase_order_id' => $receivingPo->id,
-                'nomor_faktur' => 'INV-GROSS-COMP',
-                'tanggal_penerimaan' => now()->format('d-m-Y'),
-                'tanggal_faktur' => now()->format('d-m-Y'),
-                'jumlah_dibayar' => 10000,
-                'supplier_compensation_discount' => 40000,
-                'purchase_order_detail_id' => [$poDetail->id],
-                'obat_id' => [$obat->id],
-                'qty_diterima' => [1],
-                'stok_batch_id' => [null],
-                'no_batch' => ['BATCH-GROSS-COMP'],
-                'expired_date' => [now()->addYear()->format('d-m-Y')],
-                'harga_beli' => [100000],
-                'ppn' => [0],
-            ])
+            ->postJson(route('penerimaan.store'), array_merge($receiptPayload, [
+                'jumlah_dibayar' => 70000,
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('jumlah_dibayar');
+
+        $this->actingAs($user)
+            ->postJson(route('penerimaan.store'), $receiptPayload)
             ->assertOk();
 
         $receipt = PenerimaanBarangModel::where('nomor_faktur', 'INV-GROSS-COMP')->firstOrFail();
@@ -278,9 +287,9 @@ class ReturPembelianCompensationTrackingTest extends TestCase
         $this->assertEquals(100000, (float) $receipt->total_faktur);
         $this->assertEquals(100000, (float) $receipt->grand_total);
         $this->assertEquals(40000, (float) $receipt->supplier_compensation_discount);
-        $this->assertEquals(0, (float) $receipt->jumlah_dibayar);
-        $this->assertEquals(60000, (float) $receipt->sisa_hutang);
-        $this->assertSame('belum_dibayar', $receipt->status_pembayaran);
+        $this->assertEquals(10000, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(50000, (float) $receipt->sisa_hutang);
+        $this->assertSame('sebagian', $receipt->status_pembayaran);
 
         $receipt->update(['status' => 'posted']);
         $user->givePermissionTo(SidebarPermissions::KEUANGAN);
@@ -293,8 +302,8 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             ->assertCreated();
 
         $receipt->refresh();
-        $this->assertEquals(10000, (float) $receipt->jumlah_dibayar);
-        $this->assertEquals(50000, (float) $receipt->sisa_hutang);
+        $this->assertEquals(20000, (float) $receipt->jumlah_dibayar);
+        $this->assertEquals(40000, (float) $receipt->sisa_hutang);
         $this->assertSame('sebagian', $receipt->status_pembayaran);
 
         $this->actingAs($user)
@@ -303,12 +312,12 @@ class ReturPembelianCompensationTrackingTest extends TestCase
             ->assertJsonPath('header.total_faktur', 100000)
             ->assertJsonPath('header.supplier_compensation_discount', 40000)
             ->assertJsonPath('header.payable_total', 60000)
-            ->assertJsonPath('header.sisa_hutang', 50000);
+            ->assertJsonPath('header.sisa_hutang', 40000);
 
         $this->actingAs($user)
             ->postJson(route('keuangan.payables.pay', $receipt->id), [
                 'payment_method' => 'transfer',
-                'amount' => 50000,
+                'amount' => 40000,
                 'occurred_at' => now()->format('Y-m-d H:i:s'),
             ])
             ->assertCreated();
@@ -334,8 +343,9 @@ class ReturPembelianCompensationTrackingTest extends TestCase
 
         $receipt->refresh();
         $this->assertEquals(100000, (float) $receipt->total_faktur);
-        $this->assertEquals(60000, (float) $receipt->sisa_hutang);
-        $this->assertSame('belum_dibayar', $receipt->status_pembayaran);
+        $this->assertEquals(50000, (float) $receipt->sisa_hutang);
+        $this->assertEquals(10000, (float) $receipt->jumlah_dibayar);
+        $this->assertSame('sebagian', $receipt->status_pembayaran);
     }
 
     private function postedReturn(array $overrides = []): array

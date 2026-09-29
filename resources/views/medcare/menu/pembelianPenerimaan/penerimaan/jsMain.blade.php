@@ -139,11 +139,14 @@
             input.val(formatRupiah(value)).data('raw-value', formatMoneyInputValue(value));
         }
 
-        function updateInvoicePaymentUi(payableTotal, status) {
+        function updateInvoicePaymentUi(payableTotal, paid, debt, status) {
+            let paidPercent = payableTotal > 0 ? Math.min(100, (paid / payableTotal) * 100) : 0;
+
             $('#invoiceBoardTotal').text(formatRupiah(payableTotal));
             $('#invoiceBoardHint').text(payableTotal > 0
-                ? 'Pembayaran dilakukan setelah stok diposting.'
+                ? `${paymentStatusLabel(status)} · Dibayar ${formatRupiah(paid)} · Sisa ${formatRupiah(debt)} (${paidPercent.toFixed(0)}%)`
                 : 'Nilai dihitung otomatis dari item yang diterima.');
+            $('#invoicePaymentStatusText').text(`Status: ${paymentStatusLabel(status)}`);
 
             $('.receive-payment-action').removeClass('is-active');
             if (status === 'belum_dibayar') {
@@ -519,13 +522,19 @@
             $('#summaryReceivePercent').text('0%');
             $('#summaryReceiveMeter').css('width', '0%');
             $('#receiveGrandTotal').text(formatRupiah(0));
+            $('#receivePoSummary, #receiveInvoiceSection').removeClass('is-mobile-details-open');
+            $('.receive-mobile-section-toggle')
+                .attr('aria-expanded', 'false')
+                .find('i')
+                .removeClass('mdi-chevron-up')
+                .addClass('mdi-chevron-down');
             ['subtotal', 'diskon', 'pajak', 'biaya_lain', 'supplier_compensation_discount', 'total_faktur', 'jumlah_dibayar', 'sisa_hutang'].forEach(function(field) {
                 setMoneyInput(field, 0);
             });
             $('input[name="tanggal_faktur"]').val(moment().format('DD-MM-YYYY'));
             $('input[name="tanggal_jatuh_tempo"]').val('');
-            $('select[name="status_pembayaran"]').val('belum_dibayar');
-            updateInvoicePaymentUi(0, 'belum_dibayar');
+            $('input[name="status_pembayaran"]').val('belum_dibayar');
+            updateInvoicePaymentUi(0, 0, 0, 'belum_dibayar');
             $('#penerimaanModalLabel').text('Form Penerimaan Barang');
             $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Simpan Draft');
             form.find('.is-invalid').removeClass('is-invalid');
@@ -547,6 +556,12 @@
 
         $('#penerimaanModal').on('hidden.bs.modal', function() {
             editMode = false;
+            $('#receivePoSummary, #receiveInvoiceSection').removeClass('is-mobile-details-open');
+            $('.receive-mobile-section-toggle')
+                .attr('aria-expanded', 'false')
+                .find('i')
+                .removeClass('mdi-chevron-up')
+                .addClass('mdi-chevron-down');
         });
 
         $('#openPenerimaanModal, #openPenerimaanModalToolbar').on('click', function() {
@@ -656,25 +671,25 @@
 
                 return `
                     <tr>
-                        <td>
+                        <td data-mobile-label="Nomor Retur">
                             <strong>${escapeHtml(item.nomor_retur || '-')}</strong>
                             ${notes}
                         </td>
-                        <td>${escapeHtml(item.branch || '-')}</td>
-                        <td>
+                        <td data-mobile-label="Branch">${escapeHtml(item.branch || '-')}</td>
+                        <td data-mobile-label="Tanggal / Batas">
                             <strong>${formatDateDisplay(item.tanggal_retur)}</strong>
                             <small class="d-block ${item.status === 'overdue' ? 'text-danger' : 'text-muted'}">Batas ${escapeHtml(dueDate)}</small>
                         </td>
-                        <td>
+                        <td data-mobile-label="Status">
                             <span class="supplier-compensation-status ${status.className}">
                                 <i class="mdi ${status.icon}"></i> ${status.label}
                             </span>
                         </td>
-                        <td>
+                        <td data-mobile-label="Sudah Diganti">
                             <strong>${formatRupiah(item.received_value)}</strong>
                             <small class="d-block text-muted">dari ${formatRupiah(item.expected_value)}</small>
                         </td>
-                        <td><strong class="text-danger">${formatRupiah(item.outstanding_value)}</strong></td>
+                        <td data-mobile-label="Sisa"><strong class="text-danger">${formatRupiah(item.outstanding_value)}</strong></td>
                     </tr>
                 `;
             }).join('');
@@ -730,7 +745,7 @@
             return `
                 <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}"
                     data-diskon-1="${diskon1}" data-diskon-2="${diskon2}" data-diskon-3="${diskon3}" data-diskon-efektif="${diskon}">
-                    <td>
+                    <td data-mobile-label="Barang">
                         <div class="receive-item-cell">
                             <span class="receive-item-avatar"><i class="mdi mdi-pill"></i></span>
                             <div class="receive-item-copy">
@@ -742,13 +757,13 @@
                             </div>
                         </div>
                     </td>
-                    <td>
+                    <td data-mobile-label="PO / Sisa">
                         <span class="receive-qty-stack">
                             <strong>${Number(item.qty_po || 0).toLocaleString('id-ID')}</strong>
                             <small>Sisa ${maxQty.toLocaleString('id-ID')}</small>
                         </span>
                     </td>
-                    <td>
+                    <td data-mobile-label="Qty Diterima">
                         <div class="receive-qty-control">
                             <input type="number" class="form-control form-control-sm receive-qty" name="qty_diterima[]"
                                 min="0" max="${maxQty}" step="0.01" value="${qtyValue}">
@@ -759,7 +774,7 @@
                         <small class="receive-row-hint">Maks ${maxQty.toLocaleString('id-ID')} ${escapeHtml(item.satuan || '')}</small>
                         ${conversionHint}
                     </td>
-                    <td>
+                    <td data-mobile-label="No Batch">
                         <div class="receive-batch-picker">
                             <select class="form-select form-select-sm receive-batch-select" name="stok_batch_id[]">
                                 ${receiveBatchOptionsHtml(batchOptions, selectedBatchId)}
@@ -769,17 +784,17 @@
                             <small class="receive-batch-mode">Input manual jika batch belum tersedia.</small>
                         </div>
                     </td>
-                    <td>
+                    <td data-mobile-label="Expired Date">
                         <input type="text" class="form-control form-control-sm receive-expired-date"
                             name="expired_date[]" value="${escapeHtml(expired)}" placeholder="YYYY-MM-DD">
                         <small class="receive-field-note">Wajib untuk batch baru.</small>
                     </td>
-                    <td>
+                    <td data-mobile-label="Harga Beli">
                         <input type="text" class="form-control form-control-sm receive-price" name="harga_beli[]"
                             value="${formatRupiah(harga)}" inputmode="numeric" autocomplete="off">
                         <small class="receive-field-note">Harga per ${escapeHtml(item.satuan || 'satuan')}.</small>
                     </td>
-                    <td>
+                    <td data-mobile-label="Diskon PO">
                         <div class="receive-qty-stack">
                             <strong>D1 ${formatDecimal(diskon1, 0, 2)}%</strong>
                             <small>D2 ${formatDecimal(diskon2, 0, 2)}%</small>
@@ -787,15 +802,15 @@
                         </div>
                         <small class="receive-field-note">Dari PO · efektif ${formatDecimal(diskon, 0, 2)}%</small>
                     </td>
-                    <td>
+                    <td data-mobile-label="PPN %">
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
                             min="0" max="100" step="0.01" value="${ppn}">
                         <small class="receive-field-note">Default 11%</small>
                     </td>
-                    <td>
+                    <td data-mobile-label="Subtotal">
                         <strong class="receive-row-total">${formatRupiah(0)}</strong>
                     </td>
-                    <td>
+                    <td data-mobile-label="Status">
                         <span class="receive-row-check is-empty">
                             <i class="mdi mdi-minus-circle-outline"></i>
                             Belum diisi
@@ -984,7 +999,7 @@
             }
             setMoneyInput('total_faktur', grossTotal);
             setMoneyInput('sisa_hutang', debt);
-            $('select[name="status_pembayaran"]').val(paymentStatus);
+            $('input[name="status_pembayaran"]').val(paymentStatus);
 
             if (!otherCostInput.is(':focus')) {
                 setMoneyElement(otherCostInput, otherCost);
@@ -999,7 +1014,7 @@
                 paidInput.data('raw-value', formatMoneyInputValue(paid));
             }
 
-            updateInvoicePaymentUi(payableTotal, paymentStatus);
+            updateInvoicePaymentUi(payableTotal, paid, debt, paymentStatus);
             $('#supplierCompensationMax').text(formatRupiah(maxCompensationDiscount));
             $('#invoiceBoardFormula').text(compensationDiscount > 0
                 ? `${formatRupiah(grossTotal)} - ganti rugi ${formatRupiah(compensationDiscount)}`
@@ -1082,33 +1097,6 @@
         $(document).on('blur', '.invoice-money:not([readonly]), .receive-price', function() {
             let input = $(this);
             setMoneyElement(input, parseCurrencyValue(input.val()));
-            recalculateReceiveTotals();
-        });
-
-        $('select[name="status_pembayaran"]').on('change', function() {
-            let selectedStatus = $(this).val();
-            let total = Math.max(0, getMoneyInput('total_faktur') - getMoneyInput('supplier_compensation_discount'));
-            let currentPaid = getMoneyInput('jumlah_dibayar');
-
-            if (selectedStatus === 'lunas') {
-                paymentPreset = 'full';
-                setMoneyInput('jumlah_dibayar', total);
-            }
-
-            if (selectedStatus === 'belum_dibayar') {
-                paymentPreset = 'none';
-                setMoneyInput('jumlah_dibayar', 0);
-            }
-
-            if (selectedStatus === 'sebagian') {
-                if (total > 0 && (currentPaid <= 0 || currentPaid >= total)) {
-                    paymentPreset = 'half';
-                    setMoneyInput('jumlah_dibayar', total / 2);
-                } else {
-                    paymentPreset = 'manual';
-                }
-            }
-
             recalculateReceiveTotals();
         });
 
@@ -1201,7 +1189,7 @@
         let PenerimaanTable = $('#tablePenerimaan').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
+            responsive: window.matchMedia('(min-width: 768px)').matches,
             autoWidth: false,
             pageLength: 10,
             order: [
@@ -1276,6 +1264,27 @@
                 targets: [0, 11],
                 className: 'text-center'
             }],
+            createdRow: function(row) {
+                const mobileLabels = [
+                    'No', 'Status', 'Nomor Penerimaan', 'Nomor PO', 'Supplier', 'Faktur',
+                    'Surat Jalan', 'Tanggal', 'Item / Qty', 'Total Faktur', 'User', 'Aksi'
+                ];
+
+                $(row).children('td').each(function(index) {
+                    $(this).attr('data-mobile-label', mobileLabels[index] || '');
+                });
+
+                let actionGroup = $(row).children('td').eq(11).find('.purchase-action-group');
+                if (actionGroup.length) {
+                    actionGroup.prepend(`
+                        <button type="button" class="btn btn-sm btn-light receive-mobile-more"
+                            aria-expanded="false" title="Tampilkan informasi tambahan">
+                            <i class="mdi mdi-information-outline"></i>
+                            <span>Info</span>
+                        </button>
+                    `);
+                }
+            },
             drawCallback: function() {
                 let table = $('#tablePenerimaan');
                 table.find('.btn-info').attr('title', 'Lihat detail penerimaan');
@@ -1391,6 +1400,49 @@
             PenerimaanTable.ajax.reload(null, false);
         });
 
+        $('#receiveMobileFilterToggle').on('click', function() {
+            let filterBar = $('#receiveFilterBar');
+            let isOpen = !filterBar.hasClass('is-mobile-open');
+
+            filterBar.toggleClass('is-mobile-open', isOpen);
+            $(this)
+                .toggleClass('is-active', isOpen)
+                .attr('aria-expanded', isOpen ? 'true' : 'false')
+                .attr('title', isOpen ? 'Tutup filter' : 'Buka filter')
+                .attr('aria-label', isOpen ? 'Tutup filter' : 'Buka filter')
+                .find('i')
+                .toggleClass('mdi-tune-variant', !isOpen)
+                .toggleClass('mdi-chevron-up', isOpen);
+        });
+
+        $('#penerimaanModal').on('click', '.receive-mobile-section-toggle', function() {
+            let button = $(this);
+            let panel = $(button.data('mobile-panel'));
+            let isOpen = !panel.hasClass('is-mobile-details-open');
+
+            panel.toggleClass('is-mobile-details-open', isOpen);
+            button.attr('aria-expanded', isOpen ? 'true' : 'false');
+            button.find('i')
+                .toggleClass('mdi-chevron-down', !isOpen)
+                .toggleClass('mdi-chevron-up', isOpen);
+        });
+
+        $('#tablePenerimaan').on('click', '.receive-mobile-more', function() {
+            let button = $(this);
+            let row = button.closest('tr');
+            let isExpanded = !row.hasClass('is-mobile-expanded');
+
+            row.toggleClass('is-mobile-expanded', isExpanded);
+            button
+                .attr('aria-expanded', isExpanded ? 'true' : 'false')
+                .attr('title', isExpanded ? 'Sembunyikan informasi tambahan' : 'Tampilkan informasi tambahan')
+                .find('span')
+                .text(isExpanded ? 'Ringkas' : 'Info');
+            button.find('i')
+                .toggleClass('mdi-information-outline', !isExpanded)
+                .toggleClass('mdi-chevron-up', isExpanded);
+        });
+
         $('#tablePenerimaan').on('xhr.dt', function() {
             $('#refreshReceiveTable').removeClass('is-loading').prop('disabled', false);
         });
@@ -1483,7 +1535,7 @@
                 $('#penerimaanModal').one('shown.bs.modal', function() {
                     $('#penerimaanModalLabel').text('Edit Penerimaan Barang');
                     $('#submitPenerimaanForm').html('<i class="mdi mdi-content-save-outline"></i> Perbarui Draft');
-                    paymentPreset = 'none';
+                    paymentPreset = 'manual';
                     $('#penerimaan_id').val(header.id);
                     $('#nomor_penerimaan').val(header.nomor_penerimaan);
                     $('input[name="nomor_faktur"]').val(header.nomor_faktur);
@@ -1491,16 +1543,17 @@
                     $('input[name="tanggal_penerimaan"]').val(formatDateInput(header.tanggal_penerimaan));
                     $('input[name="tanggal_faktur"]').val(formatDateInput(header.tanggal_faktur));
                     $('input[name="tanggal_jatuh_tempo"]').val(formatDateInput(header.tanggal_jatuh_tempo));
-                    $('select[name="status_pembayaran"]').val(header.status_pembayaran || 'belum_dibayar');
+                    $('input[name="status_pembayaran"]').val(header.status_pembayaran || 'belum_dibayar');
                     setMoneyInput('subtotal', header.subtotal);
                     setMoneyInput('diskon', header.diskon ?? header.total_diskon);
                     setMoneyInput('pajak', header.pajak ?? header.total_ppn);
                     setMoneyInput('biaya_lain', header.biaya_lain);
                     setMoneyInput('total_faktur', header.total_faktur ?? header.grand_total);
-                    setMoneyInput('jumlah_dibayar', 0);
+                    setMoneyInput('jumlah_dibayar', header.jumlah_dibayar);
                     setMoneyInput('sisa_hutang', Math.max(0,
                         Number(header.total_faktur ?? header.grand_total ?? 0) -
-                        Number(header.supplier_compensation_discount || 0)));
+                        Number(header.supplier_compensation_discount || 0) -
+                        Number(header.jumlah_dibayar || 0)));
                     $('textarea[name="catatan"]').val(header.catatan || '');
 
                     loadApprovedPo(header.purchase_order_id, `${po.no_po} - ${po.supplier}`).then(function() {
@@ -1571,25 +1624,25 @@
 
                     $('#detailReceiveTable tbody').append(`
                         <tr>
-                            <td>
+                            <td data-mobile-label="Barang">
                                 <strong>${escapeHtml(item.obat?.nama_obat || '-')}</strong>
                                 <small class="d-block text-muted">${escapeHtml(item.obat?.kode_obat || '-')}</small>
                             </td>
-                            <td>
+                            <td data-mobile-label="Qty">
                                 <strong>${Number(item.qty_diterima || 0).toLocaleString('id-ID')} ${escapeHtml(purchaseUnit)}</strong>
                                 <small class="d-block text-muted">${qtyStock.toLocaleString('id-ID')} ${escapeHtml(stockUnit)}</small>
                             </td>
-                            <td>${escapeHtml(item.no_batch || '-')}</td>
-                            <td>${formatDateDisplay(item.expired_date)}</td>
-                            <td>
+                            <td data-mobile-label="Batch">${escapeHtml(item.no_batch || '-')}</td>
+                            <td data-mobile-label="Expired">${formatDateDisplay(item.expired_date)}</td>
+                            <td data-mobile-label="Harga Beli">
                                 ${formatRupiah(item.harga_beli)}
                                 <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)}</small>
                             </td>
-                            <td>${formatDecimal(item.diskon_1, 0, 2)}%</td>
-                            <td>${formatDecimal(item.diskon_2, 0, 2)}%</td>
-                            <td>${formatDecimal(item.diskon_3, 0, 2)}%</td>
-                            <td>${Number(item.ppn || 0).toLocaleString('id-ID')}%</td>
-                            <td>${formatRupiah(item.total)}</td>
+                            <td data-mobile-label="Diskon 1">${formatDecimal(item.diskon_1, 0, 2)}%</td>
+                            <td data-mobile-label="Diskon 2">${formatDecimal(item.diskon_2, 0, 2)}%</td>
+                            <td data-mobile-label="Diskon 3">${formatDecimal(item.diskon_3, 0, 2)}%</td>
+                            <td data-mobile-label="PPN">${Number(item.ppn || 0).toLocaleString('id-ID')}%</td>
+                            <td data-mobile-label="Total">${formatRupiah(item.total)}</td>
                         </tr>
                     `);
                 });
@@ -1603,6 +1656,10 @@
             let details = preview.details || [];
             let missingMargin = Number(preview.summary?.missing_margin_count || 0);
             let discountForPatient = header.diskon_untuk === 'pasien';
+            let totalPurchase = details.reduce((total, item) => total + Number(item.total_harga_beli_include_ppn || item.total_harga_beli || 0), 0);
+            let totalSelling = details.reduce((total, item) => total + Number(item.total_harga_jual || 0), 0);
+            let totalStockQty = details.reduce((total, item) => total + Number(item.qty_satuan_terkecil || 0), 0);
+            const detailsOpenAttribute = window.matchMedia('(min-width: 768px)').matches ? ' open' : '';
             let discountExplanation = discountForPatient
                 ? 'Diskon diberikan ke pasien: harga beli stok dan dasar harga jual sudah menggunakan harga setelah diskon.'
                 : 'Diskon diambil apotek: harga beli stok dan dasar harga jual tetap menggunakan harga sebelum diskon.';
@@ -1620,42 +1677,42 @@
 
                 return `
                     <tr>
-                        <td class="text-start">
+                        <td class="text-start" data-mobile-label="Obat">
                             <strong>${escapeHtml(item.nama_obat)}</strong>
                             <small class="d-block text-muted">${escapeHtml(item.kode_obat)} - ${escapeHtml(item.golongan)}</small>
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-mobile-label="Total beli + PPN">
                             <strong>${formatRupiah(item.total_harga_beli_include_ppn || item.total_harga_beli)}</strong>
                             <small class="d-block text-muted">${formatDecimal(item.qty_diterima, 0, 2)} ${escapeHtml(item.satuan_beli)} x ${formatRupiah(item.harga_beli)}</small>
                             <small class="d-block text-muted">Sudah termasuk PPN</small>
                             <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(item.satuan_terkecil)}</small>
                             <small class="d-block text-muted">Dasar margin incl. PPN ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-mobile-label="Biaya lain">
                             <strong>${formatRupiah(item.alokasi_biaya_lain)}</strong>
                             <small class="d-block text-muted">${formatRupiah(item.biaya_lain_satuan_beli)}/${escapeHtml(item.satuan_beli)}</small>
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-mobile-label="Qty terkecil">
                             <strong>${formatDecimal(item.qty_satuan_terkecil, 0, 2)}</strong>
                             <small class="d-block text-muted">${escapeHtml(item.satuan_terkecil)}</small>
                             <small class="d-block text-muted">Konversi ${formatDecimal(item.konversi_satuan, 0, 2)}</small>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-mobile-label="PPN">
                             <span class="d-block">${formatDecimal(item.ppn, 0, 2)}%</span>
                             <small class="text-muted">Include total</small>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-mobile-label="Faktor">
                             <span class="d-block">${formatDecimal(item.faktor_jual, 3, 3)}</span>
                             ${marginBadge}
                             ${marginReference ? `<small class="d-block text-muted">${escapeHtml(marginReference)}</small>` : ''}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-mobile-label="Diskon">
                             <span class="d-block">D1 ${formatDecimal(item.diskon_1, 0, 2)}% · D2 ${formatDecimal(item.diskon_2, 0, 2)}% · D3 ${formatDecimal(item.diskon_3, 0, 2)}%</span>
                             <small class="d-block text-muted">Efektif ${formatDecimal(item.diskon, 0, 2)}%</small>
                             <small class="text-muted">${formatRupiah(item.nilai_diskon_beli || item.nilai_diskon_jual)}</small>
                             <small class="d-block text-muted">${discountForPatient ? 'Masuk HPP stok' : 'Menjadi margin apotek'}</small>
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" data-mobile-label="Harga jual">
                             <strong>${formatRupiah(item.harga_jual)}</strong>
                             <small class="d-block text-muted">/${escapeHtml(item.satuan_terkecil)}</small>
                             <small class="d-block text-muted">Total ${formatRupiah(item.total_harga_jual)}</small>
@@ -1668,84 +1725,220 @@
             if (!rows) {
                 rows = `
                     <tr>
-                            <td colspan="8" class="text-center text-muted py-4">Tidak ada detail harga jual.</td>
+                            <td colspan="8" class="receive-posting-empty text-center text-muted py-4">Tidak ada detail harga jual.</td>
                     </tr>
                 `;
             }
 
             return `
-                <div class="receive-selling-preview text-start">
-                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                <div class="receive-selling-preview">
+                    <div class="receive-posting-document-head">
                         <div>
+                            <span class="receive-posting-eyebrow">Preview harga jual final</span>
                             <strong>${escapeHtml(header.nomor_penerimaan || '-')}</strong>
-                            <small class="d-block text-muted">${escapeHtml(header.no_po || '-')} - ${escapeHtml(header.supplier || '-')}</small>
+                            <small><i class="mdi mdi-file-document-outline"></i>${escapeHtml(header.no_po || '-')}<i class="mdi mdi-circle-small"></i>${escapeHtml(header.supplier || '-')}</small>
                         </div>
-                        <span class="badge bg-primary bg-opacity-10 text-primary align-self-start">${details.length} item</span>
+                        <span class="receive-posting-ready"><i class="mdi mdi-check-decagram"></i> Siap diposting</span>
                     </div>
-                    <div class="alert alert-info py-2 mb-3">
-                        <strong>${escapeHtml(header.diskon_untuk_label || '-')}</strong><br>
-                        ${escapeHtml(discountExplanation)} Biaya lain ${formatRupiah(header.biaya_lain)} dialokasikan berdasarkan total qty item diterima dan ditambahkan ke harga jual.
+
+                    <div class="receive-posting-summary" aria-label="Ringkasan posting penerimaan">
+                        <article>
+                            <span><i class="mdi mdi-package-variant-closed"></i> Item</span>
+                            <strong>${details.length.toLocaleString('id-ID')}</strong>
+                            <small>baris obat</small>
+                        </article>
+                        <article>
+                            <span><i class="mdi mdi-counter"></i> Qty stok</span>
+                            <strong>${formatDecimal(totalStockQty, 0, 2)}</strong>
+                            <small>satuan terkecil</small>
+                        </article>
+                        <article>
+                            <span><i class="mdi mdi-cart-arrow-down"></i> Nilai beli</span>
+                            <strong>${formatRupiah(totalPurchase)}</strong>
+                            <small>sudah termasuk PPN</small>
+                        </article>
+                        <article class="is-highlight">
+                            <span><i class="mdi mdi-tag-text-outline"></i> Estimasi jual</span>
+                            <strong>${formatRupiah(totalSelling)}</strong>
+                            <small>termasuk biaya lain</small>
+                        </article>
                     </div>
+
+                    <div class="receive-posting-policy ${discountForPatient ? 'is-patient' : 'is-pharmacy'}">
+                        <span class="receive-posting-policy-icon"><i class="mdi ${discountForPatient ? 'mdi-account-heart-outline' : 'mdi-storefront-outline'}"></i></span>
+                        <div>
+                            <small>Kebijakan diskon aktif</small>
+                            <strong>${escapeHtml(header.diskon_untuk_label || '-')}</strong>
+                            <p>${escapeHtml(discountExplanation)} Biaya lain ${formatRupiah(header.biaya_lain)} dialokasikan proporsional dan ditambahkan ke harga jual.</p>
+                        </div>
+                    </div>
+
                     ${missingMargin > 0 ? `
-                        <div class="alert alert-warning py-2 mb-3">
-                            ${missingMargin} item belum memiliki margin aktif sesuai prioritas, sehingga faktor 1.000 dipakai.
+                        <div class="receive-posting-warning" role="alert">
+                            <i class="mdi mdi-alert-outline"></i>
+                            <div><strong>${missingMargin} item belum memiliki margin aktif</strong><span>Sistem akan memakai faktor 1.000. Periksa rincian sebelum melanjutkan.</span></div>
                         </div>
                     ` : ''}
-                    <div class="table-responsive" style="max-height: 420px; overflow: auto;">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Obat</th>
-                                    <th class="text-end">Total Beli + PPN</th>
-                                    <th class="text-end">Alokasi Biaya Lain</th>
-                                    <th class="text-end">Qty Terkecil</th>
-                                    <th class="text-center">PPN</th>
-                                    <th class="text-center">Faktor</th>
-                                    <th class="text-end">Diskon</th>
-                                    <th class="text-end">Harga Jual</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
+
+                    <details class="receive-posting-details"${detailsOpenAttribute}>
+                        <summary>
+                            <span><i class="mdi mdi-format-list-bulleted-square"></i><span><strong>Rincian pembentukan harga</strong><small>Audit HPP, diskon, margin, dan harga jual per item</small></span></span>
+                            <span class="receive-posting-details-meta">${details.length} baris <i class="mdi mdi-chevron-down"></i></span>
+                        </summary>
+                        <div class="receive-posting-table-shell">
+                            <table class="receive-posting-table">
+                                <thead>
+                                    <tr>
+                                        <th>Obat</th>
+                                        <th class="text-end">Total beli + PPN</th>
+                                        <th class="text-end">Biaya lain</th>
+                                        <th class="text-end">Qty terkecil</th>
+                                        <th class="text-center">PPN</th>
+                                        <th class="text-center">Faktor</th>
+                                        <th class="text-end">Diskon</th>
+                                        <th class="text-end">Harga jual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </details>
                 </div>
             `;
         }
 
         function renderDiscountRecipientChoice(preview) {
-            return `
-                <div class="text-start mb-3">
-                    <label class="form-label fw-semibold d-block">Diskon diberikan kepada</label>
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="border rounded-3 p-3 d-flex gap-2 h-100 w-100" for="discountRecipientPatient">
-                                <input class="form-check-input mt-1" type="radio" name="receive_discount_recipient" id="discountRecipientPatient" value="pasien" checked>
-                                <span><strong>Pasien</strong><small class="d-block text-muted">HPP stok memakai harga beli setelah diskon.</small></span>
-                            </label>
+            const paid = Number(preview.header?.jumlah_dibayar || 0);
+            const paymentOptions = Object.entries(preview.payment_methods || {})
+                .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+                .join('');
+            const paymentSection = paid > 0 ? `
+                <section class="receive-posting-payment" id="receiveInitialPaymentFields">
+                    <div class="receive-posting-section-head">
+                        <span class="receive-posting-section-icon is-money"><i class="mdi mdi-wallet-outline"></i></span>
+                        <div>
+                            <strong>Catat pembayaran awal</strong>
+                            <small>Jurnal pengeluaran dibuat otomatis saat penerimaan diposting.</small>
                         </div>
-                        <div class="col-md-6">
-                            <label class="border rounded-3 p-3 d-flex gap-2 h-100 w-100" for="discountRecipientPharmacy">
-                                <input class="form-check-input mt-1" type="radio" name="receive_discount_recipient" id="discountRecipientPharmacy" value="apotek">
-                                <span><strong>Apotek</strong><small class="d-block text-muted">HPP stok tetap sebelum diskon; selisih menjadi margin apotek.</small></span>
-                            </label>
+                        <span class="receive-posting-payment-amount">${formatRupiah(paid)}</span>
+                    </div>
+                    <div class="receive-posting-payment-grid">
+                        <div class="receive-posting-field">
+                            <label for="receivePaymentMethod">Metode pembayaran <span>*</span></label>
+                            <div class="receive-posting-control"><i class="mdi mdi-credit-card-outline"></i><select class="form-select" id="receivePaymentMethod" required><option value="">Pilih metode</option>${paymentOptions}</select></div>
+                        </div>
+                        <div class="receive-posting-field">
+                            <label for="receivePaymentOccurredAt">Waktu pembayaran <span>*</span></label>
+                            <div class="receive-posting-control"><i class="mdi mdi-calendar-clock-outline"></i><input type="datetime-local" class="form-control" id="receivePaymentOccurredAt" value="${moment().format('YYYY-MM-DDTHH:mm')}" required></div>
+                        </div>
+                        <div class="receive-posting-field">
+                            <label for="receivePaymentReference">Nomor referensi</label>
+                            <div class="receive-posting-control"><i class="mdi mdi-receipt-text-outline"></i><input type="text" class="form-control" id="receivePaymentReference" maxlength="120" placeholder="Nomor transfer / bukti bayar"></div>
                         </div>
                     </div>
+                    <div class="receive-posting-payment-note"><i class="mdi mdi-information-outline"></i> Faktur ${escapeHtml(preview.header?.nomor_faktur || '-')} akan terhubung ke modul Keuangan.</div>
+                </section>
+            ` : '';
+
+            return `
+                <div class="receive-posting-shell">
+                    <div class="receive-posting-intro">
+                        <span class="receive-posting-intro-icon"><i class="mdi mdi-shield-check-outline"></i></span>
+                        <div>
+                            <strong>Langkah terakhir sebelum stok diperbarui</strong>
+                            <p>Tentukan penerima manfaat diskon, audit harga jual batch, lalu konfirmasi posting.</p>
+                        </div>
+                        <span class="receive-posting-draft-pill"><i class="mdi mdi-file-clock-outline"></i> Draft</span>
+                    </div>
+
+                    <div class="receive-posting-steps" aria-label="Tahapan posting penerimaan">
+                        <span class="is-done"><i class="mdi mdi-check"></i><b>Data tervalidasi</b></span>
+                        <i class="mdi mdi-chevron-right"></i>
+                        <span class="is-active"><b>Atur diskon</b></span>
+                        <i class="mdi mdi-chevron-right"></i>
+                        <span><b>Posting stok</b></span>
+                    </div>
+
+                    <section class="receive-posting-choice-section">
+                        <div class="receive-posting-section-head">
+                            <span class="receive-posting-section-icon"><i class="mdi mdi-sale-outline"></i></span>
+                            <div>
+                                <strong>Siapa yang menerima manfaat diskon?</strong>
+                                <small>Pilihan ini langsung memperbarui HPP dan preview harga jual.</small>
+                            </div>
+                            <span class="receive-posting-required">Wajib dipilih</span>
+                        </div>
+                        <div class="receive-posting-choice-grid" role="radiogroup" aria-label="Penerima manfaat diskon">
+                            <label class="receive-posting-choice is-selected" for="discountRecipientPatient">
+                                <input class="visually-hidden" type="radio" name="receive_discount_recipient" id="discountRecipientPatient" value="pasien" checked>
+                                <span class="receive-posting-choice-icon is-patient"><i class="mdi mdi-account-heart-outline"></i></span>
+                                <span class="receive-posting-choice-copy"><small>Opsi pelayanan</small><strong>Untuk Pasien</strong><span>HPP stok memakai harga beli setelah diskon, sehingga manfaat diteruskan ke pasien.</span></span>
+                                <span class="receive-posting-choice-check"><i class="mdi mdi-check"></i></span>
+                            </label>
+                            <label class="receive-posting-choice" for="discountRecipientPharmacy">
+                                <input class="visually-hidden" type="radio" name="receive_discount_recipient" id="discountRecipientPharmacy" value="apotek">
+                                <span class="receive-posting-choice-icon is-pharmacy"><i class="mdi mdi-storefront-outline"></i></span>
+                                <span class="receive-posting-choice-copy"><small>Opsi bisnis</small><strong>Untuk Apotek</strong><span>HPP tetap memakai harga sebelum diskon; selisihnya menjadi margin apotek.</span></span>
+                                <span class="receive-posting-choice-check"><i class="mdi mdi-check"></i></span>
+                            </label>
+                        </div>
+                    </section>
+
+                    ${paymentSection}
+
+                    <div id="receiveSellingPreviewContent" class="receive-posting-preview" aria-live="polite">${renderHargaJualPreview(preview)}</div>
+
+                    <label class="receive-posting-agreement" for="receivePostingAgreement">
+                        <input type="checkbox" id="receivePostingAgreement">
+                        <span class="receive-posting-agreement-box"><i class="mdi mdi-check"></i></span>
+                        <span>
+                            <strong>Saya sudah memeriksa data penerimaan dan harga jual.</strong>
+                            <small>Posting akan menambah stok batch, menyimpan harga jual, dan mencatat pembayaran awal bila ada.</small>
+                        </span>
+                    </label>
                 </div>
-                <div id="receiveSellingPreviewContent">${renderHargaJualPreview(preview)}</div>
             `;
         }
 
-        function submitPostPenerimaan(id, diskonUntuk) {
+        function submitPostPenerimaan(id, payload) {
+            Swal.fire({
+                title: 'Sedang memposting penerimaan',
+                html: '<div class="receive-posting-progress"><span><i class="mdi mdi-database-sync-outline"></i></span><strong>Memperbarui stok dan harga jual batch...</strong><small>Mohon tunggu, jangan tutup halaman ini.</small></div>',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                customClass: {
+                    popup: 'receive-posting-status-popup',
+                    title: 'receive-posting-status-title',
+                    htmlContainer: 'receive-posting-status-html'
+                },
+                didOpen: function() {
+                    Swal.showLoading();
+                }
+            });
+
             $.ajax({
                 url: '{{ route("penerimaan.post", ":id") }}'.replace(':id', id),
                 type: 'PUT',
-                data: { diskon_untuk: diskonUntuk },
+                data: payload,
                 success: function(response) {
-                    Swal.fire('Berhasil', response.message, 'success');
                     PenerimaanTable.ajax.reload(null, false);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Penerimaan berhasil diposting',
+                        text: response.message,
+                        confirmButtonText: 'Selesai',
+                        confirmButtonColor: '#0f766e'
+                    });
                 },
                 error: function(xhr) {
-                    Swal.fire('Gagal', xhr.responseJSON?.message || 'Penerimaan gagal diposting.', 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Posting belum berhasil',
+                        text: xhr.responseJSON?.message || 'Penerimaan gagal diposting.',
+                        confirmButtonText: 'Tutup',
+                        confirmButtonColor: '#dc2626'
+                    });
                 }
             });
         }
@@ -1753,43 +1946,135 @@
         window.postPenerimaan = function(id) {
             const previewUrl = '{{ route("penerimaan.hargaJualPreview", ":id") }}'.replace(':id', id);
 
+            Swal.fire({
+                title: 'Menyiapkan preview posting',
+                html: '<div class="receive-posting-progress"><span><i class="mdi mdi-calculator-variant-outline"></i></span><strong>Menghitung HPP, margin, dan harga jual...</strong><small>Data terbaru sedang disiapkan.</small></div>',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                customClass: {
+                    popup: 'receive-posting-status-popup',
+                    title: 'receive-posting-status-title',
+                    htmlContainer: 'receive-posting-status-html'
+                },
+                didOpen: function() {
+                    Swal.showLoading();
+                }
+            });
+
             $.get(previewUrl, { diskon_untuk: 'pasien' }, function(preview) {
                 Swal.fire({
-                    title: 'Pilih penerima diskon',
+                    title: 'Finalisasi & Posting Penerimaan',
                     html: renderDiscountRecipientChoice(preview),
-                    icon: 'info',
-                    width: '72rem',
+                    width: '76rem',
                     showCancelButton: true,
-                    confirmButtonText: 'Posting & Simpan Harga Jual Batch',
-                    cancelButtonText: 'Batal',
+                    showCloseButton: true,
+                    buttonsStyling: false,
+                    reverseButtons: true,
+                    confirmButtonText: '<i class="mdi mdi-database-check-outline"></i><span>Posting Penerimaan</span>',
+                    cancelButtonText: 'Periksa Lagi',
                     focusConfirm: false,
+                    allowOutsideClick: false,
+                    customClass: {
+                        container: 'receive-posting-container',
+                        popup: 'receive-posting-popup',
+                        title: 'receive-posting-title',
+                        htmlContainer: 'receive-posting-html',
+                        actions: 'receive-posting-actions',
+                        confirmButton: 'receive-posting-confirm',
+                        cancelButton: 'receive-posting-cancel',
+                        closeButton: 'receive-posting-close',
+                        validationMessage: 'receive-posting-validation'
+                    },
                     didOpen: function() {
-                        $(Swal.getHtmlContainer()).on('change', 'input[name="receive_discount_recipient"]', function() {
-                            const diskonUntuk = this.value;
-                            const previewContainer = $('#receiveSellingPreviewContent');
-                            previewContainer.css('opacity', '.45');
-                            Swal.getConfirmButton().disabled = true;
+                        const container = $(Swal.getHtmlContainer());
+                        const confirmButton = Swal.getConfirmButton();
+                        let previewRequest = null;
+                        let previewIsLoading = false;
+                        let activeDiscount = 'pasien';
 
-                            $.get(previewUrl, { diskon_untuk: diskonUntuk })
+                        const updateConfirmAvailability = function() {
+                            confirmButton.disabled = previewIsLoading || !container.find('#receivePostingAgreement').is(':checked');
+                        };
+
+                        const updateChoiceState = function() {
+                            container.find('.receive-posting-choice').removeClass('is-selected').attr('aria-checked', 'false');
+                            container.find('input[name="receive_discount_recipient"]:checked').closest('.receive-posting-choice').addClass('is-selected').attr('aria-checked', 'true');
+                        };
+
+                        updateChoiceState();
+                        updateConfirmAvailability();
+
+                        container.on('change', '#receivePostingAgreement', function() {
+                            container.find('.receive-posting-agreement').toggleClass('is-checked', this.checked);
+                            updateConfirmAvailability();
+                        });
+
+                        container.on('change', 'input[name="receive_discount_recipient"]', function() {
+                            const diskonUntuk = this.value;
+                            const previewContainer = container.find('#receiveSellingPreviewContent');
+
+                            if (previewRequest) previewRequest.abort();
+
+                            updateChoiceState();
+                            previewIsLoading = true;
+                            previewContainer.addClass('is-loading').attr('aria-busy', 'true');
+                            updateConfirmAvailability();
+                            Swal.resetValidationMessage();
+
+                            previewRequest = $.get(previewUrl, { diskon_untuk: diskonUntuk })
                                 .done(function(updatedPreview) {
-                                    previewContainer.html(renderHargaJualPreview(updatedPreview)).css('opacity', '1');
-                                    Swal.getConfirmButton().disabled = false;
+                                    activeDiscount = diskonUntuk;
+                                    previewContainer.html(renderHargaJualPreview(updatedPreview));
                                 })
                                 .fail(function(xhr) {
-                                    previewContainer.css('opacity', '1');
+                                    if (xhr.statusText === 'abort') return;
+                                    container.find(`input[name="receive_discount_recipient"][value="${activeDiscount}"]`).prop('checked', true);
+                                    updateChoiceState();
                                     Swal.showValidationMessage(xhr.responseJSON?.message || 'Preview harga jual gagal diperbarui.');
+                                })
+                                .always(function(_response, status) {
+                                    if (status === 'abort') return;
+                                    previewIsLoading = false;
+                                    previewContainer.removeClass('is-loading').attr('aria-busy', 'false');
+                                    updateConfirmAvailability();
                                 });
                         });
                     },
                     preConfirm: function() {
-                        const diskonUntuk = $('input[name="receive_discount_recipient"]:checked').val();
+                        const container = $(Swal.getHtmlContainer());
+                        const diskonUntuk = container.find('input[name="receive_discount_recipient"]:checked').val();
 
                         if (!diskonUntuk) {
                             Swal.showValidationMessage('Pilih diskon diberikan ke pasien atau diambil apotek.');
                             return false;
                         }
 
-                        return diskonUntuk;
+                        if (!container.find('#receivePostingAgreement').is(':checked')) {
+                            Swal.showValidationMessage('Centang konfirmasi setelah Anda selesai memeriksa data.');
+                            return false;
+                        }
+
+                        const paid = Number(preview.header?.jumlah_dibayar || 0);
+                        const paymentMethod = container.find('#receivePaymentMethod').val();
+                        const paymentOccurredAt = container.find('#receivePaymentOccurredAt').val();
+
+                        if (paid > 0 && !paymentMethod) {
+                            Swal.showValidationMessage('Pilih metode pembayaran faktur.');
+                            return false;
+                        }
+
+                        if (paid > 0 && !paymentOccurredAt) {
+                            Swal.showValidationMessage('Isi waktu pembayaran faktur.');
+                            return false;
+                        }
+
+                        return {
+                            diskon_untuk: diskonUntuk,
+                            payment_method: paymentMethod || '',
+                            payment_occurred_at: paymentOccurredAt || '',
+                            payment_reference_no: container.find('#receivePaymentReference').val() || ''
+                        };
                     }
                 }).then(function(result) {
                     if (!result.isConfirmed) return;

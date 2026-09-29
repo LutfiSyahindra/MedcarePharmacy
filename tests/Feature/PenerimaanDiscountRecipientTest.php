@@ -6,6 +6,7 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
@@ -141,6 +142,49 @@ class PenerimaanDiscountRecipientTest extends TestCase
         $this->assertSame('2026-09-27 12:34:56', $movement->tanggal_mutasi->format('Y-m-d H:i:s'));
         $this->assertNotSame($staleBatch->id, $movement->stok_batch_id);
         $this->assertSame($movement->stok_batch_id, $detail->refresh()->stok_batch_id);
+    }
+
+    public function test_initial_invoice_payment_is_recorded_in_finance_when_receipt_is_posted(): void
+    {
+        [$user, $receipt] = $this->receiptContext('PAID');
+        $receipt->forceFill([
+            'jumlah_dibayar' => 40000,
+            'sisa_hutang' => 54905,
+            'status_pembayaran' => 'sebagian',
+        ])->save();
+
+        $this->actingAs($user)
+            ->putJson(route('penerimaan.post', $receipt->id), [
+                'diskon_untuk' => 'pasien',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('payment_method');
+
+        $response = $this->actingAs($user)
+            ->putJson(route('penerimaan.post', $receipt->id), [
+                'diskon_untuk' => 'pasien',
+                'payment_method' => 'transfer',
+                'payment_occurred_at' => '2026-09-27 10:30:00',
+                'payment_reference_no' => 'TRF-RECEIPT-001',
+            ])
+            ->assertOk()
+            ->assertJsonPath('diskon_untuk', 'pasien');
+
+        $transaction = FinanceTransactionModel::where(
+            'number',
+            $response->json('finance_transaction_number')
+        )->firstOrFail();
+
+        $this->assertSame('supplier_payment', $transaction->type);
+        $this->assertSame('supplier_payable', $transaction->source_type);
+        $this->assertSame($receipt->id, $transaction->source_id);
+        $this->assertSame('initial-payment', $transaction->source_key);
+        $this->assertSame('transfer', $transaction->payment_method);
+        $this->assertEquals(40000, (float) $transaction->amount);
+        $this->assertSame('TRF-RECEIPT-001', $transaction->reference_no);
+        $this->assertSame('posted', $receipt->fresh()->status);
+        $this->assertEquals(40000, (float) $receipt->fresh()->jumlah_dibayar);
+        $this->assertEquals(54905, (float) $receipt->fresh()->sisa_hutang);
     }
 
     /**

@@ -267,6 +267,89 @@ class FinanceService
         });
     }
 
+    public function recordInitialSupplierPayment(User $user, int $receiptId, array $payload): FinanceTransactionModel
+    {
+        return DB::transaction(function () use ($user, $receiptId, $payload) {
+            $approvalBranchIds = BranchAccess::approvalBranchIds($user);
+            $receipt = PenerimaanBarangModel::query()
+                ->whereKey($receiptId)
+                ->where('status', 'posted')
+                ->whereHas('purchaseOrder', fn ($query) => $query->whereIn('branch_id', $approvalBranchIds))
+                ->with(['purchaseOrder.branch', 'purchaseOrder.distributor', 'distributor'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $existing = FinanceTransactionModel::query()
+                ->where('source_type', 'supplier_payable')
+                ->where('source_id', $receipt->id)
+                ->where('source_key', 'initial-payment')
+                ->first();
+
+            if ($existing) {
+                return $existing->load(['branch', 'category', 'createdBy', 'cashierMovements.shift']);
+            }
+
+            $amount = round(max(0, (float) $receipt->jumlah_dibayar), 2);
+            $payableTotal = $this->supplierPayableTotal($receipt);
+
+            if ($amount <= 0.009) {
+                throw ValidationException::withMessages([
+                    'jumlah_dibayar' => 'Nominal pembayaran awal faktur harus lebih dari nol.',
+                ]);
+            }
+            if ($amount > $payableTotal + 0.009) {
+                throw ValidationException::withMessages([
+                    'jumlah_dibayar' => 'Nominal pembayaran awal melebihi nilai tagihan supplier.',
+                ]);
+            }
+
+            $branch = BranchModel::query()
+                ->whereKey($receipt->purchaseOrder->branch_id)
+                ->whereIn('id', $approvalBranchIds)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $branch) {
+                throw ValidationException::withMessages([
+                    'branch_id' => 'Cabang tidak aktif atau tidak dapat diakses untuk approval.',
+                ]);
+            }
+
+            $method = $this->settlementMethod((string) ($payload['payment_method'] ?? ''));
+            $occurredAt = $this->settlementOccurredAt($branch, $method, $payload['occurred_at'] ?? null);
+            $category = $this->settlementCategory($branch, 'expense', 'PAYABLE-SUPPLIER', 'Pembayaran Hutang Supplier', 'Hutang Supplier');
+            $supplier = $receipt->distributor?->nama ?: $receipt->purchaseOrder?->distributor?->nama ?: 'Supplier';
+            $transaction = FinanceTransactionModel::create([
+                'branch_id' => $branch->id,
+                'category_id' => $category->id,
+                'number' => $this->nextNumber($branch, $occurredAt),
+                'transaction_date' => $occurredAt,
+                'type' => 'supplier_payment',
+                'status' => 'posted',
+                'amount' => $amount,
+                'payment_method' => $method,
+                'description' => 'Pembayaran awal faktur '.$receipt->nomor_faktur.' kepada '.$supplier,
+                'reference_no' => $this->nullableText($payload['reference_no'] ?? null),
+                'source_type' => 'supplier_payable',
+                'source_id' => $receipt->id,
+                'source_key' => 'initial-payment',
+                'metadata' => [
+                    'nomor_faktur' => $receipt->nomor_faktur,
+                    'nomor_penerimaan' => $receipt->nomor_penerimaan,
+                    'counterparty' => $supplier,
+                    'origin' => 'penerimaan',
+                    'notes' => $this->nullableText($payload['notes'] ?? null),
+                ],
+                'created_by' => $user->id,
+                'posted_at' => now(),
+            ]);
+
+            $this->recordSettlementCashMovement($transaction, $branch, $user);
+
+            return $transaction->fresh(['branch', 'category', 'createdBy', 'cashierMovements.shift']);
+        });
+    }
+
     public function collectReceivable(User $user, int $saleId, array $payload): FinanceTransactionModel
     {
         return DB::transaction(function () use ($user, $saleId, $payload) {

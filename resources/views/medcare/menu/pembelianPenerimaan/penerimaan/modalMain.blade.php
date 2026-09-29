@@ -174,6 +174,11 @@
                                 <span>Progress</span>
                                 <strong id="summaryReceivePercent">0%</strong>
                             </div>
+                            <button type="button" class="receive-mobile-section-toggle"
+                                data-mobile-panel="#receivePoSummary" aria-expanded="false">
+                                <i class="mdi mdi-chevron-down"></i>
+                                <span>Rincian</span>
+                            </button>
                         </div>
                         <div class="purchase-form-section-body">
                             <div class="receive-summary-grid">
@@ -283,6 +288,11 @@
                                     <small>Tanggal faktur, nilai tagihan, status bayar, dan sisa hutang.</small>
                                 </div>
                             </div>
+                            <button type="button" class="receive-mobile-section-toggle"
+                                data-mobile-panel="#receiveInvoiceSection" aria-expanded="false">
+                                <i class="mdi mdi-chevron-down"></i>
+                                <span>Rincian nilai</span>
+                            </button>
                         </div>
 
                         <div class="purchase-form-section-body">
@@ -293,12 +303,12 @@
 
                             <div class="receive-invoice-board">
                                 <div class="receive-invoice-main">
-                                    <span>Estimasi Tagihan</span>
+                                    <span>Tagihan Bersih</span>
                                     <strong id="invoiceBoardTotal">Rp 0</strong>
                                     <small id="invoiceBoardFormula">Subtotal - diskon + PPN + biaya lain</small>
                                 </div>
                                 <small class="receive-payment-hint" id="invoiceBoardHint">
-                                    Pembayaran dilakukan setelah stok diposting.
+                                    Masukkan nominal yang sudah dibayar untuk faktur ini.
                                 </small>
                             </div>
 
@@ -385,10 +395,47 @@
                                     </div>
                                     <small class="purchase-field-hint">Terisi otomatis dari biaya asuransi dan pengiriman PO, sesuai proporsi qty yang diterima.</small>
                                 </div>
-                                <input type="hidden" class="invoice-money" name="total_faktur" value="Rp 0">
+                                <div class="col-lg-4 col-md-6">
+                                    <label class="form-label">Total Faktur</label>
+                                    <input type="text" class="form-control invoice-money fw-bold" name="total_faktur"
+                                        value="Rp 0" inputmode="numeric" readonly>
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <label class="form-label" for="invoicePaidAmount">Nominal Pembayaran Faktur</label>
+                                    <div class="receive-money-field is-primary" id="paidAmountField">
+                                        <i class="mdi mdi-cash-fast"></i>
+                                        <input type="text" class="form-control invoice-money" name="jumlah_dibayar"
+                                            id="invoicePaidAmount" value="Rp 0" inputmode="numeric"
+                                            autocomplete="off" placeholder="Rp 0">
+                                    </div>
+                                    <small class="purchase-field-hint">Isi nominal yang sudah dibayar. Jurnal Keuangan dibuat saat penerimaan diposting.</small>
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <label class="form-label">Sisa Hutang</label>
+                                    <input type="text" class="form-control invoice-money fw-bold" name="sisa_hutang"
+                                        value="Rp 0" inputmode="numeric" readonly>
+                                    <small class="purchase-field-hint" id="invoicePaymentStatusText">Status: Belum Dibayar</small>
+                                </div>
+                                <div class="col-12">
+                                    <div class="receive-payment-actions" aria-label="Aksi cepat pembayaran faktur">
+                                        <button type="button" class="btn btn-light btn-sm receive-payment-action"
+                                            data-payment-action="none">
+                                            <i class="mdi mdi-cash-remove"></i>
+                                            Belum Bayar
+                                        </button>
+                                        <button type="button" class="btn btn-light btn-sm receive-payment-action"
+                                            data-payment-action="half">
+                                            <i class="mdi mdi-chart-donut"></i>
+                                            Bayar 50%
+                                        </button>
+                                        <button type="button" class="btn btn-light btn-sm receive-payment-action"
+                                            data-payment-action="full">
+                                            <i class="mdi mdi-cash-check"></i>
+                                            Lunas
+                                        </button>
+                                    </div>
+                                </div>
                                 <input type="hidden" name="status_pembayaran" value="belum_dibayar">
-                                <input type="hidden" name="jumlah_dibayar" value="Rp 0">
-                                <input type="hidden" name="sisa_hutang" value="Rp 0">
                             </div>
                         </div>
                     </section>

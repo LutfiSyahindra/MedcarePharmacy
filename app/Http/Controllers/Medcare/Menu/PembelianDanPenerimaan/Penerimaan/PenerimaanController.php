@@ -9,6 +9,7 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\StokBatchModel;
+use App\Services\Menu\Keuangan\FinanceService;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Margins\MarginsService;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -28,7 +30,8 @@ class PenerimaanController extends Controller
     public function __construct(
         private readonly StockService $stockService,
         private readonly TransactionNotificationService $transactionNotifications,
-        private readonly MarginsService $marginsService
+        private readonly MarginsService $marginsService,
+        private readonly FinanceService $financeService,
     ) {}
 
     public function penerimaan()
@@ -316,6 +319,10 @@ class PenerimaanController extends Controller
 
         $validated = $request->validate([
             'diskon_untuk' => ['required', 'in:pasien,apotek'],
+            'payment_method' => ['nullable', Rule::in(array_keys(FinanceService::SETTLEMENT_PAYMENT_METHODS))],
+            'payment_occurred_at' => ['nullable', 'date'],
+            'payment_reference_no' => ['nullable', 'string', 'max:120'],
+            'payment_notes' => ['nullable', 'string', 'max:500'],
         ], [
             'diskon_untuk.required' => 'Pilih diskon diberikan ke pasien atau diambil apotek.',
             'diskon_untuk.in' => 'Pilihan penerima diskon tidak valid.',
@@ -337,6 +344,14 @@ class PenerimaanController extends Controller
                     'status' => 'error',
                     'message' => 'Hanya draft penerimaan yang bisa diposting.',
                 ], 422);
+            }
+
+            $initialPaymentAmount = round(max(0, (float) $penerimaan->jumlah_dibayar), 2);
+
+            if ($initialPaymentAmount > 0.009 && empty($validated['payment_method'])) {
+                throw ValidationException::withMessages([
+                    'payment_method' => 'Pilih metode pembayaran agar pembayaran faktur dapat dicatat ke Keuangan.',
+                ]);
             }
 
             $penerimaan->forceFill([
@@ -373,17 +388,35 @@ class PenerimaanController extends Controller
                 'status' => 'posted',
             ]);
 
+            $financeTransaction = null;
+
+            if ($initialPaymentAmount > 0.009) {
+                $financeTransaction = $this->financeService->recordInitialSupplierPayment(
+                    Auth::user(),
+                    (int) $penerimaan->id,
+                    [
+                        'payment_method' => $validated['payment_method'],
+                        'occurred_at' => $validated['payment_occurred_at'] ?? now(),
+                        'reference_no' => $validated['payment_reference_no'] ?? null,
+                        'notes' => $validated['payment_notes'] ?? null,
+                    ]
+                );
+            }
+
             $this->syncPurchaseOrderReceivingStatus($penerimaan->purchase_order_id);
             $actor = Auth::user();
             DB::afterCommit(fn () => $this->transactionNotifications->notifyActionResult('penerimaan', $penerimaan, 'posted', $actor));
 
             return response()->json([
                 'status' => 'success',
-                'message' => (float) $penerimaan->supplier_compensation_discount > 0
-                    ? 'Penerimaan berhasil diposting, stok diperbarui, dan potongan ganti rugi supplier direalisasikan.'
-                    : 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.',
+                'message' => $financeTransaction
+                    ? 'Penerimaan berhasil diposting, stok diperbarui, dan pembayaran faktur tercatat di Keuangan.'
+                    : ((float) $penerimaan->supplier_compensation_discount > 0
+                        ? 'Penerimaan berhasil diposting, stok diperbarui, dan potongan ganti rugi supplier direalisasikan.'
+                        : 'Penerimaan berhasil diposting, stok obat diperbarui, dan harga jual batch tersimpan.'),
                 'diskon_untuk' => $penerimaan->diskon_untuk,
                 'selling_prices' => $sellingPrices,
+                'finance_transaction_number' => $financeTransaction?->number,
             ]);
         });
     }
@@ -487,6 +520,7 @@ class PenerimaanController extends Controller
             'biaya_lain' => ['nullable', 'numeric', 'min:0'],
             'total_faktur' => ['nullable', 'numeric', 'min:0'],
             'supplier_compensation_discount' => ['nullable', 'numeric', 'min:0'],
+            'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string'],
             'purchase_order_detail_id' => ['required', 'array'],
             'purchase_order_detail_id.*' => ['required', 'integer', 'exists:purchase_order_details,id'],
@@ -810,8 +844,16 @@ class PenerimaanController extends Controller
             $grossTotalFaktur
         );
         $tagihanSetelahGantiRugi = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
-        $jumlahDibayar = 0.0;
-        $sisaHutang = $tagihanSetelahGantiRugi;
+        $jumlahDibayar = $this->moneyValue($request->jumlah_dibayar);
+
+        if ($jumlahDibayar > $tagihanSetelahGantiRugi + 0.009) {
+            throw ValidationException::withMessages([
+                'jumlah_dibayar' => 'Nominal pembayaran tidak boleh melebihi tagihan bersih sebesar Rp '.number_format($tagihanSetelahGantiRugi, 0, ',', '.').'.',
+            ]);
+        }
+
+        $jumlahDibayar = min($jumlahDibayar, $tagihanSetelahGantiRugi);
+        $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
 
         return [
             'nomor_penerimaan' => $request->nomor_penerimaan,
@@ -833,7 +875,7 @@ class PenerimaanController extends Controller
             'biaya_lain' => $biayaLain,
             'supplier_compensation_discount' => $supplierCompensationDiscount,
             'total_faktur' => $grossTotalFaktur,
-            'status_pembayaran' => $tagihanSetelahGantiRugi <= 0 ? 'lunas' : 'belum_dibayar',
+            'status_pembayaran' => $this->paymentStatus($tagihanSetelahGantiRugi, $jumlahDibayar),
             'jumlah_dibayar' => $jumlahDibayar,
             'sisa_hutang' => $sisaHutang,
             'catatan' => $request->catatan,
@@ -1109,6 +1151,19 @@ class PenerimaanController extends Controller
         return round(max(0, (float) ($value ?: 0)), 2);
     }
 
+    private function paymentStatus(float $tagihan, float $jumlahDibayar): string
+    {
+        if ($tagihan <= 0.009) {
+            return 'lunas';
+        }
+
+        if ($jumlahDibayar <= 0.009) {
+            return 'belum_dibayar';
+        }
+
+        return $jumlahDibayar >= $tagihan - 0.009 ? 'lunas' : 'sebagian';
+    }
+
     private function purchaseOrderAdditionalCost(PembelianModel $po): float
     {
         return $this->moneyValue(
@@ -1212,9 +1267,12 @@ class PenerimaanController extends Controller
                 'supplier' => $penerimaan->distributor->nama ?? '-',
                 'tanggal_penerimaan' => optional($penerimaan->tanggal_penerimaan)->format('Y-m-d'),
                 'biaya_lain' => round((float) $penerimaan->biaya_lain, 2),
+                'nomor_faktur' => $penerimaan->nomor_faktur,
+                'jumlah_dibayar' => round((float) $penerimaan->jumlah_dibayar, 2),
                 'diskon_untuk' => $diskonUntuk,
                 'diskon_untuk_label' => $diskonUntuk === 'pasien' ? 'Diberikan ke Pasien' : 'Diambil Apotek',
             ],
+            'payment_methods' => FinanceService::SETTLEMENT_PAYMENT_METHODS,
             'details' => $details,
             'summary' => [
                 'item_count' => $details->count(),

@@ -160,6 +160,11 @@
                         title="Muat ulang data" aria-label="Muat ulang data">
                         <i class="mdi mdi-refresh"></i>
                     </button>
+                    <button type="button" class="btn btn-outline-secondary purchase-icon-btn receive-mobile-filter-toggle"
+                        id="receiveMobileFilterToggle" aria-controls="receiveFilterBar" aria-expanded="false"
+                        title="Buka filter" aria-label="Buka filter">
+                        <i class="mdi mdi-tune-variant"></i>
+                    </button>
                     <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1"
                         id="openPenerimaanModalToolbar" data-bs-toggle="modal" data-bs-target="#penerimaanModal">
                         <i class="mdi mdi-plus-circle-outline"></i>
@@ -168,7 +173,7 @@
                 </div>
             </div>
 
-            <div class="purchase-filter-bar">
+            <div class="purchase-filter-bar" id="receiveFilterBar">
                 <div class="purchase-filter-group" aria-label="Filter status penerimaan">
                     <span class="purchase-filter-label">
                         <i class="mdi mdi-filter-variant"></i>
