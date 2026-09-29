@@ -1,12 +1,23 @@
 <script>
     $(document).ready(function() {
         const csrfToken = "{{ csrf_token() }}";
+        const notificationSearch = $('#searchNotifikasi');
+        const notificationSearchShell = notificationSearch.closest('.notification-search');
+        const refreshButton = $('#refreshNotificationTable');
+        const tableState = {
+            filter: '',
+            query: ''
+        };
+        let searchTimer = null;
 
         window.NotifikasiTable = $('#tableNotifikasi').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
             autoWidth: false,
+            pageLength: 10,
+            lengthChange: false,
+            order: [],
+            dom: 'rt<"notification-table-footer"ip>',
             ajax: {
                 url: "{{ route("notifikasi.table") }}",
                 type: "GET"
@@ -38,28 +49,111 @@
                 }
             ],
             rowCallback: function(row, data) {
-                $(row).toggleClass('notif-unread', Boolean(data.is_unread));
+                const cells = $(row).children('td');
+
+                $(row)
+                    .toggleClass('notif-unread', Boolean(data.is_unread))
+                    .attr('data-notification-id', data.id || '');
+
+                cells.eq(0).attr('data-label', 'Nomor');
+                cells.eq(1).attr('data-label', 'Dokumen');
+                cells.eq(2).attr('data-label', 'Ringkasan');
+                cells.eq(3).attr('data-label', 'Status');
+                cells.eq(4).attr('data-label', 'Diterima');
+                cells.eq(5).attr('data-label', 'Aksi');
+            },
+            drawCallback: function() {
+                updateNotificationTableMeta(this.api());
+            },
+            language: {
+                processing: '<i class="mdi mdi-loading mdi-spin"></i> Memuat notifikasi...',
+                emptyTable: 'Belum ada notifikasi untuk ditampilkan.',
+                zeroRecords: 'Notifikasi yang dicari tidak ditemukan.',
+                info: 'Menampilkan _START_–_END_ dari _TOTAL_ data',
+                infoEmpty: 'Belum ada data',
+                infoFiltered: '',
+                paginate: {
+                    previous: '<i class="mdi mdi-chevron-left"></i>',
+                    next: '<i class="mdi mdi-chevron-right"></i>'
+                }
             }
         });
 
-        $('.dataTables_filter').hide();
+        $('#tableNotifikasi').on('processing.dt', function(event, settings, processing) {
+            $('.notification-inbox').toggleClass('is-loading', processing);
 
-        $('#searchNotifikasi').on('keyup search', function() {
-            window.NotifikasiTable.search(this.value).draw();
+            if (processing) {
+                $('#notificationTableMeta').text('Memperbarui daftar notifikasi...');
+            }
+        });
+
+        notificationSearch.on('input search', function() {
+            tableState.query = String(this.value || '').trim();
+            notificationSearchShell.toggleClass('has-value', tableState.query !== '');
+
+            window.clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(applyNotificationSearch, 250);
         });
 
         $('.notification-filter').on('click', function() {
-            $('.notification-filter').removeClass('is-active');
-            $(this).addClass('is-active');
-            window.NotifikasiTable.search($(this).data('filter') || '').draw();
+            const activeFilter = $(this);
+
+            tableState.filter = String(activeFilter.data('filter') || '').trim();
+            $('.notification-filter')
+                .removeClass('is-active')
+                .attr('aria-pressed', 'false');
+            activeFilter
+                .addClass('is-active')
+                .attr('aria-pressed', 'true');
+
+            applyNotificationSearch();
         });
 
-        $('#refreshNotificationTable').on('click', function() {
+        $('#clearNotificationSearch').on('click', function() {
+            notificationSearch.val('').trigger('focus');
+            tableState.query = '';
+            notificationSearchShell.removeClass('has-value');
+            applyNotificationSearch();
+        });
+
+        refreshButton.on('click', function() {
+            refreshButton.addClass('is-loading').prop('disabled', true);
+            $('#tableNotifikasi').one('xhr.dt', function() {
+                refreshButton.removeClass('is-loading').prop('disabled', false);
+            });
+
             window.NotifikasiTable.ajax.reload(null, false);
             if (typeof window.loadNotif === 'function') {
                 window.loadNotif();
             }
         });
+
+        function applyNotificationSearch() {
+            const combinedSearch = [tableState.filter, tableState.query]
+                .filter(Boolean)
+                .join(' ');
+
+            window.NotifikasiTable.search(combinedSearch).draw();
+        }
+
+        function updateNotificationTableMeta(table) {
+            if (!table) return;
+
+            const info = table.page.info();
+            const count = Number(info.recordsDisplay || 0);
+            const start = count > 0 ? Number(info.start || 0) + 1 : 0;
+            const end = Number(info.end || 0);
+            const activeFilter = $('.notification-filter.is-active').text().trim() || 'Semua';
+            const context = activeFilter === 'Semua' ? 'semua kategori' : activeFilter.toLowerCase();
+            const searchContext = tableState.query ? ` untuk “${tableState.query}”` : '';
+
+            $('#notificationResultCount strong').text(count.toLocaleString('id-ID'));
+            $('#notificationTableMeta').text(
+                count > 0
+                    ? `Menampilkan ${start.toLocaleString('id-ID')}–${end.toLocaleString('id-ID')} dari ${count.toLocaleString('id-ID')} notifikasi, ${context}${searchContext}`
+                    : `Tidak ada notifikasi pada ${context}${searchContext}`
+            );
+        }
 
         window.openNotification = function(id) {
             const row = $(`button[onclick*="${id}"]`).closest('tr');
@@ -120,11 +214,18 @@
 
             $('#notif-modal-body').html(`
                 <div class="notification-modal-hero is-${tone}">
+                    <i class="mdi ${safeIcon(notification.module_icon)} notification-hero-watermark" aria-hidden="true"></i>
                     <div class="notification-hero-main">
-                        <span class="notification-kind-pill is-${tone}">
-                            <i class="mdi ${notification.can_action ? 'mdi-cursor-default-click-outline' : 'mdi-check-decagram-outline'}"></i>
-                            ${escapeHtml(kindLabel)}
-                        </span>
+                        <div class="notification-hero-badges">
+                            <span class="notification-kind-pill is-${tone}">
+                                <i class="mdi ${notification.can_action ? 'mdi-cursor-default-click-outline' : 'mdi-check-decagram-outline'}"></i>
+                                ${escapeHtml(kindLabel)}
+                            </span>
+                            <span class="notification-module-pill">
+                                <i class="mdi ${safeIcon(notification.module_icon)}"></i>
+                                ${escapeHtml(moduleLabel)}
+                            </span>
+                        </div>
                         <h6>${escapeHtml(documentNo)}</h6>
                         <p>${escapeHtml(notification.message || '-')}</p>
                         <div class="notification-hero-meta">
@@ -134,28 +235,34 @@
                         </div>
                     </div>
                     <div class="notification-hero-value">
-                        <span>Nilai transaksi</span>
-                        <strong>${amount}</strong>
-                        <small>${Number(notification.item_count || items.length || 0).toLocaleString('id-ID')} item tercatat</small>
+                        <span class="notification-hero-value-icon"><i class="mdi mdi-cash-multiple"></i></span>
+                        <div>
+                            <span>Nilai transaksi</span>
+                            <strong>${amount}</strong>
+                            <small>${Number(notification.item_count || items.length || 0).toLocaleString('id-ID')} item tercatat</small>
+                        </div>
                     </div>
                 </div>
 
                 <div class="notification-modal-tabs" role="tablist" aria-label="Detail notifikasi">
-                    <button type="button" class="notification-modal-tab is-active" data-target="#notifPaneSummary">
+                    <button type="button" class="notification-modal-tab is-active" data-target="#notifPaneSummary"
+                        role="tab" aria-selected="true" aria-controls="notifPaneSummary">
                         <i class="mdi mdi-view-dashboard-outline"></i>
                         <span>Ringkasan</span>
                     </button>
-                    <button type="button" class="notification-modal-tab" data-target="#notifPaneItems">
+                    <button type="button" class="notification-modal-tab" data-target="#notifPaneItems"
+                        role="tab" aria-selected="false" aria-controls="notifPaneItems">
                         <i class="mdi mdi-format-list-bulleted"></i>
                         <span>Item</span>
                     </button>
-                    <button type="button" class="notification-modal-tab" data-target="#notifPaneDetails">
+                    <button type="button" class="notification-modal-tab" data-target="#notifPaneDetails"
+                        role="tab" aria-selected="false" aria-controls="notifPaneDetails">
                         <i class="mdi mdi-card-text-outline"></i>
                         <span>Rincian</span>
                     </button>
                 </div>
 
-                <div class="notification-modal-pane is-active" id="notifPaneSummary">
+                <div class="notification-modal-pane is-active" id="notifPaneSummary" role="tabpanel">
                     <div class="notification-insight-grid">
                         ${insightCard('mdi-file-document-outline', 'Dokumen', documentNo, `Ref ${notification.reference_no || '-'}`, 'info')}
                         ${insightCard('mdi-storefront-outline', 'Supplier', notification.supplier || '-', moduleLabel, 'success')}
@@ -178,11 +285,11 @@
                     </div>
                 </div>
 
-                <div class="notification-modal-pane" id="notifPaneItems">
+                <div class="notification-modal-pane" id="notifPaneItems" role="tabpanel">
                     ${itemDetailsHtml(items, itemTotal)}
                 </div>
 
-                <div class="notification-modal-pane" id="notifPaneDetails">
+                <div class="notification-modal-pane" id="notifPaneDetails" role="tabpanel">
                     <div class="notification-detail-grid">
                         ${detailField('Dokumen', documentNo, 'mdi-file-document-outline')}
                         ${detailField('Referensi', notification.reference_no || '-', 'mdi-link-variant')}
@@ -205,22 +312,34 @@
                 `<span class="notification-modal-action is-static"><i class="mdi mdi-information-outline"></i><span>Tidak ada aksi aktif</span></span>`;
 
             $('#notif-modal-footer').html(`
-                <div class="notification-modal-action-group">
-                    ${actionHtml}
+                <div class="notification-modal-footer-section">
+                    <small class="notification-modal-footer-label">
+                        <i class="mdi mdi-flash-outline"></i>
+                        Aksi transaksi
+                    </small>
+                    <div class="notification-modal-action-group">
+                        ${actionHtml}
+                    </div>
                 </div>
-                <div class="notification-modal-action-group is-secondary">
-                    <button type="button" class="notification-modal-action is-copy notification-copy-doc" data-copy="${escapeAttribute(documentNo)}">
-                        <i class="mdi mdi-content-copy"></i>
-                        <span>Salin No</span>
-                    </button>
-                    <button type="button" class="notification-modal-action is-detail notification-show-details">
-                        <i class="mdi mdi-file-search-outline"></i>
-                        <span>Detail</span>
-                    </button>
-                    <a href="${escapeAttribute(pageUrl)}" class="notification-modal-action is-page">
-                        <i class="mdi mdi-open-in-new"></i>
-                        <span>Halaman</span>
-                    </a>
+                <div class="notification-modal-footer-section is-secondary">
+                    <small class="notification-modal-footer-label">
+                        <i class="mdi mdi-dots-horizontal-circle-outline"></i>
+                        Utilitas
+                    </small>
+                    <div class="notification-modal-action-group is-secondary">
+                        <button type="button" class="notification-modal-action is-copy notification-copy-doc" data-copy="${escapeAttribute(documentNo)}">
+                            <i class="mdi mdi-content-copy"></i>
+                            <span>Salin No</span>
+                        </button>
+                        <button type="button" class="notification-modal-action is-detail notification-show-details">
+                            <i class="mdi mdi-file-search-outline"></i>
+                            <span>Detail</span>
+                        </button>
+                        <a href="${escapeAttribute(pageUrl)}" class="notification-modal-action is-page">
+                            <i class="mdi mdi-open-in-new"></i>
+                            <span>Buka halaman</span>
+                        </a>
+                    </div>
                 </div>
             `);
         }
@@ -255,7 +374,7 @@
             const hasNotes = items.some(item => String(item.note || '').trim() !== '');
             const noteHeader = hasNotes ? '<th>Catatan</th>' : '';
             const noteRows = hasNotes
-                ? (item) => `<td class="notification-item-note">${escapeHtml(item.note || '-')}</td>`
+                ? (item) => `<td class="notification-item-note" data-label="Catatan">${escapeHtml(item.note || '-')}</td>`
                 : () => '';
 
             return `
@@ -312,22 +431,22 @@
 
             return `
                 <tr data-search="${escapeAttribute(rowSearch)}">
-                    <td class="notification-item-number">${Number(item.row_no || 0) > 0 ? Number(item.row_no).toLocaleString('id-ID') : '-'}</td>
-                    <td>
+                    <td class="notification-item-number" data-label="Nomor">${Number(item.row_no || 0) > 0 ? Number(item.row_no).toLocaleString('id-ID') : '-'}</td>
+                    <td data-label="Obat">
                         <strong>${escapeHtml(item.nama_obat || '-')}</strong>
                         <small>${escapeHtml(item.kode_obat || '-')}</small>
                     </td>
-                    <td>
+                    <td data-label="Jumlah">
                         <strong>${formatDecimal(item.qty, 0, 2)} ${escapeHtml(item.unit || 'satuan')}</strong>
                         ${stockLine}
                     </td>
-                    <td>${batchLine}</td>
-                    <td>
+                    <td data-label="Batch / ED">${batchLine}</td>
+                    <td data-label="Harga">
                         <strong>${formatRupiah(item.price || 0)}</strong>
                         <small>Subtotal ${formatRupiah(item.subtotal || item.total || 0)}</small>
                     </td>
-                    <td>${discountTax}</td>
-                    <td><strong>${formatRupiah(item.total || item.subtotal || 0)}</strong></td>
+                    <td data-label="Diskon / PPN">${discountTax}</td>
+                    <td data-label="Total"><strong>${formatRupiah(item.total || item.subtotal || 0)}</strong></td>
                     ${noteCell(item)}
                 </tr>
             `;
@@ -467,8 +586,12 @@
         }
 
         function activateNotificationPane(target) {
-            $('.notification-modal-tab').removeClass('is-active');
-            $(`.notification-modal-tab[data-target="${target}"]`).addClass('is-active');
+            $('.notification-modal-tab')
+                .removeClass('is-active')
+                .attr('aria-selected', 'false');
+            $(`.notification-modal-tab[data-target="${target}"]`)
+                .addClass('is-active')
+                .attr('aria-selected', 'true');
             $('.notification-modal-pane').removeClass('is-active');
             $(target).addClass('is-active');
             $('#notif-modal-body').scrollTop(0);
