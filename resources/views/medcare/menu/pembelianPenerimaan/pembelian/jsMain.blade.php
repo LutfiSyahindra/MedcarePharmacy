@@ -18,10 +18,7 @@
         const medicinePickerPageSize = 100;
         const medicineSelectPageSize = 50;
         let medicinePickerSearchTimer = null;
-        let purchaseFormDirty = false;
-        let purchaseFormHydrating = false;
         let purchaseSaveInProgress = false;
-        let allowPurchaseModalClose = false;
 
         // --- Variabel select2
         let DistributorSelect = $('select[name="distributor_id"]');
@@ -59,7 +56,7 @@
                         <div>
                             <span class="purchase-detail-number">1</span>
                             <strong>Item Obat</strong>
-                            <small>Pilih obat, satuan, qty, harga estimasi, serta Diskon 1–3.</small>
+                            <small>Pilih obat, satuan, qty, harga per satuan, serta Diskon 1–3.</small>
                         </div>
                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                             <i class="mdi mdi-trash-can-outline"></i> Hapus
@@ -74,21 +71,22 @@
                             </select>
                         </div>
 
-                        <div class="col-lg-2 col-md-6">
+                        <div class="col-lg-3 col-md-6 purchase-unit-field">
                             <label class="form-label">Satuan</label>
                             <select class="form-select satuan-select" name="satuan_id[]" disabled required>
                                 <option value="">-- Pilih Satuan --</option>
                             </select>
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-lg-1 col-md-4 purchase-qty-field">
                             <label class="form-label">Qty</label>
                             <input type="number" class="form-control" name="qty[]" min="1" value="${options.qty ?? 1}" required>
                         </div>
 
                         <div class="col-lg-2 col-md-4">
-                            <label class="form-label">Harga Estimasi</label>
-                            <input type="number" class="form-control harga_estimasi" name="harga_estimasi[]" min="0" step="0.01" value="${options.harga ?? 0}">
+                            <label class="form-label">Harga / Satuan</label>
+                            <input type="number" class="form-control harga_estimasi_satuan" name="harga_estimasi_satuan[]" min="0" step="any" value="${options.hargaSatuan ?? options.harga ?? 0}">
+                            <input type="hidden" class="harga_estimasi" name="harga_estimasi[]" value="${options.harga ?? 0}">
                         </div>
 
                         <div class="col-lg-2 col-md-4">
@@ -356,10 +354,7 @@
         // --- Reset modal ketika dibuka
         $('#pembelianModal').on('show.bs.modal', function() {
             let form = $('#pembelianForm');
-            purchaseFormHydrating = true;
-            purchaseFormDirty = false;
             purchaseSaveInProgress = false;
-            allowPurchaseModalClose = false;
             $('#pembelianModalLabel').text('Form Purchase Order');
             form.trigger('reset');
 
@@ -382,8 +377,6 @@
             // Generate No PO hanya kalau TAMBAH
             $(this).one('shown.bs.modal', function() {
                 if (!editMode) {
-                    purchaseFormHydrating = false;
-                    purchaseFormDirty = false;
                     $.get('{{ route("pembelian.generateNoPO") }}')
                         .done(function(res) {
                             form.find('input[name="no_po"]').val(res);
@@ -395,36 +388,12 @@
             loadObatInto($obatSelects);
         });
 
-        $('#pembelianForm').on('input change', 'input, select, textarea', function() {
-            if (!purchaseFormHydrating && $('#pembelianModal').hasClass('show')) {
-                purchaseFormDirty = true;
-            }
-        });
-
-        // Simpan perubahan yang belum disimpan sebagai draft sebelum modal benar-benar ditutup.
-        $('#pembelianModal').on('hide.bs.modal', function(event) {
-            if (allowPurchaseModalClose || !purchaseFormDirty || !hasMeaningfulPurchaseDraft()) {
-                return;
-            }
-
-            event.preventDefault();
-
-            if (purchaseSaveInProgress) {
-                return;
-            }
-
-            submitPurchaseOrder(true, true);
-        });
-
         // --- Reset state modal setelah benar-benar ditutup
         $('#pembelianModal').on('hidden.bs.modal', function() {
             editMode = false;
             $('#pembelian_id').val('');
             resetMedicinePicker();
-            purchaseFormHydrating = false;
-            purchaseFormDirty = false;
             purchaseSaveInProgress = false;
-            allowPurchaseModalClose = false;
             updateUnitLoadingState();
         });
         // =================== End Inisiasi Modal ===============
@@ -604,9 +573,6 @@
         $(document).on('click', '.remove-detail', function() {
             if ($('#detail-wrapper .detail-item').length > 1) {
                 $(this).closest('.detail-item').remove();
-                if (!purchaseFormHydrating) {
-                    purchaseFormDirty = true;
-                }
                 refreshDetailNumbers();
                 hitungTotal();
                 renderMedicinePicker();
@@ -617,25 +583,35 @@
             return Math.min(100, Math.max(0, Number(value) || 0));
         }
 
+        function selectedPurchaseConversion(row) {
+            const conversion = parseFloat(row.find('.satuan-select option:selected').data('konversi'));
+
+            return Number.isFinite(conversion) && conversion > 0 ? conversion : 1;
+        }
+
         function recalculatePurchaseRow(row) {
             const qty = parseFloat(row.find('[name="qty[]"]').val()) || 0;
-            const harga = parseFloat(row.find('.harga_estimasi').val()) || 0;
+            const pricePerUnit = parseFloat(row.find('.harga_estimasi_satuan').val()) || 0;
+            const conversion = selectedPurchaseConversion(row);
+            const purchaseUnitPrice = pricePerUnit * conversion;
             const discounts = [
                 normalizedDiscount(row.find('[name="diskon_1[]"]').val()),
                 normalizedDiscount(row.find('[name="diskon_2[]"]').val()),
                 normalizedDiscount(row.find('[name="diskon_3[]"]').val())
             ];
-            let subtotal = qty * harga;
+            let subtotal = qty * purchaseUnitPrice;
 
             discounts.forEach(function(discount) {
                 subtotal *= 1 - (discount / 100);
             });
 
+            // Backend dan modul penerimaan tetap menerima harga per satuan beli.
+            row.find('.harga_estimasi').val(purchaseUnitPrice.toFixed(2));
             row.find('.subtotal').val(subtotal.toFixed(2));
         }
 
-        // --- Hitung subtotal bersih setelah Diskon 1, 2, dan 3
-        $(document).on('input', '.harga_estimasi, [name="qty[]"], .purchase-discount, .purchase-additional-cost', function() {
+        // --- Hitung subtotal berdasarkan qty, harga satuan beli, lalu Diskon 1, 2, dan 3
+        $(document).on('input', '.harga_estimasi_satuan, [name="qty[]"], .purchase-discount, .purchase-additional-cost', function() {
             const row = $(this).closest('.detail-item');
 
             if (row.length) {
@@ -833,10 +809,28 @@
         function cacheMedicineUnits(medicineId, data) {
             const list = (Array.isArray(data) ? data : [])
                 .filter(item => item && item.satuan)
-                .sort((a, b) => Number(a.konversi) - Number(b.konversi));
+                .sort(function(a, b) {
+                    const defaultDifference = Number(b.is_default || 0) - Number(a.is_default || 0);
+
+                    return defaultDifference ||
+                        (Number(a.konversi) - Number(b.konversi)) ||
+                        (Number(a.id) - Number(b.id));
+                });
 
             medicineUnitCache.set(String(medicineId), list);
             return list;
+        }
+
+        function medicineUnitLabel(item, medicine) {
+            const unitName = item?.satuan?.nama || 'Satuan';
+            const stockUnitName = medicine?.satuan?.nama || 'satuan stok';
+            const conversion = Number(item?.konversi) || 1;
+
+            if (conversion === 1 && unitName.toLocaleLowerCase('id-ID') === stockUnitName.toLocaleLowerCase('id-ID')) {
+                return `${unitName} (dasar)`;
+            }
+
+            return `${unitName} (1 ${unitName} = ${conversion.toLocaleString('id-ID')} ${stockUnitName})`;
         }
 
         function preloadMedicineUnits(medicineIds) {
@@ -913,7 +907,7 @@
                 .prop('disabled', true);
 
             if (!preservePurchaseValues) {
-                row.find('.harga_estimasi, .subtotal').val(0);
+                row.find('.harga_estimasi_satuan, .harga_estimasi, .subtotal').val(0);
             }
 
             if (!obatId) {
@@ -939,7 +933,7 @@
                         let unitOptions = '<option value="">-- Pilih Satuan --</option>';
 
                         list.forEach(function(item) {
-                            unitOptions += `<option value="${escapeHtml(item.id)}" data-konversi="${escapeHtml(item.konversi)}">${escapeHtml(item.satuan.nama)}</option>`;
+                            unitOptions += `<option value="${escapeHtml(item.id)}" data-konversi="${escapeHtml(item.konversi)}">${escapeHtml(medicineUnitLabel(item, medicine))}</option>`;
                         });
 
                         $satuanSelect.html(unitOptions).prop('disabled', false);
@@ -947,8 +941,9 @@
                         const previousUnit = String(row.data('satuan-terpilih') || '');
                         const hasPreviousUnit = previousUnit &&
                             $satuanSelect.find(`option[value="${previousUnit}"]`).length > 0;
+                        const defaultUnit = list.find(item => Number(item.is_default || 0) === 1) || list[0];
 
-                        $satuanSelect.val(hasPreviousUnit ? previousUnit : String(list[0].id));
+                        $satuanSelect.val(hasPreviousUnit ? previousUnit : String(defaultUnit.id));
                     }
 
                     if (preservePurchaseValues) {
@@ -956,6 +951,9 @@
                         recalculatePurchaseRow(row);
                         hitungTotal();
                     } else {
+                        const catalogPrice = parseFloat(medicine?.harga_beli) || 0;
+
+                        row.find('.harga_estimasi_satuan').val(catalogPrice);
                         $satuanSelect.trigger('change');
                     }
                 })
@@ -1016,20 +1014,10 @@
             $('#purchaseTotalValue').text(formatRupiah(summary.total_estimasi));
         }
 
-        // --- Konversi Satuan
+        // --- Harga per satuan tetap; konversi hanya mengubah subtotal dan nilai harga satuan beli
         $(document).on('change', '.satuan-select', function() {
+            const row = $(this).closest('.detail-item');
 
-            let row = $(this).closest('.detail-item');
-            let selected = $(this).find(':selected');
-            let medicineId = String(row.find('select[name="obat_id[]"]').val() || '');
-            let hargaDasar = parseFloat(medicineCatalogById.get(medicineId)?.harga_beli) || 0;
-
-            let konversi = parseFloat(selected.data('konversi')) || 1;
-            let qty = parseFloat(row.find('[name="qty[]"]').val()) || 1;
-
-            let harga = hargaDasar * konversi;
-
-            row.find('.harga_estimasi').val(harga);
             recalculatePurchaseRow(row);
 
             hitungTotal();
@@ -1429,18 +1417,6 @@
         // =================== End Inisiasi DataTable ==================
 
         // =================== Inisiasi Action =========================
-        function hasMeaningfulPurchaseDraft() {
-            const hasMedicine = $('#detail-wrapper select[name="obat_id[]"]').toArray()
-                .some(select => String($(select).val() || '').trim() !== '');
-            const hasAdditionalCost = ['biaya_asuransi', 'biaya_pengiriman']
-                .some(name => Number($(`[name="${name}"]`).val() || 0) !== 0);
-
-            return String($('#distributor_id').val() || '').trim() !== '' ||
-                String($('input[name="tanggal"]').val() || '').trim() !== '' ||
-                String($('textarea[name="catatan"]').val() || '').trim() !== '' ||
-                hasMedicine || hasAdditionalCost;
-        }
-
         function ensurePurchaseOrderNumber() {
             if (String($('input[name="no_po"]').val() || '').trim() !== '') {
                 return Promise.resolve();
@@ -1458,7 +1434,7 @@
             return requests.length > 0 ? Promise.allSettled(requests) : Promise.resolve();
         }
 
-        function showPurchaseSaveError(xhr, automaticSave = false) {
+        function showPurchaseSaveError(xhr) {
             if (xhr?.status === 422) {
                 const errors = xhr.responseJSON?.errors || {};
                 const errorMessages = [];
@@ -1476,7 +1452,11 @@
 
                     if (index !== undefined) {
                         const row = $('#detail-wrapper .detail-item').eq(Number(index));
-                        row.find(`[name="${field}[]"]`).addClass('is-invalid');
+                        const validationField = field === 'harga_estimasi'
+                            ? '.harga_estimasi_satuan'
+                            : `[name="${field}[]"]`;
+
+                        row.find(validationField).addClass('is-invalid');
                     } else {
                         $(`[name="${field}"]`).addClass('is-invalid');
                     }
@@ -1488,7 +1468,7 @@
 
                 Swal.fire({
                     icon: 'error',
-                    title: automaticSave ? 'Draft otomatis belum tersimpan' : 'Validasi Gagal',
+                    title: 'Validasi Gagal',
                     html: errorMessages.join('<br>'),
                     toast: true,
                     position: 'top-end',
@@ -1501,12 +1481,12 @@
 
             Swal.fire({
                 icon: 'error',
-                title: automaticSave ? 'Draft otomatis gagal disimpan' : 'Purchase order gagal disimpan',
+                title: 'Purchase order gagal disimpan',
                 text: xhr?.responseJSON?.message || 'Terjadi kesalahan saat menyimpan purchase order.',
             });
         }
 
-        function submitPurchaseOrder(saveAsDraft = false, automaticSave = false) {
+        function submitPurchaseOrder(saveAsDraft = false) {
             if (purchaseSaveInProgress) {
                 return;
             }
@@ -1524,6 +1504,12 @@
                         "{{ route("pembelian.update", ":id") }}".replace(':id', purchaseOrderId) :
                         "{{ route("pembelian.store") }}";
                     const method = purchaseOrderId ? 'PUT' : 'POST';
+
+                    $('#detail-wrapper .detail-item').each(function() {
+                        recalculatePurchaseRow($(this));
+                    });
+                    hitungTotal();
+
                     const formData = $('#pembelianForm').serializeArray();
 
                     formData.push({
@@ -1549,14 +1535,12 @@
                         };
                     }
 
-                    purchaseFormDirty = false;
-                    allowPurchaseModalClose = true;
                     $('#pembelian_id').val(response.data?.id || $('#pembelian_id').val());
                     $('#pembelianModal').modal('hide');
 
                     Swal.fire({
                         icon: 'success',
-                        title: automaticSave ? 'PO otomatis tersimpan sebagai draft.' : response.message,
+                        title: response.message,
                         toast: true,
                         position: 'top-end',
                         timer: 3000,
@@ -1567,7 +1551,7 @@
                     PembelianTable.ajax.reload(null, false);
                 })
                 .catch(function(xhr) {
-                    showPurchaseSaveError(xhr, automaticSave);
+                    showPurchaseSaveError(xhr);
                 })
                 .finally(function() {
                     purchaseSaveInProgress = false;
@@ -1578,12 +1562,12 @@
         // --- Submit PO ke alur approval
         $('#pembelianForm').on('submit', function(event) {
             event.preventDefault();
-            submitPurchaseOrder(false, false);
+            submitPurchaseOrder(false);
         });
 
         // --- Simpan eksplisit sebagai draft
         $('#saveDraftForm').on('click', function() {
-            submitPurchaseOrder(true, false);
+            submitPurchaseOrder(true);
         });
 
         // --- Edit Pembelian
@@ -1754,6 +1738,8 @@
                             obatId: item.obat_id,
                             satuanTerpilih: item.satuan_konversi?.id,
                             qty: item.qty,
+                            hargaSatuan: Number(item.harga_estimasi || 0) /
+                                Math.max(1, Number(item.satuan_konversi?.konversi || 1)),
                             harga: item.harga_estimasi,
                             diskon1: item.diskon_1,
                             diskon2: item.diskon_2,
@@ -1784,19 +1770,11 @@
                                     preservePurchaseValues: true
                                 }));
                             });
-
                             return Promise.allSettled(rowLoads);
-                        })
-                        .finally(function() {
-                            window.setTimeout(function() {
-                                purchaseFormHydrating = false;
-                                purchaseFormDirty = false;
-                            }, 0);
                         });
                 },
                 error: function(xhr) {
                     editMode = false;
-                    purchaseFormHydrating = false;
                     let message = xhr.responseJSON?.message ||
                         'Terjadi kesalahan saat memuat data pembelian.';
 

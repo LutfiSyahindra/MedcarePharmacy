@@ -97,7 +97,12 @@ class PembelianRepository
 
     public function getKonversiSatuan($obatId)
     {
-        $KonversiSatuan = KonversiSatuanModel::with('satuan')->where('obat_id', $obatId)->get();
+        $KonversiSatuan = KonversiSatuanModel::with('satuan')
+            ->where('obat_id', $obatId)
+            ->orderByDesc('is_default')
+            ->orderBy('konversi')
+            ->orderBy('id')
+            ->get();
 
         return $KonversiSatuan;
     }

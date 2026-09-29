@@ -179,10 +179,12 @@ class PembelianController extends Controller
                 ->unique()
                 ->values();
             $conversions = KonversiSatuanModel::query()
-                ->select(['id', 'obat_id', 'satuan_id', 'konversi'])
+                ->select(['id', 'obat_id', 'satuan_id', 'konversi', 'is_default'])
                 ->with('satuan:id,nama')
                 ->whereIn('obat_id', $medicineIds)
+                ->orderByDesc('is_default')
                 ->orderBy('konversi')
+                ->orderBy('id')
                 ->get()
                 ->groupBy(fn (KonversiSatuanModel $conversion) => (string) $conversion->obat_id);
 

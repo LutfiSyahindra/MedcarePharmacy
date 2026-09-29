@@ -1,5 +1,5 @@
 <div class="modal fade purchase-modal" id="pembelianModal" tabindex="-1" aria-labelledby="pembelianModalLabel"
-    aria-hidden="true">
+    aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -15,7 +15,7 @@
                         <i class="mdi mdi-shield-check-outline"></i>
                         Approval Admin
                     </span>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
             </div>
 
@@ -210,7 +210,7 @@
                                         <div>
                                             <span class="purchase-detail-number">1</span>
                                             <strong>Item Obat</strong>
-                                            <small>Pilih obat, satuan, qty, harga estimasi, serta Diskon 1–3.</small>
+                                            <small>Pilih obat, satuan, qty, harga per satuan, serta Diskon 1–3.</small>
                                         </div>
                                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                                             <i class="mdi mdi-trash-can-outline"></i>
@@ -226,7 +226,7 @@
                                             </select>
                                         </div>
 
-                                        <div class="col-lg-2 col-md-6">
+                                        <div class="col-lg-3 col-md-6 purchase-unit-field">
                                             <label class="form-label">Satuan</label>
                                             <select class="form-select satuan-select" name="satuan_id[]" disabled
                                                 required>
@@ -234,16 +234,18 @@
                                             </select>
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-lg-1 col-md-4 purchase-qty-field">
                                             <label class="form-label">Qty</label>
                                             <input type="number" class="form-control qty" name="qty[]" min="1"
                                                 value="1" required>
                                         </div>
 
                                         <div class="col-lg-2 col-md-4">
-                                            <label class="form-label">Harga Estimasi</label>
-                                            <input type="number" class="form-control harga_estimasi"
-                                                name="harga_estimasi[]" min="0" step="0.01" value="0">
+                                            <label class="form-label">Harga / Satuan</label>
+                                            <input type="number" class="form-control harga_estimasi_satuan"
+                                                name="harga_estimasi_satuan[]" min="0" step="any" value="0">
+                                            <input type="hidden" class="harga_estimasi" name="harga_estimasi[]"
+                                                value="0">
                                         </div>
 
                                         <div class="col-lg-2 col-md-4">
