@@ -1316,6 +1316,8 @@
     .pos-search-result-code b { padding: 2px 5px; color: #5666b0; border-radius: 5px; background: #eef1fb; font-size: 7px; letter-spacing: .04em; }
     .pos-search-result-meta { display: block; overflow: hidden; margin-top: 3px; color: #778397; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
     .pos-search-result-side { display: grid; min-width: 82px; gap: 4px; text-align: right; }
+    .pos-search-result-prices { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .pos-search-result-prices small { color: #7a869a; font-size: 7px; font-weight: 700; }
     .pos-search-result-price { color: #283753; font-size: 10px; font-weight: 900; }
     .pos-search-result-stock { justify-self: end; padding: 3px 6px; color: #087859; border-radius: 999px; background: #e9f8f2; font-size: 7px; font-weight: 850; }
     .pos-search-result-stock.is-empty { color: #b55432; background: #fff0eb; }
@@ -1771,6 +1773,7 @@
         .pos-search-result { grid-template-columns: 35px minmax(0, 1fr); }
         .pos-search-result-icon { width: 35px; height: 35px; }
         .pos-search-result-side { grid-column: 2; grid-template-columns: auto auto; justify-content: start; text-align: left; }
+        .pos-search-result-prices { align-items: flex-start; }
         .pos-search-result-stock { justify-self: start; }
         .pos-form-grid,
         .pos-add-fields { grid-template-columns: 1fr; }

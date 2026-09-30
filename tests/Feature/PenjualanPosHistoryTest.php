@@ -8,6 +8,7 @@ use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
+use App\Models\Menu\Stok\StokBatchModel;
 use App\Models\SatuansModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,6 +101,133 @@ class PenjualanPosHistoryTest extends TestCase
         $this->actingAs($this->user)
             ->getJson(route('penjualan.pos.products', ['branch_id' => $this->branch->id]))
             ->assertOk();
+    }
+
+    public function test_product_search_and_draft_honor_selected_price_for_same_batch_layers(): void
+    {
+        ApotekProfile::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Apotek Uji Harga POS',
+            'address' => 'Jl. Uji Harga',
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+            'operational_hours' => collect([
+                'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            ])->mapWithKeys(fn (string $day) => [
+                $day => ['enabled' => true, 'open' => '00:00', 'close' => '00:00'],
+            ])->all(),
+        ]);
+        $this->actingAs($this->user)
+            ->postJson(route('penjualan.pos.shifts.open'), [
+                'branch_id' => $this->branch->id,
+                'opening_amount' => 0,
+            ])
+            ->assertOk();
+
+        $unit = SatuansModel::create([
+            'kode' => 'BOT-POS-PRICE',
+            'nama' => 'Botol',
+            'is_active' => true,
+        ]);
+        $medicine = MasterObatModel::create([
+            'kode_obat' => 'CENDO-HIALID',
+            'nama_obat' => 'CENDO HIALID',
+            'satuan_id' => $unit->id,
+            'is_active' => true,
+        ]);
+
+        $sameBatchExpiry = now()->addMonths(3);
+
+        foreach ([
+            ['BATCH-SAMA', $sameBatchExpiry, 10, 30000, 50000],
+            ['BATCH-SAMA', $sameBatchExpiry, 8, 32000, 55000],
+            ['BATCH-HARGA-SAMA', now()->addMonths(9), 4, 31000, 50000],
+        ] as [$batchNumber, $expiry, $quantity, $purchasePrice, $sellingPrice]) {
+            StokBatchModel::create([
+                'branch_id' => $this->branch->id,
+                'obat_id' => $medicine->id,
+                'no_batch' => $batchNumber,
+                'expired_date' => $expiry->toDateString(),
+                'qty' => $quantity,
+                'harga_beli' => $purchasePrice,
+                'harga_jual' => $sellingPrice,
+                'diskon' => 0,
+                'ppn' => 0,
+                'created_by' => $this->user->id,
+            ]);
+        }
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.products', [
+                'branch_id' => $this->branch->id,
+                'q' => 'CENDO HIALID',
+            ]))
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.nama_obat', 'CENDO HIALID')
+            ->assertJsonPath('0.harga_jual', 50000)
+            ->assertJsonCount(2, '0.harga_jual_options')
+            ->assertJsonPath('0.harga_jual_options.0', 50000)
+            ->assertJsonPath('0.harga_jual_options.1', 55000)
+            ->assertJsonPath('0.harga_jual_variants.0.total_stok', 14)
+            ->assertJsonPath('0.harga_jual_variants.1.total_stok', 8);
+
+        $this->actingAs($this->user)
+            ->getJson(route('penjualan.pos.quote', [
+                'branch_id' => $this->branch->id,
+                'obat_id' => $medicine->id,
+                'satuan_id' => $unit->id,
+                'qty' => 2,
+                'harga_jual_pilihan' => 55000,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('harga_jual', 55000)
+            ->assertJsonPath('harga_jual_pilihan', 55000)
+            ->assertJsonPath('stock_available', 8)
+            ->assertJsonCount(1, 'allocations')
+            ->assertJsonPath('allocations.0.no_batch', 'BATCH-SAMA')
+            ->assertJsonPath('allocations.0.harga_jual', 55000);
+
+        $draftResponse = $this->actingAs($this->user)
+            ->postJson(route('penjualan.pos.draft'), [
+                'branch_id' => $this->branch->id,
+                'jenis_transaksi' => 'penjualan_bebas',
+                'details' => [[
+                    'obat_id' => $medicine->id,
+                    'satuan_id' => $unit->id,
+                    'qty' => 2,
+                    'harga_jual_pilihan' => 55000,
+                ]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('transaction.details.0.harga_jual', 55000)
+            ->assertJsonPath('transaction.details.0.harga_jual_pilihan', 55000)
+            ->assertJsonPath('transaction.details.0.batch_summary.0.harga_jual', 55000);
+
+        $this->actingAs($this->user)
+            ->postJson(route('penjualan.pos.complete'), [
+                'branch_id' => $this->branch->id,
+                'draft_id' => $draftResponse->json('transaction.id'),
+                'jenis_transaksi' => 'penjualan_bebas',
+                'customer_name' => 'Pasien Uji Harga',
+                'customer_phone' => '081234567890',
+                'details' => [[
+                    'obat_id' => $medicine->id,
+                    'satuan_id' => $unit->id,
+                    'qty' => 2,
+                    'harga_jual_pilihan' => 55000,
+                ]],
+                'payments' => [[
+                    'metode' => 'tunai',
+                    'amount' => 110000,
+                ]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('transaction.details.0.harga_jual_pilihan', 55000)
+            ->assertJsonPath('transaction.details.0.batch_summary.0.harga_jual', 55000);
+
+        $this->assertSame(6.0, (float) StokBatchModel::where('harga_jual', 55000)->value('qty'));
+        $this->assertSame(14.0, (float) StokBatchModel::where('harga_jual', 50000)->sum('qty'));
     }
 
     public function test_history_page_renders_the_new_workspace(): void

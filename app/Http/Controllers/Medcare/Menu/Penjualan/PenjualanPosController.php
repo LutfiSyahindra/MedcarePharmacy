@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Medcare\Menu\Penjualan;
 
 use App\Http\Controllers\Controller;
 use App\Models\BranchModel;
+use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\PatientModel;
 use App\Services\Menu\Penjualan\CashierShiftService;
@@ -89,13 +90,15 @@ class PenjualanPosController extends Controller
             'satuan_id' => ['nullable', 'integer', 'exists:satuans,id'],
             'qty' => ['required', 'numeric', 'min:0.01'],
             'branch_id' => ['nullable', 'integer'],
+            'harga_jual_pilihan' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
         ]);
 
         return response()->json($this->posService->productQuote(
             (int) $validated['obat_id'],
             isset($validated['satuan_id']) ? (int) $validated['satuan_id'] : null,
             (float) $validated['qty'],
-            isset($validated['branch_id']) ? (int) $validated['branch_id'] : null
+            isset($validated['branch_id']) ? (int) $validated['branch_id'] : null,
+            isset($validated['harga_jual_pilihan']) ? (float) $validated['harga_jual_pilihan'] : null
         ));
     }
 
@@ -335,6 +338,7 @@ class PenjualanPosController extends Controller
             'details.*.obat_id' => ['required', 'integer', 'exists:master_obats,id'],
             'details.*.satuan_id' => ['nullable', 'integer', 'exists:satuans,id'],
             'details.*.qty' => ['required', 'numeric', 'min:0.01'],
+            'details.*.harga_jual_pilihan' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
             'details.*.diskon_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'details.*.diskon_nominal' => ['nullable', 'numeric', 'min:0'],
             'details.*.keterangan' => ['nullable', 'string'],
@@ -478,6 +482,7 @@ class PenjualanPosController extends Controller
                 'qty_jual' => (float) $detail->qty_jual,
                 'qty_stok' => (float) $detail->qty_stok,
                 'harga_jual' => (float) $detail->harga_jual,
+                'harga_jual_pilihan' => $this->selectedBatchSellingPrice($detail),
                 'subtotal_gross' => (float) $detail->subtotal_gross,
                 'diskon_percent' => (float) $detail->diskon_percent,
                 'diskon_nominal' => (float) $detail->diskon_nominal,
@@ -516,5 +521,23 @@ class PenjualanPosController extends Controller
                 'paid_at' => optional($payment->paid_at)->format('Y-m-d H:i'),
             ])->values()->all(),
         ];
+    }
+
+    private function selectedBatchSellingPrice(PenjualanTransactionDetailModel $detail): ?float
+    {
+        $allocations = $detail->batch_summary ?: $detail->batchAllocations;
+        $prices = collect($allocations)
+            ->map(function ($allocation) {
+                $price = is_array($allocation)
+                    ? ($allocation['harga_jual'] ?? null)
+                    : ($allocation->harga_jual ?? null);
+
+                return $price !== null ? (float) $price : null;
+            })
+            ->filter(fn ($price) => $price !== null)
+            ->unique(fn (float $price) => number_format($price, 2, '.', ''))
+            ->values();
+
+        return $prices->count() === 1 ? (float) $prices->first() : null;
     }
 }

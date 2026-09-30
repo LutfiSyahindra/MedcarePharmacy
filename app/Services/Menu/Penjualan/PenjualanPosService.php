@@ -205,7 +205,13 @@ class PenjualanPosService
             ->all();
     }
 
-    public function productQuote(int $obatId, ?int $satuanId, float $qtyJual = 1, ?int $requestedBranchId = null): array
+    public function productQuote(
+        int $obatId,
+        ?int $satuanId,
+        float $qtyJual = 1,
+        ?int $requestedBranchId = null,
+        ?float $selectedSellingPrice = null
+    ): array
     {
         $branchId = $this->resolveBranchId($requestedBranchId);
         $this->assertCashierAvailable($branchId);
@@ -213,9 +219,17 @@ class PenjualanPosService
         $unit = $this->resolveUnit($obat, $satuanId);
         $qtyJual = $this->quantity($qtyJual);
         $qtyStock = $this->quantity($qtyJual * (float) $unit['konversi']);
-        $allocations = $this->allocateFefo($branchId, $obat->id, $qtyStock, false, false);
+        $selectedSellingPrice = $selectedSellingPrice !== null ? round($selectedSellingPrice, 2) : null;
+        $allocations = $this->allocateFefo(
+            $branchId,
+            $obat->id,
+            $qtyStock,
+            false,
+            false,
+            $selectedSellingPrice
+        );
         $subtotalGross = $this->allocationSubtotal($allocations);
-        $availableStock = $this->availableStock($branchId, $obat->id);
+        $availableStock = $this->availableStock($branchId, $obat->id, $selectedSellingPrice);
         $available = $qtyStock <= $availableStock + self::STOCK_EPSILON;
         $unitPrice = $qtyJual > 0 ? round($subtotalGross / $qtyJual, 2) : 0;
 
@@ -232,6 +246,7 @@ class PenjualanPosService
             'stock_available' => round($availableStock, 2),
             'is_available' => $available,
             'harga_jual' => $unitPrice,
+            'harga_jual_pilihan' => $selectedSellingPrice,
             'subtotal_gross' => round($subtotalGross, 2),
             'allocations' => $this->allocationSummary($allocations),
         ];
@@ -404,6 +419,27 @@ class PenjualanPosService
         $units = $this->unitsForProduct($obat);
         $firstBatch = $obat->stokBatches->first();
         $totalStock = (float) ($obat->total_stok ?? 0);
+        $priceVariants = $obat->stokBatches
+            ->groupBy(fn (StokBatchModel $batch) => number_format((float) $batch->harga_jual, 2, '.', ''))
+            ->map(function (Collection $batches) {
+                /** @var StokBatchModel $nextBatch */
+                $nextBatch = $batches->first();
+
+                return [
+                    'harga_jual' => (float) $nextBatch->harga_jual,
+                    'total_stok' => round((float) $batches->sum('qty'), 2),
+                    'layer_count' => $batches->count(),
+                    'next_batch' => [
+                        'id' => $nextBatch->id,
+                        'no_batch' => $nextBatch->no_batch,
+                        'expired_date' => optional($nextBatch->expired_date)->format('Y-m-d'),
+                        'qty' => (float) $nextBatch->qty,
+                        'harga_jual' => (float) $nextBatch->harga_jual,
+                    ],
+                ];
+            })
+            ->values()
+            ->all();
 
         return [
             'id' => $obat->id,
@@ -422,6 +458,8 @@ class PenjualanPosService
             'satuan_stok' => $obat->satuan->nama ?? '-',
             'total_stok' => round($totalStock, 2),
             'harga_jual' => (float) ($firstBatch?->harga_jual ?? 0),
+            'harga_jual_options' => collect($priceVariants)->pluck('harga_jual')->all(),
+            'harga_jual_variants' => $priceVariants,
             'next_batch' => $firstBatch ? [
                 'id' => $firstBatch->id,
                 'no_batch' => $firstBatch->no_batch,
@@ -695,7 +733,19 @@ class PenjualanPosService
         $unit = $this->resolveUnit($obat, isset($item['satuan_id']) ? (int) $item['satuan_id'] : null);
         $qtyJual = $this->quantity($item['qty'] ?? 0);
         $qtyStock = $this->quantity($qtyJual * (float) $unit['konversi']);
-        $allocations = $this->allocateFefo($branchId, $obat->id, $qtyStock, $commitStock, true);
+        $selectedSellingPrice = array_key_exists('harga_jual_pilihan', $item)
+            && $item['harga_jual_pilihan'] !== null
+            && $item['harga_jual_pilihan'] !== ''
+                ? round((float) $item['harga_jual_pilihan'], 2)
+                : null;
+        $allocations = $this->allocateFefo(
+            $branchId,
+            $obat->id,
+            $qtyStock,
+            $commitStock,
+            true,
+            $selectedSellingPrice
+        );
         $subtotalGross = round($this->allocationSubtotal($allocations), 2);
 
         if ($subtotalGross <= 0) {
@@ -782,7 +832,14 @@ class PenjualanPosService
         }
     }
 
-    private function allocateFefo(int $branchId, int $obatId, float $qtyStock, bool $lock, bool $throwIfInsufficient): array
+    private function allocateFefo(
+        int $branchId,
+        int $obatId,
+        float $qtyStock,
+        bool $lock,
+        bool $throwIfInsufficient,
+        ?float $selectedSellingPrice = null
+    ): array
     {
         if ($qtyStock <= 0) {
             throw ValidationException::withMessages([
@@ -792,7 +849,7 @@ class PenjualanPosService
 
         $remaining = $qtyStock;
         $allocations = [];
-        $batches = $this->fefoBatchQuery($branchId, $obatId, $lock)->get();
+        $batches = $this->fefoBatchQuery($branchId, $obatId, $lock, $selectedSellingPrice)->get();
 
         foreach ($batches as $batch) {
             if ($remaining <= self::STOCK_EPSILON) {
@@ -825,19 +882,27 @@ class PenjualanPosService
 
             throw ValidationException::withMessages([
                 'stok' => 'Stok '.$obat?->nama_obat.' tidak cukup. Tersedia '
-                    .number_format($available, 2, ',', '.').' '.($obat?->satuan?->nama ?: 'satuan stok').'.',
+                    .number_format($available, 2, ',', '.').' '.($obat?->satuan?->nama ?: 'satuan stok')
+                    .($selectedSellingPrice !== null
+                        ? ' pada pilihan harga Rp '.number_format($selectedSellingPrice, 0, ',', '.')
+                        : '')
+                    .'.',
             ]);
         }
 
         return $allocations;
     }
 
-    private function fefoBatchQuery(int $branchId, int $obatId, bool $lock)
+    private function fefoBatchQuery(int $branchId, int $obatId, bool $lock, ?float $selectedSellingPrice = null)
     {
         $query = StokBatchModel::where('branch_id', $branchId)
             ->where('obat_id', $obatId)
             ->where('qty', '>', 0)
             ->where(fn ($query) => $query->whereNull('expired_date')->orWhereDate('expired_date', '>=', today()))
+            ->when(
+                $selectedSellingPrice !== null,
+                fn ($query) => $query->where('harga_jual', round($selectedSellingPrice, 2))
+            )
             ->orderByRaw('CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END')
             ->orderBy('expired_date')
             ->orderBy('id');
@@ -845,11 +910,16 @@ class PenjualanPosService
         return $lock ? $query->lockForUpdate() : $query;
     }
 
-    private function availableStock(int $branchId, int $obatId): float
+    private function availableStock(int $branchId, int $obatId, ?float $selectedSellingPrice = null): float
     {
         return (float) StokBatchModel::where('branch_id', $branchId)
             ->where('obat_id', $obatId)
+            ->where('qty', '>', 0)
             ->where(fn ($query) => $query->whereNull('expired_date')->orWhereDate('expired_date', '>=', today()))
+            ->when(
+                $selectedSellingPrice !== null,
+                fn ($query) => $query->where('harga_jual', round($selectedSellingPrice, 2))
+            )
             ->sum('qty');
     }
 

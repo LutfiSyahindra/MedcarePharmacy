@@ -1229,6 +1229,24 @@
                 .html(`<i class="mdi ${icon}"></i><span>${escapeHtml(message)}</span>`);
         }
 
+        function productPriceVariants(item) {
+            if (Array.isArray(item?.harga_jual_variants) && item.harga_jual_variants.length > 0) {
+                return item.harga_jual_variants;
+            }
+
+            const prices = Array.isArray(item?.harga_jual_options) && item.harga_jual_options.length > 0
+                ? item.harga_jual_options
+                : [item?.harga_jual];
+
+            return prices
+                .filter((price, index, values) => values.findIndex(value => Number(value) === Number(price)) === index)
+                .map(price => ({
+                    harga_jual: Number(price) || 0,
+                    total_stok: Number(item?.total_stok) || 0,
+                    next_batch: item?.next_batch || null
+                }));
+        }
+
         function productResult(data) {
             if (data.loading) {
                 return $(`
@@ -1243,6 +1261,8 @@
             const stock = Number(item.total_stok) || 0;
             const hasStock = stock > 0;
             const batchText = item.next_batch?.expired_date ? `ED ${item.next_batch.expired_date}` : 'Batch belum tersedia';
+            const selectedPrice = Number(item.harga_jual_pilihan ?? item.harga_jual) || 0;
+            const priceChoiceCount = Number(item.harga_choice_count) || 1;
 
             return $(`
                 <div class="pos-search-result">
@@ -1258,7 +1278,10 @@
                         <small class="pos-search-result-meta">${escapeHtml(item.kategori || '-')} · ${escapeHtml(batchText)}</small>
                     </span>
                     <span class="pos-search-result-side">
-                        <strong class="pos-search-result-price">${formatCurrency(item.harga_jual)}</strong>
+                        <span class="pos-search-result-prices">
+                            <strong class="pos-search-result-price">${formatCurrency(selectedPrice)}</strong>
+                            ${priceChoiceCount > 1 ? `<small>Pilih harga · ${priceChoiceCount} opsi</small>` : ''}
+                        </span>
                         <small class="pos-search-result-stock ${hasStock ? '' : 'is-empty'}">
                             ${hasStock ? `Stok ${formatNumber(stock)} ${escapeHtml(item.satuan_stok || '')}` : 'Stok kosong'}
                         </small>
@@ -1291,25 +1314,44 @@
                     }),
                     processResults: data => {
                         const products = data || [];
+                        const priceChoices = products.flatMap(item => {
+                            const variants = productPriceVariants(item);
+
+                            return variants.map((variant, index) => {
+                                const selectedPrice = Number(variant.harga_jual) || 0;
+                                const selectedItem = {
+                                    ...item,
+                                    harga_jual: selectedPrice,
+                                    harga_jual_pilihan: selectedPrice,
+                                    total_stok: Number(variant.total_stok) || 0,
+                                    next_batch: variant.next_batch || item.next_batch,
+                                    harga_choice_count: variants.length
+                                };
+
+                                return {
+                                    id: `${item.id}:${selectedPrice.toFixed(2)}:${index}`,
+                                    text: `${item.text} · ${formatCurrency(selectedPrice)}`,
+                                    item: selectedItem
+                                };
+                            });
+                        });
                         setProductSearchFeedback(
-                            products.length > 0
-                                ? `${products.length} produk ditemukan. Pilih produk untuk melihat detail stok.`
+                            priceChoices.length > 0
+                                ? `${products.length} produk ditemukan dengan ${priceChoices.length} pilihan harga.`
                                 : 'Produk tidak ditemukan. Coba nama, kode, kandungan, atau barcode lain.',
-                            products.length > 0 ? 'success' : 'warning',
-                            products.length > 0 ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline'
+                            priceChoices.length > 0 ? 'success' : 'warning',
+                            priceChoices.length > 0 ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline'
                         );
 
                         return {
-                            results: products.map(item => ({
-                                id: item.id,
-                                text: item.text,
-                                item
-                            }))
+                            results: priceChoices
                         };
                     }
                 },
                 templateResult: productResult,
-                templateSelection: data => data.item ? data.item.nama_obat : (data.text || 'Ketik atau scan produk...'),
+                templateSelection: data => data.item
+                    ? `${data.item.nama_obat} · ${formatCurrency(data.item.harga_jual_pilihan ?? data.item.harga_jual)}`
+                    : (data.text || 'Ketik atau scan produk...'),
                 language: {
                     inputTooShort: () => 'Ketik kode, nama, indikasi, kandungan, atau golongan obat.',
                     searching: () => {
@@ -1406,7 +1448,7 @@
             currentQuote = null;
             $('#productSearchBox').addClass('has-selection');
             setProductSearchFeedback(
-                `${selectedProduct.nama_obat} dipilih. Atur satuan dan jumlah di bawah.`,
+                `${selectedProduct.nama_obat} dipilih pada harga batch ${formatCurrency(selectedProduct.harga_jual_pilihan)}.`,
                 'success',
                 'mdi-check-decagram-outline'
             );
@@ -1460,6 +1502,7 @@
                 <div class="pos-product-summary">
                     <span>${escapeHtml(selectedProduct.kategori || 'Tanpa kategori')}</span>
                     <span>${escapeHtml(selectedProduct.sediaan || 'Sediaan belum diisi')}</span>
+                    <span>Harga batch: ${formatCurrency(selectedProduct.harga_jual_pilihan ?? selectedProduct.harga_jual)}</span>
                 </div>
                 <details class="pos-product-more">
                     <summary><i class="mdi mdi-information-outline"></i> Lihat detail obat <i class="mdi mdi-chevron-down"></i></summary>
@@ -1550,6 +1593,7 @@
                 obat_id: selectedProduct.id,
                 satuan_id: $('#unitSelect').val(),
                 qty: $('#qtyInput').val() || 1,
+                harga_jual_pilihan: selectedProduct.harga_jual_pilihan,
                 branch_id: activeBranchId || ''
             }).done(function(response) {
                 if (requestVersion !== quoteRequestVersion || !selectedProduct) return;
@@ -1578,7 +1622,7 @@
             $('#quoteFefoList').html((quote.allocations || []).map(allocation => `
                 <span class="pos-fefo-chip">
                     <i class="mdi mdi-package-variant-closed"></i>
-                    ${escapeHtml(allocation.no_batch || '-')} | ED ${escapeHtml(allocation.expired_date || '-')} | ${formatNumber(allocation.qty_stok)}
+                    ${escapeHtml(allocation.no_batch || '-')} | ED ${escapeHtml(allocation.expired_date || '-')} | ${formatNumber(allocation.qty_stok)} | ${formatCurrency(allocation.harga_jual)}
                 </span>
             `).join('') || `<span class="pos-fefo-chip text-muted"><i class="mdi mdi-package-variant"></i> Tidak ada batch aktif</span>`);
         }
@@ -1626,6 +1670,7 @@
                 qty: Number(currentQuote.qty_jual) || 1,
                 qty_stok: Number(currentQuote.qty_stok) || 0,
                 harga_jual: Number(currentQuote.harga_jual) || 0,
+                harga_jual_pilihan: Number(currentQuote.harga_jual_pilihan ?? selectedProduct.harga_jual_pilihan),
                 subtotal_gross: Number(currentQuote.subtotal_gross) || 0,
                 diskon_percent: 0,
                 diskon_nominal: 0,
@@ -1647,7 +1692,13 @@
                 jumlah_resep: compound ? (Number(currentQuote.qty_jual) || 1) : '',
                 keterangan: compound ? (compoundTemplate?.keterangan || '') : ''
             };
-            const matchingItem = isPrescriptionTransaction() ? null : cart.find(item => item.obat_id === cartItem.obat_id && item.satuan_id === cartItem.satuan_id && Number(item.diskon_percent) === 0 && Number(item.diskon_nominal) === 0);
+            const matchingItem = isPrescriptionTransaction() ? null : cart.find(item =>
+                item.obat_id === cartItem.obat_id
+                && item.satuan_id === cartItem.satuan_id
+                && Number(item.harga_jual_pilihan) === Number(cartItem.harga_jual_pilihan)
+                && Number(item.diskon_percent) === 0
+                && Number(item.diskon_nominal) === 0
+            );
 
             if (matchingItem) {
                 matchingItem.qty += cartItem.qty;
@@ -2479,6 +2530,7 @@
                 obat_id: item.obat_id,
                 satuan_id: item.satuan_id,
                 qty: item.qty,
+                harga_jual_pilihan: item.harga_jual_pilihan,
                 branch_id: activeBranchId || ''
             }).done(function(response) {
                 if (item._quote_request_version !== requestVersion) return;
@@ -2489,6 +2541,9 @@
                 item.qty = Number(response.qty_jual) || item.qty;
                 item.qty_stok = Number(response.qty_stok) || item.qty_stok;
                 item.harga_jual = Number(response.harga_jual) || item.harga_jual;
+                item.harga_jual_pilihan = response.harga_jual_pilihan !== null
+                    ? Number(response.harga_jual_pilihan)
+                    : item.harga_jual_pilihan;
                 item.subtotal_gross = Number(response.subtotal_gross) || 0;
                 item.allocations = response.allocations || [];
                 item.is_available = Boolean(response.is_available);
@@ -3523,6 +3578,7 @@
                     obat_id: item.obat_id,
                     satuan_id: item.satuan_id,
                     qty: item.qty,
+                    harga_jual_pilihan: item.harga_jual_pilihan,
                     diskon_percent: item.diskon_percent,
                     diskon_nominal: item.diskon_nominal,
                     aturan_pakai: item.aturan_pakai || '',
@@ -3816,6 +3872,9 @@
                 qty: Number(detail.qty_jual) || 1,
                 qty_stok: Number(detail.qty_stok) || 0,
                 harga_jual: Number(detail.harga_jual) || 0,
+                harga_jual_pilihan: detail.harga_jual_pilihan !== null
+                    ? Number(detail.harga_jual_pilihan)
+                    : null,
                 subtotal_gross: Number(detail.subtotal_gross) || 0,
                 diskon_percent: Number(detail.diskon_percent) || 0,
                 diskon_nominal: Number(detail.diskon_nominal) || 0,
