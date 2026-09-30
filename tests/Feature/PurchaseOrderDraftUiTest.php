@@ -21,9 +21,13 @@ class PurchaseOrderDraftUiTest extends TestCase
         $this->assertStringContainsString('col-lg-1 col-md-4 purchase-qty-field', $modal);
         $this->assertStringContainsString('name="harga_estimasi_satuan[]"', $modal);
         $this->assertStringContainsString('type="hidden" class="harga_estimasi" name="harga_estimasi[]"', $modal);
+        $this->assertStringContainsString('class="form-control purchase-tax"', $modal);
+        $this->assertStringContainsString('name="ppn[]" min="0" max="100" step="0.01" value="11"', $modal);
         $this->assertStringContainsString('const purchaseUnitPrice = pricePerUnit * conversion;', $script);
         $this->assertStringNotContainsString('convertedPurchaseUnitPrice', $script);
         $this->assertStringContainsString('let subtotal = qty * purchaseUnitPrice;', $script);
+        $this->assertStringContainsString('subtotal = roundPurchaseMoney(subtotal * (1 + (ppn / 100)));', $script);
+        $this->assertStringContainsString('value="${options.ppn ?? 11}"', $script);
         $this->assertStringContainsString("row.find('.harga_estimasi').val(purchaseUnitPrice.toFixed(2));", $script);
     }
 

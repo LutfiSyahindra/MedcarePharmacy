@@ -400,7 +400,7 @@ class TransactionNotificationService
                     'discount_1' => $discount1,
                     'discount_2' => $discount2,
                     'discount_3' => $discount3,
-                    'tax' => null,
+                    'tax' => $detail->ppn !== null ? (float) $detail->ppn : null,
                     'total' => $total,
                     'no_batch' => null,
                     'expired_date' => null,

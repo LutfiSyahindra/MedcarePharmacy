@@ -69,6 +69,7 @@ class PurchaseTieredDiscountTest extends TestCase
                 'diskon_1' => [10],
                 'diskon_2' => [5],
                 'diskon_3' => [2],
+                'ppn' => [11],
                 'subtotal' => [1],
                 'satuan_id' => [$conversion->id],
             ])
@@ -80,10 +81,16 @@ class PurchaseTieredDiscountTest extends TestCase
         $this->assertSame('10.00', $purchaseDetail->diskon_1);
         $this->assertSame('5.00', $purchaseDetail->diskon_2);
         $this->assertSame('2.00', $purchaseDetail->diskon_3);
-        $this->assertSame('167580.00', $purchaseDetail->subtotal);
-        $this->assertEquals(167580, (float) $purchaseOrder->total_estimasi);
+        $this->assertSame('11.00', $purchaseDetail->ppn);
+        $this->assertSame('186013.80', $purchaseDetail->subtotal);
+        $this->assertEquals(186013.80, (float) $purchaseOrder->total_estimasi);
 
         $purchaseOrder->update(['status' => 'approved']);
+
+        $this->actingAs($user)
+            ->getJson(route('penerimaan.purchaseOrderDetail', $purchaseOrder->id))
+            ->assertOk()
+            ->assertJsonPath('details.0.ppn', 11);
 
         $this->actingAs($user)
             ->postJson(route('penerimaan.store'), [

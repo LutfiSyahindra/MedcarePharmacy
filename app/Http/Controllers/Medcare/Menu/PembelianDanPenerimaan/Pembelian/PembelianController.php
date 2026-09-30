@@ -750,6 +750,13 @@ class PembelianController extends Controller
                 $request->input('diskon_2.'.$index, 0),
                 $request->input('diskon_3.'.$index, 0)
             );
+            $ppn = round(min(100, max(0, (float) $request->input('ppn.'.$index, 11))), 2);
+            $netAmount = TieredDiscount::netAmount(
+                $qty * $price,
+                $discount1,
+                $discount2,
+                $discount3
+            );
 
             $rows[] = [
                 'obat_id' => (int) $obatId,
@@ -758,12 +765,8 @@ class PembelianController extends Controller
                 'diskon_1' => $discount1,
                 'diskon_2' => $discount2,
                 'diskon_3' => $discount3,
-                'subtotal' => TieredDiscount::netAmount(
-                    $qty * $price,
-                    $discount1,
-                    $discount2,
-                    $discount3
-                ),
+                'ppn' => $ppn,
+                'subtotal' => round($netAmount * (1 + ($ppn / 100)), 2),
                 'satuan_konversi' => $conversionId > 0 ? $conversionId : null,
                 'is_oot' => $this->suratPesananOot->isOotDrug(
                     $medicines->get((int) $obatId)
@@ -808,6 +811,8 @@ class PembelianController extends Controller
             'diskon_2.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'diskon_3' => ['required', 'array'],
             'diskon_3.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'ppn' => ['sometimes', 'array'],
+            'ppn.*' => ['required', 'numeric', 'min:0', 'max:100'],
             'subtotal' => ['required', 'array'],
             'subtotal.*' => ['required', 'numeric', 'min:0'],
             'satuan_id' => ['required', 'array'],
@@ -832,6 +837,10 @@ class PembelianController extends Controller
                 'subtotal',
                 'satuan_id',
             ];
+
+            if ($request->has('ppn')) {
+                $detailFields[] = 'ppn';
+            }
             $itemCount = count($medicineIds);
 
             foreach ($detailFields as $field) {

@@ -952,6 +952,7 @@ class PenerimaanController extends Controller
                 'diskon_1' => (float) ($detail->diskon_1 ?? 0),
                 'diskon_2' => (float) ($detail->diskon_2 ?? 0),
                 'diskon_3' => (float) ($detail->diskon_3 ?? 0),
+                'ppn' => $detail->ppn !== null ? (float) $detail->ppn : 11,
                 'diskon_efektif' => TieredDiscount::effectivePercentage(
                     $detail->diskon_1,
                     $detail->diskon_2,

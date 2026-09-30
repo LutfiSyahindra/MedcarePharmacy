@@ -104,6 +104,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
                 'diskon_1' => [0],
                 'diskon_2' => [0],
                 'diskon_3' => [0],
+                'ppn' => [0],
                 'subtotal' => [1000],
                 'satuan_id' => [0],
             ])
@@ -401,6 +402,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             'diskon_1' => array_fill(0, $itemCount, 0),
             'diskon_2' => array_fill(0, $itemCount, 0),
             'diskon_3' => array_fill(0, $itemCount, 0),
+            'ppn' => array_fill(0, $itemCount, 0),
             'subtotal' => array_fill(0, $itemCount, 1000),
             'satuan_id' => array_map(fn (KonversiSatuanModel $conversion) => $conversion->id, $conversions),
         ];

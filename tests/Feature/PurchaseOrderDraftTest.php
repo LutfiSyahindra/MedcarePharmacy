@@ -6,6 +6,7 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\SatuansModel;
 use App\Models\User;
@@ -34,9 +35,13 @@ class PurchaseOrderDraftTest extends TestCase
             ->assertJsonPath('data.status', 'draft');
 
         $purchaseOrder = PembelianModel::findOrFail($response->json('data.id'));
+        $purchaseDetail = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)->firstOrFail();
 
         $this->assertSame('draft', $purchaseOrder->status);
         $this->assertNull($purchaseOrder->approved_by);
+        $this->assertSame('11.00', $purchaseDetail->ppn);
+        $this->assertSame('1110.00', $purchaseDetail->subtotal);
+        $this->assertSame('1110.00', $purchaseOrder->total_estimasi);
         Notification::assertNothingSent();
 
         $this->actingAs($user)

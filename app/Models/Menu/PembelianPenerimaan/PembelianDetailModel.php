@@ -22,6 +22,7 @@ class PembelianDetailModel extends Model
         'diskon_1' => 'decimal:2',
         'diskon_2' => 'decimal:2',
         'diskon_3' => 'decimal:2',
+        'ppn' => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
 

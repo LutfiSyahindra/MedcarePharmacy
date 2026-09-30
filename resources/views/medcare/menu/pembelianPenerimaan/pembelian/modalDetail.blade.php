@@ -78,7 +78,8 @@
                                         <th>Diskon 1</th>
                                         <th>Diskon 2</th>
                                         <th>Diskon 3</th>
-                                        <th>Subtotal</th>
+                                        <th>PPN</th>
+                                        <th>Subtotal + PPN</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>

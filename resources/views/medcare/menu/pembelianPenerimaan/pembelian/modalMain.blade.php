@@ -210,7 +210,7 @@
                                         <div>
                                             <span class="purchase-detail-number">1</span>
                                             <strong>Item Obat</strong>
-                                            <small>Pilih obat, satuan, qty, harga per satuan, serta Diskon 1–3.</small>
+                                            <small>Pilih obat, satuan, qty, harga per satuan, Diskon 1–3, dan PPN.</small>
                                         </div>
                                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                                             <i class="mdi mdi-trash-can-outline"></i>
@@ -249,7 +249,7 @@
                                         </div>
 
                                         <div class="col-lg-2 col-md-4">
-                                            <label class="form-label">Subtotal</label>
+                                            <label class="form-label">Subtotal + PPN</label>
                                             <input type="number" class="form-control subtotal" name="subtotal[]"
                                                 readonly>
                                         </div>
@@ -270,6 +270,12 @@
                                             <label class="form-label">Diskon 3 (%)</label>
                                             <input type="number" class="form-control purchase-discount"
                                                 name="diskon_3[]" min="0" max="100" step="0.01" value="0">
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-4">
+                                            <label class="form-label">PPN (%)</label>
+                                            <input type="number" class="form-control purchase-tax"
+                                                name="ppn[]" min="0" max="100" step="0.01" value="11" required>
                                         </div>
                                     </div>
                                 </div>
@@ -318,7 +324,7 @@
                     <div class="purchase-total-panel">
                         <div class="purchase-total-copy">
                             <span>Total Estimasi Purchase Order</span>
-                            <small>Subtotal obat ditambah biaya asuransi dan pengiriman.</small>
+                            <small>Subtotal obat setelah diskon dan PPN, ditambah biaya asuransi dan pengiriman.</small>
                         </div>
                         <div class="purchase-total-stats">
                             <span><strong id="purchaseModalItemCount">1</strong> item</span>

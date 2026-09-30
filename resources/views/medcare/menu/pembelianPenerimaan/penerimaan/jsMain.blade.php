@@ -718,7 +718,7 @@
             let diskon2 = Number(item.diskon_2 ?? existing?.diskon_2 ?? 0);
             let diskon3 = Number(item.diskon_3 ?? existing?.diskon_3 ?? 0);
             let diskon = Number(item.diskon_efektif ?? effectiveTieredDiscount(diskon1, diskon2, diskon3));
-            let ppn = existing ? Number(existing.ppn || 0) : 11;
+            let ppn = existing ? Number(existing.ppn || 0) : Number(item.ppn ?? 11);
             let batch = existing ? (existing.no_batch || '') : '';
             let expired = existing && existing.expired_date ? moment(existing.expired_date).format('YYYY-MM-DD') : '';
             let selectedBatchId = existing ? (existing.stok_batch_id || '') : '';
@@ -805,7 +805,7 @@
                     <td data-mobile-label="PPN %">
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
                             min="0" max="100" step="0.01" value="${ppn}">
-                        <small class="receive-field-note">Default 11%</small>
+                        <small class="receive-field-note">Dari PO · default 11%</small>
                     </td>
                     <td data-mobile-label="Subtotal">
                         <strong class="receive-row-total">${formatRupiah(0)}</strong>

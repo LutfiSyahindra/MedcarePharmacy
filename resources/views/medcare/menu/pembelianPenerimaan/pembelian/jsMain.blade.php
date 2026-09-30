@@ -118,7 +118,7 @@
                         <div>
                             <span class="purchase-detail-number">1</span>
                             <strong>Item Obat</strong>
-                            <small>Pilih obat, satuan, qty, harga per satuan, serta Diskon 1–3.</small>
+                            <small>Pilih obat, satuan, qty, harga per satuan, Diskon 1–3, dan PPN.</small>
                         </div>
                         <button type="button" class="btn btn-outline-danger btn-sm remove-detail">
                             <i class="mdi mdi-trash-can-outline"></i> Hapus
@@ -152,7 +152,7 @@
                         </div>
 
                         <div class="col-lg-2 col-md-4">
-                            <label class="form-label">Subtotal</label>
+                            <label class="form-label">Subtotal + PPN</label>
                             <input type="number" class="form-control subtotal" name="subtotal[]" value="${options.subtotal ?? ''}" readonly>
                         </div>
 
@@ -169,6 +169,11 @@
                         <div class="col-lg-2 col-md-4">
                             <label class="form-label">Diskon 3 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_3[]" min="0" max="100" step="0.01" value="${options.diskon3 ?? 0}">
+                        </div>
+
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label">PPN (%)</label>
+                            <input type="number" class="form-control purchase-tax" name="ppn[]" min="0" max="100" step="0.01" value="${options.ppn ?? 11}" required>
                         </div>
                     </div>
                 </div>
@@ -641,7 +646,11 @@
         });
 
         function normalizedDiscount(value) {
-            return Math.min(100, Math.max(0, Number(value) || 0));
+            return Math.round(Math.min(100, Math.max(0, Number(value) || 0)) * 100) / 100;
+        }
+
+        function roundPurchaseMoney(value) {
+            return Math.round((Math.max(0, value) + Number.EPSILON) * 100) / 100;
         }
 
         function selectedPurchaseConversion(row) {
@@ -660,19 +669,22 @@
                 normalizedDiscount(row.find('[name="diskon_2[]"]').val()),
                 normalizedDiscount(row.find('[name="diskon_3[]"]').val())
             ];
+            const ppn = normalizedDiscount(row.find('[name="ppn[]"]').val());
             let subtotal = qty * purchaseUnitPrice;
 
             discounts.forEach(function(discount) {
                 subtotal *= 1 - (discount / 100);
             });
+            subtotal = roundPurchaseMoney(subtotal);
+            subtotal = roundPurchaseMoney(subtotal * (1 + (ppn / 100)));
 
             // Backend dan modul penerimaan tetap menerima harga per satuan beli.
             row.find('.harga_estimasi').val(purchaseUnitPrice.toFixed(2));
             row.find('.subtotal').val(subtotal.toFixed(2));
         }
 
-        // --- Hitung subtotal berdasarkan qty, harga satuan beli, lalu Diskon 1, 2, dan 3
-        $(document).on('input', '.harga_estimasi_satuan, [name="qty[]"], .purchase-discount, .purchase-additional-cost', function() {
+        // --- Hitung subtotal berdasarkan qty, harga satuan beli, Diskon 1–3, lalu PPN
+        $(document).on('input', '.harga_estimasi_satuan, [name="qty[]"], .purchase-discount, .purchase-tax, .purchase-additional-cost', function() {
             const row = $(this).closest('.detail-item');
 
             if (row.length) {
@@ -1816,6 +1828,7 @@
                             diskon1: item.diskon_1,
                             diskon2: item.diskon_2,
                             diskon3: item.diskon_3,
+                            ppn: item.ppn ?? 11,
                             subtotal: item.subtotal,
                             selectClass: 'obatSelect',
                             loadingOption: true
@@ -1991,7 +2004,8 @@
                         <td data-label="Diskon 1">${Number(item.diskon_1 ?? 0).toLocaleString('id-ID')}%</td>
                         <td data-label="Diskon 2">${Number(item.diskon_2 ?? 0).toLocaleString('id-ID')}%</td>
                         <td data-label="Diskon 3">${Number(item.diskon_3 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td data-label="Subtotal">Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
+                        <td data-label="PPN">${Number(item.ppn ?? 0).toLocaleString('id-ID')}%</td>
+                        <td data-label="Subtotal + PPN">Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
                     </tr>
                 `);
                         medicineSubtotal += Number(item.subtotal ?? 0);
