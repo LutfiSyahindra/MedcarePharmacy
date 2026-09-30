@@ -66,7 +66,7 @@ class ProcurementAnalysisService
                     'quantity' => 'Qty pembelian dinormalisasi ke satuan stok menggunakan konversi pada item PO.',
                     'cancelled' => 'PO berstatus rejected dikelompokkan sebagai order dibatalkan.',
                     'need' => 'Kebutuhan = penjualan 30 hari + stok minimum - estimasi stok saat order terakhir.',
-                    'value' => 'Nilai dan harga pada analisis berasal dari estimasi item PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.',
+                    'value' => 'Ringkasan, tren, supplier, dan outstanding memakai total estimasi PO termasuk biaya pengiriman dan asuransi. Analisis barang dan kategori tetap memakai subtotal item; pada filter item, biaya PO dialokasikan proporsional untuk ringkasan tingkat PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.',
                 ],
             ],
             'summary' => $summary,
@@ -219,6 +219,8 @@ class ProcurementAnalysisService
                 'details.harga_estimasi as purchase_price', 'details.subtotal',
                 'orders.id as order_id', 'orders.no_po', 'orders.branch_id', 'orders.distributor_id as supplier_id',
                 'orders.tanggal_po as order_date', 'orders.status', 'orders.created_by',
+                'orders.total_estimasi as order_total', 'orders.biaya_asuransi as insurance_cost',
+                'orders.biaya_pengiriman as shipping_cost',
                 'suppliers.nama as supplier_name', 'medicines.kode_obat as medicine_code',
                 'medicines.nama_obat as medicine_name', 'medicines.stok_minimum as minimum_stock',
                 'medicines.category_id', 'medicines.golongan_id', 'medicines.pabrikan_id as manufacturer_id',
@@ -234,6 +236,15 @@ class ProcurementAnalysisService
             return collect();
         }
 
+        $orderItemTotals = DB::table('purchase_order_details')
+            ->whereIn('purchase_order_id', $query->pluck('order_id')->unique()->all())
+            ->groupBy('purchase_order_id')
+            ->select('purchase_order_id')
+            ->selectRaw('COUNT(*) as line_count')
+            ->selectRaw('COALESCE(SUM(CASE WHEN subtotal > 0 THEN subtotal ELSE qty * harga_estimasi END), 0) as item_value')
+            ->get()
+            ->keyBy('purchase_order_id');
+
         $received = DB::table('penerimaan_barang_detail as receipt_details')
             ->join('penerimaan_barang as receipts', 'receipts.id', '=', 'receipt_details.penerimaan_barang_id')
             ->where('receipts.status', 'posted')
@@ -244,15 +255,29 @@ class ProcurementAnalysisService
             ->get()
             ->keyBy('purchase_order_detail_id');
 
-        $lines = $query->map(function ($line) use ($received) {
+        $lines = $query->map(function ($line) use ($received, $orderItemTotals) {
             $factor = max(0.0001, (float) ($line->conversion_factor ?: 1));
             $line->ordered_qty = round((float) $line->purchase_qty * $factor, 2);
             $line->received_qty = round((float) ($received->get($line->line_id)?->received_qty ?? 0), 2);
             $line->outstanding_qty = round(max(0, $line->ordered_qty - $line->received_qty), 2);
             $line->unit_price = round((float) $line->purchase_price / $factor, 2);
             $line->line_value = round((float) ($line->subtotal > 0 ? $line->subtotal : $line->purchase_qty * $line->purchase_price), 2);
+            $orderItems = $orderItemTotals->get($line->order_id);
+            $fullOrderItemValue = (float) ($orderItems?->item_value ?? 0);
+            $fullOrderLineCount = max(1, (int) ($orderItems?->line_count ?? 1));
+            $orderTotal = (float) $line->order_total;
+            if ($orderTotal <= 0 && $fullOrderItemValue > 0) {
+                $orderTotal = $fullOrderItemValue
+                    + (float) ($line->insurance_cost ?? 0)
+                    + (float) ($line->shipping_cost ?? 0);
+            }
+            $allocationRatio = $fullOrderItemValue > 0
+                ? $line->line_value / $fullOrderItemValue
+                : 1 / $fullOrderLineCount;
+            $line->allocated_order_value = $orderTotal * $allocationRatio;
+            $line->allocated_additional_cost = $line->allocated_order_value - $line->line_value;
             $line->outstanding_value = $line->ordered_qty > 0
-                ? round($line->line_value * ($line->outstanding_qty / $line->ordered_qty), 2)
+                ? $line->allocated_order_value * ($line->outstanding_qty / $line->ordered_qty)
                 : 0;
             $line->is_cancelled = $line->status === 'rejected';
 
@@ -294,7 +319,9 @@ class ProcurementAnalysisService
     private function summaryValues(Collection $lines, Collection $leadTimes): array
     {
         return [
-            'order_value' => round((float) $lines->sum('line_value'), 2),
+            'order_value' => round((float) $lines->sum('allocated_order_value'), 2),
+            'item_value' => round((float) $lines->sum('line_value'), 2),
+            'additional_cost_value' => round((float) $lines->sum('allocated_additional_cost'), 2),
             'total_po' => $lines->pluck('order_id')->unique()->count(),
             'total_items' => $lines->count(),
             'ordered_qty' => round((float) $lines->sum('ordered_qty'), 2),
@@ -441,7 +468,7 @@ class ProcurementAnalysisService
                 'ordered_qty' => round($ordered, 2),
                 'received_qty' => round($received, 2),
                 'outstanding_qty' => round(max(0, $ordered - $received), 2),
-                'order_value' => round((float) $items->sum('line_value'), 2),
+                'order_value' => round((float) $items->sum('allocated_order_value'), 2),
                 'outstanding_value' => round((float) $items->sum('outstanding_value'), 2),
                 'fulfillment_percent' => $ordered > 0 ? round(min(100, $received / $ordered * 100), 1) : 0,
                 'lead_time_days' => $lead->isNotEmpty() ? round((float) $lead->avg('days'), 1) : null,
@@ -479,7 +506,7 @@ class ProcurementAnalysisService
                 'key' => $status,
                 'label' => $label,
                 'count' => $matching->count(),
-                'value' => round((float) $matching->sum(fn (Collection $items) => $items->sum('line_value')), 2),
+                'value' => round((float) $matching->sum(fn (Collection $items) => $items->sum('allocated_order_value')), 2),
                 'percent' => round($matching->count() / $total * 100, 1),
             ];
         })->values()->all();
@@ -516,7 +543,7 @@ class ProcurementAnalysisService
                 'supplier' => $first->supplier_name,
                 'item_count' => $items->count(),
                 'ordered_qty' => round((float) $items->sum('ordered_qty'), 2),
-                'order_value' => round((float) $items->sum('line_value'), 2),
+                'order_value' => round((float) $items->sum('allocated_order_value'), 2),
                 'status_label' => 'Batal / Ditolak',
             ];
         })->sortByDesc('date')->values()->all();
@@ -566,7 +593,7 @@ class ProcurementAnalysisService
                 continue;
             }
             $row = $buckets->get($key);
-            $row['order_value'] += (float) $line->line_value;
+            $row['order_value'] += (float) $line->allocated_order_value;
             $row['ordered_qty'] += (float) $line->ordered_qty;
             $row['received_qty'] += (float) $line->received_qty;
             $buckets->put($key, $row);

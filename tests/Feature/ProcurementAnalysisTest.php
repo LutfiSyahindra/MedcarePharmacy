@@ -68,7 +68,7 @@ class ProcurementAnalysisTest extends TestCase
             'harga_jual' => 1800,
         ]);
 
-        $current = $this->order('PO-PROC-CURRENT', '2026-08-25', 'approved', 10, 1000, 10000);
+        $current = $this->order('PO-PROC-CURRENT', '2026-08-25', 'approved', 10, 1000, 10000, 200, 300);
         $this->receipt($current['order_id'], $current['detail_id']);
         $this->order('PO-PROC-CANCEL', '2026-08-26', 'rejected', 2, 1000, 2000);
         $this->order('PO-PROC-PREVIOUS', '2026-07-20', 'approved', 5, 1000, 5000);
@@ -105,20 +105,26 @@ class ProcurementAnalysisTest extends TestCase
         $response = $this->actingAs($this->user)->getJson(route('analisisPengadaan.data', $this->period()))
             ->assertOk()
             ->assertJsonPath('analysis.meta.branch_label', 'Cabang Procurement')
-            ->assertJsonPath('analysis.meta.methodology.value', 'Nilai dan harga pada analisis berasal dari estimasi item PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.')
-            ->assertJsonPath('analysis.summary.order_value', 10000)
+            ->assertJsonPath('analysis.meta.methodology.value', 'Ringkasan, tren, supplier, dan outstanding memakai total estimasi PO termasuk biaya pengiriman dan asuransi. Analisis barang dan kategori tetap memakai subtotal item; pada filter item, biaya PO dialokasikan proporsional untuk ringkasan tingkat PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.')
+            ->assertJsonPath('analysis.summary.order_value', 10500)
+            ->assertJsonPath('analysis.summary.item_value', 10000)
+            ->assertJsonPath('analysis.summary.additional_cost_value', 500)
             ->assertJsonPath('analysis.summary.order_value_previous', 5000)
-            ->assertJsonPath('analysis.summary.order_value_change', 100)
+            ->assertJsonPath('analysis.summary.order_value_change', 110)
             ->assertJsonPath('analysis.summary.total_po', 1)
             ->assertJsonPath('analysis.summary.ordered_qty', 100)
-            ->assertJsonPath('analysis.summary.outstanding_value', 4000)
+            ->assertJsonPath('analysis.summary.outstanding_value', 4200)
             ->assertJsonPath('analysis.summary.lead_time_days', 3)
             ->assertJsonPath('analysis.summary.active_suppliers', 1)
             ->assertJsonPath('analysis.medicines.0.name', 'Amoxicillin 500 mg')
+            ->assertJsonPath('analysis.medicines.0.order_value', 10000)
             ->assertJsonPath('analysis.medicines.0.received_qty', 60)
             ->assertJsonPath('analysis.medicines.0.fulfillment_percent', 60)
             ->assertJsonPath('analysis.medicines.0.sales_30_days', 40)
             ->assertJsonPath('analysis.medicines.0.need_status', 'over')
+            ->assertJsonPath('analysis.categories.0.order_value', 10000)
+            ->assertJsonPath('analysis.suppliers.0.order_value', 10500)
+            ->assertJsonPath('analysis.suppliers.0.outstanding_value', 4200)
             ->assertJsonPath('analysis.suppliers.0.lead_time_days', 3)
             ->assertJsonPath('analysis.cancelled_orders.0.no_po', 'PO-PROC-CANCEL');
 
@@ -168,14 +174,24 @@ class ProcurementAnalysisTest extends TestCase
         return ['date_start' => '2026-08-01', 'date_end' => '2026-08-31'];
     }
 
-    private function order(string $number, string $date, string $status, float $qty, float $price, float $subtotal): array
-    {
+    private function order(
+        string $number,
+        string $date,
+        string $status,
+        float $qty,
+        float $price,
+        float $subtotal,
+        float $insuranceCost = 0,
+        float $shippingCost = 0,
+    ): array {
         $orderId = DB::table('purchase_orders')->insertGetId([
             'no_po' => $number,
             'distributor_id' => $this->supplier->id,
             'branch_id' => $this->branch->id,
             'tanggal_po' => $date,
-            'total_estimasi' => $subtotal,
+            'total_estimasi' => $subtotal + $insuranceCost + $shippingCost,
+            'biaya_asuransi' => $insuranceCost,
+            'biaya_pengiriman' => $shippingCost,
             'status' => $status,
             'created_by' => $this->user->id,
             'created_at' => now(),

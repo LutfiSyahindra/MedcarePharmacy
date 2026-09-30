@@ -136,7 +136,7 @@
 
     function renderKpis(summary) {
         const cards = [
-            ['Nilai Estimasi PO', 'order_value', money, 'mdi-cash-multiple', `Dari ${number(summary.total_items)} baris item`, ''],
+            ['Nilai Estimasi PO', 'order_value', money, 'mdi-cash-multiple', `Item ${money(summary.item_value)} + biaya ${money(summary.additional_cost_value)}`, ''],
             ['Total PO', 'total_po', value => `${number(value)} PO`, 'mdi-file-document-multiple-outline', `Sebelumnya ${number(summary.total_po_previous)} PO`, 'tone-green'],
             ['Total Qty Diorder', 'ordered_qty', value => `${number(value)} unit`, 'mdi-package-variant-closed', `Satuan stok terkonversi`, 'tone-violet'],
             ['Belum Diterima', 'outstanding_value', money, 'mdi-package-variant-remove', `Estimasi nilai PO outstanding`, 'tone-red'],
@@ -275,7 +275,7 @@
     }
 
     function renderMoving(rows) {
-        $('#paMovingDistribution').innerHTML = rows.length ? rows.map(row => `<article class="pa-moving-card is-${escapeHtml(row.key)}"><small>${escapeHtml(row.label)}</small><strong>${money(row.order_value)}</strong><p>${number(row.medicine_count)} obat · ${number(row.ordered_qty)} unit · ${percent(row.percent)} nilai estimasi PO</p></article>`).join('') : '<div class="pa-empty">Belum ada distribusi pergerakan.</div>';
+        $('#paMovingDistribution').innerHTML = rows.length ? rows.map(row => `<article class="pa-moving-card is-${escapeHtml(row.key)}"><small>${escapeHtml(row.label)}</small><strong>${money(row.order_value)}</strong><p>${number(row.medicine_count)} obat · ${number(row.ordered_qty)} unit · ${percent(row.percent)} nilai item PO</p></article>`).join('') : '<div class="pa-empty">Belum ada distribusi pergerakan.</div>';
     }
 
     function renderSuppliers(rows) {
@@ -329,7 +329,7 @@
         $('#paDrawerTitle').textContent = medicine.name || 'Detail obat';
         $('#paDrawerMeta').textContent = `${medicine.code || '-'} · ${medicine.category || '-'} · ${medicine.unit || 'unit'}`;
         const kpis = [
-            ['Total Diorder', `${number(summary.ordered_qty)} ${medicine.unit || 'unit'}`], ['Nilai Estimasi PO', money(summary.order_value)],
+            ['Total Diorder', `${number(summary.ordered_qty)} ${medicine.unit || 'unit'}`], ['Nilai Item PO', money(summary.order_value)],
             ['Frekuensi Order', `${number(summary.order_count)} kali`], ['Rata-rata / Order', `${number(summary.average_per_order)} ${medicine.unit || 'unit'}`],
             ['Supplier Utama', summary.main_supplier || '-'], ['Harga Terakhir', money(summary.last_price)],
             ['Harga Terendah', money(summary.lowest_price)], ['Harga Tertinggi', money(summary.highest_price)],
