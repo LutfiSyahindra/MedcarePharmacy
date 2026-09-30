@@ -20,6 +20,7 @@ class StokBatchModel extends Model
         'expired_date' => 'date',
         'qty' => 'decimal:2',
         'harga_beli' => 'decimal:2',
+        'biaya_lain' => 'decimal:2',
         'harga_jual' => 'decimal:2',
         'diskon' => 'decimal:2',
         'ppn' => 'decimal:2',

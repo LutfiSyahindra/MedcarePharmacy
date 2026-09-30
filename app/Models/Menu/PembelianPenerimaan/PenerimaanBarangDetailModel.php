@@ -21,6 +21,9 @@ class PenerimaanBarangDetailModel extends Model
         'diskon_2' => 'decimal:2',
         'diskon_3' => 'decimal:2',
         'diskon' => 'decimal:2',
+        'harga_beli_stok' => 'decimal:2',
+        'alokasi_biaya_lain' => 'decimal:2',
+        'biaya_lain_stok' => 'decimal:2',
     ];
 
     public function penerimaanBarang()

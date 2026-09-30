@@ -197,6 +197,7 @@ class StokController extends Controller
             ->selectRaw('COUNT(*) as total_batch')
             ->selectRaw('COALESCE(SUM(qty), 0) as total_stok')
             ->selectRaw('COALESCE(SUM(qty * harga_beli), 0) as nilai_stok')
+            ->selectRaw('COALESCE(SUM(qty * COALESCE(biaya_lain, 0)), 0) as total_biaya_lain')
             ->selectRaw('COALESCE(SUM(qty * COALESCE(harga_jual, 0)), 0) as nilai_stok_jual')
             ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date < ? THEN 1 ELSE 0 END) as expired', [$today->toDateString()])
             ->selectRaw('SUM(CASE WHEN expired_date IS NOT NULL AND expired_date >= ? AND expired_date <= ? THEN 1 ELSE 0 END) as akan_expired', [$today->toDateString(), $warningDate->toDateString()])
@@ -206,6 +207,7 @@ class StokController extends Controller
             'total_batch' => (int) ($batchSummary->total_batch ?? 0),
             'total_stok' => (float) ($batchSummary->total_stok ?? 0),
             'nilai_stok' => (float) ($batchSummary->nilai_stok ?? 0),
+            'total_biaya_lain' => (float) ($batchSummary->total_biaya_lain ?? 0),
             'nilai_stok_jual' => (float) ($batchSummary->nilai_stok_jual ?? 0),
             'expired' => (int) ($batchSummary->expired ?? 0),
             'akan_expired' => (int) ($batchSummary->akan_expired ?? 0),
@@ -231,6 +233,8 @@ class StokController extends Controller
             ->editColumn('expired_date', fn (StokBatchModel $batch) => optional($batch->expired_date)->format('Y-m-d'))
             ->editColumn('qty', fn (StokBatchModel $batch) => (float) $batch->qty)
             ->editColumn('harga_beli', fn (StokBatchModel $batch) => (float) $batch->harga_beli)
+            ->addColumn('biaya_lain', fn (StokBatchModel $batch) => (float) ($batch->biaya_lain ?? 0))
+            ->addColumn('nilai_biaya_lain', fn (StokBatchModel $batch) => (float) $batch->qty * (float) ($batch->biaya_lain ?? 0))
             ->editColumn('harga_jual', fn (StokBatchModel $batch) => (float) $batch->harga_jual)
             ->editColumn('diskon', fn (StokBatchModel $batch) => (float) ($batch->diskon ?? 0))
             ->editColumn('ppn', fn (StokBatchModel $batch) => (float) ($batch->ppn ?? 0))
@@ -454,11 +458,13 @@ class StokController extends Controller
                         .' | ED '.(optional($batch->expired_date)->format('Y-m-d') ?: '-')
                         .' | Diskon '.number_format((float) ($batch->diskon ?? 0), 2, ',', '.').'%'
                         .' | PPN '.number_format((float) ($batch->ppn ?? 0), 2, ',', '.').'%'
+                        .' | HPP Rp '.number_format((float) $batch->harga_beli, 2, ',', '.')
                         .' | Stok '.number_format((float) $batch->qty, 2, ',', '.'),
                     'no_batch' => $batch->no_batch,
                     'expired_date' => optional($batch->expired_date)->format('Y-m-d'),
                     'qty' => (float) $batch->qty,
                     'harga_beli' => (float) $batch->harga_beli,
+                    'biaya_lain' => (float) ($batch->biaya_lain ?? 0),
                     'harga_jual' => (float) $batch->harga_jual,
                     'diskon' => (float) ($batch->diskon ?? 0),
                     'ppn' => (float) ($batch->ppn ?? 0),

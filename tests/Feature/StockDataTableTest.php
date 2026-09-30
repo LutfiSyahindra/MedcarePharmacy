@@ -47,6 +47,7 @@ class StockDataTableTest extends TestCase
                 'expired_date' => today()->addYear()->toDateString(),
                 'qty' => 10,
                 'harga_beli' => 1000,
+                'biaya_lain' => 100,
                 'harga_jual' => 1500,
                 'diskon' => 0,
                 'ppn' => 0,
@@ -88,8 +89,10 @@ class StockDataTableTest extends TestCase
             ->assertJsonPath('summary.total_batch', 15)
             ->assertJsonPath('summary.total_stok', 150)
             ->assertJsonPath('summary.nilai_stok', 150000)
+            ->assertJsonPath('summary.total_biaya_lain', 15000)
             ->assertJsonPath('summary.nilai_stok_jual', 225000)
             ->assertJsonPath('data.0.nilai_stok', 10000)
+            ->assertJsonPath('data.0.nilai_biaya_lain', 1000)
             ->assertJsonPath('data.0.nilai_stok_jual', 15000);
 
         $cards = $this->getJson(route('kartuStok.table', $dataTable));

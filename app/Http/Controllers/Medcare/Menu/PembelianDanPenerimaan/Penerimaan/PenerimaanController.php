@@ -1118,11 +1118,13 @@ class PenerimaanController extends Controller
                 .' | ED '.($expiredDate ?: '-')
                 .' | Diskon '.number_format((float) ($batch->diskon ?? 0), 2, ',', '.').'%'
                 .' | PPN '.number_format((float) ($batch->ppn ?? 0), 2, ',', '.').'%'
+                .' | HPP Rp '.number_format((float) $batch->harga_beli, 2, ',', '.')
                 .' | Stok '.number_format((float) $batch->qty, 2, ',', '.'),
             'no_batch' => $batch->no_batch,
             'expired_date' => $expiredDate,
             'qty' => (float) $batch->qty,
             'harga_beli' => (float) $batch->harga_beli,
+            'biaya_lain' => (float) ($batch->biaya_lain ?? 0),
             'harga_jual' => (float) $batch->harga_jual,
             'diskon' => (float) ($batch->diskon ?? 0),
             'ppn' => (float) ($batch->ppn ?? 0),
@@ -1238,9 +1240,22 @@ class PenerimaanController extends Controller
         PenerimaanBarangModel $penerimaan,
         string $diskonUntuk
     ): void {
+        $otherCostAllocations = $this->otherCostAllocationsByDetailId($penerimaan);
+
         foreach ($penerimaan->details as $detail) {
+            $allocatedOtherCost = $otherCostAllocations[$detail->id] ?? 0;
+            $qtyStock = $this->detailStockQuantity($detail, $this->detailConversionFactor($detail));
+            $otherCostPerStockUnit = $qtyStock > 0
+                ? round($allocatedOtherCost / $qtyStock, 2)
+                : 0;
+
             $detail->forceFill([
-                'harga_beli_stok' => $this->detailStockPurchasePrice($detail, $diskonUntuk),
+                'harga_beli_stok' => $this->detailStockPurchasePrice(
+                    $detail,
+                    $diskonUntuk
+                ),
+                'alokasi_biaya_lain' => $allocatedOtherCost,
+                'biaya_lain_stok' => $otherCostPerStockUnit,
             ])->save();
         }
     }
@@ -1344,6 +1359,7 @@ class PenerimaanController extends Controller
         $hargaJual = round($totalHargaJual / $qtySatuanTerkecil, 2);
         $hargaBeliTerkecil = $totalHargaBeli / $qtySatuanTerkecil;
         $biayaLainPerSatuanBeli = $allocatedOtherCost / max(1, (float) $detail->qty_diterima);
+        $biayaLainPerSatuanStok = $allocatedOtherCost / $qtySatuanTerkecil;
         $satuanBeli = $detail->satuan_beli
             ?: ($detail->purchaseOrderDetail?->satuanKonversi?->satuan?->nama ?? ($obat->satuan->nama ?? 'satuan'));
         $satuanTerkecil = $detail->satuan_stok ?: ($obat->satuan->nama ?? 'satuan terkecil');
@@ -1378,6 +1394,8 @@ class PenerimaanController extends Controller
             'total_harga_beli_include_ppn' => round($totalHargaBeli, 2),
             'alokasi_biaya_lain' => $allocatedOtherCost,
             'biaya_lain_satuan_beli' => round($biayaLainPerSatuanBeli, 2),
+            'biaya_lain_satuan_stok' => round($biayaLainPerSatuanStok, 2),
+            'nilai_beli_stok' => round($hargaBeliStok * $qtySatuanTerkecil, 2),
             'total_harga_jual_sebelum_biaya_lain' => round($totalHargaJualSebelumBiayaLain, 2),
             'total_harga_jual' => round($totalHargaJual, 2),
             'harga_jual' => $hargaJual,

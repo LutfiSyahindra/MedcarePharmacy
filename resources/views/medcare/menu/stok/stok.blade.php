@@ -192,7 +192,7 @@
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-multiple"></i>
-                        Nilai beli: <strong id="stockValueTotal">Rp 0</strong>
+                        Nilai beli (HPP): <strong id="stockValueTotal">Rp 0</strong>
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-plus"></i>
@@ -209,8 +209,8 @@
                             <th>Total Stok</th>
                             <th>Batch</th>
                             <th>ED Terdekat</th>
-                            <th>Harga Beli Terakhir</th>
-                            <th>Nilai Beli</th>
+                            <th>HPP Terakhir</th>
+                            <th>Nilai Beli (HPP)</th>
                             <th>Nilai Jual</th>
                             <th>Stok Minimum</th>
                             <th>Status</th>
@@ -246,7 +246,11 @@
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-multiple"></i>
-                        Nilai beli: <strong id="batchPurchaseValue">Rp 0</strong>
+                        Nilai beli (HPP): <strong id="batchPurchaseValue">Rp 0</strong>
+                    </span>
+                    <span class="stock-batch-filter-note">
+                        <i class="mdi mdi-cash-marker"></i>
+                        Biaya lain-lain: <strong id="batchOtherCostValue">Rp 0</strong>
                     </span>
                     <span class="stock-batch-filter-note">
                         <i class="mdi mdi-cash-plus"></i>
@@ -277,9 +281,9 @@
                             <th>No Batch</th>
                             <th>Expired Date</th>
                             <th>Qty</th>
-                            <th>Harga Beli</th>
+                            <th>HPP</th>
                             <th>Harga Jual</th>
-                            <th>Nilai Beli</th>
+                            <th>Nilai Beli (HPP)</th>
                             <th>Nilai Jual</th>
                             <th>Status</th>
                             <th>Mutasi Terakhir</th>

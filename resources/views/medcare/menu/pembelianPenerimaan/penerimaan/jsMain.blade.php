@@ -1636,7 +1636,7 @@
                             <td data-mobile-label="Expired">${formatDateDisplay(item.expired_date)}</td>
                             <td data-mobile-label="Harga Beli">
                                 ${formatRupiah(item.harga_beli)}
-                                <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)}</small>
+                                <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)} (biaya lain tidak masuk HPP)</small>
                             </td>
                             <td data-mobile-label="Diskon 1">${formatDecimal(item.diskon_1, 0, 2)}%</td>
                             <td data-mobile-label="Diskon 2">${formatDecimal(item.diskon_2, 0, 2)}%</td>
@@ -1685,12 +1685,13 @@
                             <strong>${formatRupiah(item.total_harga_beli_include_ppn || item.total_harga_beli)}</strong>
                             <small class="d-block text-muted">${formatDecimal(item.qty_diterima, 0, 2)} ${escapeHtml(item.satuan_beli)} x ${formatRupiah(item.harga_beli)}</small>
                             <small class="d-block text-muted">Sudah termasuk PPN</small>
-                            <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(item.satuan_terkecil)}</small>
+                            <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(item.satuan_terkecil)} (tanpa biaya lain)</small>
                             <small class="d-block text-muted">Dasar margin incl. PPN ${formatRupiah(item.harga_beli_satuan_terkecil)}/${escapeHtml(item.satuan_terkecil)}</small>
                         </td>
                         <td class="text-end" data-mobile-label="Biaya lain">
                             <strong>${formatRupiah(item.alokasi_biaya_lain)}</strong>
                             <small class="d-block text-muted">${formatRupiah(item.biaya_lain_satuan_beli)}/${escapeHtml(item.satuan_beli)}</small>
+                            <small class="d-block text-muted">${formatRupiah(item.biaya_lain_satuan_stok)}/${escapeHtml(item.satuan_terkecil)}</small>
                         </td>
                         <td class="text-end" data-mobile-label="Qty terkecil">
                             <strong>${formatDecimal(item.qty_satuan_terkecil, 0, 2)}</strong>

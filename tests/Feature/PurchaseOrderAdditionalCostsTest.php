@@ -201,8 +201,12 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('header.biaya_lain', 400)
             ->assertJsonPath('details.0.alokasi_biaya_lain', 200)
+            ->assertJsonPath('details.0.biaya_lain_satuan_stok', 100)
+            ->assertJsonPath('details.0.harga_beli_stok', 1000)
             ->assertJsonPath('details.0.harga_jual', 1100)
             ->assertJsonPath('details.1.alokasi_biaya_lain', 200)
+            ->assertJsonPath('details.1.biaya_lain_satuan_stok', 100)
+            ->assertJsonPath('details.1.harga_beli_stok', 2000)
             ->assertJsonPath('details.1.harga_jual', 2100);
 
         // SQLite keeps the original PO status CHECK constraint; skip the unrelated status sync in this pricing test.
@@ -216,8 +220,106 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertJsonPath('selling_prices.0.harga_jual', 1100)
             ->assertJsonPath('selling_prices.1.harga_jual', 2100);
 
-        $this->assertSame(1100.0, (float) StokBatchModel::where('no_batch', 'BATCH-COST-01')->firstOrFail()->harga_jual);
-        $this->assertSame(2100.0, (float) StokBatchModel::where('no_batch', 'BATCH-COST-02')->firstOrFail()->harga_jual);
+        $firstBatch = StokBatchModel::where('no_batch', 'BATCH-COST-01')->firstOrFail();
+        $secondBatch = StokBatchModel::where('no_batch', 'BATCH-COST-02')->firstOrFail();
+
+        $this->assertSame(1000.0, (float) $firstBatch->harga_beli);
+        $this->assertSame(100.0, (float) $firstBatch->biaya_lain);
+        $this->assertSame(2000.0, (float) $firstBatch->qty * (float) $firstBatch->harga_beli);
+        $this->assertSame(1100.0, (float) $firstBatch->harga_jual);
+        $this->assertSame(2000.0, (float) $secondBatch->harga_beli);
+        $this->assertSame(100.0, (float) $secondBatch->biaya_lain);
+        $this->assertSame(4000.0, (float) $secondBatch->qty * (float) $secondBatch->harga_beli);
+        $this->assertSame(2100.0, (float) $secondBatch->harga_jual);
+
+        $receiptDetails = $receipt->details()->orderBy('id')->get();
+        $this->assertSame(1000.0, (float) $receiptDetails[0]->harga_beli_stok);
+        $this->assertSame(200.0, (float) $receiptDetails[0]->alokasi_biaya_lain);
+        $this->assertSame(100.0, (float) $receiptDetails[0]->biaya_lain_stok);
+        $this->assertSame(2000.0, (float) $receiptDetails[1]->harga_beli_stok);
+        $this->assertSame(200.0, (float) $receiptDetails[1]->alokasi_biaya_lain);
+        $this->assertSame(100.0, (float) $receiptDetails[1]->biaya_lain_stok);
+    }
+
+    public function test_same_physical_batch_with_different_purchase_prices_creates_separate_cost_layers(): void
+    {
+        Notification::fake();
+
+        [$user, $distributor, $unit] = $this->purchaseContext();
+        Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
+        $user->assignRole('Admin');
+        [$medicine, $conversion] = $this->createMedicineWithConversion(
+            'OBT-COST-LAYER-01',
+            'Obat Cost Layer',
+            $unit,
+            $distributor,
+        );
+        $purchaseOrder = PembelianModel::create([
+            'no_po' => 'PO-COST-LAYER-001',
+            'distributor_id' => $distributor->id,
+            'branch_id' => $user->branches()->firstOrFail()->id,
+            'tanggal_po' => '2026-09-30',
+            'total_estimasi' => 2200,
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+        $purchaseDetail = PembelianDetailModel::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'obat_id' => $medicine->id,
+            'qty' => 2,
+            'harga_estimasi' => 1100,
+            'subtotal' => 2200,
+            'satuan_konversi' => $conversion->id,
+        ]);
+
+        foreach ([
+            ['suffix' => '01', 'price' => 1000],
+            ['suffix' => '02', 'price' => 1200],
+        ] as $receiptData) {
+            $purchaseOrder->forceFill(['status' => 'approved'])->save();
+
+            $this->actingAs($user)
+                ->postJson(route('penerimaan.store'), [
+                    'nomor_penerimaan' => 'PB-COST-LAYER-'.$receiptData['suffix'],
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'nomor_faktur' => 'INV-COST-LAYER-'.$receiptData['suffix'],
+                    'tanggal_penerimaan' => '30-09-2026',
+                    'tanggal_faktur' => '30-09-2026',
+                    'purchase_order_detail_id' => [$purchaseDetail->id],
+                    'obat_id' => [$medicine->id],
+                    'qty_diterima' => [1],
+                    'stok_batch_id' => [null],
+                    'no_batch' => ['BATCH-SAMA-001'],
+                    'expired_date' => ['30-09-2027'],
+                    'harga_beli' => [$receiptData['price']],
+                    'ppn' => [0],
+                ])
+                ->assertOk();
+
+            $receipt = PenerimaanBarangModel::where(
+                'nomor_penerimaan',
+                'PB-COST-LAYER-'.$receiptData['suffix']
+            )->firstOrFail();
+
+            // Avoid the legacy SQLite PO status constraint; this test targets stock layers.
+            $purchaseOrder->forceFill(['status' => 'waiting_approval'])->save();
+
+            $this->actingAs($user)
+                ->putJson(route('penerimaan.post', $receipt->id), [
+                    'diskon_untuk' => 'pasien',
+                ])
+                ->assertOk();
+        }
+
+        $layers = StokBatchModel::where('obat_id', $medicine->id)
+            ->where('no_batch', 'BATCH-SAMA-001')
+            ->orderBy('harga_beli')
+            ->get();
+
+        $this->assertCount(2, $layers);
+        $this->assertSame([1000.0, 1200.0], $layers->map(fn ($layer) => (float) $layer->harga_beli)->all());
+        $this->assertSame([1.0, 1.0], $layers->map(fn ($layer) => (float) $layer->qty)->all());
+        $this->assertNotSame($layers[0]->id, $layers[1]->id);
     }
 
     /**

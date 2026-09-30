@@ -49,6 +49,8 @@ class StockService
             'expired_date' => $detail->expired_date,
             'qty' => $qtyStock,
             'harga_beli' => $basePrice,
+            'biaya_lain' => (float) ($detail->biaya_lain_stok ?? 0),
+            'separate_cost_layer' => true,
             'harga_jual' => $hargaJual,
             'alasan_harga' => $alasanHarga ?: 'Posting penerimaan '.$penerimaan->nomor_penerimaan.' dari PO '.($penerimaan->purchaseOrder->no_po ?? '-'),
             // Harga beli stok sudah ditetapkan neto atau bruto saat posting.
@@ -89,6 +91,7 @@ class StockService
             'expired_date' => $detail->expired_date,
             'qty' => $qtyStock,
             'harga_beli' => $basePrice,
+            'biaya_lain' => (float) ($detail->biaya_lain_stok ?? 0),
             'harga_jual' => null,
             'diskon' => $detail->diskon ?? 0,
             'ppn' => $detail->ppn ?? 0,
@@ -169,6 +172,9 @@ class StockService
     {
         $jenisMutasi = $data['jenis_mutasi'];
         $isInbound = $this->isInboundMutation($jenisMutasi);
+        $hasPurchaseCost = array_key_exists('harga_beli', $data)
+            && $data['harga_beli'] !== null
+            && $data['harga_beli'] !== '';
 
         $payload = [
             'branch_id' => BranchAccess::requireUserBranchId(),
@@ -178,6 +184,7 @@ class StockService
             'expired_date' => $data['expired_date'] ?? null,
             'qty' => $data['qty'],
             'harga_beli' => $data['harga_beli'] ?? 0,
+            'separate_cost_layer' => $isInbound && $hasPurchaseCost,
             'harga_jual' => $data['harga_jual'] ?? null,
             'alasan_harga' => $data['alasan_harga'] ?? null,
             'diskon' => array_key_exists('diskon', $data) ? $data['diskon'] : null,
@@ -459,6 +466,9 @@ class StockService
 
         if ($isInbound && empty($payload['preserve_batch_cost'])) {
             $batch->harga_beli = (float) ($payload['harga_beli'] ?: $batch->harga_beli);
+            if (array_key_exists('biaya_lain', $payload) && $payload['biaya_lain'] !== null && $payload['biaya_lain'] !== '') {
+                $batch->biaya_lain = max(0, round((float) $payload['biaya_lain'], 2));
+            }
             $batch->diskon = $diskon;
             $batch->ppn = $ppn;
             $hargaJual = $this->optionalPrice($payload['harga_jual'] ?? null);
@@ -603,6 +613,8 @@ class StockService
         bool $hasDiscountPayload = true,
         bool $hasTaxPayload = true
     ): StokBatchModel {
+        $separateCostLayer = $isInbound && ! empty($payload['separate_cost_layer']);
+
         if (! empty($payload['stok_batch_id'])) {
             $batch = StokBatchModel::where('obat_id', $obat->id)
                 ->where('branch_id', $branchId)
@@ -616,21 +628,26 @@ class StockService
                 ]);
             }
 
-            if ($isInbound && ! $hasDiscountPayload && ! $hasTaxPayload) {
+            if ($isInbound && ! $hasDiscountPayload && ! $hasTaxPayload && ! $separateCostLayer) {
                 return $batch;
             }
 
             $discountMatches = ! $hasDiscountPayload || $this->samePercent((float) ($batch->diskon ?? 0), $diskon);
             $taxMatches = ! $hasTaxPayload || $this->samePercent((float) ($batch->ppn ?? 0), $ppn);
+            $purchaseCostMatches = ! $separateCostLayer
+                || $this->samePrice((float) $batch->harga_beli, (float) ($payload['harga_beli'] ?? 0));
+            $otherCostMatches = ! $separateCostLayer
+                || $this->samePrice((float) ($batch->biaya_lain ?? 0), (float) ($payload['biaya_lain'] ?? 0));
 
-            if ($isInbound && (! $discountMatches || ! $taxMatches)) {
+            if ($isInbound && (! $discountMatches || ! $taxMatches || ! $purchaseCostMatches || ! $otherCostMatches)) {
                 return $this->resolveInboundBatchByIdentity(
                     $payload,
                     $obat,
                     $tanggalMutasi,
                     $branchId,
                     $hasDiscountPayload ? $diskon : (float) ($batch->diskon ?? 0),
-                    $hasTaxPayload ? $ppn : (float) ($batch->ppn ?? 0)
+                    $hasTaxPayload ? $ppn : (float) ($batch->ppn ?? 0),
+                    $separateCostLayer
                 );
             }
 
@@ -655,11 +672,26 @@ class StockService
             ]);
         }
 
-        return $this->resolveInboundBatchByIdentity($payload, $obat, $tanggalMutasi, $branchId, $diskon, $ppn);
+        return $this->resolveInboundBatchByIdentity(
+            $payload,
+            $obat,
+            $tanggalMutasi,
+            $branchId,
+            $diskon,
+            $ppn,
+            $separateCostLayer
+        );
     }
 
-    private function resolveInboundBatchByIdentity(array $payload, MasterObatModel $obat, Carbon $tanggalMutasi, int $branchId, float $diskon, float $ppn): StokBatchModel
-    {
+    private function resolveInboundBatchByIdentity(
+        array $payload,
+        MasterObatModel $obat,
+        Carbon $tanggalMutasi,
+        int $branchId,
+        float $diskon,
+        float $ppn,
+        bool $matchCost = false
+    ): StokBatchModel {
         $batchNumber = trim((string) ($payload['no_batch'] ?? ''));
 
         if ($batchNumber === '') {
@@ -669,6 +701,8 @@ class StockService
         }
 
         $expiredDate = $this->parseOptionalDate($payload['expired_date'] ?? null, 'expired_date');
+        $purchaseCost = max(0, round((float) ($payload['harga_beli'] ?? 0), 2));
+        $otherCost = max(0, round((float) ($payload['biaya_lain'] ?? 0), 2));
         $batch = StokBatchModel::where('obat_id', $obat->id)
             ->where('branch_id', $branchId)
             ->where('no_batch', $batchNumber)
@@ -679,6 +713,9 @@ class StockService
             )
             ->where('diskon', $diskon)
             ->where('ppn', $ppn)
+            ->when($matchCost, fn ($query) => $query
+                ->where('harga_beli', $purchaseCost)
+                ->where('biaya_lain', $otherCost))
             ->lockForUpdate()
             ->first();
 
@@ -692,7 +729,8 @@ class StockService
             'no_batch' => $batchNumber,
             'expired_date' => $expiredDate,
             'qty' => 0,
-            'harga_beli' => (float) ($payload['harga_beli'] ?? 0),
+            'harga_beli' => $purchaseCost,
+            'biaya_lain' => $otherCost,
             'harga_jual' => 0,
             'diskon' => $diskon,
             'ppn' => $ppn,
@@ -730,13 +768,16 @@ class StockService
         $diskon = $this->discountPercent($batch->diskon ?? 0);
         $ppn = $this->percent($batch->ppn ?? 0);
         $hargaBeli = max(0, (float) ($batch->harga_beli ?? 0));
+        $biayaLain = max(0, (float) ($batch->biaya_lain ?? 0));
         $hargaBeliDasar = max(0, $hargaBeli - ($hargaBeli * ($diskon / 100)));
         $hargaBeliIncludePpn = $hargaBeliDasar * (1 + ($ppn / 100));
+        $hargaJual = ($hargaBeliIncludePpn * $faktorJual) + $biayaLain;
 
         return [
-            'harga_jual' => round($hargaBeliIncludePpn * $faktorJual, 2),
+            'harga_jual' => round($hargaJual, 2),
             'harga_beli_dasar' => round($hargaBeliDasar, 2),
             'harga_beli_include_ppn' => round($hargaBeliIncludePpn, 2),
+            'biaya_lain' => round($biayaLain, 2),
             'faktor_jual' => round($faktorJual, 3),
             'ppn' => $ppn,
             'has_margin' => (bool) $margin,

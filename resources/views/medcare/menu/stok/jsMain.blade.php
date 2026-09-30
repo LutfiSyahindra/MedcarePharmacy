@@ -268,6 +268,7 @@
             $('#batchTotalCount').text(formatNumber(summary.total_batch));
             $('#batchTotalQty').text(formatNumber(summary.total_stok));
             $('#batchPurchaseValue').text(formatCurrency(summary.nilai_stok));
+            $('#batchOtherCostValue').text(formatCurrency(summary.total_biaya_lain));
             $('#batchSellingValue').text(formatCurrency(summary.nilai_stok_jual));
             $('#batchRiskCount').text(formatNumber(riskCount));
         }
@@ -294,6 +295,10 @@
             const sign = diff > 0 ? '+' : '';
 
             return `<span class="stock-money"><i class="mdi ${icon}"></i>${sign}${formatCurrency(diff)}</span>`;
+        }
+
+        function otherCostAddition(value) {
+            return `<small class="d-block text-muted">+${formatCurrency(value)}</small>`;
         }
 
         let StockTable = $('#tableStock').DataTable({
@@ -440,7 +445,10 @@
                 },
                 {
                     data: 'harga_jual',
-                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
+                    render: (data, type, row) => `
+                        <span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>
+                        ${otherCostAddition(row.biaya_lain)}
+                    `
                 },
                 {
                     data: 'nilai_stok',
@@ -448,7 +456,10 @@
                 },
                 {
                     data: 'nilai_stok_jual',
-                    render: data => `<span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>`
+                    render: (data, type, row) => `
+                        <span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>
+                        ${otherCostAddition(row.nilai_biaya_lain)}
+                    `
                 },
                 {
                     data: null,
@@ -665,10 +676,11 @@
             const faktorMargin = Number(row.margin_faktor_jual) || 1;
             const ppnMargin = Number(row.margin_ppn) || 0;
             const hargaDasarMargin = Number(row.margin_harga_beli_include_ppn) || 0;
+            const biayaLain = Number(row.biaya_lain) || 0;
             const marginHasMargin = Boolean(row.margin_has_margin);
             const marginReference = row.margin_reference || 'prioritas margin belum tersedia';
             const marginInfoClass = marginHasMargin ? 'text-success' : 'text-warning';
-            const marginCalcText = `dasar ${formatCurrency(hargaDasarMargin)} sudah termasuk PPN ${ppnMargin.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
+            const marginCalcText = `dasar HPP + PPN ${formatCurrency(hargaDasarMargin)} (PPN item ${ppnMargin.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%), lalu biaya jual ${formatCurrency(biayaLain)}`;
             const marginInfoText = marginHasMargin
                 ? `Sesuai margin ${marginReference} (${marginCalcText}, faktor ${faktorMargin.toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}): ${formatCurrency(hargaMargin)}`
                 : `Belum ada margin aktif sesuai prioritas, ${marginCalcText}, faktor 1.000: ${formatCurrency(hargaMargin)}`;
