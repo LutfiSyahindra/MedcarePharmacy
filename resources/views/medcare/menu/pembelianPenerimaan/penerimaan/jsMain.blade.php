@@ -1786,7 +1786,7 @@
                             <span><i class="mdi mdi-format-list-bulleted-square"></i><span><strong>Rincian pembentukan harga</strong><small>Audit HPP, diskon, margin, dan harga jual per item</small></span></span>
                             <span class="receive-posting-details-meta">${details.length} baris <i class="mdi mdi-chevron-down"></i></span>
                         </summary>
-                        <div class="receive-posting-table-shell">
+                        <div class="receive-posting-table-shell" role="region" aria-label="Rincian harga jual, geser ke kiri atau kanan untuk melihat seluruh kolom" tabindex="0">
                             <table class="receive-posting-table">
                                 <thead>
                                     <tr>

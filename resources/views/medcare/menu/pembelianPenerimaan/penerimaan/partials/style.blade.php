@@ -3177,6 +3177,14 @@
     }
 
     /* Premium posting confirmation */
+    .swal2-container.receive-posting-container {
+        box-sizing: border-box;
+        max-width: 100vw;
+        overflow-x: auto !important;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .swal2-popup.receive-posting-popup {
         --posting-primary: #0f766e;
         --posting-primary-strong: #0b5f59;
@@ -3186,8 +3194,11 @@
         --posting-border: #dfe8f1;
         display: flex !important;
         flex-direction: column;
-        width: min(76rem, calc(100vw - 2rem)) !important;
+        width: calc(100vw - 2rem) !important;
+        min-width: 0;
+        max-width: 76rem !important;
         max-height: calc(100vh - 1.5rem);
+        max-height: calc(100dvh - 1.5rem);
         padding: 0 !important;
         border: 1px solid rgba(15, 118, 110, .14);
         border-radius: 20px;
@@ -3229,14 +3240,19 @@
 
     .receive-posting-html {
         flex: 1 1 auto;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         min-height: 0;
         max-height: calc(100vh - 166px);
         margin: 0 !important;
         padding: 0 1.4rem !important;
         color: var(--posting-text) !important;
-        overflow-x: hidden;
+        overflow-x: auto;
         overflow-y: auto;
         overscroll-behavior: contain;
+        touch-action: pan-x pan-y;
         -webkit-overflow-scrolling: touch;
         text-align: left !important;
     }
@@ -3258,7 +3274,18 @@
     .receive-posting-shell {
         display: grid;
         gap: 1rem;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         padding: 1.15rem 0 1.25rem;
+    }
+
+    .receive-posting-shell > *,
+    .receive-posting-preview,
+    .receive-selling-preview,
+    .receive-posting-details {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .receive-posting-intro {
@@ -3949,9 +3976,17 @@
     }
 
     .receive-posting-table-shell {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         max-height: 360px;
-        overflow: auto;
+        overflow-x: auto;
+        overflow-y: auto;
         border-top: 1px solid #e4ebf2;
+        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-gutter: stable;
     }
 
     .receive-posting-table {
