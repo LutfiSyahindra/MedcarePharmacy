@@ -69,6 +69,10 @@
                 return '-';
             }
 
+            if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+                return value;
+            }
+
             let date = moment(value);
             return date.isValid() ? date.format('DD-MM-YYYY') : (value || '-');
         }
@@ -76,6 +80,10 @@
         function formatDateInput(value) {
             if (!value) {
                 return '';
+            }
+
+            if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+                return value;
             }
 
             let date = moment(value);
@@ -213,7 +221,7 @@
                 return batch.text;
             }
 
-            return `${batch.no_batch || '-'} | ED ${batch.expired_date || '-'} | Diskon ${formatDecimal(batch.diskon, 0, 2)}% | PPN ${formatDecimal(batch.ppn, 0, 2)}% | Stok ${formatDecimal(batch.qty, 0, 2)}`;
+            return `${batch.no_batch || '-'} | ED ${formatDateDisplay(batch.expired_date)} | Diskon ${formatDecimal(batch.diskon, 0, 2)}% | PPN ${formatDecimal(batch.ppn, 0, 2)}% | Stok ${formatDecimal(batch.qty, 0, 2)}`;
         }
 
         function normalizedPercent(value) {
@@ -287,7 +295,8 @@
 
             if (picker) {
                 if (value) {
-                    picker.setDate(value, false, 'Y-m-d');
+                    let inputFormat = /^\d{2}-\d{2}-\d{4}$/.test(value) ? 'd-m-Y' : 'Y-m-d';
+                    picker.setDate(value, false, inputFormat);
                 } else {
                     picker.clear();
                 }
@@ -323,7 +332,7 @@
                 hint
                     .removeClass('is-manual is-warning')
                     .addClass('is-existing')
-                    .text(`Batch existing diskon ${formatDecimal(meta.diskon, 0, 2)}%, PPN ${formatDecimal(meta.ppn, 0, 2)}%, stok ${formatDecimal(meta.qty, 0, 2)}${meta.expired ? ', ED ' + meta.expired : ''}.`);
+                    .text(`Batch existing diskon ${formatDecimal(meta.diskon, 0, 2)}%, PPN ${formatDecimal(meta.ppn, 0, 2)}%, stok ${formatDecimal(meta.qty, 0, 2)}${meta.expired ? ', ED ' + formatDateDisplay(meta.expired) : ''}.`);
                 row.data('batch-mode', 'existing');
                 return;
             }
@@ -720,7 +729,7 @@
             let diskon = Number(item.diskon_efektif ?? effectiveTieredDiscount(diskon1, diskon2, diskon3));
             let ppn = existing ? Number(existing.ppn || 0) : Number(item.ppn ?? 11);
             let batch = existing ? (existing.no_batch || '') : '';
-            let expired = existing && existing.expired_date ? moment(existing.expired_date).format('YYYY-MM-DD') : '';
+            let expired = existing && existing.expired_date ? formatDateInput(existing.expired_date) : '';
             let selectedBatchId = existing ? (existing.stok_batch_id || '') : '';
             let batchOptions = Array.isArray(item.batch_options) ? [...item.batch_options] : [];
             let conversion = Number(item.konversi || existing?.konversi_satuan || 1) || 1;
@@ -786,7 +795,7 @@
                     </td>
                     <td data-mobile-label="Expired Date">
                         <input type="text" class="form-control form-control-sm receive-expired-date"
-                            name="expired_date[]" value="${escapeHtml(expired)}" placeholder="YYYY-MM-DD">
+                            name="expired_date[]" value="${escapeHtml(expired)}" placeholder="DD-MM-YYYY">
                         <small class="receive-field-note">Wajib untuk batch baru.</small>
                     </td>
                     <td data-mobile-label="Harga Beli">
@@ -846,7 +855,7 @@
             $('#receiveDetailEmpty').addClass('d-none');
 
             flatpickr(".receive-expired-date", {
-                dateFormat: "Y-m-d",
+                dateFormat: "d-m-Y",
                 allowInput: true
             });
 

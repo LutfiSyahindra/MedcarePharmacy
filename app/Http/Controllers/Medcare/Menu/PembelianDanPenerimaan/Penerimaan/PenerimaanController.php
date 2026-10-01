@@ -1112,11 +1112,12 @@ class PenerimaanController extends Controller
     private function stockBatchOption(StokBatchModel $batch): array
     {
         $expiredDate = optional($batch->expired_date)->format('Y-m-d');
+        $expiredDateLabel = optional($batch->expired_date)->format('d-m-Y');
 
         return [
             'id' => $batch->id,
             'text' => $batch->no_batch
-                .' | ED '.($expiredDate ?: '-')
+                .' | ED '.($expiredDateLabel ?: '-')
                 .' | Diskon '.number_format((float) ($batch->diskon ?? 0), 2, ',', '.').'%'
                 .' | PPN '.number_format((float) ($batch->ppn ?? 0), 2, ',', '.').'%'
                 .' | HPP Rp '.number_format((float) $batch->harga_beli, 2, ',', '.')
