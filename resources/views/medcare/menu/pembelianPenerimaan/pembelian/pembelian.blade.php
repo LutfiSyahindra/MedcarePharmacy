@@ -46,32 +46,14 @@
                 </div>
             </div>
 
-            <div class="purchase-flow" aria-label="Alur purchase order">
-                <div class="purchase-flow-item">
-                    <span class="purchase-flow-icon"><i class="mdi mdi-file-document-edit-outline"></i></span>
-                    <div>
-                        <strong>1. Susun PO</strong>
-                        <small>Pilih distributor dan detail obat.</small>
-                    </div>
-                    <i class="mdi mdi-chevron-right purchase-flow-arrow"></i>
+            <aside class="purchase-estimate-panel" aria-label="Total nilai estimasi purchase order">
+                <span class="purchase-estimate-icon"><i class="mdi mdi-cash-multiple"></i></span>
+                <div class="purchase-estimate-copy">
+                    <span>Total Nilai Estimasi PO</span>
+                    <strong id="purchaseTotalValue">Rp 0</strong>
+                    <small>Akumulasi nilai seluruh PO yang tersimpan.</small>
                 </div>
-                <div class="purchase-flow-item">
-                    <span class="purchase-flow-icon"><i class="mdi mdi-shield-check-outline"></i></span>
-                    <div>
-                        <strong>2. Persetujuan</strong>
-                        <small>Pantau status approval setiap PO.</small>
-                    </div>
-                    <i class="mdi mdi-chevron-right purchase-flow-arrow"></i>
-                </div>
-                <div class="purchase-flow-item">
-                    <span class="purchase-flow-icon"><i class="mdi mdi-package-variant-closed-check"></i></span>
-                    <div>
-                        <strong>3. Penerimaan</strong>
-                        <small>Siapkan transaksi untuk proses berikutnya.</small>
-                    </div>
-                    <i class="mdi mdi-check-circle-outline purchase-flow-arrow"></i>
-                </div>
-            </div>
+            </aside>
         </section>
 
         <div class="purchase-stats-grid" aria-label="Ringkasan purchase order">
@@ -81,6 +63,10 @@
                     <strong id="purchaseTotalCount">0</strong>
                     <span>Total Purchase Order</span>
                     <small>Seluruh PO yang tersimpan.</small>
+                    <div class="purchase-stat-metrics" aria-label="Ringkasan item dan kuantitas">
+                        <span><b id="purchaseTotalItem">0</b> item</span>
+                        <span><b id="purchaseTotalQty">0</b> qty</span>
+                    </div>
                 </div>
             </article>
             <article class="purchase-stat is-draft">
@@ -99,12 +85,12 @@
                     <small>PO siap ditindaklanjuti.</small>
                 </div>
             </article>
-            <article class="purchase-stat is-value">
-                <span class="purchase-stat-icon"><i class="mdi mdi-cash-multiple"></i></span>
+            <article class="purchase-stat is-completed">
+                <span class="purchase-stat-icon"><i class="mdi mdi-package-variant-closed-check"></i></span>
                 <div class="purchase-stat-copy">
-                    <strong id="purchaseTotalValue">Rp 0</strong>
-                    <span>Total Nilai Estimasi</span>
-                    <small>Akumulasi seluruh PO.</small>
+                    <strong id="purchaseCompletedCount">0</strong>
+                    <span>Selesai</span>
+                    <small>PO telah diterima lengkap.</small>
                 </div>
             </article>
         </div>
@@ -134,6 +120,12 @@
                         title="Muat ulang data" aria-label="Muat ulang data">
                         <i class="mdi mdi-refresh"></i>
                     </button>
+                    <button type="button"
+                        class="btn btn-outline-secondary purchase-icon-btn purchase-mobile-filter-toggle"
+                        id="purchaseMobileFilterToggle" aria-controls="purchaseFilterBar" aria-expanded="false"
+                        title="Buka filter" aria-label="Buka filter">
+                        <i class="mdi mdi-tune-variant"></i>
+                    </button>
                     <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1"
                         data-bs-toggle="modal" data-bs-target="#pembelianModal">
                         <i class="mdi mdi-plus-circle-outline"></i>
@@ -142,7 +134,7 @@
                 </div>
             </div>
 
-            <div class="purchase-filter-bar">
+            <div class="purchase-filter-bar" id="purchaseFilterBar">
                 <div class="purchase-filter-group" aria-label="Filter status purchase order">
                     <span class="purchase-filter-label">
                         <i class="mdi mdi-filter-variant"></i>
@@ -165,6 +157,10 @@
                     <button type="button" class="purchase-filter-chip" data-status="approved" aria-pressed="false">
                         Disetujui
                         <span class="purchase-filter-count" id="purchaseApprovedFilterCount">0</span>
+                    </button>
+                    <button type="button" class="purchase-filter-chip" data-status="selesai" aria-pressed="false">
+                        Selesai
+                        <span class="purchase-filter-count" id="purchaseCompletedFilterCount">0</span>
                     </button>
                     <button type="button" class="purchase-filter-chip" data-status="rejected" aria-pressed="false">
                         Ditolak
@@ -220,11 +216,12 @@
                             <th>Tanggal PO</th>
                             <th>Branch</th>
                             <th>Distributor</th>
+                            <th>Item / Qty</th>
                             <th>Total Estimasi</th>
                             <th>Status</th>
                             <th>Catatan</th>
                             <th>User</th>
-                            <th>Actions</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody></tbody>

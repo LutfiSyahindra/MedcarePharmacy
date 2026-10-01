@@ -88,9 +88,16 @@ class PembelianController extends Controller
             'waiting_approval' => $waitingApprovalCount,
             'pending' => $draftCount + $waitingApprovalCount,
             'approved' => $summary->where('status', 'approved')->count(),
+            'selesai' => $summary->where('status', 'selesai')->count(),
             'rejected' => $summary->where('status', 'rejected')->count(),
             'total_estimasi' => $summary->sum(function ($row) {
                 return (float) ($row['total_estimasi'] ?? 0);
+            }),
+            'total_item' => $summary->sum(function ($row) {
+                return (int) ($row['item_count'] ?? 0);
+            }),
+            'total_qty' => $summary->sum(function ($row) {
+                return (float) ($row['total_qty'] ?? 0);
             }),
         ];
         $approvalUser = Auth::user();
@@ -158,11 +165,25 @@ class PembelianController extends Controller
 
     public function getObat()
     {
+        $branchId = BranchAccess::userBranchId();
         $obat = MasterObatModel::query()
             ->select(['id', 'kode_obat', 'nama_obat', 'harga_beli', 'satuan_id'])
             ->with('satuan:id,nama')
+            ->withSum([
+                'stokBatches as stok_saat_ini' => function ($query) use ($branchId) {
+                    $query->where('qty', '>', 0)
+                        ->when(
+                            $branchId,
+                            fn ($stockQuery) => $stockQuery->where('branch_id', $branchId),
+                            fn ($stockQuery) => $stockQuery->whereRaw('1 = 0')
+                        );
+                },
+            ], 'qty')
             ->orderBy('nama_obat')
-            ->get();
+            ->get()
+            ->each(function (MasterObatModel $medicine) {
+                $medicine->setAttribute('stok_saat_ini', (float) ($medicine->stok_saat_ini ?? 0));
+            });
 
         return response()->json($obat);
     }

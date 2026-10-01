@@ -126,52 +126,56 @@
                     </div>
 
                     <div class="row g-3 align-items-end">
-                        <div class="col-lg-4 col-md-6">
+                        <div class="col-12 col-lg-4 col-md-6">
                             <label class="form-label">Obat</label>
                             <select class="js-example-basic-single form-select${selectClass}" data-width="100%" name="obat_id[]" required>
                                 ${loadingOption}
                             </select>
+                            <div class="purchase-current-stock is-empty" aria-live="polite">
+                                <i class="mdi mdi-archive-outline"></i>
+                                <span>Pilih obat untuk melihat stok saat ini</span>
+                            </div>
                         </div>
 
-                        <div class="col-lg-3 col-md-6 purchase-unit-field">
+                        <div class="col-8 col-lg-3 col-md-6 purchase-unit-field">
                             <label class="form-label">Satuan</label>
                             <select class="form-select satuan-select" name="satuan_id[]" disabled required>
                                 <option value="">-- Pilih Satuan --</option>
                             </select>
                         </div>
 
-                        <div class="col-lg-1 col-md-4 purchase-qty-field">
+                        <div class="col-4 col-lg-1 col-md-4 purchase-qty-field">
                             <label class="form-label">Qty</label>
                             <input type="number" class="form-control" name="qty[]" min="1" value="${options.qty ?? 1}" required>
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-2 col-md-4">
                             <label class="form-label">Harga / Satuan</label>
                             <input type="number" class="form-control harga_estimasi_satuan" name="harga_estimasi_satuan[]" min="0" step="any" value="${options.hargaSatuan ?? options.harga ?? 0}">
                             <input type="hidden" class="harga_estimasi" name="harga_estimasi[]" value="${options.harga ?? 0}">
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-2 col-md-4">
                             <label class="form-label">Subtotal + PPN</label>
                             <input type="number" class="form-control subtotal" name="subtotal[]" value="${options.subtotal ?? ''}" readonly>
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-3 col-md-6">
                             <label class="form-label">Diskon 1 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_1[]" min="0" max="100" step="0.01" value="${options.diskon1 ?? 0}">
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-3 col-md-6">
                             <label class="form-label">Diskon 2 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_2[]" min="0" max="100" step="0.01" value="${options.diskon2 ?? 0}">
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-3 col-md-6">
                             <label class="form-label">Diskon 3 (%)</label>
                             <input type="number" class="form-control purchase-discount" name="diskon_3[]" min="0" max="100" step="0.01" value="${options.diskon3 ?? 0}">
                         </div>
 
-                        <div class="col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-3 col-md-6">
                             <label class="form-label">PPN (%)</label>
                             <input type="number" class="form-control purchase-tax" name="ppn[]" min="0" max="100" step="0.01" value="${options.ppn ?? 11}" required>
                         </div>
@@ -184,6 +188,36 @@
             $('#detail-wrapper .detail-item').each(function(index) {
                 $(this).find('.purchase-detail-number').text(index + 1);
             });
+        }
+
+        function formatStockQuantity(value) {
+            return new Intl.NumberFormat('id-ID', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            }).format(Number(value) || 0);
+        }
+
+        function updateCurrentStock(row, medicine) {
+            const stockElement = row.find('.purchase-current-stock');
+
+            if (!medicine) {
+                stockElement
+                    .addClass('is-empty')
+                    .removeClass('is-available is-empty-stock')
+                    .html('<i class="mdi mdi-archive-outline"></i><span>Pilih obat untuk melihat stok saat ini</span>');
+                return;
+            }
+
+            const stock = Number(medicine.stok_saat_ini) || 0;
+            const unitName = medicine.satuan?.nama || 'satuan dasar';
+
+            stockElement
+                .removeClass('is-empty is-available is-empty-stock')
+                .addClass(stock > 0 ? 'is-available' : 'is-empty-stock')
+                .html(
+                    `<i class="mdi ${stock > 0 ? 'mdi-package-variant-closed-check' : 'mdi-package-variant-closed-remove'}"></i>` +
+                    `<span>Stok saat ini: <strong>${formatStockQuantity(stock)} ${escapeHtml(unitName)}</strong></span>`
+                );
         }
 
         function updateUnitLoadingState() {
@@ -311,7 +345,7 @@
             if (filteredItems.length === 0) {
                 $('#medicinePickerList').html(`
                     <tr>
-                        <td colspan="6" class="purchase-picker-state">
+                        <td colspan="7" class="purchase-picker-state">
                             <i class="mdi mdi-magnify-close"></i>
                             Tidak ada obat yang sesuai dengan pencarian.
                         </td>
@@ -343,6 +377,7 @@
                             <strong class="purchase-picker-name">${escapeHtml(medicineName)}</strong>
                         </td>
                         <td data-label="Satuan Dasar">${escapeHtml(unitName)}</td>
+                        <td class="text-end purchase-picker-stock" data-label="Stok Saat Ini">${formatStockQuantity(item.stok_saat_ini)} ${escapeHtml(unitName)}</td>
                         <td class="text-end purchase-picker-price" data-label="Harga Beli">${formatRupiah(item.harga_beli || 0)}</td>
                         <td data-label="Status">
                             ${isAlreadyAdded
@@ -371,7 +406,7 @@
 
             $('#medicinePickerList').html(`
                 <tr>
-                    <td colspan="6" class="purchase-picker-state">
+                    <td colspan="7" class="purchase-picker-state">
                         <i class="mdi mdi-loading mdi-spin"></i> Memuat daftar obat...
                     </td>
                 </tr>
@@ -386,7 +421,7 @@
                     $('#medicinePickerResultCount').text('Daftar obat gagal dimuat');
                     $('#medicinePickerList').html(`
                         <tr>
-                            <td colspan="6" class="purchase-picker-state is-error">
+                            <td colspan="7" class="purchase-picker-state is-error">
                                 <i class="mdi mdi-alert-circle-outline"></i>
                                 Gagal memuat daftar obat. Tutup lalu buka kembali untuk mencoba lagi.
                             </td>
@@ -973,6 +1008,7 @@
             const requestId = ++unitRequestSequence;
 
             row.data('unit-request-id', requestId);
+            updateCurrentStock(row, medicine);
 
             if (!$('#medicinePicker').hasClass('d-none')) {
                 renderMedicinePicker();
@@ -1079,6 +1115,7 @@
             let waiting = Number(summary.waiting_approval) || 0;
             let pending = Number(summary.pending ?? (draft + waiting)) || 0;
             let approved = Number(summary.approved) || 0;
+            let completed = Number(summary.selesai) || 0;
             let rejected = Number(summary.rejected) || 0;
 
             $('#purchaseTotalCount, #purchaseAllFilterCount').text(total.toLocaleString('id-ID'));
@@ -1086,8 +1123,11 @@
             $('#purchaseDraftFilterCount').text(draft.toLocaleString('id-ID'));
             $('#purchaseWaitingFilterCount').text(waiting.toLocaleString('id-ID'));
             $('#purchaseApprovedCount, #purchaseApprovedFilterCount').text(approved.toLocaleString('id-ID'));
+            $('#purchaseCompletedCount, #purchaseCompletedFilterCount').text(completed.toLocaleString('id-ID'));
             $('#purchaseRejectedFilterCount').text(rejected.toLocaleString('id-ID'));
             $('#purchaseTotalValue').text(formatRupiah(summary.total_estimasi));
+            $('#purchaseTotalItem').text((Number(summary.total_item) || 0).toLocaleString('id-ID'));
+            $('#purchaseTotalQty').text(formatStockQuantity(summary.total_qty));
         }
 
         // --- Harga per satuan tetap; konversi hanya mengubah subtotal dan nilai harga satuan beli
@@ -1111,7 +1151,7 @@
         let PembelianTable = $('#tablePembelian').DataTable({
             processing: true,
             serverSide: true,
-            responsive: true,
+            responsive: window.matchMedia('(min-width: 768px)').matches,
             autoWidth: false,
             pageLength: 10,
             order: [
@@ -1227,6 +1267,22 @@
                     }
                 },
                 {
+                    data: 'item_count',
+                    name: 'item_count',
+                    render: function(data, type, row) {
+                        if (type !== 'display') {
+                            return Number(data) || 0;
+                        }
+
+                        return `
+                            <span class="purchase-item-qty">
+                                <strong>${(Number(data) || 0).toLocaleString('id-ID')} item</strong>
+                                <small>${formatStockQuantity(row.total_qty)} qty</small>
+                            </span>
+                        `;
+                    }
+                },
+                {
                     data: 'total_estimasi',
                     name: 'total_estimasi',
                     render: function(data) {
@@ -1306,7 +1362,7 @@
                 }
             ],
             columnDefs: [{
-                targets: [0, 10],
+                targets: [0, 11],
                 className: 'text-center'
             }],
             drawCallback: function() {
@@ -1318,6 +1374,7 @@
                     'Tanggal PO',
                     'Branch',
                     'Distributor',
+                    'Item / Qty',
                     'Total Estimasi',
                     'Status',
                     'Catatan',
@@ -1326,9 +1383,23 @@
                 ];
 
                 table.find('tbody tr').each(function() {
-                    $(this).children('td').not('[colspan]').each(function(index) {
+                    let row = $(this);
+
+                    row.children('td').not('[colspan]').each(function(index) {
                         $(this).attr('data-label', mobileLabels[index] || 'Informasi');
                     });
+
+                    let actionGroup = row.children('td').eq(11).find('.purchase-action-group');
+                    if (actionGroup.length && !actionGroup.find('.purchase-mobile-more').length) {
+                        actionGroup.prepend(`
+                            <button type="button" class="btn btn-sm purchase-mobile-more"
+                                aria-expanded="false" aria-label="Tampilkan informasi tambahan"
+                                title="Tampilkan informasi tambahan">
+                                <i class="mdi mdi-information-outline"></i>
+                                <span>Info</span>
+                            </button>
+                        `);
+                    }
                 });
 
                 table.find('.purchase-action-group .btn-approve-pembelian')
@@ -1393,7 +1464,7 @@
         $('.purchase-filter-chip').on('click', function() {
             $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
             $(this).addClass('is-active').attr('aria-pressed', 'true');
-            PembelianTable.column(7).search($(this).data('status') || '').draw();
+            PembelianTable.column(8).search($(this).data('status') || '').draw();
         });
 
         function formatDateParameter(date) {
@@ -1478,6 +1549,39 @@
         $('#refreshPurchaseTable').on('click', function() {
             $(this).addClass('is-loading').prop('disabled', true);
             PembelianTable.ajax.reload(null, false);
+        });
+
+        $('#purchaseMobileFilterToggle').on('click', function() {
+            let button = $(this);
+            let filterBar = $('#purchaseFilterBar');
+            let isOpen = !filterBar.hasClass('is-mobile-open');
+
+            filterBar.toggleClass('is-mobile-open', isOpen);
+            button
+                .toggleClass('is-active', isOpen)
+                .attr('aria-expanded', isOpen ? 'true' : 'false')
+                .attr('title', isOpen ? 'Tutup filter' : 'Buka filter')
+                .attr('aria-label', isOpen ? 'Tutup filter' : 'Buka filter')
+                .find('i')
+                .toggleClass('mdi-tune-variant', !isOpen)
+                .toggleClass('mdi-chevron-up', isOpen);
+        });
+
+        $('#tablePembelian').on('click', '.purchase-mobile-more', function() {
+            let button = $(this);
+            let row = button.closest('tr');
+            let isExpanded = !row.hasClass('is-mobile-expanded');
+
+            row.toggleClass('is-mobile-expanded', isExpanded);
+            button
+                .attr('aria-expanded', isExpanded ? 'true' : 'false')
+                .attr('aria-label', isExpanded ? 'Sembunyikan informasi tambahan' : 'Tampilkan informasi tambahan')
+                .attr('title', isExpanded ? 'Sembunyikan informasi tambahan' : 'Tampilkan informasi tambahan')
+                .find('span')
+                .text(isExpanded ? 'Ringkas' : 'Info');
+            button.find('i')
+                .toggleClass('mdi-information-outline', !isExpanded)
+                .toggleClass('mdi-chevron-up', isExpanded);
         });
 
         $('#tablePembelian').on('xhr.dt', function() {

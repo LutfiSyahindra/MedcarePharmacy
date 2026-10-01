@@ -49,7 +49,13 @@ class PembelianService
 
     public function getPembelianTable(?array $branchIds = null)
     {
-        $Pembelian = $this->PembelianRepository->getPembelian($branchIds)->load(['distributor', 'createdBy', 'approvedBy', 'branch']);
+        $Pembelian = $this->PembelianRepository->getPembelian($branchIds)->load([
+            'distributor',
+            'createdBy',
+            'approvedBy',
+            'branch',
+        ]);
+        $Pembelian->loadCount('details')->loadSum('details', 'qty');
 
         $dataPembelian = [];
         foreach ($Pembelian as $r) {
@@ -60,6 +66,8 @@ class PembelianService
                 'branch_id' => $r->branch->name ?? '-',
                 'distributor_id' => $r->distributor->nama ?? '-',
                 'tanggal_po' => $r->tanggal_po ?? '-',
+                'item_count' => (int) ($r->details_count ?? 0),
+                'total_qty' => (float) ($r->details_sum_qty ?? 0),
                 'total_estimasi' => $r->total_estimasi ?? '-',
                 'status' => $r->status ?? '-',
                 'catatan' => $r->catatan ?? '-',

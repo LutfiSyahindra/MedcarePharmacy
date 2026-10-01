@@ -15,6 +15,8 @@ class PurchaseOrderBulkMedicinePickerTest extends TestCase
             ->assertSee('id="selectAllVisibleMedicines"', false)
             ->assertSee('id="medicinePickerList"', false)
             ->assertSee('id="addSelectedMedicines"', false)
+            ->assertSee('Stok Saat Ini')
+            ->assertSee('Pilih obat untuk melihat stok saat ini')
             ->assertSee('Masukkan ke Rincian');
     }
 
@@ -31,6 +33,8 @@ class PurchaseOrderBulkMedicinePickerTest extends TestCase
         $this->assertStringContainsString('append(detailItemTemplate())', $script);
         $this->assertStringContainsString('initializeMedicineSelect($select)', $script);
         $this->assertStringContainsString('preloadMedicineUnits(selectedItems.map', $script);
+        $this->assertStringContainsString('updateCurrentStock(row, medicine);', $script);
+        $this->assertStringContainsString('medicine.stok_saat_ini', $script);
         $this->assertStringNotContainsString('medicineCatalog.forEach(function(item)', $script);
     }
 

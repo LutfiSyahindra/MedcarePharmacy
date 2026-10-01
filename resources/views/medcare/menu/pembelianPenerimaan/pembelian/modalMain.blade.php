@@ -132,7 +132,7 @@
                                 <div class="purchase-medicine-picker-head">
                                     <div>
                                         <strong><i class="mdi mdi-format-list-checks"></i> Pilih Item Obat</strong>
-                                        <small>Cari lalu centang beberapa obat untuk dimasukkan sekaligus ke rincian PO.</small>
+                                        <small>Cari lalu centang beberapa obat untuk dimasukkan sekaligus ke rincian PO. Stok mengikuti branch PO.</small>
                                     </div>
                                     <button type="button" id="closeMedicinePicker"
                                         class="btn btn-sm btn-light purchase-picker-close" aria-label="Tutup daftar obat"
@@ -169,13 +169,14 @@
                                                 <th>Kode</th>
                                                 <th>Nama Obat</th>
                                                 <th>Satuan Dasar</th>
+                                                <th class="text-end">Stok Saat Ini</th>
                                                 <th class="text-end">Harga Beli</th>
                                                 <th>Status</th>
                                             </tr>
                                         </thead>
                                         <tbody id="medicinePickerList">
                                             <tr>
-                                                <td colspan="6" class="purchase-picker-state">
+                                                <td colspan="7" class="purchase-picker-state">
                                                     <i class="mdi mdi-loading mdi-spin"></i> Memuat daftar obat...
                                                 </td>
                                             </tr>
@@ -219,14 +220,18 @@
                                     </div>
 
                                     <div class="row g-3 align-items-end">
-                                        <div class="col-lg-4 col-md-6">
+                                        <div class="col-12 col-lg-4 col-md-6">
                                             <label class="form-label">Obat</label>
                                             <select class="js-example-basic-single form-select obat-select"
                                                 data-width="100%" name="obat_id[]" required>
                                             </select>
+                                            <div class="purchase-current-stock is-empty" aria-live="polite">
+                                                <i class="mdi mdi-archive-outline"></i>
+                                                <span>Pilih obat untuk melihat stok saat ini</span>
+                                            </div>
                                         </div>
 
-                                        <div class="col-lg-3 col-md-6 purchase-unit-field">
+                                        <div class="col-8 col-lg-3 col-md-6 purchase-unit-field">
                                             <label class="form-label">Satuan</label>
                                             <select class="form-select satuan-select" name="satuan_id[]" disabled
                                                 required>
@@ -234,13 +239,13 @@
                                             </select>
                                         </div>
 
-                                        <div class="col-lg-1 col-md-4 purchase-qty-field">
+                                        <div class="col-4 col-lg-1 col-md-4 purchase-qty-field">
                                             <label class="form-label">Qty</label>
                                             <input type="number" class="form-control qty" name="qty[]" min="1"
                                                 value="1" required>
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-2 col-md-4">
                                             <label class="form-label">Harga / Satuan</label>
                                             <input type="number" class="form-control harga_estimasi_satuan"
                                                 name="harga_estimasi_satuan[]" min="0" step="any" value="0">
@@ -248,31 +253,31 @@
                                                 value="0">
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-2 col-md-4">
                                             <label class="form-label">Subtotal + PPN</label>
                                             <input type="number" class="form-control subtotal" name="subtotal[]"
                                                 readonly>
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-3 col-md-6">
                                             <label class="form-label">Diskon 1 (%)</label>
                                             <input type="number" class="form-control purchase-discount"
                                                 name="diskon_1[]" min="0" max="100" step="0.01" value="0">
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-3 col-md-6">
                                             <label class="form-label">Diskon 2 (%)</label>
                                             <input type="number" class="form-control purchase-discount"
                                                 name="diskon_2[]" min="0" max="100" step="0.01" value="0">
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-3 col-md-6">
                                             <label class="form-label">Diskon 3 (%)</label>
                                             <input type="number" class="form-control purchase-discount"
                                                 name="diskon_3[]" min="0" max="100" step="0.01" value="0">
                                         </div>
 
-                                        <div class="col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-3 col-md-6">
                                             <label class="form-label">PPN (%)</label>
                                             <input type="number" class="form-control purchase-tax"
                                                 name="ppn[]" min="0" max="100" step="0.01" value="11" required>
