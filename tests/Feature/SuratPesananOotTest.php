@@ -63,7 +63,7 @@ class SuratPesananOotTest extends TestCase
         $this->assertStringContainsString('Formulir 4', $html);
         $this->assertStringContainsString('SURAT PESANAN OBAT-OBAT TERTENTU', $html);
         $this->assertStringContainsString('Dextromethorphan 15 mg', $html);
-        $this->assertStringContainsString('Box 10 strip', $html);
+        $this->assertStringNotContainsString('Box 10 strip', $html);
         $this->assertStringContainsString('20 Tablet (dua puluh tablet)', $html);
         $this->assertStringContainsString('Apoteker Penanggung Jawab', $html);
         $this->assertSame(2, substr_count($html, 'class="medicine-table"'));

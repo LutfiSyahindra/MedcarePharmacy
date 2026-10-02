@@ -96,11 +96,10 @@
             print-color-adjust: exact;
         }
         .medicine-table .number-column { width: 7%; text-align: center; }
-        .medicine-table .name-column { width: 20%; }
-        .medicine-table .preparation-column { width: 13%; }
-        .medicine-table .strength-column { width: 22%; }
-        .medicine-table .packaging-column { width: 14%; }
-        .medicine-table .quantity-column { width: 24%; }
+        .medicine-table .name-column { width: 25%; }
+        .medicine-table .preparation-column { width: 16%; }
+        .medicine-table .strength-column { width: 27%; }
+        .medicine-table .quantity-column { width: 25%; }
         .medicine-table tbody .number-column,
         .medicine-table tbody .quantity-column { vertical-align: middle; }
         .medicine-table tbody .quantity-column { text-align: center; }
@@ -247,7 +246,7 @@
                         <strong>Rincian pemesanan dan harga</strong>
                     </div>
                 @else
-                    <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf, isi kemasan)</p>
+                    <p>(Sebutkan nama obat, bentuk sediaan, kekuatan/potensi, jumlah dalam bentuk angka dan huruf)</p>
                 @endif
                 <table class="medicine-table{{ $showsCommercialDetails ? ' commercial-detail-table' : '' }}">
                     <thead>
@@ -264,7 +263,6 @@
                                 <th class="name-column" scope="col">Nama obat</th>
                                 <th class="preparation-column" scope="col">Bentuk sediaan</th>
                                 <th class="strength-column" scope="col">Kekuatan/potensi</th>
-                                <th class="packaging-column" scope="col">Isi kemasan</th>
                                 <th class="quantity-column" scope="col">Jumlah<br>(angka dan huruf)</th>
                             @endif
                         </tr>
@@ -276,7 +274,6 @@
                                 $unitName = $detail->satuanKonversi?->satuan?->nama ?: ($medicine?->satuan?->nama ?: 'unit');
                                 $preparation = $medicine?->sediaan?->nama ?: '-';
                                 $strength = $medicine?->komposisi ?: ($medicine?->dosis ?: '-');
-                                $packaging = $medicine?->kemasan ?: '-';
                                 $quantity = number_format((float) $detail->qty, 0, ',', '.');
                                 $basePrice = (float) $detail->harga_estimasi;
                                 $totalPrice = $detail->subtotal !== null
@@ -296,7 +293,7 @@
                                 @if ($showsCommercialDetails)
                                     <td class="name-column">
                                         <span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span>
-                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}<br><strong>Kemasan:</strong> {{ $packaging }}</span>
+                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}</span>
                                     </td>
                                     <td class="order-quantity-column"><span class="order-quantity-value">{{ $quantity }}</span></td>
                                     <td class="order-unit-column">{{ $unitName }}</td>
@@ -311,7 +308,6 @@
                                     <td class="name-column"><span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span></td>
                                     <td class="preparation-column">{{ $preparation }}</td>
                                     <td class="strength-column">{{ $strength }}</td>
-                                    <td class="packaging-column">{{ $packaging }}</td>
                                     <td class="quantity-column">{{ $quantity }} {{ $unitName }} ({{ $detail->quantity_in_words }} {{ strtolower($unitName) }})</td>
                                 @endif
                             </tr>

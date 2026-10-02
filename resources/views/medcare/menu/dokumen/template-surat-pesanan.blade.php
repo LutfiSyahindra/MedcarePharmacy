@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Template {{ $meta["label"] }} - {{ $branch->apotekProfile?->name ?: $branch->name }}</title>
     @php
-        $usesPackaging = in_array($type, ["reguler", "prekursor", "oot"], true);
+        $usesPackaging = $type === "reguler";
+        $usesCompactLayout = in_array($type, ["reguler", "prekursor", "oot"], true);
     @endphp
     <style>
         @page { size: A4 portrait; margin: 10mm; }
@@ -79,7 +80,7 @@
         }
         .form-label-top { position: absolute; top: 4mm; right: 7mm; font-size: 9.5pt; }
         .document-header { margin-top: 3mm; text-align: center; }
-        .document-header h1 { margin: 0 0 1mm; font-size: {{ $usesPackaging ? "12pt" : "14pt" }}; text-decoration: underline; }
+        .document-header h1 { margin: 0 0 1mm; font-size: {{ $usesCompactLayout ? "12pt" : "14pt" }}; text-decoration: underline; }
         .document-number { display: flex; align-items: end; justify-content: center; gap: 2mm; margin: 0; font-size: 11pt; }
         .fill-line { display: inline-block; min-width: 65mm; min-height: 5mm; border-bottom: .25mm dotted #333; }
         .fill-line.is-wide { min-width: 105mm; }
@@ -96,7 +97,7 @@
             margin: 2.5mm 0 0;
             border-collapse: collapse;
             table-layout: fixed;
-            font-size: {{ $usesPackaging ? "9.5pt" : "10.5pt" }};
+            font-size: {{ $usesCompactLayout ? "9.5pt" : "10.5pt" }};
             line-height: 1.3;
         }
         .medicine-table th,
@@ -110,7 +111,7 @@
             padding-top: 1.7mm;
             padding-bottom: 1.7mm;
             background: #e9edf2;
-            font-size: {{ $usesPackaging ? "9.25pt" : "10pt" }};
+            font-size: {{ $usesCompactLayout ? "9.25pt" : "10pt" }};
             font-weight: 700;
             line-height: 1.2;
             text-align: center;
@@ -165,7 +166,7 @@
         .medicine-table .empty-row td { height: 10mm; }
         .medicine-table .empty-row.is-single-item td { height: 27mm; }
         .signature-wrap { display: flex; justify-content: flex-end; margin-top: {{ $type === "narkotika" ? "7mm" : "5mm" }}; }
-        .signature { width: {{ $usesPackaging ? "82mm" : "75mm" }}; text-align: left; }
+        .signature { width: {{ $usesCompactLayout ? "82mm" : "75mm" }}; text-align: left; }
         .signature p { margin: 0 0 3mm; }
         .signature-date { display: flex; align-items: end; gap: 1mm; }
         .signature-date .fill-line { min-width: 36mm; }
