@@ -32,6 +32,11 @@ class PembelianModel extends Model
         return $this->hasMany(PembelianDetailModel::class, 'purchase_order_id');
     }
 
+    public function penerimaanBarang()
+    {
+        return $this->hasMany(PenerimaanBarangModel::class, 'purchase_order_id');
+    }
+
     /**
      * Relasi ke distributor
      */

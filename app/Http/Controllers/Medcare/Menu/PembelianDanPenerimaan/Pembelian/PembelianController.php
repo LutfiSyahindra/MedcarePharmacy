@@ -54,8 +54,16 @@ class PembelianController extends Controller
 
     public function table(Request $request)
     {
+        $validated = $request->validate([
+            'medicine_search' => ['nullable', 'string', 'max:150'],
+            'medicine_id' => ['nullable', 'integer', 'exists:master_obats,id'],
+        ]);
         $branchIds = BranchAccess::userBranchIds();
-        $Pembelian = $this->PembelianService->getPembelianTable($branchIds);
+        $Pembelian = $this->PembelianService->getPembelianTable(
+            $branchIds,
+            $validated['medicine_search'] ?? null,
+            isset($validated['medicine_id']) ? (int) $validated['medicine_id'] : null
+        );
         $dateStart = $request->input('date_start');
         $dateEnd = $request->input('date_end');
 
@@ -88,6 +96,7 @@ class PembelianController extends Controller
             'waiting_approval' => $waitingApprovalCount,
             'pending' => $draftCount + $waitingApprovalCount,
             'approved' => $summary->where('status', 'approved')->count(),
+            'dalam_penerimaan' => $summary->where('status', 'dalam_penerimaan')->count(),
             'selesai' => $summary->where('status', 'selesai')->count(),
             'rejected' => $summary->where('status', 'rejected')->count(),
             'total_estimasi' => $summary->sum(function ($row) {
@@ -105,7 +114,7 @@ class PembelianController extends Controller
         return DataTables::of($Pembelian)
             ->addIndexColumn()
             ->addColumn('actions', function ($dataPembelian) use ($approvalUser) {
-                $status = $dataPembelian['status'];
+                $status = $dataPembelian['purchase_order_status'];
                 $canApprove = $this->transactionNotifications->canApproveBranch(
                     $approvalUser,
                     isset($dataPembelian['branch_key']) ? (int) $dataPembelian['branch_key'] : null

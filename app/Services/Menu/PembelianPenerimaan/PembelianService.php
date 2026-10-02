@@ -47,15 +47,19 @@ class PembelianService
         return $noPo;
     }
 
-    public function getPembelianTable(?array $branchIds = null)
+    public function getPembelianTable(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
     {
-        $Pembelian = $this->PembelianRepository->getPembelian($branchIds)->load([
+        $Pembelian = $this->PembelianRepository->getPembelian($branchIds, $medicineSearch, $medicineId)->load([
             'distributor',
             'createdBy',
             'approvedBy',
             'branch',
         ]);
         $Pembelian->loadCount('details')->loadSum('details', 'qty');
+        $Pembelian->loadExists([
+            'penerimaanBarang as has_receipt',
+            'penerimaanBarang as has_draft_receipt' => fn ($query) => $query->where('status', 'draft'),
+        ]);
 
         $dataPembelian = [];
         foreach ($Pembelian as $r) {
@@ -68,8 +72,19 @@ class PembelianService
                 'tanggal_po' => $r->tanggal_po ?? '-',
                 'item_count' => (int) ($r->details_count ?? 0),
                 'total_qty' => (float) ($r->details_sum_qty ?? 0),
+                'matched_medicines' => ($medicineId !== null || trim($medicineSearch ?? '') !== '') && $r->relationLoaded('details')
+                    ? $r->details->map(fn ($detail) => [
+                        'obat_id' => (int) $detail->obat_id,
+                        'kode_obat' => $detail->obat->kode_obat,
+                        'nama_obat' => $detail->obat->nama_obat,
+                        'qty' => (float) $detail->qty,
+                        'satuan' => $detail->satuanKonversi?->satuan?->nama ?? $detail->obat->satuan?->nama ?? '-',
+                    ])->values()->all()
+                    : [],
                 'total_estimasi' => $r->total_estimasi ?? '-',
-                'status' => $r->status ?? '-',
+                'status' => $r->has_draft_receipt ? 'dalam_penerimaan' : ($r->status ?? '-'),
+                'purchase_order_status' => $r->status,
+                'has_receipt' => (bool) $r->has_receipt,
                 'catatan' => $r->catatan ?? '-',
                 'created_by' => $r->createdBy->name ?? '-',
                 'approved_by' => $r->approvedBy->name ?? null,

@@ -1,9 +1,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script>
     $(document).ready(function() {
+        const selectedPurchaseOrderId = @json($selectedPurchaseOrder?->id);
+        const initialReceiptId = @json($initialReceiptId);
         let editMode = false;
-        let receiveDateStart = moment().startOf('month').format('YYYY-MM-DD');
-        let receiveDateEnd = moment().endOf('month').format('YYYY-MM-DD');
+        let receiveDateStart = selectedPurchaseOrderId ? '' : moment().startOf('month').format('YYYY-MM-DD');
+        let receiveDateEnd = selectedPurchaseOrderId ? '' : moment().endOf('month').format('YYYY-MM-DD');
         let receiveDatePicker = null;
         let paymentPreset = 'none';
         let supplierCompensationAvailable = 0;
@@ -1208,6 +1210,7 @@
                 url: '{{ route("penerimaan.table") }}',
                 type: 'GET',
                 data: function(request) {
+                    request.purchase_order_id = selectedPurchaseOrderId || '';
                     request.date_start = receiveDateStart;
                     request.date_end = receiveDateEnd;
                 },
@@ -1305,7 +1308,7 @@
             },
             language: {
                 processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat penerimaan...</span>',
-                emptyTable: 'Belum ada penerimaan barang.',
+                emptyTable: selectedPurchaseOrderId ? 'Belum ada penerimaan untuk PO ini.' : 'Belum ada penerimaan barang.',
                 zeroRecords: 'Penerimaan yang dicari tidak ditemukan.',
                 info: 'Menampilkan _START_-_END_ dari _TOTAL_ data',
                 infoEmpty: 'Menampilkan 0 data',
@@ -1354,7 +1357,7 @@
             dateFormat: 'Y-m-d',
             altInput: true,
             altFormat: 'd M Y',
-            defaultDate: [receiveDateStart, receiveDateEnd],
+            defaultDate: selectedPurchaseOrderId ? [] : [receiveDateStart, receiveDateEnd],
             locale: {
                 rangeSeparator: ' - '
             },
@@ -1369,8 +1372,8 @@
             }
         });
 
-        $('#receiveDatePreset').val('this_month');
-        $('#receiveDateRange').closest('.purchase-date-input').addClass('has-value');
+        $('#receiveDatePreset').val(selectedPurchaseOrderId ? '' : 'this_month');
+        $('#receiveDateRange').closest('.purchase-date-input').toggleClass('has-value', !selectedPurchaseOrderId);
 
         $('#clearReceiveDateRange').on('click', function() {
             receiveDateStart = '';
@@ -1657,6 +1660,8 @@
                 });
 
                 $('#penerimaanModalDetail').modal('show');
+            }).fail(function(xhr) {
+                Swal.fire('Gagal', xhr.responseJSON?.message || 'Detail penerimaan tidak bisa dimuat.', 'error');
             });
         };
 
@@ -2145,5 +2150,9 @@
                 });
             });
         };
+
+        if (initialReceiptId) {
+            window.lihatPenerimaan(initialReceiptId);
+        }
     });
 </script>

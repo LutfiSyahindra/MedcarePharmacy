@@ -8,11 +8,31 @@ use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 
 class PembelianRepository
 {
-    public function getPembelian(?array $branchIds = null)
+    public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
     {
         $query = PembelianModel::query();
 
         $this->scopeBranch($query, $branchIds);
+
+        $medicineSearch = trim($medicineSearch ?? '');
+
+        if ($medicineId !== null || $medicineSearch !== '') {
+            if ($medicineId !== null) {
+                $medicineFilter = fn ($medicineQuery) => $medicineQuery->whereKey($medicineId);
+            } else {
+                $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($medicineSearch)).'%';
+                $medicineFilter = fn ($medicineQuery) => $medicineQuery->where(function ($searchQuery) use ($pattern) {
+                    $searchQuery->whereRaw("LOWER(nama_obat) LIKE ? ESCAPE '!'", [$pattern])
+                        ->orWhereRaw("LOWER(kode_obat) LIKE ? ESCAPE '!'", [$pattern]);
+                });
+            }
+
+            $query->whereHas('details.obat', $medicineFilter)
+                ->with([
+                    'details' => fn ($detailQuery) => $detailQuery->whereHas('obat', $medicineFilter)
+                        ->with(['obat.satuan', 'satuanKonversi.satuan']),
+                ]);
+        }
 
         return $query->get();
     }

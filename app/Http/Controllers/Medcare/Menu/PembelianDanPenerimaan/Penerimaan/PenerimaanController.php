@@ -34,18 +34,48 @@ class PenerimaanController extends Controller
         private readonly FinanceService $financeService,
     ) {}
 
-    public function penerimaan()
+    public function penerimaan(Request $request)
     {
-        return view('medcare.menu.pembelianPenerimaan.penerimaan.penerimaan');
+        $request->validate([
+            'purchase_order_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $selectedPurchaseOrder = null;
+        $initialReceiptId = null;
+
+        if ($request->filled('purchase_order_id')) {
+            $query = PembelianModel::query();
+            $this->scopePurchaseOrderBranch($query);
+            $selectedPurchaseOrder = $query->findOrFail($request->integer('purchase_order_id'));
+            $initialReceiptId = $selectedPurchaseOrder->penerimaanBarang()
+                ->whereIn('status', ['draft', 'posted'])
+                ->orderByRaw("CASE WHEN status = 'draft' THEN 0 ELSE 1 END")
+                ->latest('tanggal_penerimaan')
+                ->latest('id')
+                ->value('id');
+        }
+
+        return view('medcare.menu.pembelianPenerimaan.penerimaan.penerimaan', compact(
+            'selectedPurchaseOrder',
+            'initialReceiptId'
+        ));
     }
 
     public function table(Request $request)
     {
+        $request->validate([
+            'purchase_order_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
         $query = PenerimaanBarangModel::with(['purchaseOrder', 'distributor', 'createdBy'])
             ->latest('tanggal_penerimaan')
             ->latest('id');
 
         $this->scopePenerimaanBranch($query);
+
+        if ($request->filled('purchase_order_id')) {
+            $query->where('purchase_order_id', $request->integer('purchase_order_id'));
+        }
 
         if ($request->filled('date_start')) {
             $query->whereDate('tanggal_penerimaan', '>=', $request->date_start);

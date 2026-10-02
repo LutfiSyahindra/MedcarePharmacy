@@ -136,6 +136,18 @@
         </section>
 
         <section class="purchase-table-section" id="receiveTableSection">
+            @if ($selectedPurchaseOrder)
+                <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 m-3"
+                    role="status">
+                    <span>
+                        Penerimaan untuk PO <strong>{{ $selectedPurchaseOrder->no_po }}</strong>,
+                        termasuk draft yang belum diposting.
+                    </span>
+                    <a href="{{ route('penerimaan.penerimaan') }}" class="btn btn-sm btn-outline-primary">
+                        Tampilkan Semua PO
+                    </a>
+                </div>
+            @endif
             <div class="purchase-table-toolbar">
                 <div class="purchase-table-title">
                     <span class="purchase-table-title-icon"><i class="mdi mdi-truck-check-outline"></i></span>

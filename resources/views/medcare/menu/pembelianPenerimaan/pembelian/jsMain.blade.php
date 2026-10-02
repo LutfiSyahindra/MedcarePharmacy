@@ -149,13 +149,13 @@
                             <input type="number" class="form-control" name="qty[]" min="1" value="${options.qty ?? 1}" required>
                         </div>
 
-                        <div class="col-6 col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-2 col-md-4 purchase-price-field">
                             <label class="form-label">Harga / Satuan</label>
                             <input type="number" class="form-control harga_estimasi_satuan" name="harga_estimasi_satuan[]" min="0" step="any" value="${options.hargaSatuan ?? options.harga ?? 0}">
                             <input type="hidden" class="harga_estimasi" name="harga_estimasi[]" value="${options.harga ?? 0}">
                         </div>
 
-                        <div class="col-6 col-lg-2 col-md-4">
+                        <div class="col-6 col-lg-2 col-md-4 purchase-subtotal-field">
                             <label class="form-label">Subtotal + PPN</label>
                             <input type="number" class="form-control subtotal" name="subtotal[]" value="${options.subtotal ?? ''}" readonly>
                         </div>
@@ -366,11 +366,13 @@
                 return `
                     <tr class="${isAlreadyAdded ? 'is-added' : ''}">
                         <td class="purchase-picker-check-cell" data-label="Pilih">
-                            <input type="checkbox" class="form-check-input medicine-picker-checkbox"
-                                value="${escapeHtml(id)}"
-                                aria-label="Pilih ${escapeHtml(medicineName)}"
-                                ${isChecked ? 'checked' : ''}
-                                ${isAlreadyAdded ? 'disabled' : ''}>
+                            <label class="purchase-picker-choice">
+                                <input type="checkbox" class="form-check-input medicine-picker-checkbox"
+                                    value="${escapeHtml(id)}"
+                                    aria-label="Pilih ${escapeHtml(medicineName)}"
+                                    ${isChecked ? 'checked' : ''}
+                                    ${isAlreadyAdded ? 'disabled' : ''}>
+                            </label>
                         </td>
                         <td data-label="Kode"><span class="purchase-picker-code">${escapeHtml(medicineCode)}</span></td>
                         <td data-label="Nama Obat">
@@ -746,7 +748,7 @@
             let itemCount = $('.detail-item').length;
 
             refreshDetailNumbers();
-            $('#total_estimasi').text(formatRupiah(total));
+            $('#total_estimasi, #purchaseMobileTotal').text(formatRupiah(total));
             $('#total_estimasi_input').val(total.toFixed(2));
             $('#purchaseModalLineCount, #purchaseModalItemCount').text(itemCount.toLocaleString('id-ID'));
             $('#purchaseModalQtyCount').text(totalQty.toLocaleString('id-ID'));
@@ -1109,12 +1111,26 @@
             return words.slice(0, 2).map(word => word.charAt(0)).join('') || '-';
         }
 
+        function escapeDataTableText(value) {
+            // DataTables sudah mengirim teks yang di-escape; dekode sekali sebelum render.
+            const entities = {
+                '&amp;': '&',
+                '&lt;': '<',
+                '&gt;': '>',
+                '&quot;': '"',
+                '&#039;': "'"
+            };
+            const text = String(value ?? '-').replace(/&(amp|lt|gt|quot|#039);/g, entity => entities[entity]);
+            return escapeHtml(text);
+        }
+
         function updatePurchaseSummary(summary, recordsTotal) {
             let total = Number(summary.total ?? recordsTotal) || 0;
             let draft = Number(summary.draft) || 0;
             let waiting = Number(summary.waiting_approval) || 0;
             let pending = Number(summary.pending ?? (draft + waiting)) || 0;
             let approved = Number(summary.approved) || 0;
+            let receiving = Number(summary.dalam_penerimaan) || 0;
             let completed = Number(summary.selesai) || 0;
             let rejected = Number(summary.rejected) || 0;
 
@@ -1123,6 +1139,7 @@
             $('#purchaseDraftFilterCount').text(draft.toLocaleString('id-ID'));
             $('#purchaseWaitingFilterCount').text(waiting.toLocaleString('id-ID'));
             $('#purchaseApprovedCount, #purchaseApprovedFilterCount').text(approved.toLocaleString('id-ID'));
+            $('#purchaseReceivingFilterCount').text(receiving.toLocaleString('id-ID'));
             $('#purchaseCompletedCount, #purchaseCompletedFilterCount').text(completed.toLocaleString('id-ID'));
             $('#purchaseRejectedFilterCount').text(rejected.toLocaleString('id-ID'));
             $('#purchaseTotalValue').text(formatRupiah(summary.total_estimasi));
@@ -1147,6 +1164,8 @@
         let currentMonthEnd = moment().endOf('month');
         let purchaseDateStart = currentMonthStart.format('YYYY-MM-DD');
         let purchaseDateEnd = currentMonthEnd.format('YYYY-MM-DD');
+        let purchaseMedicineSearch = '';
+        let purchaseMedicineId = '';
 
         let PembelianTable = $('#tablePembelian').DataTable({
             processing: true,
@@ -1163,9 +1182,15 @@
                 data: function(request) {
                     request.date_start = purchaseDateStart;
                     request.date_end = purchaseDateEnd;
+                    request.medicine_id = purchaseMedicineId;
                 },
                 dataSrc: function(response) {
                     updatePurchaseSummary(response.summary || {}, response.recordsTotal);
+                    $('#purchaseMedicineSearchResult')
+                        .toggleClass('d-none', !purchaseMedicineSearch)
+                        .text(purchaseMedicineSearch
+                            ? `${Number(response.recordsFiltered || 0).toLocaleString('id-ID')} PO memuat obat "${purchaseMedicineSearch}" sesuai filter aktif.`
+                            : '');
                     return response.data || [];
                 }
             },
@@ -1182,7 +1207,7 @@
                     data: 'approved_by',
                     name: 'approved_by',
                     render: function(data, type, row) {
-                        let status = String(row.status || '').toLowerCase();
+                        let status = String(row.purchase_order_status || row.status || '').toLowerCase();
 
                         if (status === 'rejected') {
                             return `
@@ -1269,16 +1294,27 @@
                 {
                     data: 'item_count',
                     name: 'item_count',
+                    responsivePriority: 2,
                     render: function(data, type, row) {
                         if (type !== 'display') {
                             return Number(data) || 0;
                         }
+
+                        const matches = (row.matched_medicines || []).map(function(medicine) {
+                            return `
+                                <span class="purchase-medicine-match">
+                                    <strong>${escapeDataTableText(medicine.nama_obat)}</strong>
+                                    <small>${escapeDataTableText(medicine.kode_obat)} &middot; ${formatStockQuantity(medicine.qty)} ${escapeDataTableText(medicine.satuan)}</small>
+                                </span>
+                            `;
+                        }).join('');
 
                         return `
                             <span class="purchase-item-qty">
                                 <strong>${(Number(data) || 0).toLocaleString('id-ID')} item</strong>
                                 <small>${formatStockQuantity(row.total_qty)} qty</small>
                             </span>
+                            ${matches ? `<span class="purchase-medicine-matches">${matches}</span>` : ''}
                         `;
                     }
                 },
@@ -1297,16 +1333,19 @@
                 {
                     data: 'status',
                     name: 'status',
-                    render: function(data) {
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+
                         let status = String(data || '').toLowerCase();
                         let statusClass =
                             (status === 'approved' || status === 'selesai') ? 'is-approved' :
                             (status === 'draft' || status === 'waiting_approval') ? 'is-draft' :
-                            status === 'diterima_sebagian' ? 'is-partial' :
+                            (status === 'dalam_penerimaan' || status === 'diterima_sebagian') ? 'is-partial' :
                             status === 'rejected' ? 'is-rejected' :
                             'is-other';
                         let statusLabel =
                             status === 'approved' ? 'Disetujui' :
+                            status === 'dalam_penerimaan' ? 'Dalam Penerimaan' :
                             status === 'diterima_sebagian' ? 'Diterima Sebagian' :
                             status === 'selesai' ? 'Selesai' :
                             status === 'draft' ? 'Draft' :
@@ -1315,18 +1354,36 @@
                             (data || '-');
                         let statusIcon =
                             status === 'approved' ? 'mdi-check-circle-outline' :
+                            status === 'dalam_penerimaan' ? 'mdi-package-variant' :
                             status === 'diterima_sebagian' ? 'mdi-progress-check' :
                             status === 'selesai' ? 'mdi-package-variant-closed-check' :
                             (status === 'draft' || status === 'waiting_approval') ?
                             'mdi-file-clock-outline' :
                             status === 'rejected' ? 'mdi-close-circle-outline' :
                             'mdi-help-circle-outline';
+                        let statusContent = `
+                            <i class="mdi ${statusIcon}"></i>
+                            ${escapeHtml(statusLabel)}
+                        `;
+
+                        if (!row.has_receipt) {
+                            return `
+                                <span class="purchase-status is-disabled ${statusClass}" role="link" aria-disabled="true"
+                                    title="Belum ada data penerimaan untuk PO ${escapeHtml(row.no_po)}">
+                                    ${statusContent}
+                                </span>
+                            `;
+                        }
+
+                        let receivingUrl = '{{ route("penerimaan.penerimaan") }}' +
+                            '?purchase_order_id=' + encodeURIComponent(row.id);
 
                         return `
-                            <span class="purchase-status ${statusClass}">
-                                <i class="mdi ${statusIcon}"></i>
-                                ${escapeHtml(statusLabel)}
-                            </span>
+                            <a class="purchase-status purchase-status-link ${statusClass}" href="${receivingUrl}"
+                                title="Lihat penerimaan PO ${escapeHtml(row.no_po)}"
+                                aria-label="Lihat penerimaan PO ${escapeHtml(row.no_po)}: ${escapeHtml(statusLabel)}">
+                                ${statusContent}
+                            </a>
                         `;
                     }
                 },
@@ -1367,6 +1424,7 @@
             }],
             drawCallback: function() {
                 let table = $('#tablePembelian');
+                table.toggleClass('is-medicine-search', Boolean(purchaseMedicineSearch));
                 const mobileLabels = [
                     'No',
                     'Approval',
@@ -1507,18 +1565,93 @@
         $('#purchaseDateRange').closest('.purchase-date-input').addClass('has-value');
 
         $('#clearPurchaseDateRange').on('click', function() {
+            clearPurchaseDateFilter();
+            PembelianTable.ajax.reload();
+        });
+
+        function clearPurchaseDateFilter() {
             purchaseDateStart = '';
             purchaseDateEnd = '';
             purchaseDatePicker.clear();
-            $('#purchaseDatePreset').val('');
+            $('#purchaseDatePreset').val('all');
             $('#purchaseDateRange').closest('.purchase-date-input').removeClass('has-value');
-            PembelianTable.ajax.reload();
+        }
+
+        $('#searchPurchaseMedicine').select2({
+            placeholder: 'Ketik nama atau kode, lalu pilih obat',
+            width: '100%',
+            allowClear: true,
+            dropdownParent: $('#purchaseMedicineSearchForm'),
+            language: {
+                searching: () => 'Memuat obat...',
+                noResults: () => 'Obat tidak ditemukan.',
+                errorLoading: () => 'Gagal memuat obat. Tutup dropdown lalu coba lagi.'
+            },
+            ajax: {
+                delay: 150,
+                transport: function(params, success, failure) {
+                    let cancelled = false;
+                    const query = String(params.data?.term || '').trim().toLocaleLowerCase('id-ID');
+                    const page = Math.max(1, Number(params.data?.page) || 1);
+
+                    getMedicineCatalog().then(function(catalog) {
+                        if (cancelled) return;
+
+                        const matches = catalog.filter(item =>
+                            medicineOptionText(item).toLocaleLowerCase('id-ID').includes(query)
+                        );
+                        const offset = (page - 1) * medicineSelectPageSize;
+
+                        success({
+                            results: matches.slice(offset, offset + medicineSelectPageSize).map(item => ({
+                                id: String(item.id),
+                                text: medicineOptionText(item)
+                            })),
+                            pagination: { more: offset + medicineSelectPageSize < matches.length }
+                        });
+                    }).catch(function() {
+                        if (!cancelled) failure();
+                    });
+
+                    return { abort: function() { cancelled = true; } };
+                },
+                processResults: data => data
+            }
+        });
+
+        $('#purchaseMedicineSearchForm').on('submit', function(event) {
+            event.preventDefault();
+            purchaseMedicineId = String($('#searchPurchaseMedicine').val() || '');
+            const medicine = medicineCatalogById.get(purchaseMedicineId);
+            purchaseMedicineSearch = medicine ? medicineOptionText(medicine) : '';
+            clearTimeout(purchaseSearchTimer);
+            $('#searchPembelian').val('').closest('.purchase-search').removeClass('has-value');
+            $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
+            $('.purchase-filter-chip[data-status=""]').addClass('is-active').attr('aria-pressed', 'true');
+            clearPurchaseDateFilter();
+            PembelianTable.search('').column(8).search('').draw();
+        });
+
+        $('#searchPurchaseMedicine').on('change', function() {
+            if ($(this).val()) {
+                $('#purchaseMedicineSearchForm').trigger('submit');
+            } else if (purchaseMedicineId) {
+                purchaseMedicineId = '';
+                purchaseMedicineSearch = '';
+                PembelianTable.ajax.reload();
+            }
         });
 
         $('#purchaseDatePreset').on('change', function() {
             let preset = this.value;
 
             if (!preset) {
+                return;
+            }
+
+            if (preset === 'all') {
+                clearPurchaseDateFilter();
+                PembelianTable.ajax.reload();
                 return;
             }
 

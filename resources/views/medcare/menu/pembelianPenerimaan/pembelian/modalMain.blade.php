@@ -152,20 +152,24 @@
                                             <i class="mdi mdi-close"></i>
                                         </button>
                                     </div>
-                                    <span id="medicinePickerResultCount" class="purchase-picker-result-count">
-                                        Memuat daftar obat...
-                                    </span>
+                                    <div class="purchase-picker-selection">
+                                        <label class="purchase-picker-select-all" for="selectAllVisibleMedicines">
+                                            <input type="checkbox" class="form-check-input"
+                                                id="selectAllVisibleMedicines"
+                                                aria-label="Pilih semua hasil pencarian">
+                                            <span>Pilih semua hasil</span>
+                                        </label>
+                                        <span id="medicinePickerResultCount" class="purchase-picker-result-count">
+                                            Memuat daftar obat...
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div class="purchase-picker-table-wrap">
                                     <table class="table table-hover align-middle purchase-picker-table">
                                         <thead>
                                             <tr>
-                                                <th class="purchase-picker-check-cell">
-                                                    <input type="checkbox" class="form-check-input"
-                                                        id="selectAllVisibleMedicines"
-                                                        aria-label="Pilih semua hasil pencarian">
-                                                </th>
+                                                <th class="purchase-picker-check-cell">Pilih</th>
                                                 <th>Kode</th>
                                                 <th>Nama Obat</th>
                                                 <th>Satuan Dasar</th>
@@ -245,7 +249,7 @@
                                                 value="1" required>
                                         </div>
 
-                                        <div class="col-6 col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-2 col-md-4 purchase-price-field">
                                             <label class="form-label">Harga / Satuan</label>
                                             <input type="number" class="form-control harga_estimasi_satuan"
                                                 name="harga_estimasi_satuan[]" min="0" step="any" value="0">
@@ -253,7 +257,7 @@
                                                 value="0">
                                         </div>
 
-                                        <div class="col-6 col-lg-2 col-md-4">
+                                        <div class="col-6 col-lg-2 col-md-4 purchase-subtotal-field">
                                             <label class="form-label">Subtotal + PPN</label>
                                             <input type="number" class="form-control subtotal" name="subtotal[]"
                                                 readonly>
@@ -339,22 +343,28 @@
                         <strong id="total_estimasi">Rp 0</strong>
                         <input type="hidden" name="total_estimasi" id="total_estimasi_input" value="0">
                     </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                            <i class="mdi mdi-close-circle-outline"></i>
-                            Tutup
-                        </button>
-                        <button type="button" id="saveDraftForm" class="btn btn-outline-primary">
-                            <i class="mdi mdi-content-save-move-outline"></i>
-                            Simpan sebagai Draft
-                        </button>
-                        <button type="submit" id="submitForm" class="btn btn-primary">
-                            <i class="mdi mdi-content-save-outline"></i>
-                            Simpan Purchase Order
-                        </button>
-                    </div>
                 </form>
+            </div>
+
+            <div class="modal-footer purchase-form-footer">
+                <div class="purchase-mobile-total" role="status" aria-live="polite" aria-atomic="true">
+                    <span>Total Estimasi</span>
+                    <strong id="purchaseMobileTotal">Rp 0</strong>
+                </div>
+                <div class="purchase-save-actions">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        <i class="mdi mdi-close-circle-outline"></i>
+                        Tutup
+                    </button>
+                    <button type="button" id="saveDraftForm" class="btn btn-outline-primary">
+                        <i class="mdi mdi-content-save-move-outline"></i>
+                        Simpan sebagai Draft
+                    </button>
+                    <button type="submit" id="submitForm" class="btn btn-primary" form="pembelianForm">
+                        <i class="mdi mdi-content-save-outline"></i>
+                        Simpan Purchase Order
+                    </button>
+                </div>
             </div>
         </div>
     </div>

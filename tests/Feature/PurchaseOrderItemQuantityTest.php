@@ -51,12 +51,17 @@ class PurchaseOrderItemQuantityTest extends TestCase
             {
                 return $this;
             }
+
+            public function loadExists($relations)
+            {
+                return $this;
+            }
         };
         $repository = new class($orders) extends PembelianRepository
         {
             public function __construct(private readonly EloquentCollection $orders) {}
 
-            public function getPembelian(?array $branchIds = null)
+            public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
             {
                 return $this->orders;
             }

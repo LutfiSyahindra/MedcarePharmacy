@@ -412,6 +412,87 @@
         background: var(--purchase-soft-red);
     }
 
+    .purchase-medicine-search {
+        display: grid;
+        gap: .45rem;
+        padding: .85rem 1rem;
+        border-bottom: 1px solid var(--purchase-border);
+        background: var(--purchase-soft-blue);
+    }
+
+    .purchase-medicine-search > label {
+        margin: 0;
+        color: var(--purchase-text);
+        font-weight: 700;
+    }
+
+    .purchase-medicine-search-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .6rem;
+    }
+
+    .purchase-medicine-search-select {
+        flex: 1 1 280px;
+        min-width: 0;
+    }
+
+    .purchase-medicine-search-select .select2-container {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .purchase-medicine-search .select2-selection--single {
+        min-height: 44px;
+        height: auto;
+        border-color: var(--purchase-border);
+        border-radius: 8px;
+    }
+
+    .purchase-medicine-search .select2-selection--single .select2-selection__rendered {
+        padding: .65rem 2.25rem .65rem .75rem;
+        line-height: 1.5;
+    }
+
+    .purchase-medicine-search .select2-selection--single .select2-selection__arrow {
+        height: 42px;
+    }
+
+    .purchase-medicine-search .select2-search__field {
+        border: 1px solid var(--purchase-border);
+        border-radius: 6px;
+        padding: .55rem;
+    }
+
+    .purchase-medicine-search > small {
+        color: var(--purchase-muted);
+    }
+
+    .purchase-medicine-search-controls > button {
+        flex: 1 0 auto;
+    }
+
+    .purchase-medicine-matches {
+        display: flex;
+        flex-direction: column;
+        gap: .4rem;
+        margin-top: .5rem;
+        min-width: 180px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .purchase-medicine-match {
+        display: flex;
+        flex-direction: column;
+        color: var(--purchase-primary-strong);
+        font-size: .8rem;
+    }
+
+    .purchase-medicine-match small {
+        color: var(--purchase-muted);
+    }
+
     .purchase-icon-btn {
         display: inline-grid !important;
         width: 42px;
@@ -749,6 +830,25 @@
         background: #f2f4f7;
     }
 
+    .purchase-status-link {
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .purchase-status-link:hover {
+        text-decoration: underline;
+    }
+
+    .purchase-status-link:focus-visible {
+        outline: 2px solid var(--purchase-accent);
+        outline-offset: 3px;
+    }
+
+    .purchase-status.is-disabled {
+        opacity: .6;
+        cursor: not-allowed;
+    }
+
     .purchase-note {
         display: block;
         max-width: 210px;
@@ -1038,6 +1138,18 @@
         font-weight: 800;
     }
 
+    .purchase-mobile-total {
+        display: none;
+    }
+
+    .purchase-save-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: .55rem;
+        min-width: 0;
+    }
+
     .purchase-form-section {
         margin-bottom: 1rem;
         border: 1px solid var(--purchase-border);
@@ -1258,6 +1370,41 @@
         font-size: .78rem;
         font-weight: 800;
         white-space: nowrap;
+    }
+
+    .purchase-picker-selection {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: .45rem .75rem;
+        min-width: 0;
+    }
+
+    .purchase-picker-select-all,
+    .purchase-picker-choice {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        min-height: 44px;
+        margin: 0;
+        color: var(--purchase-text);
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .purchase-picker-choice {
+        width: 44px;
+    }
+
+    .purchase-picker-select-all .form-check-input,
+    .purchase-picker-choice .form-check-input {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        margin: 0;
+        cursor: inherit;
     }
 
     .purchase-picker-table-wrap {
@@ -1691,9 +1838,106 @@
         .purchase-search {
             min-width: 100%;
         }
+
+        .purchase-total-panel {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .purchase-total-copy {
+            min-width: 0;
+        }
+
+        .purchase-total-stats {
+            justify-content: flex-start;
+            margin-left: 0;
+        }
+
+        .purchase-total-panel > strong {
+            max-width: 100%;
+            text-align: right;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
     }
 
     @media (max-width: 767.98px) {
+        .purchase-page input:not([type="checkbox"]):not([type="hidden"]),
+        .purchase-page select,
+        .purchase-page textarea,
+        .purchase-modal .select2-selection__rendered,
+        .purchase-page .select2-search__field {
+            font-size: 16px !important;
+        }
+
+        .purchase-page .form-control,
+        .purchase-page .form-select,
+        .purchase-search input,
+        .purchase-picker-search input {
+            min-height: 44px;
+        }
+
+        .purchase-modal .select2-container--default .select2-selection--single {
+            height: 44px;
+        }
+
+        .purchase-modal .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 42px;
+        }
+
+        .purchase-modal .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 42px;
+        }
+
+        .purchase-modal .btn-close {
+            box-sizing: border-box;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            margin: 0;
+            background-position: center;
+        }
+
+        .purchase-picker-close {
+            width: 44px;
+            height: 44px;
+            flex-basis: 44px;
+        }
+
+        .purchase-modal .modal-title {
+            font-size: 1rem;
+        }
+
+        .purchase-po-number,
+        .purchase-money,
+        .purchase-status,
+        .purchase-approval,
+        .purchase-user,
+        .purchase-total-panel strong {
+            min-width: 0;
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .purchase-search-clear,
+        .purchase-picker-search button,
+        .purchase-date-input button {
+            width: 44px;
+            height: 44px;
+            flex-basis: 44px;
+            margin: 0;
+        }
+
+        .purchase-medicine-search-controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .purchase-medicine-search-controls > button {
+            min-height: 44px;
+        }
+
         .purchase-page .page-breadcrumb,
         .purchase-page .breadcrumb {
             display: none;
@@ -1786,8 +2030,11 @@
             font-size: 1rem;
         }
 
-        .purchase-stat span {
-            font-size: .59rem;
+        .purchase-stat-copy > span {
+            font-size: .7rem;
+            letter-spacing: 0;
+            line-height: 1.35;
+            text-transform: none;
         }
 
         .purchase-stat small {
@@ -1872,18 +2119,23 @@
         }
 
         .purchase-filter-group {
-            flex-wrap: nowrap;
-            padding-bottom: .25rem;
-            overflow-x: auto;
-            overscroll-behavior-inline: contain;
-            scrollbar-width: thin;
-            scroll-snap-type: inline proximity;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: stretch;
+            gap: .5rem;
         }
 
         .purchase-filter-chip {
-            min-height: 40px;
-            flex: 0 0 auto;
-            scroll-snap-align: start;
+            justify-content: space-between;
+            min-width: 0;
+            min-height: 44px;
+            border-radius: 8px;
+            text-align: left;
+            white-space: normal;
+        }
+
+        .purchase-filter-count {
+            flex-shrink: 0;
         }
 
         .purchase-filter-controls {
@@ -1893,9 +2145,8 @@
         }
 
         .purchase-filter-label {
-            min-height: 40px;
-            flex: 0 0 auto;
-            margin: 0 .2rem 0 0;
+            grid-column: 1 / -1;
+            margin: 0 0 .15rem;
         }
 
         .purchase-date-filter {
@@ -1996,6 +2247,11 @@
             display: flex !important;
         }
 
+        #tablePembelian.is-medicine-search tbody tr > td:nth-child(7) {
+            display: flex !important;
+            grid-column: 1 / -1;
+        }
+
         .purchase-table tbody td:nth-child(3),
         .purchase-table tbody td:nth-child(6),
         .purchase-table tbody td:nth-child(10),
@@ -2075,14 +2331,15 @@
 
         .purchase-action-group {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
             width: 100%;
             gap: .45rem;
         }
 
         .purchase-action-group .btn {
             width: 100%;
-            height: 42px;
+            min-height: 44px;
+            height: auto;
         }
 
         .purchase-action-group .purchase-mobile-more {
@@ -2107,6 +2364,13 @@
             justify-content: center !important;
         }
 
+        .purchase-table-section .page-link {
+            display: grid;
+            min-width: 44px;
+            min-height: 44px;
+            place-items: center;
+        }
+
         .purchase-table-hint {
             align-items: flex-start;
             padding: .75rem .85rem;
@@ -2117,6 +2381,7 @@
             width: 100%;
             max-width: none;
             height: 100%;
+            height: 100dvh;
             min-height: 100%;
             margin: 0;
         }
@@ -2125,16 +2390,16 @@
         .purchase-modal .modal-dialog-scrollable .modal-content {
             height: 100%;
             max-height: 100vh;
+            max-height: 100dvh;
             border-radius: 0;
         }
 
         .purchase-modal .modal-body {
+            min-height: 0;
             max-height: none !important;
             padding: .85rem;
-        }
-
-        #pembelianModal .modal-body {
-            padding-bottom: 5.75rem;
+            overscroll-behavior-y: contain;
+            scroll-padding-block: 1rem;
         }
 
         .purchase-modal .modal-footer,
@@ -2143,6 +2408,8 @@
             grid-template-columns: 1fr;
             gap: .55rem;
             width: 100%;
+            flex-shrink: 0;
+            padding-bottom: calc(.85rem + env(safe-area-inset-bottom, 0px));
         }
 
         .purchase-modal .modal-footer .btn {
@@ -2152,31 +2419,217 @@
             margin: 0 !important;
         }
 
-        #pembelianForm > .modal-footer {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 5;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            box-sizing: border-box;
+        .purchase-modal .modal-content > .purchase-form-footer {
             margin: 0;
-            padding: .85rem;
-            background: rgba(255, 255, 255, .96);
+            padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+            background: #fff;
             box-shadow: 0 -10px 24px rgba(15, 23, 42, .08);
-            backdrop-filter: blur(8px);
         }
 
-        #pembelianForm > .modal-footer .btn-light {
+        .purchase-form-footer > * {
+            margin: 0;
+        }
+
+        .purchase-mobile-total {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: .75rem;
+            min-width: 0;
+            color: var(--purchase-muted);
+            font-size: .78rem;
+        }
+
+        .purchase-mobile-total strong {
+            min-width: 0;
+            color: var(--purchase-primary-strong);
+            font-size: 1rem;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .purchase-save-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100%;
+        }
+
+        .purchase-modal .purchase-save-actions .btn-light {
             display: none;
         }
 
-        #pembelianForm > .modal-footer .btn {
+        .purchase-save-actions .btn {
             min-width: 0;
             padding-inline: .55rem;
             font-size: .78rem;
             line-height: 1.25;
             white-space: normal;
+        }
+
+        .purchase-detail-card > .row {
+            --bs-gutter-x: .75rem;
+            --bs-gutter-y: .8rem;
+            margin-inline: 0;
+            padding: .75rem .375rem;
+        }
+
+        .purchase-detail-card .purchase-price-field,
+        .purchase-detail-card .purchase-subtotal-field {
+            width: 100%;
+        }
+
+        .purchase-detail-card .purchase-subtotal-field {
+            order: 1;
+        }
+
+        .purchase-subtotal-field .form-control {
+            color: var(--purchase-primary-strong);
+            background: var(--purchase-soft);
+            font-weight: 800;
+        }
+
+        .purchase-medicine-picker-toolbar,
+        .purchase-medicine-picker-footer {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .purchase-medicine-picker-head {
+            align-items: flex-start;
+        }
+
+        .purchase-medicine-picker-head small {
+            font-size: .72rem;
+            line-height: 1.35;
+        }
+
+        .purchase-picker-search {
+            width: 100%;
+        }
+
+        .purchase-picker-search input {
+            min-height: 44px;
+        }
+
+        .purchase-picker-selection {
+            width: 100%;
+        }
+
+        .purchase-picker-select-all {
+            font-size: .78rem;
+        }
+
+        .purchase-picker-result-count {
+            white-space: normal;
+        }
+
+        .purchase-picker-table-wrap {
+            max-height: 420px;
+            padding: .65rem;
+            background: #f7faff;
+        }
+
+        .purchase-picker-table,
+        .purchase-picker-table tbody {
+            display: block;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .purchase-picker-table thead {
+            display: none;
+        }
+
+        .purchase-picker-table tbody tr {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-bottom: .6rem;
+            border: 1px solid var(--purchase-border);
+            border-radius: 9px;
+            background: #fff;
+            box-shadow: 0 5px 14px rgba(15, 23, 42, .04);
+            overflow: hidden;
+        }
+
+        .purchase-picker-table tbody tr:last-child {
+            margin-bottom: 0;
+        }
+
+        .purchase-picker-table tbody td {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: .25rem;
+            border: 0;
+            border-bottom: 1px solid #edf2f8;
+            padding: .6rem !important;
+            text-align: left !important;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .purchase-picker-code,
+        .purchase-picker-name {
+            min-width: 0;
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .purchase-picker-table .form-check-input {
+            width: 22px;
+            height: 22px;
+        }
+
+        .purchase-picker-table tbody td:nth-child(3) {
+            grid-column: 1 / -1;
+            grid-row: 1;
+            min-height: 62px;
+            padding-right: 3.5rem !important;
+            background: #fbfdff;
+        }
+
+        .purchase-picker-table tbody td:nth-child(1) {
+            position: absolute;
+            top: .25rem;
+            right: .25rem;
+            z-index: 1;
+            width: auto;
+            padding: 0 !important;
+        }
+
+        .purchase-picker-table tbody td:nth-child(1)::before {
+            display: none;
+        }
+
+        .purchase-picker-table tbody td::before {
+            color: var(--purchase-muted);
+            content: attr(data-label);
+            font-size: .62rem;
+            font-weight: 900;
+            letter-spacing: .04em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .purchase-picker-table tbody td.purchase-picker-state {
+            position: static;
+            display: block;
+            width: 100%;
+            grid-column: 1 / -1;
+            padding: 2rem .75rem !important;
+            text-align: center !important;
+        }
+
+        .purchase-picker-table tbody td.purchase-picker-state::before {
+            display: none;
+        }
+
+        .purchase-medicine-picker-footer .btn {
+            min-height: 44px;
+            justify-content: center;
         }
 
         .purchase-detail-table,
@@ -2232,6 +2685,21 @@
             line-height: 1;
             text-transform: uppercase;
         }
+
+        .purchase-detail-table .badge {
+            align-self: flex-start;
+            max-width: 100%;
+            margin-left: 0 !important;
+            white-space: normal;
+        }
+
+        .purchase-detail-table .badge.bg-info {
+            color: #0e7490;
+        }
+
+        .purchase-detail-table .badge.bg-warning {
+            color: #92400e;
+        }
     }
 
     @media (max-width: 575.98px) {
@@ -2240,8 +2708,13 @@
         }
 
         .purchase-hero h2 {
-            margin-top: .7rem;
-            font-size: 1.35rem;
+            margin-top: .55rem;
+            font-size: 1.05rem;
+        }
+
+        .purchase-kicker {
+            font-size: .65rem;
+            letter-spacing: .025em;
         }
 
         .purchase-hero p {
@@ -2260,7 +2733,16 @@
         }
 
         .purchase-estimate-panel {
+            gap: .65rem;
             padding: .65rem;
+        }
+
+        .purchase-estimate-copy {
+            min-width: 0;
+        }
+
+        .purchase-estimate-copy strong {
+            font-size: 1.1rem;
         }
 
         .purchase-estimate-icon {
@@ -2321,9 +2803,16 @@
         .purchase-modal-header-meta {
             position: absolute;
             top: 50%;
-            right: .9rem;
+            right: .25rem;
             width: auto;
             margin: 0;
+            transform: translateY(-50%);
+        }
+
+        .purchase-modal .modal-header > .btn-close {
+            position: absolute;
+            top: 50%;
+            right: .25rem;
             transform: translateY(-50%);
         }
 
@@ -2383,25 +2872,27 @@
         }
 
         .purchase-detail-card-head {
-            align-items: stretch;
-            flex-direction: column;
+            align-items: center;
+            gap: .5rem;
+            padding: .6rem .75rem;
         }
 
         .purchase-detail-card-head > div {
-            align-items: flex-start;
+            align-items: center;
         }
 
         .purchase-detail-card-head small {
-            font-size: .72rem;
+            display: none;
         }
 
         .purchase-detail-card > .row {
-            padding: .75rem;
+            padding: .75rem .375rem;
         }
 
         .purchase-modal .remove-detail {
-            width: 100%;
-            min-height: 42px;
+            flex-shrink: 0;
+            min-width: 44px;
+            min-height: 44px;
         }
 
         .purchase-detail-actions,
@@ -2411,127 +2902,7 @@
 
         .purchase-detail-actions .btn {
             justify-content: center;
-        }
-
-        .purchase-medicine-picker-toolbar,
-        .purchase-medicine-picker-footer {
-            align-items: stretch;
-            flex-direction: column;
-        }
-
-        .purchase-medicine-picker-head {
-            align-items: flex-start;
-        }
-
-        .purchase-medicine-picker-head small {
-            font-size: .72rem;
-            line-height: 1.35;
-        }
-
-        .purchase-picker-search {
-            width: 100%;
-        }
-
-        .purchase-picker-search input {
-            min-height: 42px;
-        }
-
-        .purchase-picker-result-count {
-            white-space: normal;
-        }
-
-        .purchase-picker-table-wrap {
-            max-height: 420px;
-            padding: .65rem;
-            background: #f7faff;
-        }
-
-        .purchase-picker-table,
-        .purchase-picker-table tbody {
-            display: block;
-            width: 100%;
-            min-width: 0;
-        }
-
-        .purchase-picker-table thead {
-            display: none;
-        }
-
-        .purchase-picker-table tbody tr {
-            position: relative;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            margin-bottom: .6rem;
-            border: 1px solid var(--purchase-border);
-            border-radius: 9px;
-            background: #fff;
-            box-shadow: 0 5px 14px rgba(15, 23, 42, .04);
-            overflow: hidden;
-        }
-
-        .purchase-picker-table tbody tr:last-child {
-            margin-bottom: 0;
-        }
-
-        .purchase-picker-table tbody td {
-            display: flex;
-            min-width: 0;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: .25rem;
-            border: 0;
-            border-bottom: 1px solid #edf2f8;
-            padding: .6rem !important;
-            text-align: left !important;
-            overflow-wrap: anywhere;
-        }
-
-        .purchase-picker-table tbody td:nth-child(3) {
-            grid-column: 1 / -1;
-            grid-row: 1;
-            padding-right: 3rem !important;
-            background: #fbfdff;
-        }
-
-        .purchase-picker-table tbody td:nth-child(1) {
-            position: absolute;
-            top: .65rem;
-            right: .65rem;
-            z-index: 1;
-            width: auto;
-            padding: 0 !important;
-        }
-
-        .purchase-picker-table tbody td:nth-child(1)::before {
-            display: none;
-        }
-
-        .purchase-picker-table tbody td::before {
-            color: var(--purchase-muted);
-            content: attr(data-label);
-            font-size: .62rem;
-            font-weight: 900;
-            letter-spacing: .04em;
-            line-height: 1;
-            text-transform: uppercase;
-        }
-
-        .purchase-picker-table tbody td.purchase-picker-state {
-            position: static;
-            display: block;
-            width: 100%;
-            grid-column: 1 / -1;
-            padding: 2rem .75rem !important;
-            text-align: center !important;
-        }
-
-        .purchase-picker-table tbody td.purchase-picker-state::before {
-            display: none;
-        }
-
-        .purchase-medicine-picker-footer .btn {
-            min-height: 42px;
-            justify-content: center;
+            min-height: 44px;
         }
 
         .purchase-detail-summary span {
@@ -2571,6 +2942,7 @@
         .purchase-page *::after {
             scroll-behavior: auto !important;
             transition: none !important;
+            animation: none !important;
         }
     }
 </style>

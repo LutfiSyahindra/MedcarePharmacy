@@ -134,6 +134,26 @@
                 </div>
             </div>
 
+            <form class="purchase-medicine-search" id="purchaseMedicineSearchForm">
+                <label for="searchPurchaseMedicine">
+                    <i class="mdi mdi-pill"></i>
+                    Cari obat di PO
+                </label>
+                <div class="purchase-medicine-search-controls">
+                    <div class="purchase-medicine-search-select">
+                        <select id="searchPurchaseMedicine" class="form-select"
+                            aria-describedby="purchaseMedicineSearchHint">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary">Cari di Semua PO</button>
+                </div>
+                <small id="purchaseMedicineSearchHint">
+                    Ketik nama atau kode, lalu pilih obat. Pencarian dimulai dari semua tanggal dan status.
+                </small>
+                <small id="purchaseMedicineSearchResult" class="d-none" role="status" aria-live="polite"></small>
+            </form>
+
             <div class="purchase-filter-bar" id="purchaseFilterBar">
                 <div class="purchase-filter-group" aria-label="Filter status purchase order">
                     <span class="purchase-filter-label">
@@ -157,6 +177,10 @@
                     <button type="button" class="purchase-filter-chip" data-status="approved" aria-pressed="false">
                         Disetujui
                         <span class="purchase-filter-count" id="purchaseApprovedFilterCount">0</span>
+                    </button>
+                    <button type="button" class="purchase-filter-chip" data-status="dalam_penerimaan" aria-pressed="false">
+                        Dalam Penerimaan
+                        <span class="purchase-filter-count" id="purchaseReceivingFilterCount">0</span>
                     </button>
                     <button type="button" class="purchase-filter-chip" data-status="selesai" aria-pressed="false">
                         Selesai
@@ -186,6 +210,7 @@
                         <select id="purchaseDatePreset" class="form-select form-select-sm"
                             aria-label="Pilih periode cepat">
                             <option value="">Periode cepat</option>
+                            <option value="all">Semua Tanggal</option>
                             <option value="today">Hari Ini</option>
                             <option value="7days">7 Hari Terakhir</option>
                             <option value="30days">30 Hari Terakhir</option>
