@@ -1319,6 +1319,8 @@
     .pos-search-result-prices { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
     .pos-search-result-prices small { color: #7a869a; font-size: 7px; font-weight: 700; }
     .pos-search-result-price { color: #283753; font-size: 10px; font-weight: 900; }
+    .pos-search-result-original-price { color: #778397; font-size: var(--pos-readable-caption, 11px); line-height: 1.4; white-space: nowrap; }
+    .pos-search-result-discount { display: inline-flex; padding: 2px 6px; color: #087859; border-radius: 5px; background: #e9f8f2; font-size: var(--pos-readable-caption, 11px); font-weight: 700; line-height: 1.4; white-space: nowrap; }
     .pos-search-result-stock { justify-self: end; padding: 3px 6px; color: #087859; border-radius: 999px; background: #e9f8f2; font-size: 7px; font-weight: 850; }
     .pos-search-result-stock.is-empty { color: #b55432; background: #fff0eb; }
     .pos-search-loading { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 14px; color: #69758a; font-size: 9px; }

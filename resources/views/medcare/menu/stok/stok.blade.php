@@ -228,7 +228,7 @@
                     <span class="stock-section-icon"><i class="mdi mdi-package-variant-closed"></i></span>
                     <div>
                         <h5>Stok Per Batch</h5>
-                        <p>Daftar batch aktif, expired date, qty, serta nilai beli dan jual per batch.</p>
+                        <p>Daftar batch aktif, diskon, harga jual sebelum dan sesudah diskon, serta nilai beli dan jual per batch.</p>
                     </div>
                 </div>
                 <div class="stock-section-tools">
@@ -282,7 +282,9 @@
                             <th>Expired Date</th>
                             <th>Qty</th>
                             <th>HPP</th>
-                            <th>Harga Jual</th>
+                            <th>Diskon</th>
+                            <th>Harga Jual<br>Sebelum Diskon</th>
+                            <th>Harga Jual<br>Sesudah Diskon</th>
                             <th>Nilai Beli (HPP)</th>
                             <th>Nilai Jual</th>
                             <th>Status</th>

@@ -22,6 +22,8 @@ class StokController extends Controller
 
     private array $batchMarginPreviews = [];
 
+    private array $batchDiscountPreviews = [];
+
     public function __construct(private readonly StockService $stockService) {}
 
     public function stok(Request $request)
@@ -176,10 +178,11 @@ class StokController extends Controller
 
     public function batchTable(Request $request)
     {
+        $this->batchDiscountPreviews = [];
         $warningDays = $this->warningDays($request);
         $today = Carbon::today();
         $warningDate = Carbon::today()->addDays($warningDays);
-        $query = StokBatchModel::with(['obat.satuan', 'obat.golongan', 'obat.mainGolongan', 'obat.subGolongan'])
+        $query = StokBatchModel::with(['obat.satuan', 'obat.golongan', 'obat.mainGolongan', 'obat.subGolongan', 'latestPostedReceiptDetail.penerimaanBarang'])
             ->where('qty', '>', 0)
             ->orderBy('expired_date')
             ->orderBy('no_batch');
@@ -237,6 +240,10 @@ class StokController extends Controller
             ->addColumn('nilai_biaya_lain', fn (StokBatchModel $batch) => (float) $batch->qty * (float) ($batch->biaya_lain ?? 0))
             ->editColumn('harga_jual', fn (StokBatchModel $batch) => (float) $batch->harga_jual)
             ->editColumn('diskon', fn (StokBatchModel $batch) => (float) ($batch->diskon ?? 0))
+            ->addColumn('diskon_persen', fn (StokBatchModel $batch) => $this->batchDiscountPreview($batch)['diskon_persen'])
+            ->addColumn('diskon_untuk', fn (StokBatchModel $batch) => $this->batchDiscountPreview($batch)['diskon_untuk'])
+            ->addColumn('harga_jual_sebelum_diskon', fn (StokBatchModel $batch) => $this->batchDiscountPreview($batch)['harga_jual_sebelum_diskon'])
+            ->addColumn('harga_jual_sesudah_diskon', fn (StokBatchModel $batch) => $this->batchDiscountPreview($batch)['harga_jual_sesudah_diskon'])
             ->editColumn('ppn', fn (StokBatchModel $batch) => (float) ($batch->ppn ?? 0))
             ->addColumn('nilai_stok', fn (StokBatchModel $batch) => (float) $batch->qty * (float) $batch->harga_beli)
             ->addColumn('nilai_stok_jual', fn (StokBatchModel $batch) => (float) $batch->qty * (float) $batch->harga_jual)
@@ -251,6 +258,7 @@ class StokController extends Controller
             ->addColumn('margin_has_margin', fn (StokBatchModel $batch) => (bool) $this->batchMarginPreview($batch)['has_margin'])
             ->addColumn('margin_reference', fn (StokBatchModel $batch) => $this->batchMarginPreview($batch)['margin_reference'])
             ->removeColumn('obat')
+            ->removeColumn('latest_posted_receipt_detail')
             ->with(['summary' => $summary])
             ->make(true);
     }
@@ -582,6 +590,12 @@ class StokController extends Controller
     {
         return $this->batchMarginPreviews[$batch->id]
             ??= $this->stockService->batchSellingPriceMarginPreview($batch);
+    }
+
+    private function batchDiscountPreview(StokBatchModel $batch): array
+    {
+        return $this->batchDiscountPreviews[$batch->id]
+            ??= $this->stockService->batchSellingPriceDiscountPreview($batch);
     }
 
     private function batchStatus(StokBatchModel $batch, Carbon $today, Carbon $warningDate): string

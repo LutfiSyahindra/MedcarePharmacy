@@ -127,6 +127,7 @@ class PenjualanPosService
             'distributor',
             'rakPenyimpanan',
             'konversiSatuan.satuan',
+            'stokBatches.latestPostedReceiptDetail.penerimaanBarang',
             'stokBatches' => function ($query) use ($branchId) {
                 $query->where('branch_id', $branchId)
                     ->where('qty', '>', 0)
@@ -419,6 +420,14 @@ class PenjualanPosService
         $units = $this->unitsForProduct($obat);
         $firstBatch = $obat->stokBatches->first();
         $totalStock = (float) ($obat->total_stok ?? 0);
+        $discountPreview = $firstBatch
+            ? $this->stockService->batchSellingPriceDiscountPreview($firstBatch)
+            : [
+                'diskon_persen' => 0.0,
+                'diskon_untuk' => null,
+                'harga_jual_sebelum_diskon' => 0.0,
+                'harga_jual_sesudah_diskon' => 0.0,
+            ];
         $priceVariants = $obat->stokBatches
             ->groupBy(fn (StokBatchModel $batch) => number_format((float) $batch->harga_jual, 2, '.', ''))
             ->map(function (Collection $batches) {
@@ -427,6 +436,7 @@ class PenjualanPosService
 
                 return [
                     'harga_jual' => (float) $nextBatch->harga_jual,
+                    ...$this->stockService->batchSellingPriceDiscountPreview($nextBatch),
                     'total_stok' => round((float) $batches->sum('qty'), 2),
                     'layer_count' => $batches->count(),
                     'next_batch' => [
@@ -458,6 +468,7 @@ class PenjualanPosService
             'satuan_stok' => $obat->satuan->nama ?? '-',
             'total_stok' => round($totalStock, 2),
             'harga_jual' => (float) ($firstBatch?->harga_jual ?? 0),
+            ...$discountPreview,
             'harga_jual_options' => collect($priceVariants)->pluck('harga_jual')->all(),
             'harga_jual_variants' => $priceVariants,
             'next_batch' => $firstBatch ? [

@@ -379,6 +379,30 @@ class StockService
         return $this->calculateBatchSellingPriceFromMargin($batch);
     }
 
+    public function batchSellingPriceDiscountPreview(StokBatchModel $batch): array
+    {
+        $batch->loadMissing('latestPostedReceiptDetail.penerimaanBarang');
+        $detail = $batch->latestPostedReceiptDetail;
+        $diskon = $this->discountPercent($detail?->diskon ?? $batch->diskon ?? 0);
+        $diskonUntuk = $detail ? ($detail->penerimaanBarang?->diskon_untuk ?: 'pasien') : null;
+        $diskonJual = $diskonUntuk === 'apotek' ? 0 : $diskon;
+        $hargaJual = max(0, round((float) ($batch->harga_jual ?? 0), 2));
+        $biayaLain = max(0, (float) ($batch->biaya_lain ?? 0));
+
+        // Harga jual batch sudah memuat manfaat diskon. Biaya lain tidak ikut didiskon.
+        // Harga bruto tidak dapat dipulihkan dari harga neto dengan diskon 100%.
+        $hargaSebelumDiskon = $diskonJual >= 100
+            ? null
+            : round($hargaJual + max(0, $hargaJual - $biayaLain) * $diskonJual / (100 - $diskonJual), 2);
+
+        return [
+            'diskon_persen' => $diskon,
+            'diskon_untuk' => $diskonUntuk,
+            'harga_jual_sebelum_diskon' => $hargaSebelumDiskon,
+            'harga_jual_sesudah_diskon' => $hargaJual,
+        ];
+    }
+
     private function applyBatchSellingPrice(StokBatchModel $batch, float $hargaJualBaru, string $alasan, ?int $changedBy = null): array
     {
         $hargaJualLama = (float) ($batch->harga_jual ?? 0);

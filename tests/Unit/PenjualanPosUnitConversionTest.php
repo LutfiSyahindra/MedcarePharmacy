@@ -37,7 +37,7 @@ class PenjualanPosUnitConversionTest extends TestCase
             $medicine->setRelation($relation, null);
         }
 
-        $service = (new ReflectionClass(PenjualanPosService::class))->newInstanceWithoutConstructor();
+        $service = app(PenjualanPosService::class);
         $method = (new ReflectionClass($service))->getMethod('productPayload');
         $payload = $method->invoke($service, $medicine);
 
@@ -92,12 +92,15 @@ class PenjualanPosUnitConversionTest extends TestCase
 
     private function batch(int $id, string $number, float $sellingPrice): StokBatchModel
     {
-        return (new StokBatchModel)->forceFill([
+        $batch = (new StokBatchModel)->forceFill([
             'id' => $id,
             'no_batch' => $number,
             'expired_date' => now()->addMonths($id),
             'qty' => 5,
             'harga_jual' => $sellingPrice,
         ]);
+        $batch->setRelation('latestPostedReceiptDetail', null);
+
+        return $batch;
     }
 }

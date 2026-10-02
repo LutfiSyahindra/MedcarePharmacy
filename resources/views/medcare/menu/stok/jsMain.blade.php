@@ -444,7 +444,30 @@
                     render: data => `<span class="stock-money"><i class="mdi mdi-cash"></i>${formatCurrency(data)}</span>`
                 },
                 {
-                    data: 'harga_jual',
+                    data: 'diskon_persen',
+                    orderable: false,
+                    searchable: false,
+                    render: (data, type, row) => {
+                        if (type !== 'display') return Number(data) || 0;
+                        const penerima = row.diskon_untuk === 'apotek' ? 'Untuk apotek'
+                            : row.diskon_untuk === 'pasien' ? 'Untuk pasien' : 'Diskon batch';
+                        return `<span class="stock-number"><i class="mdi mdi-tag-outline"></i>${formatNumber(data)}%</span>
+                            ${Number(data) > 0 ? `<small class="d-block text-muted">${penerima}</small>` : ''}`;
+                    }
+                },
+                {
+                    data: 'harga_jual_sebelum_diskon',
+                    orderable: false,
+                    searchable: false,
+                    render: (data, type) => {
+                        if (type !== 'display') return data;
+                        if (data === null) return '<span class="text-muted" title="Harga sebelum diskon 100% tidak tersedia">-</span>';
+                        return `<span class="stock-money"><i class="mdi mdi-cash"></i>${formatCurrency(data)}</span>`;
+                    }
+                },
+                {
+                    data: 'harga_jual_sesudah_diskon',
+                    name: 'harga_jual',
                     render: (data, type, row) => `
                         <span class="stock-money"><i class="mdi mdi-cash-plus"></i>${formatCurrency(data)}</span>
                         ${otherCostAddition(row.biaya_lain)}

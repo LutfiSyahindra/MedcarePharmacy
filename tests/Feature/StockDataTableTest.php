@@ -91,6 +91,9 @@ class StockDataTableTest extends TestCase
             ->assertJsonPath('summary.nilai_stok', 150000)
             ->assertJsonPath('summary.total_biaya_lain', 15000)
             ->assertJsonPath('summary.nilai_stok_jual', 225000)
+            ->assertJsonPath('data.0.diskon_persen', 0)
+            ->assertJsonPath('data.0.harga_jual_sebelum_diskon', 1500)
+            ->assertJsonPath('data.0.harga_jual_sesudah_diskon', 1500)
             ->assertJsonPath('data.0.nilai_stok', 10000)
             ->assertJsonPath('data.0.nilai_biaya_lain', 1000)
             ->assertJsonPath('data.0.nilai_stok_jual', 15000);

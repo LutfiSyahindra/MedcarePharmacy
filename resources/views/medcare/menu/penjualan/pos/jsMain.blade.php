@@ -1242,6 +1242,9 @@
                 .filter((price, index, values) => values.findIndex(value => Number(value) === Number(price)) === index)
                 .map(price => ({
                     harga_jual: Number(price) || 0,
+                    diskon_persen: Number(item?.diskon_persen) || 0,
+                    diskon_untuk: item?.diskon_untuk ?? null,
+                    harga_jual_sebelum_diskon: item?.harga_jual_sebelum_diskon ?? null,
                     total_stok: Number(item?.total_stok) || 0,
                     next_batch: item?.next_batch || null
                 }));
@@ -1262,6 +1265,9 @@
             const hasStock = stock > 0;
             const batchText = item.next_batch?.expired_date ? `ED ${item.next_batch.expired_date}` : 'Batch belum tersedia';
             const selectedPrice = Number(item.harga_jual_pilihan ?? item.harga_jual) || 0;
+            const originalPrice = Number(item.harga_jual_sebelum_diskon) || 0;
+            const discountPercent = Math.min(100, Math.max(0, Number(item.diskon_persen) || 0));
+            const hasDiscount = discountPercent > 0 && item.diskon_untuk !== 'apotek';
             const priceChoiceCount = Number(item.harga_choice_count) || 1;
 
             return $(`
@@ -1279,7 +1285,9 @@
                     </span>
                     <span class="pos-search-result-side">
                         <span class="pos-search-result-prices">
+                            ${hasDiscount && originalPrice > selectedPrice ? `<del class="pos-search-result-original-price" aria-label="Harga sebelum diskon">${formatCurrency(originalPrice)}</del>` : ''}
                             <strong class="pos-search-result-price">${formatCurrency(selectedPrice)}</strong>
+                            ${hasDiscount ? `<span class="pos-search-result-discount">Diskon ${formatNumber(discountPercent)}%</span>` : ''}
                             ${priceChoiceCount > 1 ? `<small>Pilih harga · ${priceChoiceCount} opsi</small>` : ''}
                         </span>
                         <small class="pos-search-result-stock ${hasStock ? '' : 'is-empty'}">
@@ -1323,6 +1331,10 @@
                                     ...item,
                                     harga_jual: selectedPrice,
                                     harga_jual_pilihan: selectedPrice,
+                                    diskon_persen: Number(variant.diskon_persen) || 0,
+                                    diskon_untuk: variant.diskon_untuk ?? null,
+                                    harga_jual_sebelum_diskon: variant.harga_jual_sebelum_diskon ?? null,
+                                    harga_jual_sesudah_diskon: selectedPrice,
                                     total_stok: Number(variant.total_stok) || 0,
                                     next_batch: variant.next_batch || item.next_batch,
                                     harga_choice_count: variants.length

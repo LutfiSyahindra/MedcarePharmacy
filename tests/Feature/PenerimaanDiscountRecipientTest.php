@@ -61,6 +61,15 @@ class PenerimaanDiscountRecipientTest extends TestCase
         $this->assertSame(0.0, (float) $batch->diskon);
         $this->assertSame(9490.5, (float) $batch->harga_jual);
         $this->assertSame(8550.0, (float) KartuStokModel::where('stok_batch_id', $batch->id)->firstOrFail()->harga_beli);
+
+        $this->getJson(route('stok.batchTable', ['obat_id' => $detail->obat_id]))
+            ->assertOk()
+            ->assertJsonPath('data.0.diskon', 0)
+            ->assertJsonPath('data.0.diskon_persen', 14.5)
+            ->assertJsonPath('data.0.diskon_untuk', 'pasien')
+            ->assertJsonPath('data.0.harga_jual_sebelum_diskon', 11100)
+            ->assertJsonPath('data.0.harga_jual_sesudah_diskon', 9490.5)
+            ->assertJsonPath('data.0.nilai_stok_jual', 94905);
     }
 
     public function test_pharmacy_discount_keeps_gross_purchase_price_in_stock(): void
@@ -95,6 +104,49 @@ class PenerimaanDiscountRecipientTest extends TestCase
         $this->assertSame(0.0, (float) $batch->diskon);
         $this->assertSame(11100.0, (float) $batch->harga_jual);
         $this->assertSame(10000.0, (float) KartuStokModel::where('stok_batch_id', $batch->id)->firstOrFail()->harga_beli);
+
+        $this->getJson(route('stok.batchTable', ['obat_id' => $detail->obat_id]))
+            ->assertOk()
+            ->assertJsonPath('data.0.diskon_persen', 14.5)
+            ->assertJsonPath('data.0.diskon_untuk', 'apotek')
+            ->assertJsonPath('data.0.harga_jual_sebelum_diskon', 11100)
+            ->assertJsonPath('data.0.harga_jual_sesudah_diskon', 11100);
+    }
+
+    public function test_batch_discount_display_excludes_other_costs_and_unposted_receipts(): void
+    {
+        [$user, $receipt, $detail] = $this->receiptContext('DISPLAY');
+        $receipt->update(['biaya_lain' => 1000]);
+
+        $this->actingAs($user)
+            ->putJson(route('penerimaan.post', $receipt->id), ['diskon_untuk' => 'pasien'])
+            ->assertOk();
+
+        $batch = $detail->refresh()->stokBatch;
+        $unpostedReceipt = $receipt->replicate()->fill([
+            'nomor_penerimaan' => 'PB-DISC-UNPOSTED',
+            'status' => 'draft',
+            'diskon_untuk' => 'apotek',
+        ]);
+        $unpostedReceipt->save();
+        $detail->replicate()->fill([
+            'penerimaan_barang_id' => $unpostedReceipt->id,
+            'diskon' => 50,
+        ])->save();
+
+        $this->getJson(route('stok.batchTable', ['obat_id' => $detail->obat_id]))
+            ->assertOk()
+            ->assertJsonPath('data.0.diskon_persen', 14.5)
+            ->assertJsonPath('data.0.diskon_untuk', 'pasien')
+            ->assertJsonPath('data.0.harga_jual_sebelum_diskon', 11200)
+            ->assertJsonPath('data.0.harga_jual_sesudah_diskon', 9590.5);
+
+        // Perubahan harga aktif tetap menjadi dasar tampilan harga sesudah diskon.
+        $batch->update(['harga_jual' => 8650]);
+        $this->getJson(route('stok.batchTable', ['obat_id' => $detail->obat_id]))
+            ->assertOk()
+            ->assertJsonPath('data.0.harga_jual_sebelum_diskon', 10100)
+            ->assertJsonPath('data.0.harga_jual_sesudah_diskon', 8650);
     }
 
     public function test_post_refreshes_stale_cancellation_metadata_before_recording_stock(): void

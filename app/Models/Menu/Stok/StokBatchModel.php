@@ -4,6 +4,7 @@ namespace App\Models\Menu\Stok;
 
 use App\Models\BranchModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +46,14 @@ class StokBatchModel extends Model
     public function riwayatHarga()
     {
         return $this->hasMany(RiwayatHargaModel::class, 'stok_batch_id');
+    }
+
+    public function latestPostedReceiptDetail()
+    {
+        return $this->hasOne(PenerimaanBarangDetailModel::class, 'stok_batch_id')
+            ->ofMany(['id' => 'max'], function ($query) {
+                $query->whereHas('penerimaanBarang', fn ($receipt) => $receipt->where('status', 'posted'));
+            });
     }
 
     public function stockOpnameDetails()

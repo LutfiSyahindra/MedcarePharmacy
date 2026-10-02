@@ -4,8 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\ApotekProfile;
 use App\Models\BranchModel;
+use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianModel;
+use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
+use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionDetailModel;
 use App\Models\Menu\Penjualan\PenjualanTransactionModel;
 use App\Models\Menu\Stok\StokBatchModel;
@@ -101,6 +105,116 @@ class PenjualanPosHistoryTest extends TestCase
         $this->actingAs($this->user)
             ->getJson(route('penjualan.pos.products', ['branch_id' => $this->branch->id]))
             ->assertOk();
+    }
+
+    public function test_product_search_returns_discount_prices_for_each_batch_price_choice(): void
+    {
+        ApotekProfile::create([
+            'branch_id' => $this->branch->id,
+            'name' => 'Apotek Diskon POS',
+            'address' => 'Jl. Uji Diskon',
+            'latitude' => -6.2,
+            'longitude' => 106.8,
+            'operational_hours' => collect([
+                'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            ])->mapWithKeys(fn (string $day) => [
+                $day => ['enabled' => true, 'open' => '00:00', 'close' => '00:00'],
+            ])->all(),
+        ]);
+        $this->actingAs($this->user)
+            ->postJson(route('penjualan.pos.shifts.open'), [
+                'branch_id' => $this->branch->id,
+                'opening_amount' => 0,
+            ])->assertOk();
+
+        $unit = SatuansModel::create(['kode' => 'TAB-DISKON-POS', 'nama' => 'Tablet', 'is_active' => true]);
+        $medicine = MasterObatModel::create([
+            'kode_obat' => 'DISKON-POS',
+            'nama_obat' => 'Obat Diskon POS',
+            'satuan_id' => $unit->id,
+            'is_active' => true,
+        ]);
+        $distributor = DistributorModel::create(['kode' => 'DIST-POS', 'nama' => 'Distributor POS']);
+        $order = PembelianModel::create([
+            'no_po' => 'PO-DISKON-POS',
+            'distributor_id' => $distributor->id,
+            'branch_id' => $this->branch->id,
+            'tanggal_po' => today(),
+            'created_by' => $this->user->id,
+        ]);
+
+        $cases = [
+            ['pasien', 14.5, 9590.5, 11200],
+            ['apotek', 14.5, 11200, 11200],
+            [null, 10, 1450, 1600],
+            [null, 0, 2000, 2000],
+            [null, 100, 100, null],
+        ];
+        foreach ($cases as $index => [$recipient, $discount, $price]) {
+            $batch = StokBatchModel::create([
+                'branch_id' => $this->branch->id,
+                'obat_id' => $medicine->id,
+                'no_batch' => 'DISKON-'.$index,
+                'expired_date' => now()->addMonths($index + 1)->toDateString(),
+                'qty' => 10,
+                'harga_jual' => $price,
+                'biaya_lain' => 100,
+                'diskon' => $recipient ? 0 : $discount,
+            ]);
+            if ($recipient) {
+                $receipt = PenerimaanBarangModel::create([
+                    'nomor_penerimaan' => 'PB-DISKON-'.$index,
+                    'purchase_order_id' => $order->id,
+                    'distributor_id' => $distributor->id,
+                    'nomor_faktur' => 'FAKTUR-'.$index,
+                    'tanggal_penerimaan' => today(),
+                    'status' => 'posted',
+                    'diskon_untuk' => $recipient,
+                ]);
+                $detail = PenerimaanBarangDetailModel::create([
+                    'penerimaan_barang_id' => $receipt->id,
+                    'obat_id' => $medicine->id,
+                    'stok_batch_id' => $batch->id,
+                    'diskon' => $discount,
+                ]);
+                $draftReceipt = $receipt->replicate()->fill([
+                    'nomor_penerimaan' => 'PB-DRAFT-'.$index,
+                    'status' => 'draft',
+                    'diskon_untuk' => 'apotek',
+                ]);
+                $draftReceipt->save();
+                $detail->replicate()->fill([
+                    'penerimaan_barang_id' => $draftReceipt->id,
+                    'diskon' => 50,
+                ])->save();
+            }
+        }
+
+        $response = $this->getJson(route('penjualan.pos.products', [
+            'branch_id' => $this->branch->id,
+            'q' => $medicine->kode_obat,
+        ]))->assertOk()
+            ->assertJsonPath('0.diskon_persen', 14.5)
+            ->assertJsonPath('0.diskon_untuk', 'pasien')
+            ->assertJsonPath('0.harga_jual_sebelum_diskon', 11200)
+            ->assertJsonPath('0.harga_jual_sesudah_diskon', 9590.5)
+            ->assertJsonCount(5, '0.harga_jual_variants');
+
+        foreach ($cases as $index => [$recipient, $discount, $price, $originalPrice]) {
+            $response
+                ->assertJsonPath("0.harga_jual_variants.$index.diskon_persen", $discount)
+                ->assertJsonPath("0.harga_jual_variants.$index.diskon_untuk", $recipient)
+                ->assertJsonPath("0.harga_jual_variants.$index.harga_jual_sebelum_diskon", $originalPrice)
+                ->assertJsonPath("0.harga_jual_variants.$index.harga_jual_sesudah_diskon", $price)
+                ->assertJsonPath("0.harga_jual_variants.$index.harga_jual", $price);
+        }
+
+        $this->getJson(route('penjualan.pos.quote', [
+            'branch_id' => $this->branch->id,
+            'obat_id' => $medicine->id,
+            'qty' => 1,
+            'harga_jual_pilihan' => 9590.5,
+        ]))->assertOk()->assertJsonPath('harga_jual', 9590.5);
     }
 
     public function test_product_search_and_draft_honor_selected_price_for_same_batch_layers(): void
