@@ -310,6 +310,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/penerimaan', [PenerimaanController::class, 'penerimaan'])->name('penerimaan.penerimaan');
         Route::get('/penerimaan/table', [PenerimaanController::class, 'table'])->name('penerimaan.table');
+        Route::get('/penerimaan/obat', [PenerimaanController::class, 'receiptMedicines'])->name('penerimaan.receiptMedicines');
         Route::get('/penerimaan/generateNoPenerimaan', [PenerimaanController::class, 'generateNoPenerimaan'])->name('penerimaan.generateNoPenerimaan');
         Route::get('/penerimaan/approved-po', [PenerimaanController::class, 'approvedPurchaseOrders'])->name('penerimaan.approvedPo');
         Route::get('/penerimaan/po/{id}', [PenerimaanController::class, 'purchaseOrderDetail'])->name('penerimaan.purchaseOrderDetail');

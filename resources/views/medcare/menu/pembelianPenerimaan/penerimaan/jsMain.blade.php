@@ -7,10 +7,26 @@
         let receiveDateStart = selectedPurchaseOrderId ? '' : moment().startOf('month').format('YYYY-MM-DD');
         let receiveDateEnd = selectedPurchaseOrderId ? '' : moment().endOf('month').format('YYYY-MM-DD');
         let receiveDatePicker = null;
+        let receiveMedicineId = '';
         let paymentPreset = 'none';
         let supplierCompensationAvailable = 0;
         let currentPoAdditionalCost = 0;
         let currentPoTotalQty = 0;
+        let pendingReceiptPo = null;
+        let pendingInvoiceMode = '';
+        let receiptInvoiceMode = '';
+        let receiptSaving = false;
+        let pickerSelection = null;
+        let pickerInvoiceMode = '';
+        let pickerDetail = null;
+        let pickerBusy = false;
+        let pickerListRequest = null;
+        let pickerDetailRequest = null;
+        let pickerCreateRequest = null;
+        let pickerQuery = '';
+        let pickerOrderQuery = '';
+        let pickerMedicineId = '';
+        let pickerMedicines = new Map();
 
         $.ajaxSetup({
             headers: {
@@ -32,18 +48,12 @@
             dateFormat: "d-m-Y"
         });
 
-        $('#purchase_order_id').select2({
-            placeholder: "-- Pilih PO approved --",
-            allowClear: true,
-            dropdownParent: $('#penerimaanModal'),
-            width: '100%'
-        });
-
         function formatRupiah(value) {
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
                 currency: 'IDR',
-                minimumFractionDigits: 0
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
             }).format(Number(value) || 0);
         }
 
@@ -92,9 +102,17 @@
             return date.isValid() ? date.format('DD-MM-YYYY') : value;
         }
 
+        function roundMoney(value) {
+            let numeric = Number(value) || 0;
+            let [coefficient, exponent = '0'] = String(numeric).split('e');
+            let shifted = Number(`${coefficient}e${Number(exponent) + 2}`);
+            // Preserve half-cent rounding when floating-point arithmetic lands just below the midpoint.
+            return Math.round(shifted + Number.EPSILON * Math.abs(shifted)) / 100;
+        }
+
         function formatMoneyInputValue(value) {
             let numeric = typeof value === 'string' ? parseCurrencyValue(value) : (Number(value) || 0);
-            return (Math.round(numeric * 100) / 100).toFixed(2);
+            return roundMoney(numeric).toFixed(2);
         }
 
         function parseCurrencyValue(value) {
@@ -227,7 +245,7 @@
         }
 
         function normalizedPercent(value) {
-            return Math.min(100, Math.max(0, Number(value) || 0));
+            return roundMoney(Math.min(100, Math.max(0, Number(value) || 0)));
         }
 
         function normalizedDiscount(value) {
@@ -241,7 +259,7 @@
                 netAmount *= 1 - (normalizedDiscount(discount) / 100);
             });
 
-            return netAmount;
+            return roundMoney(netAmount);
         }
 
         function effectiveTieredDiscount(discount1, discount2, discount3) {
@@ -510,18 +528,25 @@
                 .toggleClass('btn-outline-primary', !(hasValidItem && hasInvoice));
         }
 
-        function resetPenerimaanForm() {
+        function resetPenerimaanForm(generateNumber = true) {
             let form = $('#penerimaanForm');
             form.trigger('reset');
             paymentPreset = 'none';
             currentPoAdditionalCost = 0;
             currentPoTotalQty = 0;
+            receiptInvoiceMode = '';
+            $('#receiveInvoiceModeNotice, #submitPenerimaanNextInvoice').addClass('d-none');
             $('#penerimaan_id').val('');
-            $('#purchase_order_id').val('').trigger('change');
+            $('#purchase_order_id, #receive_selected_po').val('');
             $('#receive_supplier').val('');
             hideSupplierCompensationAlert();
             $('#receivePoSummary').addClass('d-none');
+            $('#receiveInvoiceHistory').addClass('d-none');
+            $('#receiveInvoiceHistoryList').empty();
+            $('#receiveInvoiceHistoryCount').text('0 faktur');
+            $('#receiveInvoiceHistoryEmpty').removeClass('d-none');
             $('#receiveDetailRows').empty();
+            updateReceiveItemSearch();
             $('#receiveDetailEditor').addClass('d-none');
             $('#receiveDetailEmpty').removeClass('d-none');
             $('#receiveDetailLiveSummary').addClass('d-none');
@@ -552,16 +577,27 @@
             form.find('.invalid-feedback').remove();
             updateFormProgress();
 
-            $.get('{{ route("penerimaan.generateNoPenerimaan") }}', function(response) {
-                $('#nomor_penerimaan').val(response);
-            });
-
-            loadApprovedPo();
+            if (generateNumber) {
+                $.get('{{ route("penerimaan.generateNoPenerimaan") }}', function(response) {
+                    $('#nomor_penerimaan').val(response);
+                });
+            }
         }
 
         $('#penerimaanModal').on('show.bs.modal', function() {
             if (!editMode) {
                 resetPenerimaanForm();
+                if (pendingReceiptPo) {
+                    receiptInvoiceMode = pendingInvoiceMode;
+                    pendingInvoiceMode = '';
+                    applyPurchaseOrder(pendingReceiptPo);
+                    renderPoDetails(pendingReceiptPo);
+                    $('#receiveInvoiceModeNotice').removeClass('d-none').text(receiptInvoiceMode === 'split'
+                        ? 'Pecah Faktur: isi hanya barang dan qty pada faktur ini. Qty 0 tidak disimpan. Sisa PO tersedia untuk faktur berikutnya; setiap faktur memiliki batch, pembayaran, dan posting sendiri.'
+                        : 'Satu faktur: seluruh sisa qty PO sudah terisi. Periksa qty, batch, dan rincian faktur sebelum menyimpan.');
+                    $('#submitPenerimaanNextInvoice').toggleClass('d-none', receiptInvoiceMode !== 'split');
+                    pendingReceiptPo = null;
+                }
             }
         });
 
@@ -575,36 +611,411 @@
                 .addClass('mdi-chevron-down');
         });
 
-        $('#openPenerimaanModal, #openPenerimaanModalToolbar').on('click', function() {
-            editMode = false;
+        function applyPurchaseOrder(po) {
+            $('#purchase_order_id').val(po.id);
+            $('#receive_selected_po').val(po.no_po || '-');
+            renderPoSummary(po);
+            renderReceivedInvoices(po.received_invoices || []);
+        }
+
+        function setReceivedInvoiceHistoryOpen(isOpen) {
+            $('#receiveInvoiceHistoryBody').toggleClass('d-none', !isOpen);
+            let button = $('#receiveInvoiceHistoryToggle');
+            button.attr('aria-expanded', isOpen ? 'true' : 'false')
+                .attr('aria-label', `${isOpen ? 'Tutup' : 'Buka'} riwayat barang diterima di faktur terpisah`);
+            button.find('span').text(isOpen ? 'Tutup' : 'Buka');
+            button.find('i')
+                .toggleClass('mdi-chevron-up', isOpen)
+                .toggleClass('mdi-chevron-down', !isOpen);
+        }
+
+        $('#receiveInvoiceHistoryToggle').on('click', function() {
+            setReceivedInvoiceHistoryOpen($(this).attr('aria-expanded') !== 'true');
         });
 
-        function loadApprovedPo(selectedId, selectedText) {
-            return $.ajax({
-                url: '{{ route("penerimaan.approvedPo") }}',
-                type: 'GET',
-                dataType: 'json',
-                success: function(response) {
-                    let select = $('#purchase_order_id');
-                    select.empty().append('<option value="">-- Pilih PO --</option>');
+        function renderReceivedInvoices(invoices) {
+            setReceivedInvoiceHistoryOpen(!window.matchMedia('(max-width: 767.98px)').matches);
+            $('#receiveInvoiceHistory').removeClass('d-none');
+            $('#receiveInvoiceHistoryCount').text(`${invoices.length.toLocaleString('id-ID')} faktur`);
+            $('#receiveInvoiceHistoryEmpty').toggleClass('d-none', invoices.length > 0);
+            $('#receiveInvoiceHistoryList').html(invoices.map(invoice => `
+                <article class="receive-history-card">
+                    <div class="receive-history-card-header">
+                        <div class="receive-history-reference">
+                            <strong>Faktur ${escapeHtml(invoice.nomor_faktur || '-')}</strong>
+                            <small>${escapeHtml(invoice.nomor_penerimaan || '-')} · Tanggal faktur ${escapeHtml(formatDateDisplay(invoice.tanggal_faktur))} · Diterima ${escapeHtml(formatDateDisplay(invoice.tanggal_penerimaan))}</small>
+                        </div>
+                        <div class="receive-history-status">
+                            ${statusBadge(invoice.status)}
+                            <small>${invoice.status === 'posted' ? 'Sudah masuk stok' : 'Belum masuk stok'}</small>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table receive-history-table receive-mobile-card-table align-middle mb-0">
+                            <thead>
+                                <tr><th scope="col">Barang</th><th scope="col">Qty Diterima</th><th scope="col">No Batch</th><th scope="col">Expired Date</th></tr>
+                            </thead>
+                            <tbody>${(invoice.details || []).map(item => `
+                                <tr>
+                                    <td data-mobile-label="Barang"><strong>${escapeHtml(item.nama_obat || '-')}</strong><small>${escapeHtml(item.kode_obat || '-')}</small></td>
+                                    <td data-mobile-label="Qty Diterima">${formatDecimal(item.qty_diterima)} ${escapeHtml(item.satuan || '-')}</td>
+                                    <td data-mobile-label="No Batch">${escapeHtml(item.no_batch || '-')}</td>
+                                    <td data-mobile-label="Expired Date">${escapeHtml(formatDateDisplay(item.expired_date))}</td>
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                </article>
+            `).join(''));
+        }
 
-                    (response || []).forEach(function(item) {
-                        let option = new Option(item.text, item.id, false, String(item.id) === String(selectedId));
-                        $(option).attr('data-supplier', item.supplier);
-                        $(option).attr('data-outstanding', item.outstanding_qty);
-                        select.append(option);
-                    });
+        function pickerSearchTokens(query) {
+            return String(query || '').toLocaleLowerCase('id-ID').replace(/"/g, '').split(/\s+/).filter(Boolean);
+        }
 
-                    if (selectedId && !select.find(`option[value="${selectedId}"]`).length) {
-                        select.append(new Option(selectedText || `PO #${selectedId}`, selectedId, true, true));
-                    }
+        function pickerMedicineSearchText(po) {
+            return (po.medicines || []).map(medicine => `${medicine.nama_obat} ${medicine.kode_obat}`).join(' ');
+        }
 
-                    if (selectedId) {
-                        select.val(String(selectedId)).trigger('change.select2');
-                    }
+        function pickerMedicineMatches(po) {
+            return pickerMedicineId ? (po.medicines || []).filter(medicine =>
+                String(medicine.id) === pickerMedicineId) : [];
+        }
+
+        function updatePickerMedicineOptions(orders) {
+            pickerMedicines = new Map();
+            orders.forEach(po => (po.medicines || []).forEach(medicine => {
+                pickerMedicines.set(String(medicine.id), medicine);
+            }));
+            let select = $('#receivePoPickerSearch').empty().append(new Option('', ''));
+            [...pickerMedicines.values()]
+                .sort((left, right) => `${left.nama_obat} ${left.kode_obat}`.localeCompare(`${right.nama_obat} ${right.kode_obat}`, 'id-ID'))
+                .forEach(medicine => select.append(new Option(`${medicine.nama_obat} (${medicine.kode_obat})`, String(medicine.id))));
+            select.val(pickerMedicines.has(pickerMedicineId) ? pickerMedicineId : null).trigger('change');
+        }
+
+        function highlightPickerText(value, query) {
+            let tokens = pickerSearchTokens(query).map(token => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            if (!tokens.length) return escapeHtml(value);
+            return String(value ?? '-').split(new RegExp(`(${tokens.join('|')})`, 'gi'))
+                .map((part, index) => index % 2 ? `<mark>${escapeHtml(part)}</mark>` : escapeHtml(part)).join('');
+        }
+
+        function renderPickerMedicines(po, query) {
+            let medicines = po.medicines || [];
+            let matches = pickerMedicineMatches(po);
+            let source = matches.length ? matches : medicines;
+            let visible = source.slice(0, matches.length ? 3 : 2);
+            let preview = visible.map(medicine => `
+                <span class="receive-po-picker-medicine ${matches.length ? 'is-match' : ''}">
+                    <strong>${highlightPickerText(medicine.nama_obat, query)}</strong>
+                    <small>${highlightPickerText(medicine.kode_obat, query)} &middot; Sisa ${formatDecimal(medicine.outstanding_qty)} ${escapeHtml(medicine.satuan)}</small>
+                </span>`).join('');
+            return `
+                <div class="receive-po-picker-item-meta"><strong>${formatDecimal(po.item_count)} item</strong>
+                    <span>Sisa ${formatDecimal(po.outstanding_qty)} qty</span>
+                    ${matches.length ? '<span class="receive-po-picker-match-label"><i class="mdi mdi-pill"></i> Obat ditemukan</span>' : ''}
+                </div>
+                <div class="receive-po-picker-medicines">${preview}</div>
+                ${source.length > visible.length ? `<small class="receive-po-picker-more">+${source.length - visible.length} obat ${matches.length ? 'cocok lainnya' : 'lainnya'} &middot; lihat detail</small>` : ''}`;
+        }
+
+        function updatePickerResults(table) {
+            let rows = table.rows({ search: 'applied' }).data().toArray();
+            let filters = [];
+            if (pickerOrderQuery) filters.push(`Pencarian "${pickerOrderQuery}"`);
+            if (pickerMedicineId) filters.push(`Memuat obat "${pickerQuery}"`);
+            $('#receivePoPickerResultCount').text(filters.length
+                ? `${formatDecimal(rows.length)} PO sesuai pencarian`
+                : `${formatDecimal(rows.length)} pembelian tersedia`);
+            $('#receivePoPickerResultHint').text(filters.length
+                ? filters.join(' · ')
+                : 'Pilih satu PO untuk melanjutkan.');
+        }
+
+        function updatePickerOverview(orders) {
+            $('#receivePickerOrderCount').text(formatDecimal(orders.length));
+            $('#receivePickerOutstandingCount').text(formatDecimal(orders.reduce((total, po) => total + Number(po.outstanding_qty || 0), 0)));
+            $('#receivePickerEstimatedValue').text(formatRupiah(orders.reduce((total, po) => total + Number(po.total_estimasi || 0), 0)));
+        }
+
+        $('#receivePoPickerSearch').select2({
+            dropdownParent: $('#receivePoPickerModal'),
+            width: '100%',
+            placeholder: 'Cari / pilih nama atau kode obat...',
+            allowClear: true,
+            language: {
+                noResults: () => 'Obat tidak ditemukan di PO tersedia.',
+                searching: () => 'Mencari obat...'
+            }
+        });
+
+        $.fn.dataTable.ext.search.push(function(settings, searchData, dataIndex, row) {
+            if (settings.nTable.id !== 'receivePoPickerTable' || !pickerMedicineId) return true;
+            return pickerMedicineMatches(row).length > 0;
+        });
+
+        let pickerTable = null;
+        pickerTable = $('#receivePoPickerTable').DataTable({
+            data: [],
+            autoWidth: false,
+            pageLength: 10,
+            dom: 'rtip',
+            order: [[2, 'desc']],
+            columns: [
+                { data: 'no_po', render: (value, type, row) => type === 'display' ? `
+                    <div class="receive-po-picker-reference"><span><i class="mdi mdi-file-document-outline"></i></span>
+                        <strong>${highlightPickerText(value, pickerOrderQuery)}</strong></div>
+                    <span class="receive-po-picker-approved"><i class="mdi mdi-check-circle-outline"></i> ${row.status === 'diterima_sebagian' ? 'Diterima sebagian' : 'Disetujui'}</span>` : value },
+                { data: 'supplier', render: (value, type, row) => type === 'display'
+                    ? `<strong class="receive-po-picker-supplier">${highlightPickerText(value, pickerOrderQuery)}</strong>
+                        <small class="receive-po-picker-branch"><i class="mdi mdi-map-marker-outline"></i> ${highlightPickerText(row.branch, pickerOrderQuery)}</small>`
+                    : `${value} ${row.branch}` },
+                { data: 'tanggal_po', render: (value, type) => type === 'display'
+                    ? highlightPickerText(formatDateDisplay(value), pickerOrderQuery)
+                    : type === 'filter' ? `${value} ${formatDateDisplay(value)}` : value },
+                { data: 'outstanding_qty', render: (value, type, row) => type === 'display'
+                    ? renderPickerMedicines(row, `${pickerOrderQuery} ${pickerQuery}`) : type === 'filter' ? pickerMedicineSearchText(row) : value },
+                { data: 'total_estimasi', render: (value, type) => type === 'display'
+                    ? `<strong class="receive-po-picker-value">${formatRupiah(value)}</strong>` : value },
+                { data: 'id', orderable: false, searchable: false, render: () => `
+                    <div class="receive-po-picker-row-actions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary receive-po-picker-action" data-action="detail">
+                            <i class="mdi mdi-eye-outline"></i> Detail
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary receive-po-picker-action" data-action="select" aria-pressed="false">
+                            <i class="mdi mdi-check-circle-outline"></i> Pilih
+                        </button>
+                    </div>` }
+            ],
+            columnDefs: [{
+                targets: '_all',
+                createdCell: function(cell, value, row, rowIndex, columnIndex) {
+                    $(cell).attr('data-label', ['Pembelian', 'Supplier / Cabang', 'Tanggal PO', 'Obat & Sisa Qty', 'Total Estimasi', 'Aksi'][columnIndex]);
                 }
+            }],
+            language: {
+                emptyTable: '<div class="receive-po-picker-empty"><i class="mdi mdi-file-check-outline"></i><strong>Belum ada PO siap diterima</strong><span>Pembelian disetujui yang masih bersisa akan tampil di sini.</span></div>',
+                zeroRecords: '<div class="receive-po-picker-empty"><i class="mdi mdi-magnify"></i><strong>PO belum ditemukan</strong><span>Ubah kata pencarian atau hapus filter obat untuk melihat PO lainnya.</span></div>',
+                info: 'Menampilkan _START_–_END_ dari _TOTAL_ pembelian',
+                infoEmpty: 'Tidak ada pembelian',
+                infoFiltered: '(dari _MAX_ pembelian)',
+                paginate: { previous: 'Sebelumnya', next: 'Berikutnya' }
+            },
+            drawCallback: function() {
+                updatePickerSelection();
+                updatePickerResults(this.api());
+            }
+        });
+
+        function showPickerMessage(message, isError = false) {
+            $('#receivePoPickerMessage').text(message)
+                .toggleClass('d-none', !message)
+                .toggleClass('alert-danger', isError)
+                .toggleClass('alert-info', !isError);
+        }
+
+        function updatePickerSelection() {
+            $('#receivePoPickerSelection').text(pickerSelection
+                ? `${pickerSelection.no_po} · ${pickerSelection.supplier}`
+                : 'Belum ada pembelian dipilih');
+            $('#receivePoPickerSelectionPanel').toggleClass('has-selection', Boolean(pickerSelection));
+            $('#receivePoPickerSelectionPanel .receive-po-picker-selection-icon i')
+                .toggleClass('mdi-file-document-outline', !pickerSelection)
+                .toggleClass('mdi-check-circle-outline', Boolean(pickerSelection));
+            $('#receivePoPickerInvoiceOptions').toggleClass('d-none', !pickerSelection);
+            $('#receivePoPickerInvoiceHint').text(pickerSelection
+                ? `Pilih cara pencatatan faktur untuk ${pickerSelection.no_po}.`
+                : 'Pilih cara pencatatan faktur untuk PO terpilih.');
+            $('input[name="receive_invoice_mode"]').prop('disabled', pickerBusy || !pickerSelection)
+                .each(function() {
+                    $(this).prop('checked', this.value === pickerInvoiceMode);
+                });
+            $('.receive-invoice-option').each(function() {
+                $(this).toggleClass('is-selected', $(this).find('input').is(':checked'));
+            });
+            $('#receivePoPickerCreate').prop('disabled', pickerBusy || !pickerSelection || !pickerInvoiceMode);
+            $('#receivePoPickerOrderSearch, #receivePoPickerClearSearch').prop('disabled', pickerBusy);
+            $('#receivePoPickerSearch').prop('disabled', pickerBusy || !pickerMedicines.size);
+            $('#receivePoPickerRefresh, .receive-po-picker-action').prop('disabled', pickerBusy);
+            $('#receivePoPickerSelectDetail').prop('disabled', pickerBusy || !pickerDetail?.can_create_receipt);
+            $('#receivePoPickerTable tbody tr').each(function() {
+                let row = pickerTable?.row(this).data();
+                let selected = Boolean(row && pickerSelection && Number(row.id) === Number(pickerSelection.id));
+                $(this).toggleClass('is-selected', selected)
+                    .find('[data-action="select"]').attr('aria-pressed', String(selected))
+                    .toggleClass('btn-primary', selected).toggleClass('btn-outline-primary', !selected)
+                    .html(`<i class="mdi mdi-check-circle-outline"></i> ${selected ? 'Dipilih' : 'Pilih'}`);
             });
         }
+
+        function selectPickerPurchaseOrder(po) {
+            if (Number(pickerSelection?.id) !== Number(po.id)) {
+                pickerInvoiceMode = '';
+            }
+            pickerSelection = po;
+            updatePickerSelection();
+            document.getElementById('receivePoPickerInvoiceOptions')?.scrollIntoView({
+                behavior: 'smooth', block: 'nearest'
+            });
+        }
+
+        $('input[name="receive_invoice_mode"]').on('change', function() {
+            pickerInvoiceMode = this.value;
+            updatePickerSelection();
+        });
+
+        function showPickerList() {
+            $('#receivePoPickerDetail').addClass('d-none');
+            $('#receivePoPickerList').removeClass('d-none');
+            $('#receivePickerStepList').addClass('is-active');
+            $('#receivePickerStepDetail').removeClass('is-active');
+            pickerTable.columns.adjust();
+        }
+
+        function loadPickerOrders() {
+            pickerListRequest?.abort();
+            pickerDetailRequest?.abort();
+            pickerSelection = null;
+            pickerInvoiceMode = '';
+            pickerDetail = null;
+            pickerBusy = true;
+            $('#receivePoPickerSearch').select2('close');
+            showPickerList();
+            pickerTable.clear().draw();
+            updatePickerOverview([]);
+            $('.receive-po-picker-overview').addClass('is-loading');
+            showPickerMessage('Memuat pembelian disetujui...');
+            updatePickerSelection();
+            pickerListRequest = $.get('{{ route("penerimaan.approvedPo") }}').done(function(orders) {
+                pickerBusy = false;
+                updatePickerOverview(orders || []);
+                $('.receive-po-picker-overview').removeClass('is-loading');
+                pickerTable.rows.add(orders || []);
+                updatePickerMedicineOptions(orders || []);
+                showPickerMessage('');
+                updatePickerSelection();
+            }).fail(function(xhr) {
+                if (xhr.statusText === 'abort') return;
+                pickerBusy = false;
+                updatePickerMedicineOptions([]);
+                $('.receive-po-picker-overview').removeClass('is-loading');
+                showPickerMessage('Pembelian gagal dimuat. Klik muat ulang untuk mencoba kembali.', true);
+                updatePickerSelection();
+            });
+        }
+
+        $('#receivePoPickerModal').on('show.bs.modal', function() {
+            $('#receivePoPickerOrderSearch').val('').trigger('input');
+            $('#receivePoPickerSearch').val(null).trigger('change');
+            loadPickerOrders();
+        }).on('shown.bs.modal', function() {
+            pickerTable.columns.adjust();
+            if (!window.matchMedia('(max-width: 767.98px)').matches) {
+                $('#receivePoPickerOrderSearch').trigger('focus');
+            }
+        }).on('hidden.bs.modal', function() {
+            $('#receivePoPickerSearch').select2('close');
+            pickerListRequest?.abort();
+            pickerDetailRequest?.abort();
+            pickerCreateRequest?.abort();
+        });
+
+        $('#receivePoPickerOrderSearch').on('input', function() {
+            pickerOrderQuery = this.value.trim();
+            $('#receivePoPickerClearSearch').toggleClass('d-none', !this.value);
+            pickerTable.search(pickerOrderQuery, false, true, true).rows().invalidate('data').draw();
+        });
+        $('#receivePoPickerClearSearch').on('click', function() {
+            $('#receivePoPickerOrderSearch').val('').trigger('input').trigger('focus');
+        });
+        $('#receivePoPickerSearch').on('change', function() {
+            pickerMedicineId = this.value || '';
+            pickerQuery = pickerMedicines.get(pickerMedicineId)?.nama_obat || '';
+            pickerTable.search(pickerOrderQuery, false, true, true).rows().invalidate('data').draw();
+        });
+        $('#receivePoPickerRefresh').on('click', loadPickerOrders);
+        $('#receivePoPickerBack').on('click', showPickerList);
+        $('#receivePoPickerSelectDetail').on('click', function() {
+            if (!pickerDetail?.can_create_receipt || pickerBusy) return;
+            selectPickerPurchaseOrder(pickerDetail);
+        });
+
+        $('#receivePoPickerTable').on('click', '.receive-po-picker-action', function() {
+            if (pickerBusy) return;
+            let po = pickerTable.row($(this).closest('tr')).data();
+            if ($(this).data('action') === 'select') {
+                selectPickerPurchaseOrder(po);
+                return;
+            }
+            pickerDetailRequest?.abort();
+            pickerBusy = true;
+            updatePickerSelection();
+            showPickerMessage('Memuat detail pembelian...');
+            pickerDetailRequest = $.get('{{ route("penerimaan.purchaseOrderDetail", ":id") }}'.replace(':id', po.id))
+                .done(function(detail) {
+                    pickerDetail = detail;
+                    $('#receivePickerDetailNumber').text(detail.no_po || '-');
+                    $('#receivePickerDetailSupplier').text(detail.supplier || '-');
+                    $('#receivePickerDetailBranch').text(detail.branch || '-');
+                    $('#receivePickerDetailDate').text(formatDateDisplay(detail.tanggal_po));
+                    $('#receivePickerDetailInsurance').text(formatRupiah(detail.biaya_asuransi));
+                    $('#receivePickerDetailShipping').text(formatRupiah(detail.biaya_pengiriman));
+                    $('#receivePickerDetailTotal').text(formatRupiah(detail.total_estimasi));
+                    $('#receivePickerDetailNotes').text(detail.catatan || '-');
+                    $('#receivePickerDetailRows').html((detail.details || []).map(item => `
+                        <tr>
+                            <td data-mobile-label="Obat"><strong>${highlightPickerText(item.nama_obat, `${pickerOrderQuery} ${pickerQuery}`)}</strong><small class="d-block text-muted">${highlightPickerText(item.kode_obat, `${pickerOrderQuery} ${pickerQuery}`)}</small></td>
+                            <td data-mobile-label="Satuan">${escapeHtml(item.satuan)}</td>
+                            <td data-mobile-label="Qty Pembelian">${formatDecimal(item.qty_po)}</td>
+                            <td data-mobile-label="Qty dalam Penerimaan">${formatDecimal(item.received_qty)}</td>
+                            <td data-mobile-label="Sisa Qty">${formatDecimal(item.outstanding_qty)}</td>
+                            <td data-mobile-label="Harga Estimasi">${formatRupiah(item.harga_estimasi)}</td>
+                            <td data-mobile-label="Diskon 1 / 2 / 3">${formatDecimal(item.diskon_1)}% / ${formatDecimal(item.diskon_2)}% / ${formatDecimal(item.diskon_3)}%</td>
+                            <td data-mobile-label="PPN">${formatDecimal(item.ppn)}%</td>
+                        </tr>`).join(''));
+                    $('#receivePoPickerList').addClass('d-none');
+                    $('#receivePoPickerDetail').removeClass('d-none');
+                    $('#receivePickerStepList').removeClass('is-active');
+                    $('#receivePickerStepDetail').addClass('is-active');
+                    showPickerMessage(detail.can_create_receipt ? ''
+                        : 'Pembelian ini sudah berubah atau tidak lagi tersedia. Muat ulang daftar pembelian.', !detail.can_create_receipt);
+                }).fail(function(xhr) {
+                    if (xhr.statusText === 'abort') return;
+                    showPickerMessage(xhr.responseJSON?.message || 'Detail pembelian gagal dimuat. Silakan coba kembali.', true);
+                }).always(function() {
+                    pickerBusy = false;
+                    updatePickerSelection();
+                });
+        });
+
+        $('#receivePoPickerCreate').on('click', function() {
+            if (!pickerSelection || !pickerInvoiceMode || pickerBusy) return;
+            pickerDetailRequest?.abort();
+            pickerBusy = true;
+            updatePickerSelection();
+            showPickerMessage('Menyiapkan form penerimaan...');
+            pickerCreateRequest = $.get('{{ route("penerimaan.purchaseOrderDetail", ":id") }}'.replace(':id', pickerSelection.id))
+                .done(function(po) {
+                    if (!po.can_create_receipt) {
+                        pickerSelection = null;
+                        showPickerMessage('Pembelian ini sudah berubah atau tidak lagi tersedia. Muat ulang daftar pembelian.', true);
+                        return;
+                    }
+                    pendingReceiptPo = po;
+                    pendingInvoiceMode = pickerInvoiceMode;
+                    editMode = false;
+                    $('#receivePoPickerModal').one('hidden.bs.modal', function() {
+                        $('#penerimaanModal').modal('show');
+                    }).modal('hide');
+                }).fail(function(xhr) {
+                    if (xhr.statusText === 'abort') return;
+                    showPickerMessage(xhr.responseJSON?.message || 'Form penerimaan gagal disiapkan. Silakan coba kembali.', true);
+                }).always(function() {
+                    pickerBusy = false;
+                    updatePickerSelection();
+                });
+        });
 
         function renderPoSummary(po) {
             currentPoAdditionalCost = Number(po.total_biaya_tambahan || 0);
@@ -722,8 +1133,8 @@
         }
 
         function detailRowTemplate(item, existing = null) {
-            let qtyValue = existing ? Number(existing.qty_diterima || 0) : 0;
             let maxQty = Number(item.outstanding_qty || 0);
+            let qtyValue = existing ? Number(existing.qty_diterima || 0) : receiptInvoiceMode === 'single' ? maxQty : 0;
             let harga = existing ? Number(existing.harga_beli || 0) : Number(item.harga_estimasi || 0);
             let diskon1 = Number(item.diskon_1 ?? existing?.diskon_1 ?? existing?.diskon ?? 0);
             let diskon2 = Number(item.diskon_2 ?? existing?.diskon_2 ?? 0);
@@ -754,7 +1165,7 @@
             }
 
             return `
-                <tr class="receive-detail-row" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}"
+                <tr class="receive-detail-row" data-po-detail-id="${escapeHtml(item.id)}" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}"
                     data-diskon-1="${diskon1}" data-diskon-2="${diskon2}" data-diskon-3="${diskon3}" data-diskon-efektif="${diskon}">
                     <td data-mobile-label="Barang">
                         <div class="receive-item-cell">
@@ -777,8 +1188,10 @@
                     <td data-mobile-label="Qty Diterima">
                         <div class="receive-qty-control">
                             <input type="number" class="form-control form-control-sm receive-qty" name="qty_diterima[]"
-                                min="0" max="${maxQty}" step="0.01" value="${qtyValue}">
-                            <button type="button" class="btn btn-sm btn-light receive-fill-max" title="Isi sisa PO">
+                                min="0" max="${maxQty}" step="0.01" value="${qtyValue}" inputmode="decimal"
+                                aria-label="Qty diterima ${escapeHtml(item.nama_obat)}">
+                            <button type="button" class="btn btn-sm btn-light receive-fill-max" title="Isi sisa PO"
+                                aria-label="Isi seluruh sisa ${escapeHtml(item.nama_obat)}">
                                 Max
                             </button>
                         </div>
@@ -787,22 +1200,26 @@
                     </td>
                     <td data-mobile-label="No Batch">
                         <div class="receive-batch-picker">
-                            <select class="form-select form-select-sm receive-batch-select" name="stok_batch_id[]">
+                            <select class="form-select form-select-sm receive-batch-select" name="stok_batch_id[]"
+                                aria-label="Pilih batch ${escapeHtml(item.nama_obat)}">
                                 ${receiveBatchOptionsHtml(batchOptions, selectedBatchId)}
                             </select>
                             <input type="text" class="form-control form-control-sm" name="no_batch[]"
-                                value="${escapeHtml(batch)}" placeholder="Batch manual">
+                                value="${escapeHtml(batch)}" placeholder="Batch manual"
+                                aria-label="Nomor batch ${escapeHtml(item.nama_obat)}">
                             <small class="receive-batch-mode">Input manual jika batch belum tersedia.</small>
                         </div>
                     </td>
                     <td data-mobile-label="Expired Date">
                         <input type="text" class="form-control form-control-sm receive-expired-date"
-                            name="expired_date[]" value="${escapeHtml(expired)}" placeholder="DD-MM-YYYY">
+                            name="expired_date[]" value="${escapeHtml(expired)}" placeholder="DD-MM-YYYY"
+                            aria-label="Tanggal kedaluwarsa ${escapeHtml(item.nama_obat)}">
                         <small class="receive-field-note">Wajib untuk batch baru.</small>
                     </td>
                     <td data-mobile-label="Harga Beli">
                         <input type="text" class="form-control form-control-sm receive-price" name="harga_beli[]"
-                            value="${formatRupiah(harga)}" inputmode="numeric" autocomplete="off">
+                            value="${formatRupiah(harga)}" inputmode="decimal" autocomplete="off"
+                            aria-label="Harga beli ${escapeHtml(item.nama_obat)}">
                         <small class="receive-field-note">Harga per ${escapeHtml(item.satuan || 'satuan')}.</small>
                     </td>
                     <td data-mobile-label="Diskon PO">
@@ -815,7 +1232,8 @@
                     </td>
                     <td data-mobile-label="PPN %">
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
-                            min="0" max="100" step="0.01" value="${ppn}">
+                            min="0" max="100" step="0.01" value="${ppn}" inputmode="decimal"
+                            aria-label="PPN persen ${escapeHtml(item.nama_obat)}">
                         <small class="receive-field-note">Dari PO · default 11%</small>
                     </td>
                     <td data-mobile-label="Subtotal">
@@ -831,6 +1249,43 @@
             `;
         }
 
+        $('#receiveItemSearch').select2({
+            dropdownParent: $('#penerimaanModal'),
+            width: '100%',
+            placeholder: 'Cari / pilih nama atau kode barang dari PO...',
+            allowClear: true,
+            minimumResultsForSearch: 0,
+            language: {
+                noResults: () => 'Barang tidak ditemukan pada PO terpilih.',
+                searching: () => 'Mencari barang...'
+            }
+        }).on('change', function() {
+            filterReceiveItemRows();
+        }).on('select2:select', function() {
+            $('#receiveDetailRows .receive-detail-row:not(.d-none)').first()
+                .find('.receive-qty').trigger('focus');
+        }).on('select2:open', function() {
+            document.querySelector('#penerimaanModal .select2-search__field')?.focus();
+        });
+
+        function filterReceiveItemRows() {
+            let selectedId = String($('#receiveItemSearch').val() || '');
+            $('#receiveDetailRows .receive-detail-row').each(function() {
+                let row = $(this);
+                row.toggleClass('d-none', selectedId !== '' && row.attr('data-po-detail-id') !== selectedId);
+            });
+        }
+
+        function updateReceiveItemSearch(items = []) {
+            let options = '<option value=""></option>';
+            items.forEach(function(item) {
+                let label = `${item.nama_obat || '-'} (${item.kode_obat || '-'}) - Sisa ${formatDecimal(item.outstanding_qty)} ${item.satuan || ''}`;
+                options += `<option value="${escapeHtml(item.id)}">${escapeHtml(label)}</option>`;
+            });
+
+            $('#receiveItemSearch').html(options).val('').prop('disabled', !items.length).trigger('change');
+        }
+
         function renderPoDetails(po, existingDetails = []) {
             let existingByDetail = {};
             existingDetails.forEach(function(detail) {
@@ -839,7 +1294,10 @@
 
             $('#receiveDetailRows').empty();
 
-            if (!po.details || !po.details.length) {
+            let items = (po.details || []).filter(item => Number(item.outstanding_qty) > 0 || existingByDetail[item.id]);
+            updateReceiveItemSearch(items);
+
+            if (!items.length) {
                 $('#receiveDetailEditor').addClass('d-none');
                 $('#receiveDetailEmpty').removeClass('d-none');
                 $('#receiveDetailLiveSummary').addClass('d-none');
@@ -848,11 +1306,11 @@
                 return;
             }
 
-            po.details.forEach(function(item) {
+            items.forEach(function(item) {
                 $('#receiveDetailRows').append(detailRowTemplate(item, existingByDetail[item.id]));
             });
 
-            $('#receiveLineCount').text(po.details.length.toLocaleString('id-ID'));
+            $('#receiveLineCount').text(items.length.toLocaleString('id-ID'));
             $('#receiveDetailEditor').removeClass('d-none');
             $('#receiveDetailEmpty').addClass('d-none');
 
@@ -887,7 +1345,7 @@
                 let discount1 = Number(row.data('diskon-1')) || 0;
                 let discount2 = Number(row.data('diskon-2')) || 0;
                 let discount3 = Number(row.data('diskon-3')) || 0;
-                let tax = Number(row.find('.receive-tax').val()) || 0;
+                let tax = normalizedPercent(row.find('.receive-tax').val());
                 let max = Number(row.data('max')) || 0;
                 let conversion = Number(row.data('konversi')) || 1;
                 let purchaseUnit = row.data('satuan') || 'satuan';
@@ -896,11 +1354,12 @@
                 let batch = row.find('input[name="no_batch[]"]').val()?.trim();
                 let expired = row.find('input[name="expired_date[]"]').val()?.trim();
                 let hasBatchInfo = selectedBatchId ? Boolean(batch) : Boolean(batch && expired);
-                let subtotal = qty * price;
+                // Match the server's rounding for each receipt line before summing the invoice.
+                let subtotal = roundMoney(qty * price);
                 let taxBase = tieredDiscountNet(subtotal, discount1, discount2, discount3);
-                let discountValue = Math.max(0, subtotal - taxBase);
-                let taxValue = taxBase * tax / 100;
-                let total = taxBase + taxValue;
+                let discountValue = roundMoney(Math.max(0, subtotal - taxBase));
+                let taxValue = roundMoney(taxBase * (tax / 100));
+                let total = roundMoney(taxBase + taxValue);
                 let check = row.find('.receive-row-check');
 
                 totalOutstanding += max;
@@ -959,23 +1418,23 @@
         }
 
         function syncInvoiceTotals(stats) {
-            let subtotal = Number(stats.totalSubtotal) || 0;
-            let discount = Number(stats.totalDiscount) || 0;
-            let tax = Number(stats.totalTax) || 0;
+            let subtotal = roundMoney(stats.totalSubtotal);
+            let discount = roundMoney(stats.totalDiscount);
+            let tax = roundMoney(stats.totalTax);
             let otherCostInput = $('input[name="biaya_lain"]');
             let paidInput = $('input[name="jumlah_dibayar"]');
             let receivedQty = Number(stats.totalQty) || 0;
             let otherCost = currentPoTotalQty > 0
-                ? Math.round((currentPoAdditionalCost * Math.min(receivedQty, currentPoTotalQty) / currentPoTotalQty) * 100) / 100
+                ? roundMoney(currentPoAdditionalCost * Math.min(receivedQty, currentPoTotalQty) / currentPoTotalQty)
                 : 0;
             setMoneyInput('biaya_lain', otherCost);
-            let grossTotal = Math.max(0, subtotal - discount + tax + otherCost);
+            let grossTotal = roundMoney(Math.max(0, subtotal - discount + tax + otherCost));
             let compensationEnabled = $('#applySupplierCompensation').is(':checked') && supplierCompensationAvailable > 0;
             let compensationInput = $('#supplierCompensationDiscount');
             let maxCompensationDiscount = Math.min(grossTotal, supplierCompensationAvailable);
             let compensationDiscount = compensationEnabled ? parseCurrencyValue(compensationInput.val()) : 0;
-            compensationDiscount = Math.min(maxCompensationDiscount, compensationDiscount);
-            let payableTotal = Math.max(0, grossTotal - compensationDiscount);
+            compensationDiscount = roundMoney(Math.min(maxCompensationDiscount, compensationDiscount));
+            let payableTotal = roundMoney(Math.max(0, grossTotal - compensationDiscount));
             let paid = getMoneyInput('jumlah_dibayar');
             let isEditingPaid = paidInput.is(':focus');
 
@@ -989,11 +1448,9 @@
                 }
             }
 
-            if (paid > payableTotal) {
-                paid = payableTotal;
-            }
+            paid = Math.min(roundMoney(paid), payableTotal);
 
-            let debt = Math.max(0, payableTotal - paid);
+            let debt = roundMoney(Math.max(0, payableTotal - paid));
             let paymentStatus = paymentStatusFromAmounts(payableTotal, paid);
 
             if (grossTotal > 0 && payableTotal <= 0) {
@@ -1140,6 +1597,7 @@
         });
 
         $('#fillAllOutstanding').on('click', function() {
+            $('#receiveItemSearch').val('').trigger('change');
             $('.receive-detail-row').each(function() {
                 $(this).find('.receive-qty').val(Number($(this).data('max')) || 0);
             });
@@ -1147,38 +1605,9 @@
         });
 
         $('#clearAllQty').on('click', function() {
+            $('#receiveItemSearch').val('').trigger('change');
             $('.receive-detail-row .receive-qty').val(0);
             recalculateReceiveTotals();
-        });
-
-        $('#purchase_order_id').on('change', function() {
-            let poId = $(this).val();
-
-            if (!poId) {
-                currentPoAdditionalCost = 0;
-                currentPoTotalQty = 0;
-                $('#receive_supplier').val('');
-                hideSupplierCompensationAlert();
-                $('#receivePoSummary').addClass('d-none');
-                $('#receiveDetailRows').empty();
-                $('#receiveDetailEditor').addClass('d-none');
-                $('#receiveDetailEmpty').removeClass('d-none');
-                $('#receiveDetailLiveSummary').addClass('d-none');
-                $('#receiveLineCount').text('0');
-                $('#receiveReadyRows, #receiveWarningRows').text('0 item');
-                $('#receiveLiveQty').text('0');
-                $('#receiveLiveValue').text(formatRupiah(0));
-                $('#summaryItemPo, #summaryOutstandingQty, #summaryFilledQty').text('0');
-                $('#summaryReceivePercent').text('0%');
-                $('#summaryReceiveMeter').css('width', '0%');
-                recalculateReceiveTotals();
-                return;
-            }
-
-            $.get('{{ route("penerimaan.purchaseOrderDetail", ":id") }}'.replace(':id', poId), function(po) {
-                renderPoSummary(po);
-                renderPoDetails(po);
-            });
         });
 
         function updateReceiveSummary(summary, recordsTotal) {
@@ -1197,11 +1626,96 @@
             $('#receiveCancelledInsight').text(cancelled.toLocaleString('id-ID'));
         }
 
+        function renderReceiveItems(row, type) {
+            const total = `${formatDecimal(row.total_barang)} item / ${formatDecimal(row.total_qty)}`;
+            if (type !== 'display' || !row.obat_dipilih_details?.length) return total;
+
+            // DataTables already escapes the nested medicine strings in the response.
+            const medicine = row.obat_dipilih_details[0];
+            return `<span class="receive-medicine-receipt-total">Total penerimaan: ${total}</span><div class="receive-medicine-matches">
+                <div class="receive-medicine-match-title">
+                    <strong>${medicine.nama_obat}</strong>
+                    <span>${medicine.kode_obat || '-'}</span>
+                </div>
+                ${row.obat_dipilih_details.map(detail => `
+                <div class="receive-medicine-match">
+                    <dl class="receive-medicine-batch-meta">
+                        <div><dt>Qty diterima</dt><dd>${formatDecimal(detail.qty_diterima)} ${detail.satuan}</dd></div>
+                        <div><dt>Batch</dt><dd>${detail.no_batch || '-'}</dd></div>
+                        <div><dt>Kedaluwarsa</dt><dd>ED: ${escapeHtml(formatDateDisplay(detail.expired_date))}</dd></div>
+                    </dl>
+                </div>
+            `).join('')}</div>`;
+        }
+
+        function renderReceiveMedicineOption(medicine) {
+            if (!medicine.id || !medicine.nama_obat) return medicine.text;
+            return $(`<span class="receive-medicine-option">
+                <strong>${escapeHtml(medicine.nama_obat)}</strong>
+                <small>Kode: ${escapeHtml(medicine.kode_obat || '-')}</small>
+            </span>`);
+        }
+
+        function renderReceiveMedicineCard(row) {
+            // Receipt text is escaped by the DataTables endpoint; actions are its trusted HTML.
+            return `<article class="receive-medicine-result-card">
+                <header class="receive-medicine-result-card-header">
+                    <div><small>Nomor penerimaan</small><h6>${row.nomor_penerimaan || '-'}</h6></div>
+                    ${statusBadge(row.status)}
+                </header>
+                <dl class="receive-medicine-receipt-meta">
+                    <div class="is-wide"><dt>Supplier</dt><dd>${row.supplier || '-'}</dd></div>
+                    <div><dt>Tanggal terima</dt><dd>${escapeHtml(formatDateDisplay(row.tanggal))}</dd></div>
+                    <div><dt>Nomor PO</dt><dd>${row.no_po || '-'}</dd></div>
+                    <div><dt>Nomor faktur</dt><dd>${row.nomor_faktur || '-'}</dd></div>
+                    <div><dt>Total faktur</dt><dd>${formatRupiah(row.grand_total)}</dd></div>
+                </dl>
+                <div class="receive-medicine-result-card-body">${renderReceiveItems(row, 'display')}</div>
+                <footer class="receive-medicine-result-card-footer">
+                    <span>Aksi penerimaan</span>
+                    <div class="purchase-action-group">${row.actions || ''}</div>
+                </footer>
+            </article>`;
+        }
+
+        function updateReceiveMedicineResults(table) {
+            const filtered = Boolean(receiveMedicineId);
+            $('#receiveTableSection').toggleClass('is-medicine-filtered', filtered);
+            $('#receiveMedicineResults').prop('hidden', !filtered).attr('aria-busy', 'false');
+            if (!filtered) {
+                $('#receiveMedicineResultList').empty();
+                $('#receiveMedicineResultCount').text('');
+                return;
+            }
+
+            const rows = table.rows({ page: 'current' }).data().toArray();
+            const page = table.page.info();
+            $('#receiveMedicineResultCount').text(rows.length
+                ? `${formatDecimal(page.start + 1)}–${formatDecimal(page.end)} dari ${formatDecimal(page.recordsDisplay)} penerimaan`
+                : '0 penerimaan ditemukan');
+            $('#receiveMedicineResultList').html(rows.length
+                ? rows.map(renderReceiveMedicineCard).join('')
+                : `<div class="receive-medicine-results-empty">
+                    <i class="mdi mdi-package-variant" aria-hidden="true"></i>
+                    <strong>Belum ada penerimaan yang sesuai</strong>
+                    <p>Coba ubah tanggal, status, atau pencarian nomor penerimaan. Pilih obat lain untuk mencari kembali.</p>
+                </div>`);
+        }
+
+        $('#tablePenerimaan').on('preXhr.dt', function() {
+            if (!receiveMedicineId) return;
+            $('#receiveMedicineResults').attr('aria-busy', 'true');
+            $('#receiveMedicineResultCount').text('Memuat penerimaan...');
+            $('#receiveMedicineResultList').html('<div class="receive-medicine-results-empty"><i class="mdi mdi-loading mdi-spin" aria-hidden="true"></i><span>Memuat riwayat penerimaan obat...</span></div>');
+        });
+
         let PenerimaanTable = $('#tablePenerimaan').DataTable({
             processing: true,
             serverSide: true,
             responsive: window.matchMedia('(min-width: 768px)').matches,
             autoWidth: false,
+            dom: 'rt<"receive-table-footer"ip>',
+            pagingType: 'simple_numbers',
             pageLength: 10,
             order: [
                 [7, 'desc']
@@ -1211,6 +1725,7 @@
                 type: 'GET',
                 data: function(request) {
                     request.purchase_order_id = selectedPurchaseOrderId || '';
+                    request.obat_id = receiveMedicineId;
                     request.date_start = receiveDateStart;
                     request.date_end = receiveDateEnd;
                 },
@@ -1255,7 +1770,7 @@
                 },
                 {
                     data: null,
-                    render: row => `${Number(row.total_barang || 0).toLocaleString('id-ID')} item / ${Number(row.total_qty || 0).toLocaleString('id-ID')}`
+                    render: renderReceiveItems
                 },
                 {
                     data: 'grand_total',
@@ -1298,13 +1813,17 @@
                 }
             },
             drawCallback: function() {
-                let table = $('#tablePenerimaan');
+                updateReceiveMedicineResults(this.api());
+                let table = $('#tablePenerimaan, #receiveMedicineResultList');
                 table.find('.btn-info').attr('title', 'Lihat detail penerimaan');
                 table.find('.btn-print-receipt').attr('title', 'Cetak penerimaan');
                 table.find('.btn-success').attr('title', 'Edit draft penerimaan');
                 table.find('.btn-primary').attr('title', 'Posting penerimaan ke stok');
                 table.find('.btn-warning').attr('title', 'Batalkan penerimaan');
                 table.find('.btn-danger').attr('title', 'Hapus draft penerimaan');
+                table.find('.purchase-action-group .btn[title]').each(function() {
+                    $(this).attr('aria-label', $(this).attr('title'));
+                });
             },
             language: {
                 processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat penerimaan...</span>',
@@ -1375,6 +1894,62 @@
         $('#receiveDatePreset').val(selectedPurchaseOrderId ? '' : 'this_month');
         $('#receiveDateRange').closest('.purchase-date-input').toggleClass('has-value', !selectedPurchaseOrderId);
 
+        $('#receiveMedicineFilter').select2({
+            width: '100%',
+            placeholder: 'Ketik nama atau kode obat...',
+            dropdownParent: $('.receive-medicine-select'),
+            templateResult: renderReceiveMedicineOption,
+            templateSelection: renderReceiveMedicineOption,
+            minimumResultsForSearch: 0,
+            allowClear: false,
+            ajax: {
+                url: '{{ route("penerimaan.receiptMedicines") }}',
+                dataType: 'json',
+                delay: 250,
+                data: params => ({
+                    q: params.term || '',
+                    page: params.page || 1,
+                    purchase_order_id: selectedPurchaseOrderId || ''
+                })
+            },
+            language: {
+                noResults: () => 'Obat tidak ditemukan dalam penerimaan.',
+                searching: () => 'Mencari obat...',
+                loadingMore: () => 'Memuat obat lainnya...',
+                errorLoading: () => 'Daftar obat gagal dimuat. Silakan coba lagi.'
+            }
+        }).on('change', function() {
+            receiveMedicineId = this.value || '';
+            $('#clearReceiveMedicineFilter').prop('disabled', !receiveMedicineId);
+            $('#receiveTableSection').toggleClass('is-medicine-filtered', Boolean(receiveMedicineId));
+            $('#receiveMedicineResults').prop('hidden', !receiveMedicineId);
+
+            if (receiveMedicineId) {
+                receiveDateStart = '';
+                receiveDateEnd = '';
+                receiveDatePicker.clear(false);
+                $('#receiveDatePreset').val('');
+                $('#receiveDateRange').closest('.purchase-date-input').removeClass('has-value');
+            }
+
+            $('#receiveMedicineFilterHint').text(receiveMedicineId
+                ? 'Periode diatur ke semua tanggal saat memilih obat. Gunakan filter tanggal dan status untuk mempersempit hasil.'
+                : 'Ketik nama atau kode obat, lalu pilih obat untuk melihat riwayat penerimaan dan batch-nya.');
+            PenerimaanTable.ajax.reload();
+        });
+
+        $('#receiveMedicineFilter').on('select2:open', function() {
+            $('.receive-medicine-select .select2-dropdown').addClass('receive-medicine-dropdown');
+            $('.receive-medicine-select .select2-search__field')
+                .attr('placeholder', 'Cari nama / kode obat')
+                .attr('aria-label', 'Cari nama atau kode obat dalam penerimaan');
+        });
+
+        $('#clearReceiveMedicineFilter').on('click', function() {
+            $('#receiveMedicineFilter').val(null).trigger('change');
+            $('.receive-medicine-select .select2-selection').trigger('focus');
+        });
+
         $('#clearReceiveDateRange').on('click', function() {
             receiveDateStart = '';
             receiveDateEnd = '';
@@ -1427,6 +2002,13 @@
                 .toggleClass('mdi-chevron-up', isOpen);
         });
 
+        $('#penerimaanModal').on('click', '[data-receive-section]', function() {
+            document.getElementById($(this).data('receive-section'))?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'start'
+            });
+        });
+
         $('#penerimaanModal').on('click', '.receive-mobile-section-toggle', function() {
             let button = $(this);
             let panel = $(button.data('mobile-panel'));
@@ -1448,6 +2030,7 @@
             button
                 .attr('aria-expanded', isExpanded ? 'true' : 'false')
                 .attr('title', isExpanded ? 'Sembunyikan informasi tambahan' : 'Tampilkan informasi tambahan')
+                .attr('aria-label', isExpanded ? 'Sembunyikan informasi tambahan' : 'Tampilkan informasi tambahan')
                 .find('span')
                 .text(isExpanded ? 'Ringkas' : 'Info');
             button.find('i')
@@ -1455,8 +2038,18 @@
                 .toggleClass('mdi-chevron-up', isExpanded);
         });
 
-        $('#tablePenerimaan').on('xhr.dt', function() {
+        $('#tablePenerimaan').on('xhr.dt', function(event, settings, response) {
             $('#refreshReceiveTable').removeClass('is-loading').prop('disabled', false);
+            if (receiveMedicineId && !response) {
+                $('#receiveMedicineResults').attr('aria-busy', 'false');
+                $('#receiveMedicineResultCount').text('Data gagal dimuat');
+                $('#receiveMedicineResultList').html(`<div class="receive-medicine-results-empty">
+                    <i class="mdi mdi-alert-circle-outline" aria-hidden="true"></i>
+                    <strong>Riwayat penerimaan gagal dimuat</strong>
+                    <p>Tekan tombol muat ulang data untuk mencoba kembali.</p>
+                </div>`);
+                return true;
+            }
         });
 
         $('#scrollReceiveTable').on('click', function() {
@@ -1466,14 +2059,34 @@
             });
         });
 
+        function openNextInvoice(poId) {
+            $.get('{{ route("penerimaan.purchaseOrderDetail", ":id") }}'.replace(':id', poId))
+                .done(function(po) {
+                    if (!po.can_create_receipt) {
+                        Swal.fire('Faktur sudah disimpan', 'Seluruh qty PO sudah masuk ke penerimaan. Tidak ada sisa untuk faktur berikutnya.', 'success');
+                        return;
+                    }
+                    pendingReceiptPo = po;
+                    pendingInvoiceMode = 'split';
+                    editMode = false;
+                    $('#penerimaanModal').modal('show');
+                }).fail(function(xhr) {
+                    Swal.fire('Faktur sudah disimpan', xhr.responseJSON?.message ||
+                        'Form faktur berikutnya belum dapat dimuat. Buka daftar PO untuk melanjutkan pencatatan.', 'warning');
+                });
+        }
+
         $('#penerimaanForm').on('submit', function(e) {
             e.preventDefault();
-            $(document.activeElement).filter('.invoice-money').trigger('blur');
+            if (receiptSaving) return;
+            $(document.activeElement).filter('.invoice-money, .receive-price').trigger('blur');
+            recalculateReceiveTotals();
 
             let itemStats = collectReceiveStats();
             let hasValidItem = itemStats.itemCount > 0 && itemStats.invalidRows === 0;
 
             if (!hasValidItem) {
+                $('#receiveItemSearch').val('').trigger('change');
                 updateFormProgress();
                 document.getElementById('receiveDetailSection')?.scrollIntoView({
                     behavior: 'smooth',
@@ -1507,12 +2120,22 @@
             let url = id ? '{{ route("penerimaan.update", ":id") }}'.replace(':id', id) :
                 '{{ route("penerimaan.store") }}';
             let method = id ? 'PUT' : 'POST';
+            let createNextInvoice = !id && receiptInvoiceMode === 'split'
+                && e.originalEvent?.submitter?.id === 'submitPenerimaanNextInvoice';
+            let poId = $('#purchase_order_id').val();
+            receiptSaving = true;
+            $('#submitPenerimaanForm, #submitPenerimaanNextInvoice').prop('disabled', true);
 
             $.ajax({
                 url: url,
                 type: method,
                 data: serializePenerimaanForm(),
                 success: function(response) {
+                    if (createNextInvoice) {
+                        $('#penerimaanModal').one('hidden.bs.modal', function() {
+                            openNextInvoice(poId);
+                        });
+                    }
                     $('#penerimaanModal').modal('hide');
                     Swal.fire({
                         icon: 'success',
@@ -1534,12 +2157,17 @@
                         title: 'Gagal menyimpan',
                         text: firstError || message
                     });
+                },
+                complete: function() {
+                    receiptSaving = false;
+                    $('#submitPenerimaanForm, #submitPenerimaanNextInvoice').prop('disabled', false);
                 }
             });
         });
 
         window.editPenerimaan = function(id) {
             $.get('{{ route("penerimaan.edit", ":id") }}'.replace(':id', id), function(response) {
+                resetPenerimaanForm(false);
                 editMode = true;
                 let header = response.header;
                 let po = response.po_payload;
@@ -1568,14 +2196,12 @@
                         Number(header.jumlah_dibayar || 0)));
                     $('textarea[name="catatan"]').val(header.catatan || '');
 
-                    loadApprovedPo(header.purchase_order_id, `${po.no_po} - ${po.supplier}`).then(function() {
-                        renderPoSummary(po);
-                        let compensationDiscount = Number(header.supplier_compensation_discount || 0);
-                        $('#applySupplierCompensation').prop('checked', compensationDiscount > 0);
-                        $('#supplierCompensationDiscount').prop('disabled', compensationDiscount <= 0);
-                        setMoneyInput('supplier_compensation_discount', compensationDiscount);
-                        renderPoDetails(po, header.details || []);
-                    });
+                    applyPurchaseOrder(po);
+                    let compensationDiscount = Number(header.supplier_compensation_discount || 0);
+                    $('#applySupplierCompensation').prop('checked', compensationDiscount > 0);
+                    $('#supplierCompensationDiscount').prop('disabled', compensationDiscount <= 0);
+                    setMoneyInput('supplier_compensation_discount', compensationDiscount);
+                    renderPoDetails(po, header.details || []);
                 });
 
                 $('#penerimaanModal').modal('show');

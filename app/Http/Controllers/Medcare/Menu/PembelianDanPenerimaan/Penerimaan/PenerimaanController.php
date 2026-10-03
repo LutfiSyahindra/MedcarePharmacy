@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Penerimaan;
 
 use App\Http\Controllers\Controller;
+use App\Models\MasterObatModel;
 use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
@@ -65,6 +66,7 @@ class PenerimaanController extends Controller
     {
         $request->validate([
             'purchase_order_id' => ['nullable', 'integer', 'min:1'],
+            'obat_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $query = PenerimaanBarangModel::with(['purchaseOrder', 'distributor', 'createdBy'])
@@ -75,6 +77,15 @@ class PenerimaanController extends Controller
 
         if ($request->filled('purchase_order_id')) {
             $query->where('purchase_order_id', $request->integer('purchase_order_id'));
+        }
+
+        if ($request->filled('obat_id')) {
+            $medicineId = $request->integer('obat_id');
+            $query->whereHas('details', fn ($details) => $details->where('obat_id', $medicineId))
+                ->with(['details' => fn ($details) => $details
+                    ->where('obat_id', $medicineId)
+                    ->with(['obat.satuan', 'purchaseOrderDetail.satuanKonversi.satuan'])
+                    ->orderBy('id')]);
         }
 
         if ($request->filled('date_start')) {
@@ -104,6 +115,22 @@ class PenerimaanController extends Controller
             ->addColumn('supplier', fn ($row) => $row->distributor->nama ?? '-')
             ->addColumn('tanggal', fn ($row) => optional($row->tanggal_penerimaan)->format('Y-m-d'))
             ->addColumn('user', fn ($row) => $row->createdBy->name ?? '-')
+            ->addColumn('obat_dipilih_details', function ($row) use ($request) {
+                if (! $request->filled('obat_id')) {
+                    return [];
+                }
+
+                return $row->details->map(fn ($detail) => [
+                    'obat_id' => $detail->obat_id,
+                    'nama_obat' => $detail->obat->nama_obat ?? '-',
+                    'kode_obat' => $detail->obat->kode_obat ?? '-',
+                    'qty_diterima' => (float) $detail->qty_diterima,
+                    'satuan' => $detail->satuan_beli
+                        ?: ($detail->purchaseOrderDetail?->satuanKonversi?->satuan?->nama ?? ($detail->obat->satuan->nama ?? '-')),
+                    'no_batch' => $detail->no_batch,
+                    'expired_date' => optional($detail->expired_date)->format('Y-m-d'),
+                ])->values()->all();
+            })
             ->addColumn('actions', function ($row) use ($approvalUser) {
                 $canApprove = $this->transactionNotifications->canApproveBranch(
                     $approvalUser,
@@ -126,9 +153,53 @@ class PenerimaanController extends Controller
 
                 return $detailButton.' '.$printButton.' '.$editButton.' '.$postButton.' '.$cancelButton.' '.$deleteButton;
             })
+            ->removeColumn('details')
             ->rawColumns(['actions'])
             ->with(['summary' => $summary])
             ->make(true);
+    }
+
+    public function receiptMedicines(Request $request)
+    {
+        $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'purchase_order_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $receiptMedicineIds = PenerimaanBarangDetailModel::query()
+            ->select('obat_id')
+            ->whereHas('penerimaanBarang', function ($receipts) use ($request) {
+                $this->scopePenerimaanBranch($receipts);
+
+                if ($request->filled('purchase_order_id')) {
+                    $receipts->where('purchase_order_id', $request->integer('purchase_order_id'));
+                }
+            });
+
+        $query = MasterObatModel::query()
+            ->select(['id', 'nama_obat', 'kode_obat'])
+            ->whereIn('id', $receiptMedicineIds);
+        $search = trim((string) $request->input('q', ''));
+
+        if ($search !== '') {
+            $query->where(function ($medicines) use ($search) {
+                $medicines->where('nama_obat', 'like', '%'.$search.'%')
+                    ->orWhere('kode_obat', 'like', '%'.$search.'%');
+            });
+        }
+
+        $medicines = $query->orderBy('nama_obat')->orderBy('id')->simplePaginate(20);
+
+        return response()->json([
+            'results' => $medicines->getCollection()->map(fn ($medicine) => [
+                'id' => $medicine->id,
+                'text' => $medicine->nama_obat.' ('.$medicine->kode_obat.')',
+                'nama_obat' => $medicine->nama_obat,
+                'kode_obat' => $medicine->kode_obat,
+            ])->values(),
+            'pagination' => ['more' => $medicines->hasMorePages()],
+        ]);
     }
 
     public function generateNoPenerimaan()
@@ -148,9 +219,10 @@ class PenerimaanController extends Controller
 
     public function approvedPurchaseOrders()
     {
-        $query = PembelianModel::with(['distributor', 'details'])
+        $query = PembelianModel::with(['distributor', 'branch', 'details.obat.satuan', 'details.satuanKonversi.satuan'])
             ->whereIn('status', self::RECEIVABLE_PO_STATUSES)
-            ->latest('tanggal_po');
+            ->latest('tanggal_po')
+            ->latest('id');
 
         $this->scopePurchaseOrderBranch($query);
 
@@ -158,11 +230,20 @@ class PenerimaanController extends Controller
             ->map(function ($po) {
                 $totalOutstanding = 0;
                 $outstandingItems = 0;
+                $medicines = [];
 
                 foreach ($po->details as $detail) {
-                    $outstanding = max(0, (float) $detail->qty - $this->receivedQtyForPoDetail($detail->id));
+                    $outstanding = max(0, round((float) $detail->qty - $this->receivedQtyForPoDetail($detail->id), 2));
                     $totalOutstanding += $outstanding;
                     $outstandingItems += $outstanding > 0 ? 1 : 0;
+                    $medicines[] = [
+                        'id' => $detail->obat_id,
+                        'nama_obat' => $detail->obat->nama_obat ?? '-',
+                        'kode_obat' => $detail->obat->kode_obat ?? '-',
+                        'satuan' => $detail->satuanKonversi->satuan->nama ?? ($detail->obat->satuan->nama ?? '-'),
+                        'qty_po' => (float) $detail->qty,
+                        'outstanding_qty' => $outstanding,
+                    ];
                 }
 
                 return [
@@ -170,10 +251,14 @@ class PenerimaanController extends Controller
                     'no_po' => $po->no_po,
                     'text' => $po->no_po.' - '.($po->distributor->nama ?? 'Supplier tidak diketahui'),
                     'supplier' => $po->distributor->nama ?? '-',
+                    'branch' => $po->branch->name ?? '-',
+                    'status' => $po->status,
                     'tanggal_po' => $po->tanggal_po,
+                    'total_estimasi' => (float) $po->total_estimasi,
                     'item_count' => $po->details->count(),
                     'outstanding_items' => $outstandingItems,
                     'outstanding_qty' => $totalOutstanding,
+                    'medicines' => $medicines,
                 ];
             })
             ->filter(fn ($po) => $po['outstanding_qty'] > 0)
@@ -581,7 +666,7 @@ class PenerimaanController extends Controller
 
         $this->scopePurchaseOrderBranch($query);
 
-        $po = $query->findOrFail($id);
+        $po = $query->lockForUpdate()->findOrFail($id);
 
         if (! in_array($po->status, self::RECEIVABLE_PO_STATUSES, true)) {
             throw ValidationException::withMessages([
@@ -605,6 +690,8 @@ class PenerimaanController extends Controller
             'total_ppn' => 0,
             'grand_total' => 0,
         ];
+
+        $quantitiesByDetail = [];
 
         foreach ($request->purchase_order_detail_id as $index => $poDetailId) {
             $poDetail = $detailsById->get((int) $poDetailId);
@@ -643,9 +730,11 @@ class PenerimaanController extends Controller
                 throw ValidationException::withMessages(['expired_date.'.$index => 'Expired date wajib diisi.']);
             }
 
-            $outstanding = max(0, (float) $poDetail->qty - $this->receivedQtyForPoDetail($poDetail->id, $ignorePenerimaanId));
+            $outstanding = max(0, round((float) $poDetail->qty - $this->receivedQtyForPoDetail($poDetail->id, $ignorePenerimaanId), 2));
 
-            if ($qty > $outstanding) {
+            $quantitiesByDetail[$poDetail->id] = ($quantitiesByDetail[$poDetail->id] ?? 0) + $qty;
+
+            if ($quantitiesByDetail[$poDetail->id] - $outstanding > 0.00001) {
                 throw ValidationException::withMessages([
                     'qty_diterima.'.$index => 'Qty diterima melebihi sisa PO ('.$outstanding.').',
                 ]);
@@ -721,8 +810,7 @@ class PenerimaanController extends Controller
             return ['total' => 0, 'allocations' => []];
         }
 
-        $grossTotalFaktur = max(
-            0,
+        $grossTotalFaktur = $this->moneyValue(
             (float) $computed['subtotal']
                 - (float) $computed['total_diskon']
                 + (float) $computed['total_ppn']
@@ -864,16 +952,16 @@ class PenerimaanController extends Controller
         array $computed,
         float $supplierCompensationDiscount = 0
     ): array {
-        $subtotal = (float) $computed['subtotal'];
-        $diskon = (float) $computed['total_diskon'];
-        $pajak = (float) $computed['total_ppn'];
+        $subtotal = $this->moneyValue($computed['subtotal']);
+        $diskon = $this->moneyValue($computed['total_diskon']);
+        $pajak = $this->moneyValue($computed['total_ppn']);
         $biayaLain = $this->allocatedPurchaseOrderAdditionalCost($po, (float) $computed['total_qty']);
-        $grossTotalFaktur = max(0, $subtotal - $diskon + $pajak + $biayaLain);
+        $grossTotalFaktur = $this->moneyValue($subtotal - $diskon + $pajak + $biayaLain);
         $supplierCompensationDiscount = min(
             $this->moneyValue($supplierCompensationDiscount),
             $grossTotalFaktur
         );
-        $tagihanSetelahGantiRugi = max(0, $grossTotalFaktur - $supplierCompensationDiscount);
+        $tagihanSetelahGantiRugi = $this->moneyValue($grossTotalFaktur - $supplierCompensationDiscount);
         $jumlahDibayar = $this->moneyValue($request->jumlah_dibayar);
 
         if ($jumlahDibayar > $tagihanSetelahGantiRugi + 0.009) {
@@ -883,7 +971,7 @@ class PenerimaanController extends Controller
         }
 
         $jumlahDibayar = min($jumlahDibayar, $tagihanSetelahGantiRugi);
-        $sisaHutang = max(0, $tagihanSetelahGantiRugi - $jumlahDibayar);
+        $sisaHutang = $this->moneyValue($tagihanSetelahGantiRugi - $jumlahDibayar);
 
         return [
             'nomor_penerimaan' => $request->nomor_penerimaan,
@@ -962,7 +1050,7 @@ class PenerimaanController extends Controller
 
         $details = $po->details->map(function ($detail) use ($ignorePenerimaanId, $batchOptionsByObat) {
             $received = $this->receivedQtyForPoDetail($detail->id, $ignorePenerimaanId);
-            $outstanding = max(0, (float) $detail->qty - $received);
+            $outstanding = max(0, round((float) $detail->qty - $received, 2));
 
             return [
                 'id' => $detail->id,
@@ -995,9 +1083,45 @@ class PenerimaanController extends Controller
             ];
         })->values();
 
+        $poDetailsById = $details->keyBy('id');
+        $receivedInvoices = $po->penerimaanBarang()
+            ->with('details.obat')
+            ->where('status', '!=', 'cancelled')
+            ->when($ignorePenerimaanId, fn ($query) => $query->where('id', '!=', $ignorePenerimaanId))
+            ->orderBy('tanggal_penerimaan')
+            ->orderBy('id')
+            ->get()
+            ->map(function ($receipt) use ($poDetailsById) {
+                return [
+                    'id' => $receipt->id,
+                    'nomor_penerimaan' => $receipt->nomor_penerimaan,
+                    'nomor_faktur' => $receipt->nomor_faktur,
+                    'tanggal_faktur' => optional($receipt->tanggal_faktur)->format('Y-m-d'),
+                    'tanggal_penerimaan' => optional($receipt->tanggal_penerimaan)->format('Y-m-d'),
+                    'status' => $receipt->status,
+                    'details' => $receipt->details->map(function ($detail) use ($poDetailsById) {
+                        $poDetail = $poDetailsById->get($detail->purchase_order_detail_id);
+
+                        return [
+                            'purchase_order_detail_id' => $detail->purchase_order_detail_id,
+                            'obat_id' => $detail->obat_id,
+                            'nama_obat' => $detail->obat->nama_obat ?? '-',
+                            'kode_obat' => $detail->obat->kode_obat ?? '-',
+                            'qty_diterima' => (float) $detail->qty_diterima,
+                            'satuan' => $detail->satuan_beli ?: ($poDetail['satuan'] ?? '-'),
+                            'no_batch' => $detail->no_batch,
+                            'expired_date' => optional($detail->expired_date)->format('Y-m-d'),
+                        ];
+                    })->values(),
+                ];
+            })->values();
+
         return [
             'id' => $po->id,
             'no_po' => $po->no_po,
+            'status' => $po->status,
+            'can_create_receipt' => in_array($po->status, self::RECEIVABLE_PO_STATUSES, true)
+                && $details->sum('outstanding_qty') > 0,
             'supplier' => $po->distributor->nama ?? '-',
             'distributor_id' => $po->distributor_id,
             'branch' => $po->branch->name ?? '-',
@@ -1010,6 +1134,7 @@ class PenerimaanController extends Controller
             'catatan' => $po->catatan,
             'supplier_compensation_alert' => $this->supplierCompensationAlert((int) $po->distributor_id),
             'details' => $details,
+            'received_invoices' => $receivedInvoices,
         ];
     }
 

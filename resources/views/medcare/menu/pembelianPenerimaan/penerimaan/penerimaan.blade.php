@@ -13,6 +13,7 @@
     <div class="purchase-page">
         @include("medcare.menu.pembelianPenerimaan.penerimaan.modalMain")
         @include("medcare.menu.pembelianPenerimaan.penerimaan.modalDetail")
+        @include("medcare.menu.pembelianPenerimaan.penerimaan.modalPurchaseOrder")
 
         <nav class="page-breadcrumb">
             <ol class="breadcrumb">
@@ -27,14 +28,17 @@
                     <i class="mdi mdi-package-variant-closed-check"></i>
                     Receiving Workspace
                 </span>
-                <h2>Terima barang dari PO yang sudah disetujui dengan kontrol batch dan sisa qty.</h2>
+                <h2>
+                    <span class="receive-hero-title-desktop">Terima barang dari PO yang sudah disetujui dengan kontrol batch dan sisa qty.</span>
+                    <span class="receive-hero-title-mobile">Penerimaan Barang</span>
+                </h2>
                 <p>
-                    Pilih PO approved, isi faktur, surat jalan, qty diterima, batch, expired date,
+                    Pilih pembelian yang disetujui, tentukan satu faktur atau pecah faktur, lalu isi surat jalan, qty diterima, batch, expired date,
                     harga beli, diskon, dan PPN dalam satu form yang mudah diaudit.
                 </p>
                 <div class="purchase-hero-actions">
                     <button type="button" class="btn btn-light" id="openPenerimaanModal" data-bs-toggle="modal"
-                        data-bs-target="#penerimaanModal">
+                        data-bs-target="#receivePoPickerModal">
                         <i class="mdi mdi-plus-circle-outline"></i>
                         Buat Penerimaan
                     </button>
@@ -49,7 +53,7 @@
                 <div class="purchase-flow-item">
                     <span class="purchase-flow-icon"><i class="mdi mdi-file-check-outline"></i></span>
                     <div>
-                        <strong>1. Pilih PO Approved</strong>
+                        <strong>1. Pilih Pembelian Disetujui</strong>
                         <small>Hanya PO yang sudah disetujui dan masih bersisa.</small>
                     </div>
                     <i class="mdi mdi-chevron-right purchase-flow-arrow"></i>
@@ -114,7 +118,7 @@
                 <div>
                     <small>Qty diterima periode ini</small>
                     <strong id="receiveTotalQty">0</strong>
-                    <span>Akumulasi qty dari filter tanggal aktif.</span>
+                    <span>Akumulasi qty seluruh item pada penerimaan yang ditampilkan.</span>
                 </div>
             </article>
             <article class="receive-insight-card">
@@ -178,11 +182,34 @@
                         <i class="mdi mdi-tune-variant"></i>
                     </button>
                     <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1"
-                        id="openPenerimaanModalToolbar" data-bs-toggle="modal" data-bs-target="#penerimaanModal">
+                        id="openPenerimaanModalToolbar" data-bs-toggle="modal" data-bs-target="#receivePoPickerModal">
                         <i class="mdi mdi-plus-circle-outline"></i>
                         <span>Tambah Penerimaan</span>
                     </button>
                 </div>
+            </div>
+
+            <div class="receive-medicine-filter" role="group" aria-labelledby="receiveMedicineFilterLabel">
+                <div class="receive-medicine-filter-heading">
+                    <label for="receiveMedicineFilter" id="receiveMedicineFilterLabel">
+                        <i class="mdi mdi-pill" aria-hidden="true"></i> Cari Obat dalam Penerimaan
+                    </label>
+                    <span class="receive-medicine-scope"><i class="mdi mdi-calendar-search" aria-hidden="true"></i> Semua tanggal saat memilih obat</span>
+                </div>
+                <div class="receive-medicine-filter-input">
+                    <div class="receive-medicine-select">
+                        <select id="receiveMedicineFilter" aria-describedby="receiveMedicineFilterHint">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary" id="clearReceiveMedicineFilter" disabled
+                        aria-label="Hapus filter obat" title="Hapus filter obat">
+                        <i class="mdi mdi-close" aria-hidden="true"></i><span>Reset obat</span>
+                    </button>
+                </div>
+                <p id="receiveMedicineFilterHint" role="status" aria-live="polite">
+                    Ketik nama atau kode obat, lalu pilih obat untuk melihat riwayat penerimaan dan batch-nya.
+                </p>
             </div>
 
             <div class="purchase-filter-bar" id="receiveFilterBar">
@@ -243,6 +270,13 @@
             </div>
 
             <div class="table-responsive purchase-table-wrap">
+                <div id="receiveMedicineResults" class="receive-medicine-results" hidden aria-busy="false">
+                    <div class="receive-medicine-results-heading">
+                        <h6>Hasil Pencarian Obat</h6>
+                        <p id="receiveMedicineResultCount" role="status" aria-live="polite"></p>
+                    </div>
+                    <div id="receiveMedicineResultList" class="receive-medicine-result-list"></div>
+                </div>
                 <table id="tablePenerimaan" class="table purchase-table align-middle">
                     <thead>
                         <tr>

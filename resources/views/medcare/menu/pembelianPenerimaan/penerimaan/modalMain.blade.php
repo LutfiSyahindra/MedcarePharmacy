@@ -15,7 +15,7 @@
                         <i class="mdi mdi-file-clock-outline"></i>
                         Draft sebelum posting stok
                     </span>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
             </div>
 
@@ -24,31 +24,34 @@
                     @csrf
                     <input type="hidden" name="penerimaan_id" id="penerimaan_id">
 
-                    <div class="receive-form-progress" aria-label="Progress kelengkapan form">
-                        <div class="receive-progress-step is-active" id="receiveStepPo">
+                    <nav class="receive-form-progress" aria-label="Navigasi dan kelengkapan form">
+                        <button type="button" class="receive-progress-step is-active" id="receiveStepPo"
+                            data-receive-section="receiveInfoSection" aria-controls="receiveInfoSection">
                             <span>1</span>
-                            <div>
+                            <span class="receive-progress-copy">
                                 <strong>Pilih PO</strong>
                                 <small>Belum dipilih</small>
-                            </div>
-                        </div>
+                            </span>
+                        </button>
                         <div class="receive-progress-line"></div>
-                        <div class="receive-progress-step" id="receiveStepItems">
+                        <button type="button" class="receive-progress-step" id="receiveStepItems"
+                            data-receive-section="receiveDetailSection" aria-controls="receiveDetailSection">
                             <span>2</span>
-                            <div>
-                                <strong>Detail Barang</strong>
+                            <span class="receive-progress-copy">
+                                <strong>Barang</strong>
                                 <small>Belum ada qty</small>
-                            </div>
-                        </div>
+                            </span>
+                        </button>
                         <div class="receive-progress-line"></div>
-                        <div class="receive-progress-step" id="receiveStepInvoice">
+                        <button type="button" class="receive-progress-step" id="receiveStepInvoice"
+                            data-receive-section="receiveInvoiceSection" aria-controls="receiveInvoiceSection">
                             <span>3</span>
-                            <div>
+                            <span class="receive-progress-copy">
                                 <strong>Faktur</strong>
                                 <small>Menunggu detail</small>
-                            </div>
-                        </div>
-                    </div>
+                            </span>
+                        </button>
+                    </nav>
 
                     <section class="purchase-form-section receive-info-section" id="receiveInfoSection">
                         <div class="purchase-form-section-header">
@@ -64,42 +67,40 @@
                         <div class="purchase-form-section-body">
                             <div class="row g-3">
                                 <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Nomor Penerimaan</label>
+                                    <label class="form-label" for="nomor_penerimaan">Nomor Penerimaan</label>
                                     <input type="text" class="form-control" name="nomor_penerimaan"
                                         id="nomor_penerimaan" readonly>
                                     <small class="purchase-field-hint">Dibuat otomatis per bulan.</small>
                                 </div>
-                                <div class="col-lg-5 col-md-6">
-                                    <label class="form-label">Nomor PO Approved</label>
-                                    <select class="form-select" name="purchase_order_id" id="purchase_order_id"
-                                        data-width="100%" required>
-                                        <option value="">-- Pilih PO --</option>
-                                    </select>
-                                    <small class="purchase-field-hint">PO yang sudah habis diterima tidak ditampilkan.</small>
+                                <div class="col-lg-5 col-md-6 receive-field-wide">
+                                    <label class="form-label" for="receive_selected_po">Pembelian Terpilih</label>
+                                    <input type="hidden" name="purchase_order_id" id="purchase_order_id">
+                                    <input type="text" class="form-control" id="receive_selected_po" readonly>
+                                    <small class="purchase-field-hint">Penerimaan dibuat dari pembelian yang dipilih.</small>
                                 </div>
-                                <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Supplier</label>
-                                    <input type="text" class="form-control" id="receive_supplier" readonly>
+                                <div class="col-lg-4 col-md-6 receive-field-wide">
+                                    <label class="form-label" for="receive_supplier">Supplier</label>
+                                    <textarea class="form-control receive-supplier-name" id="receive_supplier" rows="2" readonly></textarea>
                                 </div>
                                 <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Nomor Surat Jalan</label>
+                                    <label class="form-label" for="receiveDeliveryNumber">Nomor Surat Jalan</label>
                                     <input type="text" class="form-control" name="nomor_surat_jalan"
-                                        placeholder="Opsional">
+                                        id="receiveDeliveryNumber" placeholder="Opsional">
                                 </div>
                                 <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Tanggal Penerimaan</label>
+                                    <label class="form-label" for="receiveDateInput">Tanggal Penerimaan</label>
                                     <div class="input-group flatpickr" id="receive-date" data-wrap="true"
                                         data-click-opens="true">
                                         <input type="text" class="form-control" placeholder="Pilih tanggal"
-                                            name="tanggal_penerimaan" data-input required>
+                                            name="tanggal_penerimaan" id="receiveDateInput" data-input required>
                                         <span class="input-group-text" data-toggle>
                                             <i class="mdi mdi-calendar-month-outline"></i>
                                         </span>
                                     </div>
                                 </div>
-                                <div class="col-lg-6">
-                                    <label class="form-label">Catatan</label>
-                                    <textarea class="form-control" name="catatan" rows="1"
+                                <div class="col-lg-6 receive-field-wide">
+                                    <label class="form-label" for="receiveNotes">Catatan</label>
+                                    <textarea class="form-control" name="catatan" id="receiveNotes" rows="2"
                                         placeholder="Kondisi barang atau catatan tambahan (opsional)"></textarea>
                                 </div>
                             </div>
@@ -209,6 +210,32 @@
                         </div>
                     </section>
 
+                    <section class="purchase-form-section receive-history-section d-none" id="receiveInvoiceHistory"
+                        aria-labelledby="receiveInvoiceHistoryTitle">
+                        <div class="purchase-form-section-header">
+                            <div class="purchase-form-section-title">
+                                <i class="mdi mdi-history"></i>
+                                <div>
+                                    <strong id="receiveInvoiceHistoryTitle">Barang Diterima di Faktur Terpisah</strong>
+                                    <small>Riwayat faktur lain dari PO ini. Draft belum masuk stok dan sudah mengurangi sisa PO.</small>
+                                </div>
+                            </div>
+                            <span class="receive-item-count" id="receiveInvoiceHistoryCount">0 faktur</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
+                                id="receiveInvoiceHistoryToggle" aria-controls="receiveInvoiceHistoryBody"
+                                aria-expanded="true" aria-label="Tutup riwayat barang diterima di faktur terpisah">
+                                <i class="mdi mdi-chevron-up" aria-hidden="true"></i>
+                                <span>Tutup</span>
+                            </button>
+                        </div>
+                        <div class="purchase-form-section-body" id="receiveInvoiceHistoryBody">
+                            <p class="receive-history-empty mb-0" id="receiveInvoiceHistoryEmpty">
+                                Belum ada barang yang diterima di faktur lain untuk PO ini.
+                            </p>
+                            <div class="receive-history-list" id="receiveInvoiceHistoryList" aria-live="polite"></div>
+                        </div>
+                    </section>
+
                     <section class="purchase-form-section receive-detail-section" id="receiveDetailSection">
                         <div class="purchase-form-section-header">
                             <div class="purchase-form-section-title">
@@ -234,6 +261,17 @@
                         </div>
 
                         <div class="purchase-form-section-body">
+                            <div id="receiveInvoiceModeNotice" class="alert alert-info d-none" role="status"></div>
+                            <div class="receive-item-search mb-3">
+                                <label class="form-label" for="receiveItemSearch">Cari Barang dari PO</label>
+                                <select class="form-select" id="receiveItemSearch"
+                                    aria-describedby="receiveItemSearchHint" disabled>
+                                    <option value=""></option>
+                                </select>
+                                <small class="purchase-field-hint" id="receiveItemSearchHint">
+                                    Cari nama atau kode barang pada PO terpilih. Hapus pilihan untuk melihat semua barang.
+                                </small>
+                            </div>
                             <div class="receive-detail-live-summary d-none" id="receiveDetailLiveSummary">
                                 <div>
                                     <span>Siap disimpan</span>
@@ -336,87 +374,87 @@
                                         <i class="mdi mdi-hand-coin-outline"></i>
                                         <input type="text" class="form-control invoice-money"
                                             name="supplier_compensation_discount" id="supplierCompensationDiscount"
-                                            value="Rp 0" inputmode="numeric" autocomplete="off" disabled>
+                                            value="Rp 0" inputmode="decimal" autocomplete="off" disabled>
                                     </div>
                                     <small>Maksimal <span id="supplierCompensationMax">Rp 0</span></small>
                                 </div>
                             </div>
 
                             <div class="row g-3">
-                                <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Nomor Faktur</label>
+                                <div class="col-lg-4 col-md-6 receive-field-wide">
+                                    <label class="form-label" for="receiveInvoiceNumber">Nomor Faktur</label>
                                     <input type="text" class="form-control" name="nomor_faktur"
-                                        placeholder="Contoh: INV/2026/001" required>
+                                        id="receiveInvoiceNumber" placeholder="Contoh: INV/2026/001" required>
                                 </div>
                                 <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Tanggal Faktur</label>
+                                    <label class="form-label" for="receiveInvoiceDateInput">Tanggal Faktur</label>
                                     <div class="input-group flatpickr" id="invoice-date" data-wrap="true"
                                         data-click-opens="true">
                                         <input type="text" class="form-control" placeholder="Pilih tanggal"
-                                            name="tanggal_faktur" data-input required>
+                                            name="tanggal_faktur" id="receiveInvoiceDateInput" data-input required>
                                         <span class="input-group-text" data-toggle>
                                             <i class="mdi mdi-calendar-month-outline"></i>
                                         </span>
                                     </div>
                                 </div>
                                 <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Tanggal Jatuh Tempo</label>
+                                    <label class="form-label" for="receiveInvoiceDueInput">Tanggal Jatuh Tempo</label>
                                     <div class="input-group flatpickr" id="invoice-due-date" data-wrap="true"
                                         data-click-opens="true">
                                         <input type="text" class="form-control" placeholder="Pilih tanggal"
-                                            name="tanggal_jatuh_tempo" data-input>
+                                            name="tanggal_jatuh_tempo" id="receiveInvoiceDueInput" data-input>
                                         <span class="input-group-text" data-toggle>
                                             <i class="mdi mdi-calendar-alert-outline"></i>
                                         </span>
                                     </div>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Subtotal</label>
+                                <div class="col-lg-3 col-md-6 receive-invoice-breakdown">
+                                    <label class="form-label" for="receiveInvoiceSubtotal">Subtotal</label>
                                     <input type="text" class="form-control invoice-money" name="subtotal"
-                                        value="Rp 0" inputmode="numeric" readonly>
+                                        id="receiveInvoiceSubtotal" value="Rp 0" inputmode="numeric" readonly>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Diskon</label>
+                                <div class="col-lg-3 col-md-6 receive-invoice-breakdown">
+                                    <label class="form-label" for="receiveInvoiceDiscount">Diskon</label>
                                     <input type="text" class="form-control invoice-money" data-invoice-field="diskon"
-                                        value="Rp 0" inputmode="numeric" readonly>
+                                        id="receiveInvoiceDiscount" value="Rp 0" inputmode="numeric" readonly>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Pajak</label>
+                                <div class="col-lg-3 col-md-6 receive-invoice-breakdown">
+                                    <label class="form-label" for="receiveInvoiceTax">Pajak</label>
                                     <input type="text" class="form-control invoice-money" name="pajak"
-                                        value="Rp 0" inputmode="numeric" readonly>
+                                        id="receiveInvoiceTax" value="Rp 0" inputmode="numeric" readonly>
                                 </div>
-                                <div class="col-lg-3 col-md-6">
-                                    <label class="form-label">Biaya Lain</label>
+                                <div class="col-lg-3 col-md-6 receive-invoice-breakdown">
+                                    <label class="form-label" for="receiveInvoiceAdditionalCost">Biaya Lain</label>
                                     <div class="receive-money-field">
                                         <i class="mdi mdi-cash-plus"></i>
                                         <input type="text" class="form-control invoice-money" name="biaya_lain"
-                                            value="Rp 0" inputmode="numeric" autocomplete="off"
+                                            id="receiveInvoiceAdditionalCost" value="Rp 0" inputmode="numeric" autocomplete="off"
                                             placeholder="Rp 0" readonly>
                                     </div>
                                     <small class="purchase-field-hint">Terisi otomatis dari biaya asuransi dan pengiriman PO, sesuai proporsi qty yang diterima.</small>
                                 </div>
-                                <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Total Faktur</label>
+                                <div class="col-lg-4 col-md-6 receive-invoice-breakdown receive-field-wide">
+                                    <label class="form-label" for="receiveInvoiceTotal">Total Faktur</label>
                                     <input type="text" class="form-control invoice-money fw-bold" name="total_faktur"
-                                        value="Rp 0" inputmode="numeric" readonly>
+                                        id="receiveInvoiceTotal" value="Rp 0" inputmode="numeric" readonly>
                                 </div>
-                                <div class="col-lg-4 col-md-6">
+                                <div class="col-lg-4 col-md-6 receive-field-wide">
                                     <label class="form-label" for="invoicePaidAmount">Nominal Pembayaran Faktur</label>
                                     <div class="receive-money-field is-primary" id="paidAmountField">
                                         <i class="mdi mdi-cash-fast"></i>
                                         <input type="text" class="form-control invoice-money" name="jumlah_dibayar"
-                                            id="invoicePaidAmount" value="Rp 0" inputmode="numeric"
+                                            id="invoicePaidAmount" value="Rp 0" inputmode="decimal"
                                             autocomplete="off" placeholder="Rp 0">
                                     </div>
                                     <small class="purchase-field-hint">Isi nominal yang sudah dibayar. Jurnal Keuangan dibuat saat penerimaan diposting.</small>
                                 </div>
-                                <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">Sisa Hutang</label>
+                                <div class="col-lg-4 col-md-6 receive-field-wide">
+                                    <label class="form-label" for="receiveInvoiceDebt">Sisa Hutang</label>
                                     <input type="text" class="form-control invoice-money fw-bold" name="sisa_hutang"
-                                        value="Rp 0" inputmode="numeric" readonly>
+                                        id="receiveInvoiceDebt" value="Rp 0" inputmode="numeric" readonly>
                                     <small class="purchase-field-hint" id="invoicePaymentStatusText">Status: Belum Dibayar</small>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-12 receive-field-wide">
                                     <div class="receive-payment-actions" aria-label="Aksi cepat pembayaran faktur">
                                         <button type="button" class="btn btn-light btn-sm receive-payment-action"
                                             data-payment-action="none">
@@ -440,23 +478,28 @@
                         </div>
                     </section>
 
-                    <div class="receive-form-actions">
-                        <div class="receive-form-total">
-                            <span>Total Penerimaan</span>
-                            <strong id="receiveGrandTotal">Rp 0</strong>
-                            <small><span id="receiveModalItemCount">0</span> item · Qty <span id="receiveModalQtyCount">0</span></small>
-                        </div>
-                        <div class="receive-form-buttons">
-                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                                Batal
-                            </button>
-                            <button type="submit" id="submitPenerimaanForm" class="btn btn-primary">
-                                <i class="mdi mdi-content-save-outline"></i>
-                                Simpan Draft
-                            </button>
-                        </div>
-                    </div>
                 </form>
+            </div>
+
+            <div class="modal-footer receive-form-actions receive-form-footer">
+                <div class="receive-form-total">
+                    <span>Total Penerimaan</span>
+                    <strong id="receiveGrandTotal">Rp 0</strong>
+                    <small><span id="receiveModalItemCount">0</span> item · Qty <span id="receiveModalQtyCount">0</span></small>
+                </div>
+                <div class="receive-form-buttons">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        Batal
+                    </button>
+                    <button type="submit" form="penerimaanForm" id="submitPenerimaanForm" class="btn btn-primary">
+                        <i class="mdi mdi-content-save-outline"></i>
+                        Simpan Draft
+                    </button>
+                    <button type="submit" form="penerimaanForm" id="submitPenerimaanNextInvoice" class="btn btn-outline-primary d-none">
+                        <i class="mdi mdi-file-document-multiple-outline"></i>
+                        Simpan &amp; Faktur Berikutnya
+                    </button>
+                </div>
             </div>
         </div>
     </div>
