@@ -90,6 +90,9 @@ class MarginsService
                 'persentase' => number_format($persentase).'%',
                 'tingkat' => $r->tingkat,
                 'is_active' => $r->is_active,
+                'is_used' => $r->used_at !== null || $r->used_batch_count > 0,
+                'used_product_count' => (int) $r->used_product_count,
+                'used_batch_count' => (int) $r->used_batch_count,
             ];
         }
 
@@ -184,8 +187,20 @@ class MarginsService
     public function findByIdMargins($id)
     {
         $Margins = $this->MarginsRepository->findByIdMargins($id);
+        $Margins->is_used = $Margins->used_at !== null || $Margins->used_batch_count > 0;
 
         return $Margins;
+    }
+
+    public function markMarginUsed(MarginsModel $margin): void
+    {
+        if ($margin->used_at !== null) {
+            return;
+        }
+
+        MarginsModel::query()->whereKey($margin->id)->whereNull('used_at')->update(['used_at' => now()]);
+        $margin->used_at = now();
+        $margin->syncOriginalAttribute('used_at');
     }
 
     public function updateMargins($id, array $data)

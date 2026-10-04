@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Menu\Stok\StokBatchModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,15 @@ class MarginsModel extends Model
         'tingkat',
         'is_active',
     ];
+
+    protected $casts = [
+        'used_at' => 'datetime',
+    ];
+
+    public function stokBatches()
+    {
+        return $this->hasMany(StokBatchModel::class, 'margin_id');
+    }
 
     public function getReference()
     {

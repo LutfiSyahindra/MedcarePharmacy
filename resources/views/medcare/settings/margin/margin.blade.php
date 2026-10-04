@@ -125,6 +125,7 @@
                             <th>Persentase</th>
                             <th>Tingkat</th>
                             <th>Status</th>
+                            <th>Pemakaian</th>
                             <th>Actions</th>
                         </tr>
                     </thead>

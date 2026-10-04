@@ -320,6 +320,8 @@ class StokController extends Controller
             ->removeColumn('obat')
             ->removeColumn('batch')
             ->removeColumn('changed_by')
+            // The client escapes this plain-text reason when rendering the cell.
+            ->rawColumns(['alasan'])
             ->with(['summary' => $summary])
             ->make(true);
     }

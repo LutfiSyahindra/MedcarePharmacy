@@ -743,6 +743,72 @@
         border-top: 1px solid var(--margin-border);
     }
 
+    .margin-usage {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .3rem;
+    }
+
+    .margin-usage-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        padding: .35rem .55rem;
+        border-radius: 999px;
+        font-size: .75rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .margin-usage-badge.is-used {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .margin-usage-badge.is-unused {
+        color: #64748b;
+        background: #f1f5f9;
+    }
+
+    .margin-usage small {
+        color: var(--margin-muted);
+    }
+
+    .margin-application-option {
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        margin-top: .65rem;
+        padding: 1rem;
+        border: 1px solid var(--margin-border);
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+    }
+
+    .margin-application-option:has(input:checked) {
+        border-color: var(--margin-primary-strong);
+        background: var(--margin-soft);
+    }
+
+    .margin-application-option input {
+        flex-shrink: 0;
+    }
+
+    .margin-application-option strong {
+        display: block;
+        color: var(--margin-text);
+        font-size: .85rem;
+    }
+
+    .margin-application-option small {
+        display: block;
+        margin-top: .35rem;
+        color: var(--margin-muted);
+        font-size: .78rem;
+    }
+
     .margin-modal .modal-footer .btn {
         display: inline-flex;
         align-items: center;

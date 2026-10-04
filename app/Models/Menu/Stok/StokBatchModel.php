@@ -4,6 +4,7 @@ namespace App\Models\Menu\Stok;
 
 use App\Models\BranchModel;
 use App\Models\MasterObatModel;
+use App\Models\MarginsModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,7 @@ class StokBatchModel extends Model
         'harga_beli' => 'decimal:2',
         'biaya_lain' => 'decimal:2',
         'harga_jual' => 'decimal:2',
+        'margin_factor' => 'decimal:3',
         'diskon' => 'decimal:2',
         'ppn' => 'decimal:2',
         'last_movement_at' => 'datetime',
@@ -31,6 +33,11 @@ class StokBatchModel extends Model
     public function obat()
     {
         return $this->belongsTo(MasterObatModel::class, 'obat_id');
+    }
+
+    public function margin()
+    {
+        return $this->belongsTo(MarginsModel::class, 'margin_id');
     }
 
     public function branch()

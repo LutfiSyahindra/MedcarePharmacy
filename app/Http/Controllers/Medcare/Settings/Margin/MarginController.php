@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Medcare\Settings\Margin;
 
 use App\Http\Controllers\Controller;
+use App\Services\Menu\Stok\StockService;
 use App\Services\Settings\Margins\MarginsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
@@ -12,7 +14,7 @@ use Yajra\DataTables\Facades\DataTables;
 class MarginController extends Controller
 {
     protected $MarginsService;
-    public function __construct(MarginsService $MarginsService)
+    public function __construct(MarginsService $MarginsService, private readonly StockService $stockService)
     {
         $this->MarginsService = $MarginsService;
     }
@@ -138,22 +140,36 @@ class MarginController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        Log::info($request->all());
         $validated = $request->validate([
             'tingkat' => 'required|string|in:kategori,golongan,main_golongan,sub_golongan,obat',
             'reference_id' => 'required',
             'faktor_jual' => 'required|numeric|min:0|max:100',
+            'application_scope' => ['required', Rule::in(['existing_products', 'next_receipts'])],
+        ], [
+            'application_scope.required' => 'Pilih cara penerapan perubahan margin.',
+            'application_scope.in' => 'Pilihan penerapan margin tidak valid.',
         ]);
 
-        Log::info($validated);
+        return DB::transaction(function () use ($id, $validated) {
+            $applicationScope = $validated['application_scope'];
+            unset($validated['application_scope']);
+            $dataMargins = $this->MarginsService->updateMargins($id, $validated);
+            $result = ['updated_product_count' => 0, 'updated_batch_count' => 0];
 
-        $dataMargins = $this->MarginsService->updateMargins($id, $validated);
+            if ($applicationScope === 'existing_products') {
+                $result = $this->stockService->applyUpdatedMarginToBatches($dataMargins);
+            }
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Margins berhasil diperbarui',
-            'data'    => $dataMargins
-        ], 200);
+            return response()->json([
+                'status' => 'success',
+                'message' => $applicationScope === 'existing_products'
+                    ? 'Margin berhasil diperbarui. Harga '.$result['updated_batch_count'].' batch dari '.$result['updated_product_count'].' produk diperbarui.'
+                    : 'Margin berhasil diperbarui untuk penerimaan selanjutnya. Harga produk yang sudah ada tetap.',
+                'data' => $dataMargins,
+                'application_scope' => $applicationScope,
+                ...$result,
+            ]);
+        });
     }
 
     /**

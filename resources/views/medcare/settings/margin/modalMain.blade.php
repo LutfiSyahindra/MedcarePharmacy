@@ -67,6 +67,27 @@
                             <small class="margin-form-hint" id="referenceHint">Pilih tingkat terlebih dahulu.</small>
                             <div class="invalid-feedback" id="error-reference_id"></div>
                         </div>
+                        <fieldset id="marginApplicationOptions" class="margin-field is-wide d-none" disabled>
+                            <legend class="form-label">Penerapan Perubahan Margin</legend>
+                            <p class="margin-form-hint" id="marginUsageSummary"></p>
+                            <label class="margin-application-option" for="marginApplyExisting">
+                                <input type="radio" class="form-check-input" id="marginApplyExisting"
+                                    name="application_scope" value="existing_products">
+                                <span>
+                                    <strong>Terapkan dan ubah harga pada produk yang telah menggunakan margin tersebut</strong>
+                                    <small>Harga stok produk yang sudah memakai margin ini dihitung ulang di semua cabang. Perubahan dicatat dalam riwayat harga.</small>
+                                </span>
+                            </label>
+                            <label class="margin-application-option" for="marginApplyNext">
+                                <input type="radio" class="form-check-input" id="marginApplyNext"
+                                    name="application_scope" value="next_receipts" checked>
+                                <span>
+                                    <strong>Terapkan pada Penerimaan selanjutnya</strong>
+                                    <small>Harga stok yang sudah ada tetap. Margin baru digunakan saat penerimaan berikutnya diposting.</small>
+                                </span>
+                            </label>
+                            <div class="invalid-feedback" id="error-application_scope"></div>
+                        </fieldset>
                     </div>
                     <input id="marginsId" class="form-control" name="marginsId" type="hidden">
                     <div class="modal-footer">

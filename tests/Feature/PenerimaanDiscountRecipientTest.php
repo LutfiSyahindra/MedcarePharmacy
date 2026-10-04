@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\BranchModel;
 use App\Models\DistributorModel;
+use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\MarginsModel;
 use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -24,6 +26,54 @@ use Tests\TestCase;
 class PenerimaanDiscountRecipientTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_future_margin_change_keeps_old_stock_price_when_receiving_the_same_batch_number(): void
+    {
+        [$user, $receipt, $detail] = $this->receiptContext('MARGIN');
+        $group = GolonganModel::create(['kode' => 'RECEIPT-MG', 'nama' => 'Golongan Penerimaan']);
+        $detail->obat->update(['golongan_id' => $group->id]);
+        $margin = MarginsModel::create([
+            'tingkat' => 'golongan', 'reference_id' => $group->id, 'faktor_jual' => 1.2, 'is_active' => true,
+        ]);
+
+        $this->actingAs($user)->getJson(route('penerimaan.hargaJualPreview', [
+            'id' => $receipt->id, 'diskon_untuk' => 'pasien',
+        ]))->assertOk();
+        $this->assertNull($margin->refresh()->used_at);
+
+        $this->putJson(route('penerimaan.post', $receipt->id), ['diskon_untuk' => 'pasien'])
+            ->assertOk()->assertJsonPath('selling_prices.0.harga_jual', 11388.6);
+        $oldBatch = $detail->refresh()->stokBatch;
+        $this->assertSame($margin->id, $oldBatch->margin_id);
+        $this->assertSame('1.200', $oldBatch->margin_factor);
+        $this->assertNotNull($margin->refresh()->used_at);
+
+        $this->putJson(route('margin.update', $margin->id), [
+            'tingkat' => 'golongan', 'reference_id' => $group->id,
+            'faktor_jual' => 1.5, 'application_scope' => 'next_receipts',
+        ])->assertOk();
+        $this->assertSame(11388.6, (float) $oldBatch->refresh()->harga_jual);
+
+        $nextReceipt = $receipt->refresh()->replicate()->fill([
+            'nomor_penerimaan' => 'PB-DISC-MARGIN-NEXT', 'nomor_faktur' => 'INV-DISC-MARGIN-NEXT',
+            'status' => 'draft', 'posted_at' => null, 'posted_by' => null,
+        ]);
+        $nextReceipt->save();
+        $nextDetail = $detail->replicate()->fill(['penerimaan_barang_id' => $nextReceipt->id]);
+        $nextDetail->save();
+
+        $this->putJson(route('penerimaan.post', $nextReceipt->id), ['diskon_untuk' => 'pasien'])
+            ->assertOk()->assertJsonPath('selling_prices.0.harga_jual', 14235.75);
+        $newBatch = $nextDetail->refresh()->stokBatch;
+        $this->assertNotSame($oldBatch->id, $newBatch->id);
+        $this->assertSame($oldBatch->no_batch, $newBatch->no_batch);
+        $this->assertSame('1.500', $newBatch->margin_factor);
+        $this->assertSame($margin->id, $newBatch->margin_id);
+        $this->assertSame(14235.75, (float) $newBatch->harga_jual);
+        $this->assertSame(11388.6, (float) $oldBatch->refresh()->harga_jual);
+        $this->assertSame(10.0, (float) $oldBatch->qty);
+        $this->assertSame(10.0, (float) $newBatch->qty);
+    }
 
     public function test_patient_discount_posts_net_purchase_price_to_stock(): void
     {

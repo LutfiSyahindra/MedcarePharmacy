@@ -3,6 +3,7 @@
 namespace App\Services\Menu\Stok;
 
 use App\Models\MasterObatModel;
+use App\Models\MarginsModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianDetailModel;
@@ -20,6 +21,7 @@ use App\Models\Menu\Stok\StockOpnameMovementModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Settings\Margins\MarginsService;
 use App\Support\BranchAccess;
+use App\Support\MarginPriceHistory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -40,6 +42,7 @@ class StockService
         $qtyStock = $this->receiptStockQuantity($detail);
         $basePrice = $this->receiptBasePrice($detail);
         $discountAlreadyResolved = in_array($penerimaan->diskon_untuk, ['pasien', 'apotek'], true);
+        $margin = $hargaJual !== null ? $this->marginsService->activeMarginForObat($detail->obat) : null;
 
         $movement = $this->recordMovement([
             'branch_id' => $branchId,
@@ -52,6 +55,8 @@ class StockService
             'biaya_lain' => (float) ($detail->biaya_lain_stok ?? 0),
             'separate_cost_layer' => true,
             'harga_jual' => $hargaJual,
+            'margin_id' => $margin?->id,
+            'margin_factor' => $margin?->faktor_jual,
             'alasan_harga' => $alasanHarga ?: 'Posting penerimaan '.$penerimaan->nomor_penerimaan.' dari PO '.($penerimaan->purchaseOrder->no_po ?? '-'),
             // Harga beli stok sudah ditetapkan neto atau bruto saat posting.
             // Batch tidak boleh mengurangi diskon yang sama untuk kedua kalinya.
@@ -66,6 +71,10 @@ class StockService
             'keterangan' => 'Penerimaan barang dari PO '.($penerimaan->purchaseOrder->no_po ?? '-').' - '.$this->conversionNote($detail, $qtyStock),
             'created_by' => $penerimaan->posted_by ?: Auth::id(),
         ]);
+
+        if ($margin) {
+            $this->marginsService->markMarginUsed($margin);
+        }
 
         if ($movement->stok_batch_id
             && (int) $detail->stok_batch_id !== (int) $movement->stok_batch_id) {
@@ -366,10 +375,73 @@ class StockService
             ->lockForUpdate()
             ->findOrFail($batchId);
         $marginPrice = $this->batchSellingPriceMarginPreview($batch);
+        $margin = $this->marginsService->activeMarginForObat($batch->obat);
+        $this->setBatchMargin($batch, $margin);
 
-        return $this->applyBatchSellingPrice($batch, $marginPrice['harga_jual'], $alasan, $changedBy) + [
+        $result = $this->applyBatchSellingPrice($batch, $marginPrice['harga_jual'], $alasan, $changedBy);
+        if ($batch->isDirty()) {
+            $batch->save();
+        }
+
+        return $result + [
             'margin_price' => $marginPrice,
         ];
+    }
+
+    public function applyUpdatedMarginToBatches(MarginsModel $margin): array
+    {
+        $updatedProducts = [];
+        $updatedBatchCount = 0;
+        $marginLabel = MarginPriceHistory::marginLabel($margin);
+
+        // Margins are shared settings. Apply only to stock that actually used
+        // this rule, even if classifications or priorities have since changed.
+        StokBatchModel::query()->with(['obat.golongan', 'obat.mainGolongan', 'obat.subGolongan'])
+            ->where('margin_id', $margin->id)->where('qty', '>', 0)
+            ->lockForUpdate()->chunkById(200, function ($batches) use ($margin, $marginLabel, &$updatedProducts, &$updatedBatchCount) {
+                foreach ($batches as $batch) {
+                    $price = $this->calculateBatchSellingPriceFromMargin($batch, $margin);
+                    $reason = MarginPriceHistory::describe(
+                        $marginLabel,
+                        $batch->obat->nama_obat,
+                        $batch->no_batch,
+                        (float) $batch->harga_jual,
+                        $price['harga_jual'],
+                        $batch->margin_factor !== null ? (float) $batch->margin_factor : null,
+                        (float) $margin->faktor_jual
+                    );
+                    $this->setBatchMargin($batch, $margin);
+                    $result = $this->applyBatchSellingPrice(
+                        $batch,
+                        $price['harga_jual'],
+                        $reason
+                    );
+
+                    if ($batch->isDirty()) {
+                        $batch->save();
+                    }
+
+                    if ($result['changed']) {
+                        $updatedProducts[$batch->obat_id] = true;
+                        $updatedBatchCount++;
+                    }
+                }
+            });
+
+        return [
+            'updated_product_count' => count($updatedProducts),
+            'updated_batch_count' => $updatedBatchCount,
+        ];
+    }
+
+    private function setBatchMargin(StokBatchModel $batch, ?MarginsModel $margin): void
+    {
+        $batch->margin_id = $margin?->id;
+        $batch->margin_factor = $margin?->faktor_jual;
+
+        if ($margin) {
+            $this->marginsService->markMarginUsed($margin);
+        }
     }
 
     public function batchSellingPriceMarginPreview(StokBatchModel $batch): array
@@ -500,6 +572,10 @@ class StockService
             if ($hargaJual !== null) {
                 $hargaJualBaru = $hargaJual;
                 $batch->harga_jual = $hargaJual;
+                if (array_key_exists('margin_id', $payload)) {
+                    $batch->margin_id = $payload['margin_id'];
+                    $batch->margin_factor = $payload['margin_factor'] ?? null;
+                }
             }
         }
 
@@ -662,8 +738,11 @@ class StockService
                 || $this->samePrice((float) $batch->harga_beli, (float) ($payload['harga_beli'] ?? 0));
             $otherCostMatches = ! $separateCostLayer
                 || $this->samePrice((float) ($batch->biaya_lain ?? 0), (float) ($payload['biaya_lain'] ?? 0));
+            $sellingPrice = $this->optionalPrice($payload['harga_jual'] ?? null);
+            $sellingPriceMatches = ! $separateCostLayer || $sellingPrice === null || (float) $batch->qty <= 0
+                || $this->samePrice((float) $batch->harga_jual, $sellingPrice);
 
-            if ($isInbound && (! $discountMatches || ! $taxMatches || ! $purchaseCostMatches || ! $otherCostMatches)) {
+            if ($isInbound && (! $discountMatches || ! $taxMatches || ! $purchaseCostMatches || ! $otherCostMatches || ! $sellingPriceMatches)) {
                 return $this->resolveInboundBatchByIdentity(
                     $payload,
                     $obat,
@@ -727,6 +806,7 @@ class StockService
         $expiredDate = $this->parseOptionalDate($payload['expired_date'] ?? null, 'expired_date');
         $purchaseCost = max(0, round((float) ($payload['harga_beli'] ?? 0), 2));
         $otherCost = max(0, round((float) ($payload['biaya_lain'] ?? 0), 2));
+        $sellingPrice = $this->optionalPrice($payload['harga_jual'] ?? null);
         $batch = StokBatchModel::where('obat_id', $obat->id)
             ->where('branch_id', $branchId)
             ->where('no_batch', $batchNumber)
@@ -740,6 +820,8 @@ class StockService
             ->when($matchCost, fn ($query) => $query
                 ->where('harga_beli', $purchaseCost)
                 ->where('biaya_lain', $otherCost))
+            ->when($matchCost && $sellingPrice !== null, fn ($query) => $query
+                ->where(fn ($prices) => $prices->where('harga_jual', $sellingPrice)->orWhere('qty', '<=', 0)))
             ->lockForUpdate()
             ->first();
 
@@ -776,7 +858,7 @@ class StockService
         ]);
     }
 
-    private function calculateBatchSellingPriceFromMargin(StokBatchModel $batch): array
+    private function calculateBatchSellingPriceFromMargin(StokBatchModel $batch, ?MarginsModel $margin = null): array
     {
         $obat = $batch->obat;
 
@@ -786,7 +868,7 @@ class StockService
             ]);
         }
 
-        $margin = $this->marginsService->activeMarginForObat($obat);
+        $margin ??= $this->marginsService->activeMarginForObat($obat);
         $faktorJual = $margin ? (float) $margin->faktor_jual : 1.0;
         $marginReference = $this->marginsService->marginReferenceLabelForObat($obat, $margin);
         $diskon = $this->discountPercent($batch->diskon ?? 0);

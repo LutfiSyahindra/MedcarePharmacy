@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BranchModel;
 use App\Models\MasterObatModel;
 use App\Models\Menu\Stok\KartuStokModel;
+use App\Models\Menu\Stok\RiwayatHargaModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Models\SatuansModel;
 use App\Models\User;
@@ -15,6 +16,42 @@ use Tests\TestCase;
 class StockDataTableTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_price_history_returns_reasons_as_plain_text_for_client_rendering(): void
+    {
+        $branch = BranchModel::create(['code' => 'HISTORY', 'name' => 'Cabang Riwayat', 'is_active' => true]);
+        $user = User::factory()->create(['branch_id' => $branch->id]);
+        $medicine = MasterObatModel::create([
+            'kode_obat' => 'HISTORY-001',
+            'nama_obat' => 'ONEMED SYRINGE 50 CC LUER LOCK - LUBANG TENGAH',
+        ]);
+        $batch = StokBatchModel::create([
+            'branch_id' => $branch->id, 'obat_id' => $medicine->id, 'no_batch' => '08112588',
+            'qty' => 10, 'harga_beli' => 4000, 'harga_jual' => 5655.19,
+        ]);
+        $reasons = [
+            'Perubahan margin Golongan "ALKES". Harga jual "ONEMED SYRINGE 50 CC LUER LOCK - LUBANG TENGAH" (batch "08112588"): Rp5.880,19 → Rp5.655,19.',
+            'Penyesuaian <img src=x onerror="alert(1)"> untuk AT&T; kode literal &quot;.',
+        ];
+        $expectedReasons = [];
+
+        foreach ($reasons as $reason) {
+            $history = RiwayatHargaModel::create([
+                'obat_id' => $medicine->id, 'stok_batch_id' => $batch->id,
+                'harga_jual_lama' => 5880.19, 'harga_jual_baru' => 5655.19,
+                'alasan' => $reason, 'changed_by' => $user->id, 'created_at' => now(),
+            ]);
+            $expectedReasons[$history->id] = $reason;
+        }
+
+        $response = $this->actingAs($user)->getJson(route('stok.riwayatHarga.table', [
+            'draw' => 1, 'start' => 0, 'length' => 10, 'stok_batch_id' => $batch->id,
+        ]))->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('summary.penurunan', 2);
+
+        foreach ($response->json('data') as $row) {
+            $this->assertSame($expectedReasons[$row['id']], $row['alasan']);
+        }
+    }
 
     public function test_stock_endpoints_page_in_the_database_and_keep_full_summaries(): void
     {

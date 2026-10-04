@@ -169,6 +169,8 @@
             $('#marginsModalLabel').text('Tambah Margin');
             form.trigger('reset');
             isEditMode = false;
+            $('#marginApplicationOptions').addClass('d-none').prop('disabled', true);
+            $('#marginUsageSummary').text('');
             MarginUI.clearValidation('#marginsForm');
             $('#marginsId').val('');
             $('#submitForm').html(marginSubmitDefault).prop('disabled', false);
@@ -367,6 +369,24 @@
                     searchable: false
                 },
                 {
+                    data: 'is_used',
+                    name: 'is_used',
+                    searchable: false,
+                    render: function(data, type, row) {
+                        const isUsed = data === true || data === 1 || data === '1';
+                        if (type !== 'display') return isUsed ? 1 : 0;
+
+                        const count = Number(row.used_product_count || 0).toLocaleString('id-ID');
+                        return `<div class="margin-usage">
+                            <span class="margin-usage-badge ${isUsed ? 'is-used' : 'is-unused'}">
+                                <i class="mdi ${isUsed ? 'mdi-check-circle-outline' : 'mdi-circle-outline'}"></i>
+                                ${isUsed ? 'Sudah terpakai' : 'Belum terpakai'}
+                            </span>
+                            ${isUsed ? `<small>${count} produk</small>` : ''}
+                        </div>`;
+                    }
+                },
+                {
                     data: 'actions',
                     name: 'actions',
                     orderable: false,
@@ -449,6 +469,9 @@
 
             Swal.fire({
                 title: marginsId ? 'Perbarui margin ini?' : 'Tambahkan margin baru?',
+                text: marginsId ? ($('#marginApplyExisting').is(':checked') ?
+                    'Harga stok produk yang telah menggunakan margin ini akan diperbarui di semua cabang.' :
+                    'Margin baru digunakan pada penerimaan selanjutnya. Harga stok yang sudah ada tetap.') : '',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonText: 'Ya, simpan',
@@ -495,6 +518,9 @@
                                     $('#error-reference_id').text(message);
                                     $('#reference_idSelect').addClass('is-invalid')
                                         .closest('.margin-field').addClass('has-error');
+                                } else if (key === 'application_scope') {
+                                    $('#error-application_scope').text(message);
+                                    $('#marginApplicationOptions').addClass('has-error');
                                 } else {
                                     MarginUI.markInvalid(key, message);
                                 }
@@ -531,7 +557,7 @@
             isEditMode = true;
             MarginUI.clearValidation('#marginsForm');
             $('#marginsModalLabel').text('Edit Margin');
-            $('#submitForm').html(marginSubmitUpdate).prop('disabled', false);
+            $('#submitForm').html(marginSubmitUpdate).prop('disabled', true);
 
             $.ajax({
                 url: "{{ route("margin.edit", ":id") }}".replace(':id', id),
@@ -540,6 +566,13 @@
                     $('#marginsId').val(response.id);
                     $('#tingkat').val(response.tingkat);
                     $('#faktor_jual').val(response.faktor_jual);
+                    $('#marginApplicationOptions').removeClass('d-none').prop('disabled', false);
+                    $('#marginApplyNext').prop('checked', true);
+                    const productCount = Number(response.used_product_count || 0).toLocaleString('id-ID');
+                    const batchCount = Number(response.used_batch_count || 0).toLocaleString('id-ID');
+                    $('#marginUsageSummary').text(response.is_used ?
+                        `Margin ini sudah terpakai. Tercatat ${productCount} produk dalam ${batchCount} batch.` :
+                        'Margin ini belum terpakai pada produk.');
                     updateMarginPreview();
 
                     loadReferences(response.tingkat, [response.reference_id], false).done(function() {
@@ -553,6 +586,7 @@
                             );
                             $('#reference_idSelect').append(option).trigger('change');
                         }
+                        $('#submitForm').prop('disabled', false);
                     });
                 },
                 error: function() {
