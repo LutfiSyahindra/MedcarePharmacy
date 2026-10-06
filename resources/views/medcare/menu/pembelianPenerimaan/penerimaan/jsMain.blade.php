@@ -263,9 +263,13 @@
         }
 
         function effectiveTieredDiscount(discount1, discount2, discount3) {
-            let remaining = tieredDiscountNet(100, discount1, discount2, discount3);
+            let remainingFactor = 1;
 
-            return Number((100 - remaining).toFixed(2));
+            [discount1, discount2, discount3].forEach(function(discount) {
+                remainingFactor *= 1 - (normalizedDiscount(discount) / 100);
+            });
+
+            return roundMoney((1 - remainingFactor) * 100);
         }
 
         function sameDiscount(left, right) {
@@ -332,7 +336,11 @@
             let batchInput = row.find('input[name="no_batch[]"]');
             let expiredInput = row.find('input[name="expired_date[]"]');
             let hint = row.find('.receive-batch-mode');
-            let rowDiscount = normalizedDiscount(row.data('diskon-efektif'));
+            let rowDiscount = effectiveTieredDiscount(
+                row.find('[name="diskon_1[]"]').val(),
+                row.find('[name="diskon_2[]"]').val(),
+                row.find('[name="diskon_3[]"]').val()
+            );
             let rowTax = normalizedPercent(row.find('.receive-tax').val());
 
             if (meta.id) {
@@ -1136,10 +1144,10 @@
             let maxQty = Number(item.outstanding_qty || 0);
             let qtyValue = existing ? Number(existing.qty_diterima || 0) : receiptInvoiceMode === 'single' ? maxQty : 0;
             let harga = existing ? Number(existing.harga_beli || 0) : Number(item.harga_estimasi || 0);
-            let diskon1 = Number(item.diskon_1 ?? existing?.diskon_1 ?? existing?.diskon ?? 0);
-            let diskon2 = Number(item.diskon_2 ?? existing?.diskon_2 ?? 0);
-            let diskon3 = Number(item.diskon_3 ?? existing?.diskon_3 ?? 0);
-            let diskon = Number(item.diskon_efektif ?? effectiveTieredDiscount(diskon1, diskon2, diskon3));
+            let diskon1 = normalizedDiscount(existing?.diskon_1 ?? existing?.diskon ?? item.diskon_1 ?? 0);
+            let diskon2 = normalizedDiscount(existing?.diskon_2 ?? item.diskon_2 ?? 0);
+            let diskon3 = normalizedDiscount(existing?.diskon_3 ?? item.diskon_3 ?? 0);
+            let diskon = effectiveTieredDiscount(diskon1, diskon2, diskon3);
             let ppn = existing ? Number(existing.ppn || 0) : Number(item.ppn ?? 11);
             let batch = existing ? (existing.no_batch || '') : '';
             let expired = existing && existing.expired_date ? formatDateInput(existing.expired_date) : '';
@@ -1165,8 +1173,7 @@
             }
 
             return `
-                <tr class="receive-detail-row" data-po-detail-id="${escapeHtml(item.id)}" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}"
-                    data-diskon-1="${diskon1}" data-diskon-2="${diskon2}" data-diskon-3="${diskon3}" data-diskon-efektif="${diskon}">
+                <tr class="receive-detail-row" data-po-detail-id="${escapeHtml(item.id)}" data-max="${maxQty}" data-konversi="${conversion}" data-satuan="${escapeHtml(item.satuan)}" data-satuan-stok="${escapeHtml(stockUnit)}">
                     <td data-mobile-label="Barang">
                         <div class="receive-item-cell">
                             <span class="receive-item-avatar"><i class="mdi mdi-pill"></i></span>
@@ -1222,13 +1229,21 @@
                             aria-label="Harga beli ${escapeHtml(item.nama_obat)}">
                         <small class="receive-field-note">Harga per ${escapeHtml(item.satuan || 'satuan')}.</small>
                     </td>
-                    <td data-mobile-label="Diskon PO">
-                        <div class="receive-qty-stack">
-                            <strong>D1 ${formatDecimal(diskon1, 0, 2)}%</strong>
-                            <small>D2 ${formatDecimal(diskon2, 0, 2)}%</small>
-                            <small>D3 ${formatDecimal(diskon3, 0, 2)}%</small>
+                    <td data-mobile-label="Diskon %">
+                        <div class="receive-discount-fields">
+                            ${[diskon1, diskon2, diskon3].map((value, index) => `
+                                <label class="receive-discount-field">
+                                    <span>D${index + 1}</span>
+                                    <input type="number" class="form-control form-control-sm receive-discount"
+                                        name="diskon_${index + 1}[]" min="0" max="100" step="0.01"
+                                        value="${value}" inputmode="decimal"
+                                        aria-label="Diskon ${index + 1} persen ${escapeHtml(item.nama_obat)}">
+                                    <span>%</span>
+                                </label>
+                            `).join('')}
                         </div>
-                        <small class="receive-field-note">Dari PO · efektif ${formatDecimal(diskon, 0, 2)}%</small>
+                        <small class="receive-field-note">Bisa diubah sesuai faktur.</small>
+                        <small class="receive-field-note receive-discount-effective">Efektif ${formatDecimal(diskon, 0, 2)}%</small>
                     </td>
                     <td data-mobile-label="PPN %">
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
@@ -1342,9 +1357,9 @@
                 rowCount++;
                 let qty = Number(row.find('.receive-qty').val()) || 0;
                 let price = parseCurrencyValue(row.find('.receive-price').val());
-                let discount1 = Number(row.data('diskon-1')) || 0;
-                let discount2 = Number(row.data('diskon-2')) || 0;
-                let discount3 = Number(row.data('diskon-3')) || 0;
+                let discount1 = normalizedDiscount(row.find('[name="diskon_1[]"]').val());
+                let discount2 = normalizedDiscount(row.find('[name="diskon_2[]"]').val());
+                let discount3 = normalizedDiscount(row.find('[name="diskon_3[]"]').val());
                 let tax = normalizedPercent(row.find('.receive-tax').val());
                 let max = Number(row.data('max')) || 0;
                 let conversion = Number(row.data('konversi')) || 1;
@@ -1365,6 +1380,7 @@
                 totalOutstanding += max;
 
                 row.find('.receive-row-total').text(formatRupiah(total));
+                row.find('.receive-discount-effective').text(`Efektif ${formatDecimal(effectiveTieredDiscount(discount1, discount2, discount3), 0, 2)}%`);
                 row.find('.receive-conversion-hint').text(conversionText(qty, conversion, purchaseUnit, stockUnit));
                 row.removeClass('is-filled is-warning is-empty');
                 check.removeClass('is-ok is-warning is-empty');
@@ -1513,7 +1529,7 @@
             updateFormProgress();
         }
 
-        $(document).on('input change', '.receive-qty, .receive-price, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
+        $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
             let input = $(this);
             let max = Number(input.closest('.receive-detail-row').data('max')) || 0;
 
@@ -1525,7 +1541,7 @@
                 input.val(max);
             }
 
-            if (input.hasClass('receive-tax')) {
+            if (input.hasClass('receive-tax') || input.hasClass('receive-discount')) {
                 setReceiveBatchMode(input.closest('.receive-detail-row').find('.receive-batch-select'), true);
             }
 

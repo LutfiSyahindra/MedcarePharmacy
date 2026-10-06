@@ -651,6 +651,12 @@ class PenerimaanController extends Controller
             'expired_date.*' => ['nullable', 'string'],
             'harga_beli' => ['required', 'array'],
             'harga_beli.*' => ['required', 'numeric', 'min:0'],
+            'diskon_1' => ['nullable', 'array'],
+            'diskon_1.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'diskon_2' => ['nullable', 'array'],
+            'diskon_2.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'diskon_3' => ['nullable', 'array'],
+            'diskon_3.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'ppn' => ['required', 'array'],
             'ppn.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
@@ -745,9 +751,9 @@ class PenerimaanController extends Controller
             $qtyStock = $qty * $conversion;
             $hargaStock = $conversion > 0 ? $harga / $conversion : $harga;
             [$diskon1, $diskon2, $diskon3] = TieredDiscount::percentages(
-                $poDetail->diskon_1,
-                $poDetail->diskon_2,
-                $poDetail->diskon_3
+                $request->input('diskon_1.'.$index, $poDetail->diskon_1),
+                $request->input('diskon_2.'.$index, $poDetail->diskon_2),
+                $request->input('diskon_3.'.$index, $poDetail->diskon_3)
             );
             $diskon = TieredDiscount::effectivePercentage($diskon1, $diskon2, $diskon3);
             $ppn = $this->discountPercent($request->ppn[$index] ?? 0);

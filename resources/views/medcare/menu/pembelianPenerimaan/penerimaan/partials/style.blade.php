@@ -2034,6 +2034,27 @@
         white-space: nowrap;
     }
 
+    .receive-discount-fields {
+        display: grid;
+        gap: .35rem;
+        min-width: 120px;
+    }
+
+    .receive-discount-field {
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        margin: 0;
+        color: var(--purchase-muted);
+        font-size: .74rem;
+        font-weight: 700;
+    }
+
+    .receive-detail-row .receive-discount-field .receive-discount {
+        min-width: 0;
+        flex: 1;
+    }
+
     .receive-progress-meter {
         height: 9px;
         margin-top: .85rem;
@@ -7013,6 +7034,10 @@
         .receive-detail-row.is-warning .receive-field-note,
         .receive-detail-row.is-warning .receive-row-hint {
             display: block;
+        }
+
+        .receive-discount-fields {
+            min-width: 0;
         }
     }
 

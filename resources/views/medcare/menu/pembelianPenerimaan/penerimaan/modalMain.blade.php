@@ -305,7 +305,7 @@
                                             <th>No Batch</th>
                                             <th>Expired Date</th>
                                             <th>Harga Beli</th>
-                                            <th>Diskon PO</th>
+                                            <th>Diskon %</th>
                                             <th>PPN %</th>
                                             <th>Subtotal</th>
                                             <th>Status</th>

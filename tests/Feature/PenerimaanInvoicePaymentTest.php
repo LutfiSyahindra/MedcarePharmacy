@@ -131,6 +131,92 @@ class PenerimaanInvoicePaymentTest extends TestCase
         $this->assertEquals(3444.67, (float) $receipt->fresh()->jumlah_dibayar);
     }
 
+    public function test_receipt_discounts_can_be_changed_and_reset_without_changing_the_po(): void
+    {
+        $payload = $this->invoicePayload([2], 100000, 151848);
+        $payload['diskon_1'] = [20];
+        $payload['diskon_2'] = [10];
+        $payload['diskon_3'] = [5];
+        $payload['diskon'] = 1;
+        $payload['total_faktur'] = 1;
+        $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+
+        $receipt = PenerimaanBarangModel::firstOrFail();
+        $detail = $receipt->details()->firstOrFail();
+        $this->assertSame('20.00', $detail->diskon_1);
+        $this->assertSame('10.00', $detail->diskon_2);
+        $this->assertSame('5.00', $detail->diskon_3);
+        $this->assertSame('31.60', $detail->diskon);
+        $this->assertEquals(63200, (float) $receipt->diskon);
+        $this->assertEquals(15048, (float) $receipt->pajak);
+        $this->assertEquals(151848, (float) $receipt->total_faktur);
+        $this->assertSame('lunas', $receipt->status_pembayaran);
+        $this->getJson(route('penerimaan.edit', $receipt->id))->assertOk()
+            ->assertJsonPath('header.details.0.diskon_1', '20.00')
+            ->assertJsonPath('header.details.0.diskon_2', '10.00')
+            ->assertJsonPath('header.details.0.diskon_3', '5.00');
+
+        $payload['diskon_1'] = [0];
+        $payload['diskon_2'] = [0];
+        $payload['diskon_3'] = [0];
+        $this->putJson(route('penerimaan.update', $receipt->id), $payload)->assertOk();
+        $receipt->refresh();
+        $detail = $receipt->details()->firstOrFail();
+        $this->assertSame('0.00', $detail->diskon_1);
+        $this->assertSame('0.00', $detail->diskon_2);
+        $this->assertSame('0.00', $detail->diskon_3);
+        $this->assertEquals(0, (float) $receipt->diskon);
+        $this->assertEquals(22000, (float) $receipt->pajak);
+        $this->assertEquals(222000, (float) $receipt->total_faktur);
+        $this->assertEquals(70152, (float) $receipt->sisa_hutang);
+        $this->assertSame('sebagian', $receipt->status_pembayaran);
+        $poDetail = $this->purchaseOrder->details()->firstOrFail();
+        $this->assertSame('10.00', $poDetail->diskon_1);
+        $this->assertSame('5.00', $poDetail->diskon_2);
+        $this->assertSame('2.00', $poDetail->diskon_3);
+    }
+
+    public function test_each_receipt_batch_uses_its_own_discounts(): void
+    {
+        $payload = $this->invoicePayload([1, 1], 100000, 186924);
+        $payload['diskon_1'] = [20, 0];
+        $payload['diskon_2'] = [10, 0];
+        $payload['diskon_3'] = [5, 0];
+        $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+
+        $receipt = PenerimaanBarangModel::firstOrFail();
+        $details = $receipt->details()->orderBy('id')->get();
+        $this->assertEquals(75924, (float) $details[0]->total);
+        $this->assertEquals(111000, (float) $details[1]->total);
+        $this->assertEquals(186924, (float) $receipt->total_faktur);
+        $this->assertEquals(31600, (float) $receipt->diskon);
+    }
+
+    public static function invalidReceiptDiscounts(): array
+    {
+        return [
+            'negative' => ['diskon_1', [-0.01], 'diskon_1.0'],
+            'above 100 percent' => ['diskon_2', [100.01], 'diskon_2.0'],
+            'not numeric' => ['diskon_3', ['invalid'], 'diskon_3.0'],
+            'not an array' => ['diskon_1', 10, 'diskon_1'],
+        ];
+    }
+
+    #[DataProvider('invalidReceiptDiscounts')]
+    public function test_invalid_discounts_cannot_be_saved_or_updated(string $field, mixed $value, string $error): void
+    {
+        $payload = $this->invoicePayload([2], 100000, 0);
+        $this->postJson(route('penerimaan.store'), [$field => $value] + $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors($error);
+        $this->assertDatabaseCount('penerimaan_barang', 0);
+
+        $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+        $receipt = PenerimaanBarangModel::firstOrFail();
+        $this->putJson(route('penerimaan.update', $receipt->id), [$field => $value] + $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors($error);
+        $this->assertEquals(186013.80, (float) $receipt->fresh()->total_faktur);
+    }
+
     private function invoicePayload(array $quantities, float $price, float $payment): array
     {
         $detail = $this->purchaseOrder->details()->firstOrFail();
