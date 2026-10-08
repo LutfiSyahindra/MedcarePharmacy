@@ -56,6 +56,9 @@ class ProcurementAnalysisController extends Controller
             'manufacturer_id' => ['nullable', 'integer'],
             'po_status' => ['nullable', Rule::in(ProcurementAnalysisService::PO_STATUSES)],
             'receipt_status' => ['nullable', Rule::in(ProcurementAnalysisService::RECEIPT_STATUSES)],
+            'receiving_supplier_id' => ['nullable', 'integer'],
+            'receiving_status' => ['nullable', Rule::in(ProcurementAnalysisService::RECEIVING_STATUSES)],
+            'receiving_search' => ['nullable', 'string', 'max:150'],
             'created_by' => ['nullable', 'integer'],
             'granularity' => ['nullable', Rule::in(['day', 'week', 'month', 'year'])],
         ]);
@@ -85,6 +88,9 @@ class ProcurementAnalysisController extends Controller
             'manufacturer_id' => isset($validated['manufacturer_id']) ? (int) $validated['manufacturer_id'] : null,
             'po_status' => $validated['po_status'] ?? null,
             'receipt_status' => $validated['receipt_status'] ?? null,
+            'receiving_supplier_id' => isset($validated['receiving_supplier_id']) ? (int) $validated['receiving_supplier_id'] : null,
+            'receiving_status' => $validated['receiving_status'] ?? null,
+            'receiving_search' => trim($validated['receiving_search'] ?? ''),
             'created_by' => isset($validated['created_by']) ? (int) $validated['created_by'] : null,
             'granularity' => $validated['granularity'] ?? 'day',
         ];

@@ -19,6 +19,10 @@ class ProcurementAnalysisService
 
     public const RECEIPT_STATUSES = ['none', 'partial', 'complete'];
 
+    public const RECEIVING_STATUSES = ['received', 'outstanding', 'none', 'partial', 'complete'];
+
+    private const COUNTED_PO_STATUSES = ['approved', 'diterima_sebagian', 'selesai'];
+
     private const STATUS_LABELS = [
         'draft' => 'Draft',
         'waiting_approval' => 'Menunggu',
@@ -39,8 +43,8 @@ class ProcurementAnalysisService
         [$previousStart, $previousEnd] = $this->previousPeriod($filters['start'], $filters['end']);
         $lines = $this->orderLines($context['branch_ids'], $filters, $filters['start'], $filters['end']);
         $previousLines = $this->orderLines($context['branch_ids'], $filters, $previousStart, $previousEnd);
-        $activeLines = $lines->where('is_cancelled', false)->values();
-        $previousActiveLines = $previousLines->where('is_cancelled', false)->values();
+        $activeLines = $lines->whereIn('status', self::COUNTED_PO_STATUSES)->values();
+        $previousActiveLines = $previousLines->whereIn('status', self::COUNTED_PO_STATUSES)->values();
         $leadTimes = $this->leadTimes($activeLines);
         $previousLeadTimes = $this->leadTimes($previousActiveLines);
         $summary = $this->summary($activeLines, $previousActiveLines, $leadTimes, $previousLeadTimes);
@@ -63,10 +67,14 @@ class ProcurementAnalysisService
                 'generated_at' => now()->format('Y-m-d H:i:s'),
                 'active_filters' => $this->activeFilterLabels($filters, $options),
                 'methodology' => [
+                    'orders' => 'Nilai, qty, item, dan kebutuhan hanya menghitung PO berstatus Approved, Diterima Sebagian, dan Selesai.',
                     'quantity' => 'Qty pembelian dinormalisasi ke satuan stok menggunakan konversi pada item PO.',
                     'cancelled' => 'PO berstatus rejected dikelompokkan sebagai order dibatalkan.',
                     'need' => 'Kebutuhan = penjualan 30 hari + stok minimum - estimasi stok saat order terakhir.',
                     'value' => 'Ringkasan, tren, supplier, dan outstanding memakai total estimasi PO termasuk biaya pengiriman dan asuransi. Analisis barang dan kategori tetap memakai subtotal item; pada filter item, biaya PO dialokasikan proporsional untuk ringkasan tingkat PO. Harga aktual berasal dari penerimaan posted dan tersedia pada Laporan Realisasi Pembelian.',
+                    // 'receipts' => 'Penerimaan mengikuti PO berstatus approved, diterima_sebagian, dan selesai pada periode dan filter aktif, berdasarkan seluruh transaksi posted hingga saat ini. Nilai diterima memakai total aktual item setelah diskon dan PPN ditambah alokasi biaya lain penerimaan. Qty memakai satuan stok. Item dihitung per baris PO; item sebagian masuk dalam jumlah sudah dan belum diterima.',
+                    'receipts' => ' ',
+
                 ],
             ],
             'summary' => $summary,
@@ -78,6 +86,8 @@ class ProcurementAnalysisService
             'suppliers' => $supplierRows,
             'categories' => $categoryRows,
             'status_distribution' => $this->statusDistribution($lines),
+            'receiving' => $this->receivingAnalysis($lines, $filters),
+            'received_items' => $this->receivedRows($activeLines),
             'outstanding' => $this->outstandingRows($activeLines),
             'cancelled_orders' => $this->cancelledRows($lines),
             'lead_time_suppliers' => $supplierRows->whereNotNull('lead_time_days')->sortBy('lead_time_days')->values()->all(),
@@ -98,7 +108,7 @@ class ProcurementAnalysisService
             ->findOrFail($medicineId);
         $filters['medicine_id'] = $medicineId;
         $lines = $this->orderLines($context['branch_ids'], $filters, $filters['start'], $filters['end']);
-        $activeLines = $lines->where('is_cancelled', false)->values();
+        $activeLines = $lines->whereIn('status', self::COUNTED_PO_STATUSES)->values();
         $leadTimes = $this->leadTimes($activeLines);
         $row = $this->medicineRows($activeLines, $context['branch_ids'], $filters)->first();
         $stock = $this->currentStocks($context['branch_ids'], [$medicineId])->get($medicineId, 0);
@@ -123,6 +133,9 @@ class ProcurementAnalysisService
             'manufacturer' => $medicine->pabrikan?->nama ?: '-',
             'summary' => [
                 'ordered_qty' => round((float) $activeLines->sum('ordered_qty'), 2),
+                'received_qty' => round((float) $activeLines->sum('received_qty'), 2),
+                'outstanding_qty' => round((float) $activeLines->sum('outstanding_qty'), 2),
+                'received_value' => round((float) $activeLines->sum('received_value'), 2),
                 'order_value' => round((float) $activeLines->sum('line_value'), 2),
                 'order_count' => $orders->count(),
                 'average_per_order' => $orders->count() > 0 ? round((float) $activeLines->sum('ordered_qty') / $orders->count(), 2) : 0,
@@ -144,6 +157,8 @@ class ProcurementAnalysisService
                 'supplier' => $line->supplier_name,
                 'qty' => round((float) $line->ordered_qty, 2),
                 'received_qty' => round((float) $line->received_qty, 2),
+                'outstanding_qty' => round((float) $line->outstanding_qty, 2),
+                'received_value' => round((float) $line->received_value, 2),
                 'unit' => $line->stock_unit ?: 'unit',
                 'price' => round((float) $line->unit_price, 2),
                 'value' => round((float) $line->line_value, 2),
@@ -252,6 +267,7 @@ class ProcurementAnalysisService
             ->groupBy('receipt_details.purchase_order_detail_id')
             ->select('receipt_details.purchase_order_detail_id')
             ->selectRaw('COALESCE(SUM(CASE WHEN receipt_details.qty_diterima_stok > 0 THEN receipt_details.qty_diterima_stok ELSE receipt_details.qty_diterima * COALESCE(NULLIF(receipt_details.konversi_satuan, 0), 1) END), 0) as received_qty')
+            ->selectRaw('COALESCE(SUM(receipt_details.total + COALESCE(receipt_details.alokasi_biaya_lain, 0)), 0) as received_value')
             ->get()
             ->keyBy('purchase_order_detail_id');
 
@@ -259,6 +275,7 @@ class ProcurementAnalysisService
             $factor = max(0.0001, (float) ($line->conversion_factor ?: 1));
             $line->ordered_qty = round((float) $line->purchase_qty * $factor, 2);
             $line->received_qty = round((float) ($received->get($line->line_id)?->received_qty ?? 0), 2);
+            $line->received_value = round((float) ($received->get($line->line_id)?->received_value ?? 0), 2);
             $line->outstanding_qty = round(max(0, $line->ordered_qty - $line->received_qty), 2);
             $line->unit_price = round((float) $line->purchase_price / $factor, 2);
             $line->line_value = round((float) ($line->subtotal > 0 ? $line->subtotal : $line->purchase_qty * $line->purchase_price), 2);
@@ -285,12 +302,11 @@ class ProcurementAnalysisService
         });
 
         $orderReceiptStatuses = $lines->groupBy('order_id')->map(function (Collection $items) {
-            $ordered = (float) $items->sum('ordered_qty');
             $receivedQty = (float) $items->sum('received_qty');
 
             return match (true) {
                 $receivedQty <= 0 => 'none',
-                $ordered > 0 && $receivedQty + 0.0001 < $ordered => 'partial',
+                $items->sum('outstanding_qty') > 0 => 'partial',
                 default => 'complete',
             };
         });
@@ -325,6 +341,12 @@ class ProcurementAnalysisService
             'total_po' => $lines->pluck('order_id')->unique()->count(),
             'total_items' => $lines->count(),
             'ordered_qty' => round((float) $lines->sum('ordered_qty'), 2),
+            'received_qty' => round((float) $lines->sum('received_qty'), 2),
+            'outstanding_qty' => round((float) $lines->sum('outstanding_qty'), 2),
+            'received_value' => round((float) $lines->sum('received_value'), 2),
+            'received_items' => $lines->where('received_qty', '>', 0)->count(),
+            'outstanding_items' => $lines->where('outstanding_qty', '>', 0)->count(),
+            'partial_received_items' => $lines->filter(fn ($line) => $line->received_qty > 0 && $line->outstanding_qty > 0)->count(),
             'outstanding_value' => round((float) $lines->sum('outstanding_value'), 2),
             'lead_time_days' => $leadTimes->isNotEmpty() ? round((float) $leadTimes->avg('days'), 1) : 0,
             'active_suppliers' => $lines->pluck('supplier_id')->unique()->count(),
@@ -415,7 +437,8 @@ class ProcurementAnalysisService
                 'order_count' => $orders->count(),
                 'ordered_qty' => $orderedQty,
                 'received_qty' => $receivedQty,
-                'outstanding_qty' => round(max(0, $orderedQty - $receivedQty), 2),
+                'received_value' => round((float) $items->sum('received_value'), 2),
+                'outstanding_qty' => round((float) $items->sum('outstanding_qty'), 2),
                 'fulfillment_percent' => $orderedQty > 0 ? round(min(100, $receivedQty / $orderedQty * 100), 1) : 0,
                 'order_value' => round((float) $items->sum('line_value'), 2),
                 'outstanding_value' => round((float) $items->sum('outstanding_value'), 2),
@@ -467,7 +490,8 @@ class ProcurementAnalysisService
                 'item_count' => $items->count(),
                 'ordered_qty' => round($ordered, 2),
                 'received_qty' => round($received, 2),
-                'outstanding_qty' => round(max(0, $ordered - $received), 2),
+                'received_value' => round((float) $items->sum('received_value'), 2),
+                'outstanding_qty' => round((float) $items->sum('outstanding_qty'), 2),
                 'order_value' => round((float) $items->sum('allocated_order_value'), 2),
                 'outstanding_value' => round((float) $items->sum('outstanding_value'), 2),
                 'fulfillment_percent' => $ordered > 0 ? round(min(100, $received / $ordered * 100), 1) : 0,
@@ -512,6 +536,59 @@ class ProcurementAnalysisService
         })->values()->all();
     }
 
+    private function receivingAnalysis(Collection $lines, array $filters): array
+    {
+        $supplierId = $filters['receiving_supplier_id'] ?? null;
+        $status = $filters['receiving_status'] ?? null;
+        $search = mb_strtolower($filters['receiving_search'] ?? '');
+        $matching = $lines->filter(function ($line) use ($supplierId, $search) {
+            return (! $supplierId || (int) $line->supplier_id === $supplierId)
+                && ($search === '' || str_contains(mb_strtolower($line->no_po.' '.$line->medicine_name.' '.$line->medicine_code), $search));
+        });
+        $active = $matching->whereIn('status', self::COUNTED_PO_STATUSES)->filter(fn ($line) => match ($status) {
+            'received' => $line->received_qty > 0,
+            'outstanding' => $line->outstanding_qty > 0,
+            'none' => $line->received_qty <= 0 && $line->outstanding_qty > 0,
+            'partial' => $line->received_qty > 0 && $line->outstanding_qty > 0,
+            'complete' => $line->received_qty > 0 && $line->outstanding_qty <= 0,
+            default => true,
+        })->values();
+
+        return [
+            'filters' => [
+                'supplier_id' => $supplierId,
+                'status' => $status,
+                'search' => $filters['receiving_search'] ?? '',
+            ],
+            'summary' => $this->summaryValues($active, collect()) + [
+                'unique_items' => $active->pluck('medicine_id')->unique()->count(),
+            ],
+            'received_items' => $this->receivedRows($active),
+            'outstanding' => $this->outstandingRows($active),
+            'cancelled_orders' => $status ? [] : $this->cancelledRows($matching),
+        ];
+    }
+
+    private function receivedRows(Collection $lines): array
+    {
+        return $lines->where('received_qty', '>', 0)->map(fn ($line) => [
+            'id' => (int) $line->line_id,
+            'medicine_id' => (int) $line->medicine_id,
+            'no_po' => $line->no_po,
+            'date' => $line->order_date,
+            'medicine' => $line->medicine_name,
+            'medicine_code' => $line->medicine_code,
+            'unit' => $line->stock_unit ?: 'unit',
+            'supplier_id' => (int) $line->supplier_id,
+            'supplier' => $line->supplier_name,
+            'ordered_qty' => round((float) $line->ordered_qty, 2),
+            'received_qty' => round((float) $line->received_qty, 2),
+            'outstanding_qty' => round((float) $line->outstanding_qty, 2),
+            'received_value' => round((float) $line->received_value, 2),
+            'receipt_status' => $line->outstanding_qty > 0 ? 'partial' : 'complete',
+        ])->sortByDesc('received_value')->values()->all();
+    }
+
     private function outstandingRows(Collection $lines): array
     {
         return $lines->where('outstanding_qty', '>', 0)->map(fn ($line) => [
@@ -520,7 +597,9 @@ class ProcurementAnalysisService
             'no_po' => $line->no_po,
             'date' => $line->order_date,
             'medicine' => $line->medicine_name,
+            'medicine_code' => $line->medicine_code,
             'unit' => $line->stock_unit ?: 'unit',
+            'supplier_id' => (int) $line->supplier_id,
             'supplier' => $line->supplier_name,
             'ordered_qty' => round((float) $line->ordered_qty, 2),
             'received_qty' => round((float) $line->received_qty, 2),
@@ -540,6 +619,7 @@ class ProcurementAnalysisService
                 'id' => (int) $first->order_id,
                 'no_po' => $first->no_po,
                 'date' => $first->order_date,
+                'supplier_id' => (int) $first->supplier_id,
                 'supplier' => $first->supplier_name,
                 'item_count' => $items->count(),
                 'ordered_qty' => round((float) $items->sum('ordered_qty'), 2),

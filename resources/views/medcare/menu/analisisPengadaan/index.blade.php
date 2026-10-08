@@ -7,6 +7,7 @@
 
 @section('content')
     <main class="pa-page" id="procurementAnalysisApp"
+        data-active-tab="summary"
         data-url="{{ route('analisisPengadaan.data') }}"
         data-medicine-url="{{ route('analisisPengadaan.medicine', ['medicine' => '__MEDICINE__']) }}"
         data-default-start="{{ $defaultDateStart }}"
@@ -43,8 +44,9 @@
             </div>
         </section>
 
+        <p class="pa-tabs-hint">Geser tab untuk melihat bagian analisis lainnya.</p>
         <nav class="pa-tabs" id="paTabs" aria-label="Bagian analisis pengadaan">
-            <button type="button" class="is-active" data-tab="summary"><i class="mdi mdi-view-dashboard-outline"></i><span>Ringkasan</span></button>
+            <button type="button" class="is-active" data-tab="summary" aria-current="page"><i class="mdi mdi-view-dashboard-outline"></i><span>Ringkasan</span></button>
             <button type="button" data-tab="medicines"><i class="mdi mdi-pill-multiple"></i><span>Analisis Barang</span></button>
             <button type="button" data-tab="suppliers"><i class="mdi mdi-truck-outline"></i><span>Analisis Supplier</span></button>
             <button type="button" data-tab="receipts"><i class="mdi mdi-package-variant-closed-check"></i><span>Order vs Penerimaan</span></button>
@@ -56,7 +58,7 @@
                 <div class="pa-heading"><span class="is-navy"><i class="mdi mdi-tune-variant"></i></span><div><small>Smart controls</small><h2>Filter Analisis</h2><p>Semua KPI, grafik, ranking, dan tabel mengikuti parameter ini.</p></div></div>
                 <div class="pa-filter-head-actions">
                     <span class="pa-filter-status" id="paFilterStatus"><i class="mdi mdi-check-decagram-outline"></i> Siap digunakan</span>
-                    <button type="button" class="pa-icon-btn" id="paFilterToggle" aria-expanded="true" title="Ringkas filter"><i class="mdi mdi-chevron-up"></i></button>
+                    <button type="button" class="pa-icon-btn pa-filter-toggle" id="paFilterToggle" aria-controls="paFilterBody" aria-expanded="true"><span>Ringkas filter</span><i class="mdi mdi-chevron-up" aria-hidden="true"></i></button>
                 </div>
             </div>
             <div class="pa-filter-body" id="paFilterBody">
@@ -94,8 +96,9 @@
 
         <section class="pa-tab-panel is-active" data-tab-panel="summary">
             <div class="pa-section-label"><div><span>Executive overview</span><h2>Kinerja pengadaan periode aktif</h2></div><p><i class="mdi mdi-clock-check-outline"></i> Diperbarui <b id="paGeneratedAt">&mdash;</b></p></div>
+            <p class="pa-receipt-note" id="paOrderMethodology">Nilai, qty, item, dan kebutuhan hanya menghitung PO berstatus Approved, Diterima Sebagian, dan Selesai.</p>
             <div class="pa-kpi-grid" id="paKpiGrid" aria-live="polite">
-                @for ($i = 0; $i < 6; $i++)<article class="pa-kpi is-loading"><span></span><div><small>Memuat data</small><strong>&nbsp;</strong><p>&nbsp;</p></div></article>@endfor
+                @for ($i = 0; $i < 12; $i++)<article class="pa-kpi is-loading"><span></span><div><small>Memuat data</small><strong>&nbsp;</strong><p>&nbsp;</p></div></article>@endfor
             </div>
 
             <div class="pa-grid pa-grid-wide">
@@ -118,7 +121,7 @@
 
             <div class="pa-grid pa-grid-two">
                 <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-cyan"><i class="mdi mdi-clock-fast"></i></span><div><h2>Lead Time Supplier</h2><p>Supplier tercepat berdasarkan penerimaan pertama.</p></div></div></div><div class="pa-chart" id="paLeadChart"></div></article>
-                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-rose"><i class="mdi mdi-list-status"></i></span><div><h2>Distribusi Status PO</h2><p>Draft hingga selesai atau dibatalkan.</p></div></div></div><div class="pa-split"><div class="pa-chart" id="paStatusChart"></div><div class="pa-mini-list" id="paStatusList"></div></div></article>
+                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-rose"><i class="mdi mdi-list-status"></i></span><div><h2>Distribusi Status PO</h2><p>Pemantauan semua status; perhitungan KPI hanya PO yang disetujui.</p></div></div></div><div class="pa-split"><div class="pa-chart" id="paStatusChart"></div><div class="pa-mini-list" id="paStatusList"></div></div></article>
             </div>
 
             <article class="pa-panel pa-insights"><div class="pa-panel-head"><div class="pa-heading"><span class="is-amber"><i class="mdi mdi-lightbulb-on-outline"></i></span><div><h2>Insight Pengadaan</h2><p>Prioritas otomatis dari data periode aktif.</p></div></div></div><div class="pa-insight-grid" id="paInsights"></div></article>
@@ -131,30 +134,50 @@
                 <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-package-variant"></i></span><div><h2>Paling Banyak Diorder</h2><p>Total qty tertinggi.</p></div></div></div><div class="pa-rank-list" id="paQuantityList"></div></article>
                 <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-green"><i class="mdi mdi-cash-multiple"></i></span><div><h2>Nilai Item Terbesar</h2><p>Subtotal item PO tertinggi, tanpa biaya tingkat PO.</p></div></div></div><div class="pa-rank-list" id="paValueList"></div></article>
             </div>
-            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-navy"><i class="mdi mdi-table-large"></i></span><div><h2>Ringkasan Analisis Barang</h2><p>Frekuensi, qty, subtotal item, fulfillment, harga, dan pergerakan.</p></div></div><span class="pa-soft-badge" id="paMedicineCount">0 obat</span></div><div class="table-responsive"><table class="table pa-table"><thead><tr><th>Obat</th><th>Supplier utama</th><th class="text-end">Frekuensi</th><th class="text-end">Qty order</th><th class="text-end">Nilai item</th><th class="text-end">Diterima</th><th class="text-end">Harga terakhir</th><th class="text-end">Perubahan</th><th>Pergerakan</th></tr></thead><tbody id="paMedicineBody"></tbody></table></div></article>
+            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-navy"><i class="mdi mdi-table-large"></i></span><div><h2>Ringkasan Analisis Barang</h2><p>Frekuensi, qty dan nilai penerimaan, harga, dan pergerakan.</p></div></div><span class="pa-soft-badge" id="paMedicineCount">0 obat</span></div><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table"><thead><tr><th>Obat</th><th>Supplier utama</th><th class="text-end">Frekuensi</th><th class="text-end">Qty order</th><th class="text-end">Nilai item PO</th><th class="text-end">Qty diterima</th><th class="text-end">Qty belum diterima</th><th class="text-end">Nilai diterima</th><th class="text-end">Harga terakhir</th><th class="text-end">Perubahan</th><th>Pergerakan</th></tr></thead><tbody id="paMedicineBody"></tbody></table></div></article>
             <div class="pa-grid pa-grid-two">
-                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-orange"><i class="mdi mdi-chart-line"></i></span><div><h2>Perubahan Harga Estimasi PO</h2><p>Perubahan harga estimasi per satuan stok dari PO pertama ke terakhir; harga aktual tersedia pada laporan realisasi.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Estimasi awal</th><th class="text-end">Estimasi terakhir</th><th class="text-end">Perubahan</th></tr></thead><tbody id="paPriceBody"></tbody></table></div></article>
-                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-cyan"><i class="mdi mdi-repeat-variant"></i></span><div><h2>Frekuensi Reorder</h2><p>Jarak rata-rata pemesanan ulang obat yang sama.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Frekuensi</th><th class="text-end">Rata-rata jeda</th><th>Tanggal terakhir</th></tr></thead><tbody id="paReorderBody"></tbody></table></div></article>
+                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-orange"><i class="mdi mdi-chart-line"></i></span><div><h2>Perubahan Harga Estimasi PO</h2><p>Perubahan harga estimasi per satuan stok dari PO pertama ke terakhir; harga aktual tersedia pada laporan realisasi.</p></div></div></div><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Estimasi awal</th><th class="text-end">Estimasi terakhir</th><th class="text-end">Perubahan</th></tr></thead><tbody id="paPriceBody"></tbody></table></div></article>
+                <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-cyan"><i class="mdi mdi-repeat-variant"></i></span><div><h2>Frekuensi Reorder</h2><p>Jarak rata-rata pemesanan ulang obat yang sama.</p></div></div></div><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table pa-table-compact"><thead><tr><th>Obat</th><th class="text-end">Frekuensi</th><th class="text-end">Rata-rata jeda</th><th>Tanggal terakhir</th></tr></thead><tbody id="paReorderBody"></tbody></table></div></article>
             </div>
             <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-speedometer"></i></span><div><h2>Slow / Fast Moving Order</h2><p>Apakah subtotal item didominasi produk cepat atau lambat bergerak.</p></div></div></div><div class="pa-moving-grid" id="paMovingDistribution"></div></article>
         </section>
 
         <section class="pa-tab-panel" data-tab-panel="suppliers">
-            <div class="pa-section-label"><div><span>Supplier performance</span><h2>Analisis supplier</h2></div><p>Nilai estimasi PO, fulfillment, outstanding, dan lead time.</p></div>
-            <article class="pa-panel"><div class="table-responsive"><table class="table pa-table"><thead><tr><th>Supplier</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty order</th><th class="text-end">Nilai estimasi PO</th><th class="text-end">Outstanding</th><th class="text-end">Fulfillment</th><th class="text-end">Lead time</th></tr></thead><tbody id="paSupplierBody"></tbody></table></div></article>
-            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-shape-outline"></i></span><div><h2>Order per Kategori Obat</h2><p>Distribusi jumlah item, qty, dan subtotal item berdasarkan kategori.</p></div></div></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>Kategori</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty</th><th class="text-end">Nilai item</th><th class="text-end">Kontribusi</th></tr></thead><tbody id="paCategoryBody"></tbody></table></div></article>
+            <div class="pa-section-label"><div><span>Supplier performance</span><h2>Analisis supplier</h2></div><p>Nilai dan qty penerimaan, outstanding, fulfillment, dan lead time.</p></div>
+            <article class="pa-panel"><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table"><thead><tr><th>Supplier</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty order</th><th class="text-end">Qty diterima</th><th class="text-end">Qty belum diterima</th><th class="text-end">Nilai estimasi PO</th><th class="text-end">Nilai diterima</th><th class="text-end">Outstanding</th><th class="text-end">Fulfillment</th><th class="text-end">Lead time</th></tr></thead><tbody id="paSupplierBody"></tbody></table></div></article>
+            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-violet"><i class="mdi mdi-shape-outline"></i></span><div><h2>Order per Kategori Obat</h2><p>Distribusi jumlah item, qty, dan subtotal item berdasarkan kategori.</p></div></div></div><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table pa-table-compact"><thead><tr><th>Kategori</th><th class="text-end">Jumlah PO</th><th class="text-end">Item</th><th class="text-end">Qty</th><th class="text-end">Nilai item</th><th class="text-end">Kontribusi</th></tr></thead><tbody id="paCategoryBody"></tbody></table></div></article>
         </section>
 
         <section class="pa-tab-panel" data-tab-panel="receipts">
             <div class="pa-section-label"><div><span>Receiving control</span><h2>Order vs penerimaan</h2></div><p>Temukan item yang belum diterima atau baru dipenuhi sebagian.</p></div>
-            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-red"><i class="mdi mdi-alert-circle-outline"></i></span><div><h2>Outstanding Order</h2><p>Nilai yang belum diterima termasuk alokasi proporsional biaya PO.</p></div></div><span class="pa-soft-badge" id="paOutstandingCount">0 item</span></div><div class="table-responsive"><table class="table pa-table"><thead><tr><th>PO / Tanggal</th><th>Barang</th><th>Supplier</th><th class="text-end">Dipesan</th><th class="text-end">Diterima</th><th class="text-end">Belum diterima</th><th class="text-end">Nilai outstanding</th><th>Status</th></tr></thead><tbody id="paOutstandingBody"></tbody></table></div></article>
-            <article class="pa-panel"><div class="pa-panel-head"><div class="pa-heading"><span class="is-rose"><i class="mdi mdi-cancel"></i></span><div><h2>Order Dibatalkan</h2><p>PO berstatus rejected pada periode aktif.</p></div></div><span class="pa-soft-badge" id="paCancelledCount">0 PO</span></div><div class="table-responsive"><table class="table pa-table pa-table-compact"><thead><tr><th>No. PO</th><th>Tanggal</th><th>Supplier</th><th class="text-end">Item</th><th class="text-end">Qty</th><th class="text-end">Nilai</th><th>Status</th></tr></thead><tbody id="paCancelledBody"></tbody></table></div></article>
+            <details class="pa-panel pa-receiving-scope-filter" id="paReceivingFilterPanel" open>
+                <summary class="pa-panel-head"><div class="pa-heading"><span class="is-teal"><i class="mdi mdi-filter-variant"></i></span><div><h2>Filter Order vs Penerimaan</h2><p>Atur supplier, status penerimaan, atau pencarian barang.</p></div></div><i class="mdi mdi-chevron-down pa-section-chevron" aria-hidden="true"></i></summary>
+                <form id="paReceivingFilterForm" class="pa-receiving-filter">
+                    <div class="pa-filter-grid pa-receiving-filter-grid">
+                        <label><span><i class="mdi mdi-truck-outline"></i> Supplier</span><select name="receiving_supplier_id" id="paReceivingSupplier"><option value="">Semua supplier</option></select></label>
+                        <label><span><i class="mdi mdi-package-check"></i> Status item penerimaan</span><select name="receiving_status" id="paReceivingStatus"><option value="">Semua item</option><option value="received">Sudah diterima (Posted)</option><option value="outstanding">Belum diterima / masih tersisa</option><option value="none">Belum diterima sama sekali</option><option value="partial">Diterima sebagian</option><option value="complete">Diterima lengkap</option></select></label>
+                        <label><span><i class="mdi mdi-magnify"></i> Cari PO / barang</span><input type="search" name="receiving_search" id="paReceivingSearch" enterkeyhint="search" placeholder="Nomor PO, nama atau kode barang" maxlength="150"></label>
+                    </div>
+                    <div class="pa-filter-footer">
+                        <div class="pa-active-filters"><i class="mdi mdi-filter-check"></i><span id="paReceivingScope" aria-live="polite">Memuat ringkasan penerimaan...</span></div>
+                        <div><button type="button" class="pa-btn pa-btn-ghost" id="paReceivingReset"><i class="mdi mdi-backup-restore"></i> Reset</button><button type="submit" class="pa-btn pa-btn-primary" id="paReceivingApply"><i class="mdi mdi-filter-check"></i> Terapkan Filter</button></div>
+                    </div>
+                </form>
+            </details>
+            <details class="pa-receiving-summary" id="paReceivingSummary" open>
+                <summary><span><i class="mdi mdi-chart-box-outline" aria-hidden="true"></i> Ringkasan penerimaan</span><i class="mdi mdi-chevron-down pa-section-chevron" aria-hidden="true"></i></summary>
+                <div class="pa-kpi-grid" id="paReceivingKpis" aria-live="polite"></div>
+                <p class="pa-receipt-note" id="paReceiptMethodology"></p>
+            </details>
+            @include('medcare.menu.analisisPengadaan.partials.receivingTable', ['kind' => 'received', 'prefix' => 'paReceived', 'title' => 'Item Sudah Diterima', 'tone' => 'is-green', 'icon' => 'mdi-package-variant-closed-check', 'description' => 'Item diterima lengkap maupun sebagian, beserta nilai aktual penerimaan posted.'])
+            @include('medcare.menu.analisisPengadaan.partials.receivingTable', ['kind' => 'outstanding', 'prefix' => 'paOutstanding', 'title' => 'Outstanding Order', 'tone' => 'is-red', 'icon' => 'mdi-alert-circle-outline', 'description' => 'Nilai yang belum diterima termasuk alokasi proporsional biaya PO.'])
+            @include('medcare.menu.analisisPengadaan.partials.receivingTable', ['kind' => 'cancelled', 'prefix' => 'paCancelled', 'title' => 'Order Dibatalkan', 'tone' => 'is-rose', 'icon' => 'mdi-cancel', 'description' => 'PO berstatus rejected pada periode aktif.'])
         </section>
 
         <section class="pa-tab-panel" data-tab-panel="sales">
             <div class="pa-section-label"><div><span>Demand alignment</span><h2>Order vs kebutuhan</h2></div><p>Indikator pembelian berdasarkan stok saat order terakhir, penjualan 30 hari, dan stok minimum.</p></div>
             <div class="pa-need-legend"><span class="is-optimal"><i></i> Optimal</span><span class="is-evaluation"><i></i> Perlu Evaluasi</span><span class="is-over"><i></i> Over Order</span><span class="is-under"><i></i> Under Order</span></div>
-            <article class="pa-panel"><div class="table-responsive"><table class="table pa-table pa-need-table"><thead><tr><th>Obat</th><th class="text-end">Stok saat order</th><th class="text-end">Penjualan 30 hari</th><th class="text-end">Stok minimum</th><th class="text-end">Estimasi kebutuhan</th><th class="text-end">Qty order terakhir</th><th class="text-end">Rasio</th><th>Status</th></tr></thead><tbody id="paNeedBody"></tbody></table></div></article>
+            <article class="pa-panel"><p class="pa-table-scroll-hint"><i class="mdi mdi-swap-horizontal" aria-hidden="true"></i> Geser tabel ke samping untuk melihat semua kolom.</p><div class="table-responsive" tabindex="0"><table class="table pa-table pa-need-table"><thead><tr><th>Obat</th><th class="text-end">Stok saat order</th><th class="text-end">Penjualan 30 hari</th><th class="text-end">Stok minimum</th><th class="text-end">Estimasi kebutuhan</th><th class="text-end">Qty order terakhir</th><th class="text-end">Rasio</th><th>Status</th></tr></thead><tbody id="paNeedBody"></tbody></table></div></article>
         </section>
 
         <div class="pa-toast" id="paToast" role="status" aria-live="polite" hidden><i class="mdi mdi-check-circle-outline"></i><span></span></div>
