@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Services\Settings\Master\KonversiSatuanObatService;
 use App\Services\Settings\Master\MasterObatService;
 use App\Services\Settings\Master\SatuanService;
+use App\Support\BranchAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\DataTables;
 
 class KonversiSatuanObatController extends Controller
@@ -31,8 +34,9 @@ class KonversiSatuanObatController extends Controller
 
     public function table(Request $request)
     {
-        $status = $request->get('status', 'all');
-        $KonversiSatuanObat = $this->KonversiSatuanObatService->getObatKonversiTable($status);
+        $validated = $request->validate(['status' => ['nullable', Rule::in(['all', 'with', 'without', 'po_without'])]]);
+        $branchIds = BranchAccess::userBranchIds();
+        $KonversiSatuanObat = $this->KonversiSatuanObatService->getObatKonversiTable($validated['status'] ?? 'all', $branchIds);
 
         return DataTables::of($KonversiSatuanObat)
         ->addIndexColumn()
@@ -48,7 +52,7 @@ class KonversiSatuanObatController extends Controller
         })
 
         ->rawColumns(['actions'])
-        ->with('summary', $this->KonversiSatuanObatService->getKonversiSummary())
+        ->with('summary', $this->KonversiSatuanObatService->getKonversiSummary($branchIds))
         ->make(true);
     }
 
@@ -62,6 +66,58 @@ class KonversiSatuanObatController extends Controller
     {
         $Satuan = $this->SatuanService->getSatuan();
         return $Satuan;
+    }
+
+    private function batchTargetRules(): array
+    {
+        return [
+            'scope' => ['required', Rule::in(['all', 'without', 'po_without'])],
+            'satuan_stok_ids' => ['nullable', 'array'],
+            'satuan_stok_ids.*' => ['required', 'integer', 'distinct', 'exists:satuans,id'],
+            'obat_ids' => ['nullable', 'array'],
+            'obat_ids.*' => ['required', 'integer', 'distinct', 'exists:master_obats,id'],
+        ];
+    }
+
+    public function previewBatch(Request $request)
+    {
+        $validated = $request->validate($this->batchTargetRules());
+        $targets = $this->KonversiSatuanObatService->previewBatch($validated, BranchAccess::userBranchIds());
+
+        return response()->json(['data' => $targets, 'target_count' => count($targets)]);
+    }
+
+    public function storeBatch(Request $request)
+    {
+        $validated = $request->validate([
+            ...$this->batchTargetRules(),
+            'target_ids' => ['required', 'array', 'min:1'],
+            'target_ids.*' => ['required', 'integer', 'distinct', 'exists:master_obats,id'],
+            'conversions' => ['required', 'array', 'min:1', 'max:20'],
+            'conversions.*.satuan_id' => ['required', 'integer', 'distinct', 'exists:satuans,id'],
+            'conversions.*.konversi' => ['required', 'integer', 'min:1', 'max:2147483647'],
+            'conversions.*.is_default' => ['nullable', 'boolean'],
+        ]);
+        $result = $this->KonversiSatuanObatService->storeBatch($validated, BranchAccess::userBranchIds());
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $result,
+            'message' => $result['added'].' konversi ditambahkan. '.$result['updated_medicines'].' obat diperbarui. '.$result['skipped'].' nilai konversi yang sudah ada dilewati. '.$this->poSyncMessage($result['po_sync']),
+        ]);
+    }
+
+    private function poSyncMessage(array $summary): string
+    {
+        $message = $summary['updated_items'].' item pada '.$summary['updated_orders'].' PO ikut diperbarui.';
+        if ($summary['protected_items']) {
+            $message .= ' '.$summary['protected_items'].' item PO dilindungi karena sudah memiliki penerimaan atau status PO sudah ditutup.';
+        }
+        if ($summary['ambiguous_items']) {
+            $message .= ' '.$summary['ambiguous_items'].' item PO belum diperbarui. Pilih satu konversi Utama agar satuan PO dapat ditentukan.';
+        }
+
+        return $message;
     }
 
     /**
@@ -85,16 +141,20 @@ class KonversiSatuanObatController extends Controller
             'is_default.*' => 'nullable|boolean'
         ]);
 
-        foreach ($request->obat_id as $index => $obat_id) {
-            $this->KonversiSatuanObatService->createKonversi([
-                'obat_id' => $obat_id,
-                'satuan_id' => $request->satuan_id[$index],
-                'konversi' => $request->konversi[$index],
-                'is_default'=> $request->is_default[$index] ?? 0,
-            ]);
-        }
+        $poSync = DB::transaction(function () use ($request) {
+            foreach ($request->obat_id as $index => $obat_id) {
+                $this->KonversiSatuanObatService->createKonversi([
+                    'obat_id' => $obat_id,
+                    'satuan_id' => $request->satuan_id[$index],
+                    'konversi' => $request->konversi[$index],
+                    'is_default'=> $request->is_default[$index] ?? 0,
+                ]);
+            }
 
-        return response()->json(['status' => 'success', 'message' => 'Konversi berhasil ditambahkan']);
+            return $this->KonversiSatuanObatService->syncMissingPurchaseOrderUnits($request->obat_id, BranchAccess::userBranchIds());
+        }, 3);
+
+        return response()->json(['status' => 'success', 'po_sync' => $poSync, 'message' => 'Konversi berhasil ditambahkan. '.$this->poSyncMessage($poSync)]);
     }
 
     /**
@@ -127,12 +187,12 @@ class KonversiSatuanObatController extends Controller
             'is_default.*' => 'nullable|boolean',
         ]);
 
-        $data = $this->KonversiSatuanObatService->syncKonversiForObat($obatId, $validated);
+        $data = $this->KonversiSatuanObatService->syncKonversiForObat($obatId, $validated, BranchAccess::userBranchIds());
 
         return response()->json([
             'status' => 'success',
             'data' => $data,
-            'message' => 'Konversi satuan obat berhasil disimpan',
+            'message' => 'Konversi satuan obat berhasil disimpan. '.$this->poSyncMessage($data['po_sync']),
         ]);
     }
 
@@ -162,9 +222,16 @@ class KonversiSatuanObatController extends Controller
 
         $validated['is_default'] = (int) $request->input('is_default', 0);
 
-        $KonversiSatuanObat = $this->KonversiSatuanObatService->updateKonversi($id, $validated);
+        $result = DB::transaction(function () use ($id, $validated) {
+            $conversion = $this->KonversiSatuanObatService->updateKonversi($id, $validated);
 
-        return response()->json(['status' => 'success', 'data' => $KonversiSatuanObat, 'message' => 'Konversi berhasil Update']);
+            return [
+                'conversion' => $conversion,
+                'po_sync' => $this->KonversiSatuanObatService->syncMissingPurchaseOrderUnits([$conversion->obat_id], BranchAccess::userBranchIds()),
+            ];
+        }, 3);
+
+        return response()->json(['status' => 'success', 'data' => $result['conversion'], 'po_sync' => $result['po_sync'], 'message' => 'Konversi berhasil diperbarui. '.$this->poSyncMessage($result['po_sync'])]);
     }
 
     /**
@@ -178,6 +245,8 @@ class KonversiSatuanObatController extends Controller
                 'success' => true,
                 'message' => 'Konversi berhasil dihapus.'
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             // Tangani jika terjadi kesalahan
             return response()->json([
@@ -198,6 +267,6 @@ class KonversiSatuanObatController extends Controller
             'file' => 'required|mimes:xlsx,xls',
         ]);
 
-        return $this->KonversiSatuanObatService->importExcel($request->file('file'));
+        return $this->KonversiSatuanObatService->importExcel($request->file('file'), BranchAccess::userBranchIds());
     }
 }

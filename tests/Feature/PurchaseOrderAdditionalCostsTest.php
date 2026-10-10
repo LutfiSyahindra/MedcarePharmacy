@@ -78,7 +78,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
         $this->assertSame('19000.00', $purchaseOrder->total_estimasi);
     }
 
-    public function test_purchase_can_use_base_unit_when_medicine_has_no_conversion_record(): void
+    public function test_purchase_can_save_draft_when_medicine_has_no_conversion_record(): void
     {
         Notification::fake();
 
@@ -94,6 +94,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
         $this->actingAs($user)
             ->postJson(route('pembelian.store'), [
                 'no_po' => 'PO-BASE-UNIT-001',
+                'save_as_draft' => true,
                 'distributor_id' => $distributor->id,
                 'tanggal' => '26-09-2026',
                 'catatan' => null,
@@ -108,7 +109,8 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
                 'subtotal' => [1000],
                 'satuan_id' => [0],
             ])
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.status', 'draft');
 
         $purchaseOrder = PembelianModel::where('no_po', 'PO-BASE-UNIT-001')->firstOrFail();
         $detail = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)->firstOrFail();

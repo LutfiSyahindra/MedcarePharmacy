@@ -15,6 +15,11 @@ class KonversiSatuanObatRepository
 
     public function getObatWithKonversi()
     {
+        return $this->obatWithKonversiQuery()->get();
+    }
+
+    public function obatWithKonversiQuery()
+    {
         return MasterObatModel::with([
             'satuan',
             'konversiSatuan' => function ($query) {
@@ -23,8 +28,7 @@ class KonversiSatuanObatRepository
                     ->orderBy('id');
             },
         ])
-            ->orderBy('nama_obat')
-            ->get();
+            ->orderBy('nama_obat');
     }
 
     public function updateStatus($id, $status)

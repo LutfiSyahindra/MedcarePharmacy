@@ -209,6 +209,13 @@
                                     <i class="mdi mdi-loading mdi-spin"></i> Memuat satuan obat...
                                 </span>
                             </div>
+                            <div id="purchaseConversionWarning" class="alert alert-warning d-none" role="alert">
+                                <i class="mdi mdi-alert-outline"></i>
+                                <strong>Satuan konversi belum lengkap.</strong>
+                                PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di
+                                <a href="{{ route('konversiSatuanObat.konversiSatuanObat') }}" target="_blank" rel="noopener">Master Data Konversi Satuan</a>,
+                                lalu buka kembali draft untuk memproses PO.
+                            </div>
                             <div id="detail-wrapper">
                                 <div class="detail-item purchase-detail-card">
                                     <div class="purchase-detail-card-head">
@@ -241,6 +248,7 @@
                                                 required>
                                                 <option value="">-- Pilih Satuan --</option>
                                             </select>
+                                            <small class="purchase-unit-warning text-warning d-none">Lengkapi satuan konversi. Item ini hanya dapat disimpan sebagai draft.</small>
                                         </div>
 
                                         <div class="col-4 col-lg-1 col-md-4 purchase-qty-field">

@@ -5,6 +5,7 @@ namespace App\Services\Menu\PembelianPenerimaan;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Repositories\Menu\PembelianPenerimaan\PembelianRepository;
+use Illuminate\Validation\ValidationException;
 
 class PembelianService
 {
@@ -130,6 +131,24 @@ class PembelianService
 
     public function updateStatus($id, $status, $approvedBy = null, ?array $branchIds = null)
     {
+        if ($status === 'approved') {
+            $purchaseOrder = $this->PembelianRepository->findByIdPembelian($id, $branchIds);
+            $errors = [];
+
+            foreach ($purchaseOrder?->details ?? [] as $index => $detail) {
+                $conversion = $detail->satuanKonversi;
+
+                if (! $conversion || (int) $conversion->obat_id !== (int) $detail->obat_id
+                    || (float) $conversion->konversi <= 0 || ! $conversion->satuan) {
+                    $errors['satuan_id.'.$index] = 'Lengkapi satuan konversi untuk item obat ke-'.($index + 1).'. PO belum dapat diproses.';
+                }
+            }
+
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+        }
+
         return $this->PembelianRepository->updateStatus($id, $status, $approvedBy, $branchIds);
     }
 

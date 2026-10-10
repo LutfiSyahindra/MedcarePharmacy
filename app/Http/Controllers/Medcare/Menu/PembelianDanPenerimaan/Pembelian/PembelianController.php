@@ -303,6 +303,7 @@ class PembelianController extends Controller
                 'message' => $saveAsDraft
                     ? 'Draft purchase order berhasil disimpan.'
                     : 'Pembelian berhasil ditambahkan',
+                'warning' => $this->missingConversionWarning($detailRows),
                 'data' => [
                     'id' => $po->id,
                     'status' => $po->status,
@@ -683,6 +684,7 @@ class PembelianController extends Controller
                 'message' => $saveAsDraft
                     ? 'Draft purchase order berhasil diperbarui.'
                     : 'Pembelian berhasil diperbarui',
+                'warning' => $this->missingConversionWarning($detailRows),
                 'data' => [
                     'id' => $po->id,
                     'status' => $po->status,
@@ -725,7 +727,7 @@ class PembelianController extends Controller
     }
 
     /**
-     * @return array<int, array<string, bool|int|float>>
+     * @return array<int, array<string, bool|int|float|null>>
      */
     private function purchaseDetailRows(Request $request): array
     {
@@ -779,6 +781,15 @@ class PembelianController extends Controller
         }
 
         return $rows;
+    }
+
+    private function missingConversionWarning(array $detailRows): ?string
+    {
+        if (collect($detailRows)->contains(fn (array $row) => $row['satuan_konversi'] === null)) {
+            return 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di Master Data sebelum memproses PO.';
+        }
+
+        return null;
     }
 
     private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): void
@@ -871,14 +882,10 @@ class PembelianController extends Controller
                 ->values();
             $conversions = KonversiSatuanModel::query()
                 ->whereKey($conversionIds)
+                ->where('konversi', '>', 0)
+                ->whereHas('satuan')
                 ->get(['id', 'obat_id'])
                 ->keyBy('id');
-            $medicinesWithConversions = KonversiSatuanModel::query()
-                ->whereIn('obat_id', collect($medicineIds)->map(fn ($medicineId) => (int) $medicineId)->filter())
-                ->pluck('obat_id')
-                ->map(fn ($medicineId) => (int) $medicineId)
-                ->unique()
-                ->flip();
 
             foreach ($medicineIds as $index => $medicineId) {
                 if (! array_key_exists($index, $conversionValues)) {
@@ -894,10 +901,10 @@ class PembelianController extends Controller
                 $conversionId = (int) $conversionValues[$index];
 
                 if ($conversionId <= 0) {
-                    if ($medicinesWithConversions->has($medicineId)) {
+                    if (! $request->boolean('save_as_draft')) {
                         $validator->errors()->add(
                             'satuan_id.'.$index,
-                            'Pilih satuan yang tersedia untuk item obat ke-'.((int) $index + 1).'.'
+                            'Lengkapi satuan konversi untuk item obat ke-'.((int) $index + 1).'. PO hanya dapat disimpan sebagai draft sebelum satuan konversi lengkap.'
                         );
                     }
 

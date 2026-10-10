@@ -142,6 +142,7 @@
                             <select class="form-select satuan-select" name="satuan_id[]" disabled required>
                                 <option value="">-- Pilih Satuan --</option>
                             </select>
+                            <small class="purchase-unit-warning text-warning d-none">Lengkapi satuan konversi. Item ini hanya dapat disimpan sebagai draft.</small>
                         </div>
 
                         <div class="col-4 col-lg-1 col-md-4 purchase-qty-field">
@@ -222,9 +223,22 @@
 
         function updateUnitLoadingState() {
             const isLoading = pendingUnitRequests.size > 0;
+            let hasMissingConversion = false;
 
-            $('#submitForm, #saveDraftForm').prop('disabled', isLoading || purchaseSaveInProgress);
+            $('#detail-wrapper .detail-item').each(function() {
+                const row = $(this);
+                const unitSelect = row.find('.satuan-select');
+                const missingConversion = Boolean(row.find('[name="obat_id[]"]').val()) &&
+                    !unitSelect.prop('disabled') && !(Number(unitSelect.val()) > 0);
+
+                row.find('.purchase-unit-warning').toggleClass('d-none', !missingConversion);
+                hasMissingConversion = hasMissingConversion || missingConversion;
+            });
+
+            $('#submitForm').prop('disabled', isLoading || purchaseSaveInProgress || hasMissingConversion);
+            $('#saveDraftForm').prop('disabled', isLoading || purchaseSaveInProgress);
             $('#purchaseUnitLoadingNotice').toggleClass('d-none', !isLoading);
+            $('#purchaseConversionWarning').toggleClass('d-none', !hasMissingConversion);
         }
 
         function getMedicineCatalog() {
@@ -459,6 +473,7 @@
         $('#pembelianModal').on('show.bs.modal', function() {
             let form = $('#pembelianForm');
             purchaseSaveInProgress = false;
+            medicineUnitCache.clear();
             $('#pembelianModalLabel').text('Form Purchase Order');
             form.trigger('reset');
 
@@ -787,6 +802,7 @@
             $('#purchaseModalQtyCount').text(totalQty.toLocaleString('id-ID'));
             $('#purchaseModalMedicineSubtotal').text(formatRupiah(medicineSubtotal));
             $('#purchaseModalAdditionalCost').text(formatRupiah(additionalCost));
+            updateUnitLoadingState();
         }
 
         // --- Get data distributor
@@ -954,7 +970,7 @@
 
         function cacheMedicineUnits(medicineId, data) {
             const list = (Array.isArray(data) ? data : [])
-                .filter(item => item && item.satuan)
+                .filter(item => item && item.satuan && Number(item.konversi) > 0)
                 .sort(function(a, b) {
                     const defaultDifference = Number(b.is_default || 0) - Number(a.is_default || 0);
 
@@ -1073,7 +1089,7 @@
                         const unitName = medicine?.satuan?.nama || 'Satuan dasar';
 
                         $satuanSelect
-                            .html(`<option value="0" data-konversi="1">${escapeHtml(unitName)} (dasar)</option>`)
+                            .html(`<option value="0" data-konversi="1">${escapeHtml(unitName)} (konversi belum tersedia)</option>`)
                             .prop('disabled', false)
                             .val('0');
                     } else {
@@ -1853,6 +1869,20 @@
                     waitForPendingUnitRequests()
                 ])
                 .then(function() {
+                    if (!saveAsDraft && $('#detail-wrapper .detail-item').toArray().some(function(element) {
+                        const row = $(element);
+
+                        return Boolean(row.find('[name="obat_id[]"]').val()) &&
+                            !(Number(row.find('.satuan-select').val()) > 0);
+                    })) {
+                        throw {
+                            status: 422,
+                            responseJSON: {
+                                message: 'Lengkapi satuan konversi terlebih dahulu. PO hanya dapat disimpan sebagai draft.'
+                            }
+                        };
+                    }
+
                     const purchaseOrderId = $('#pembelian_id').val();
                     const url = purchaseOrderId ?
                         "{{ route("pembelian.update", ":id") }}".replace(':id', purchaseOrderId) :
@@ -1892,15 +1922,24 @@
                     $('#pembelian_id').val(response.data?.id || $('#pembelian_id').val());
                     $('#pembelianModal').modal('hide');
 
-                    Swal.fire({
-                        icon: 'success',
-                        title: response.message,
-                        toast: true,
-                        position: 'top-end',
-                        timer: 3000,
-                        timerProgressBar: true,
-                        showConfirmButton: false,
-                    });
+                    if (response.warning) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: response.message,
+                            text: response.warning,
+                            confirmButtonText: 'Mengerti'
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'success',
+                            title: response.message,
+                            toast: true,
+                            position: 'top-end',
+                            timer: 3000,
+                            timerProgressBar: true,
+                            showConfirmButton: false,
+                        });
+                    }
 
                     PembelianTable.ajax.reload(null, false);
                 })

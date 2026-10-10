@@ -276,6 +276,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/konversiSatuanObat', [KonversiSatuanObatController::class, 'konversi'])->name('konversiSatuanObat.konversiSatuanObat');
         Route::get('/konversiSatuanObat/table', [KonversiSatuanObatController::class, 'table'])->name('konversiSatuanObat.table');
         Route::post('/konversiSatuanObat/store', [KonversiSatuanObatController::class, 'store'])->name('konversiSatuanObat.store');
+        Route::get('/konversiSatuanObat/batch/preview', [KonversiSatuanObatController::class, 'previewBatch'])->name('konversiSatuanObat.batchPreview');
+        Route::post('/konversiSatuanObat/batch', [KonversiSatuanObatController::class, 'storeBatch'])->name('konversiSatuanObat.batchStore');
         Route::put('/konversiSatuanObat/{id}/sync', [KonversiSatuanObatController::class, 'sync'])->name('konversiSatuanObat.sync');
         Route::get('/konversiSatuanObat/{id}/edit', [KonversiSatuanObatController::class, 'edit'])->name('konversiSatuanObat.edit');
         Route::get('/konversiSatuanObat/getObat', [KonversiSatuanObatController::class, 'getObat'])->name('konversiSatuanObat.getObat');

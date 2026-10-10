@@ -7,6 +7,7 @@
         let satuanRequest = null;
         let activeObatRow = null;
         let konversiTable = null;
+        let conversionFieldKey = 0;
 
         if ($.fn.dropify) {
             $('#myDropify').dropify();
@@ -101,6 +102,7 @@
             $('#konversiTotalObat').text(formatNumber(latestSummary.total_obat || 0));
             $('#konversiWith').text(formatNumber(latestSummary.sudah_konversi || 0));
             $('#konversiWithout').text(formatNumber(latestSummary.belum_konversi || 0));
+            $('#konversiPoWithout').text(formatNumber(latestSummary.po_belum_konversi || 0));
 
             if (konversiTable && konversiTable.page) {
                 const info = konversiTable.page.info();
@@ -120,6 +122,7 @@
                     ${escapeHtml(row.status_label)}
                     <small>${escapeHtml(countText)}</small>
                 </span>
+                ${Number(row.po_missing_unit_count) > 0 ? `<small class="konversi-po-reference">${formatNumber(row.po_missing_unit_count)} item PO belum diisi satuannya</small>` : ''}
             `;
         }
 
@@ -154,8 +157,8 @@
 
         function setStatusFilter(status) {
             currentStatus = status || 'all';
-            $('.konversi-status-filter .btn').removeClass('is-active');
-            $(`.konversi-status-filter .btn[data-status="${currentStatus}"]`).addClass('is-active');
+            $('.konversi-status-filter .btn').removeClass('is-active').attr('aria-pressed', 'false');
+            $(`.konversi-status-filter .btn[data-status="${currentStatus}"]`).addClass('is-active').attr('aria-pressed', 'true');
             konversiTable.ajax.reload(null, true);
         }
 
@@ -188,12 +191,16 @@
                         }
 
                         const subtitle = `${row.kode_obat || '-'} - Satuan stok: ${row.satuan_stok || 'PCS'}`;
+                        const orders = row.purchase_orders || [];
+                        const poContext = orders.length
+                            ? `<small class="konversi-po-reference" title="${escapeHtml(orders.join(', '))}"><i class="mdi mdi-cart-outline"></i> PO: ${escapeHtml(orders.slice(0, 3).join(', '))}${orders.length > 3 ? ` (+${orders.length - 3} lainnya)` : ''}</small>`
+                            : '';
 
                         if (ui.identity) {
-                            return ui.identity(row.nama_obat, subtitle);
+                            return ui.identity(row.nama_obat, subtitle) + poContext;
                         }
 
-                        return `<strong>${escapeHtml(row.nama_obat || '-')}</strong><br><small>${escapeHtml(subtitle)}</small>`;
+                        return `<strong>${escapeHtml(row.nama_obat || '-')}</strong><br><small>${escapeHtml(subtitle)}</small>` + poContext;
                     }
                 },
                 {
@@ -233,12 +240,17 @@
                     data: 'actions',
                     name: 'actions',
                     orderable: false,
-                    searchable: false
+                    searchable: false,
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+
+                        return `<div class="obat-action-group"><button type="button" class="btn konversi-manage-btn" onclick="manageKonversiObat(${Number(row.id)})" aria-label="Kelola satuan ${escapeHtml(row.nama_obat)}"><i class="mdi mdi-tune-variant" aria-hidden="true"></i>Kelola satuan</button></div>`;
+                    }
                 }
             ]
         }));
 
-        $('.dataTables_filter').hide();
+        $('#tableKonversi_wrapper .dataTables_filter').hide();
 
         let searchTimer = null;
         $('#searchKonversi').on('input', function() {
@@ -319,6 +331,8 @@
             return html;
         }
 
+        @include("medcare.masterData.konversi.jsBatch")
+
         function initSatuanSelect($select, selectedId = null) {
             loadSatuanOptions().then(function() {
                 if ($select.data('select2')) {
@@ -345,6 +359,7 @@
             const id = data.id || '';
             const konversi = data.konversi || '';
             const isDefault = Number(data.is_default || 0) === 1;
+            const fieldKey = ++conversionFieldKey;
 
             return `
                 <div class="konversi-input-card input-group-item mb-3">
@@ -358,10 +373,10 @@
                     <div class="konversi-input-card-body">
                         <div class="obat-fields">
                             <div class="obat-field is-satuan">
-                                <label class="form-label">Satuan Pembelian</label>
+                                <label class="form-label" for="conversionUnit${fieldKey}">Satuan pembelian</label>
                                 <div class="obat-input-shell">
                                     <span class="obat-input-icon"><i class="mdi mdi-package-variant"></i></span>
-                                    <select class="form-select satuanSelect" name="satuan_id[]" required>
+                                    <select id="conversionUnit${fieldKey}" class="form-select satuanSelect" name="satuan_id[]" required>
                                         <option value="">Memuat data...</option>
                                     </select>
                                 </div>
@@ -369,21 +384,21 @@
                             </div>
 
                             <div class="obat-field is-konversi">
-                                <label class="form-label">Isi Konversi</label>
+                                <label class="form-label" for="conversionValue${fieldKey}">Isi per satuan pembelian</label>
                                 <div class="obat-input-shell">
                                     <span class="obat-input-icon"><i class="mdi mdi-calculator-variant-outline"></i></span>
-                                    <input class="form-control konversiValue" type="number" name="konversi[]" value="${escapeHtml(konversi)}" min="1" placeholder="Contoh: 10" required>
+                                    <input id="conversionValue${fieldKey}" class="form-control konversiValue" type="number" inputmode="numeric" name="konversi[]" value="${escapeHtml(konversi)}" min="1" step="1" placeholder="Contoh: 10" required>
                                 </div>
                                 <div class="invalid-feedback"></div>
                             </div>
 
                             <div class="obat-field is-default">
-                                <label class="form-label">Default</label>
-                                <div class="konversi-default-box">
+                                <span class="form-label">Prioritas PO</span>
+                                <label class="konversi-default-box">
                                     <input type="hidden" name="is_default[]" value="${isDefault ? '1' : '0'}" class="defaultHidden">
                                     <input class="form-check-input defaultCheck" type="checkbox" value="1" ${isDefault ? 'checked' : ''}>
-                                    <label class="form-check-label">Utama</label>
-                                </div>
+                                    <span>Utama untuk PO</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -594,7 +609,7 @@
                 success: function(response) {
                     $('#konversiModal').modal('hide');
                     konversiTable.ajax.reload(null, false);
-                    toast('success', response.message || 'Konversi berhasil disimpan');
+                    toast('success', 'Konversi disimpan', escapeHtml(response.message || 'Konversi berhasil disimpan'));
                 },
                 error: function(xhr) {
                     if (xhr.status === 422) {
@@ -686,6 +701,9 @@
                             html: `
                                 <p>${response.added} data berhasil ditambahkan.</p>
                                 <p>${response.skipped} data dilewati (sudah ada).</p>
+                                <p>${formatNumber(response.po_sync?.updated_items || 0)} item PO ikut diperbarui.</p>
+                                ${response.po_sync?.protected_items ? `<p>${formatNumber(response.po_sync.protected_items)} item PO dilindungi karena sudah memiliki penerimaan atau status PO sudah ditutup.</p>` : ''}
+                                ${response.po_sync?.ambiguous_items ? `<p>${formatNumber(response.po_sync.ambiguous_items)} item PO belum diperbarui. Pilih satu konversi Utama untuk obat terkait.</p>` : ''}
                             `,
                             timer: 2500,
                             showConfirmButton: false,
