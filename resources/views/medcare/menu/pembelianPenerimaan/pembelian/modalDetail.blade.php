@@ -104,7 +104,7 @@
 
             <div class="modal-footer d-flex justify-content-between align-items-center">
                 <button type="button" class="btn btn-outline-danger" id="btnPrintPDF" disabled
-                    title="Surat pesanan mengikuti klasifikasi obat; OOT memiliki prioritas untuk seluruh PO">
+                    title="Cetak surat pesanan sesuai jenis SP dalam PO">
                     <i class="mdi mdi-file-pdf-box fs-5"></i>
                     <span>Cetak Surat Pesanan</span>
                 </button>

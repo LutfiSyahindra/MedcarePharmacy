@@ -1796,6 +1796,48 @@
         white-space: nowrap;
     }
 
+    .purchase-detail-table .purchase-sp-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: .28rem .5rem;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font-size: .78rem;
+        font-weight: 800;
+        line-height: 1.3;
+        vertical-align: middle;
+    }
+
+    .purchase-detail-table .purchase-sp-badge.is-regular {
+        color: #155e75;
+        background-color: #cffafe;
+        border-color: #67e8f9;
+    }
+
+    .purchase-detail-table .purchase-sp-badge.is-narcotic {
+        color: #991b1b;
+        background-color: #fee2e2;
+        border-color: #fca5a5;
+    }
+
+    .purchase-detail-table .purchase-sp-badge.is-psychotropic {
+        color: #1e40af;
+        background-color: #dbeafe;
+        border-color: #93c5fd;
+    }
+
+    .purchase-detail-table .purchase-sp-badge.is-precursor {
+        color: #92400e;
+        background-color: #fef3c7;
+        border-color: #fbbf24;
+    }
+
+    .purchase-detail-table .purchase-sp-badge.is-oot {
+        color: #166534;
+        background-color: #dcfce7;
+        border-color: #86efac;
+    }
+
     @keyframes purchase-spin {
         to {
             transform: rotate(360deg);
@@ -2686,20 +2728,13 @@
             text-transform: uppercase;
         }
 
-        .purchase-detail-table .badge {
+        .purchase-detail-table .purchase-sp-badge {
             align-self: flex-start;
             max-width: 100%;
             margin-left: 0 !important;
             white-space: normal;
         }
 
-        .purchase-detail-table .badge.bg-info {
-            color: #0e7490;
-        }
-
-        .purchase-detail-table .badge.bg-warning {
-            color: #92400e;
-        }
     }
 
     @media (max-width: 575.98px) {

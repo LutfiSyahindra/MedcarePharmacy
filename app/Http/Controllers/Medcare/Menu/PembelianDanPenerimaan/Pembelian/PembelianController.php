@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 use App\Http\Controllers\Controller;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
-use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananOotService;
@@ -325,31 +324,19 @@ class PembelianController extends Controller
         $Pembelian = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
         $ootDetails = $this->suratPesananOot->ootDetails($Pembelian);
 
-        if ($ootDetails->isNotEmpty()) {
-            $Pembelian->setAttribute('has_regular_items', false);
-            $Pembelian->setAttribute('regular_item_count', 0);
-            $Pembelian->setAttribute('has_narcotic_items', false);
-            $Pembelian->setAttribute('narcotic_item_count', 0);
-            $Pembelian->setAttribute('has_psychotropic_items', false);
-            $Pembelian->setAttribute('psychotropic_item_count', 0);
-            $Pembelian->setAttribute('has_precursor_items', false);
-            $Pembelian->setAttribute('precursor_item_count', 0);
-        } else {
-            $regularDetails = $this->suratPesananReguler->regularDetails($Pembelian);
-            $narcoticDetails = $this->suratPesananNarkotika->narcoticDetails($Pembelian);
-            $psychotropicDetails = $this->suratPesananPsikotropika->psychotropicDetails($Pembelian);
-            $precursorDetails = $this->suratPesananPrekursor->precursorDetails($Pembelian);
+        $regularDetails = $this->suratPesananReguler->regularDetails($Pembelian);
+        $narcoticDetails = $this->suratPesananNarkotika->narcoticDetails($Pembelian);
+        $psychotropicDetails = $this->suratPesananPsikotropika->psychotropicDetails($Pembelian);
+        $precursorDetails = $this->suratPesananPrekursor->precursorDetails($Pembelian);
 
-            $Pembelian->setAttribute('has_regular_items', $regularDetails->isNotEmpty());
-            $Pembelian->setAttribute('regular_item_count', $regularDetails->count());
-            $Pembelian->setAttribute('has_narcotic_items', $narcoticDetails->isNotEmpty());
-            $Pembelian->setAttribute('narcotic_item_count', $narcoticDetails->count());
-            $Pembelian->setAttribute('has_psychotropic_items', $psychotropicDetails->isNotEmpty());
-            $Pembelian->setAttribute('psychotropic_item_count', $psychotropicDetails->count());
-            $Pembelian->setAttribute('has_precursor_items', $precursorDetails->isNotEmpty());
-            $Pembelian->setAttribute('precursor_item_count', $precursorDetails->count());
-        }
-
+        $Pembelian->setAttribute('has_regular_items', $regularDetails->isNotEmpty());
+        $Pembelian->setAttribute('regular_item_count', $regularDetails->count());
+        $Pembelian->setAttribute('has_narcotic_items', $narcoticDetails->isNotEmpty());
+        $Pembelian->setAttribute('narcotic_item_count', $narcoticDetails->count());
+        $Pembelian->setAttribute('has_psychotropic_items', $psychotropicDetails->isNotEmpty());
+        $Pembelian->setAttribute('psychotropic_item_count', $psychotropicDetails->count());
+        $Pembelian->setAttribute('has_precursor_items', $precursorDetails->isNotEmpty());
+        $Pembelian->setAttribute('precursor_item_count', $precursorDetails->count());
         $Pembelian->setAttribute('has_oot_items', $ootDetails->isNotEmpty());
         $Pembelian->setAttribute('oot_item_count', $ootDetails->count());
 
@@ -359,7 +346,6 @@ class PembelianController extends Controller
     public function suratPesananNarkotika(Request $request, string $id)
     {
         $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
-        $this->abortIfOotPurchaseOrder($purchaseOrder);
         $narcoticDetails = $this->suratPesananNarkotika->narcoticDetails($purchaseOrder);
 
         abort_if(
@@ -379,7 +365,6 @@ class PembelianController extends Controller
     public function suratPesananPsikotropika(Request $request, string $id)
     {
         $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
-        $this->abortIfOotPurchaseOrder($purchaseOrder);
         $psychotropicDetails = $this->suratPesananPsikotropika->psychotropicDetails($purchaseOrder);
 
         abort_if(
@@ -399,7 +384,6 @@ class PembelianController extends Controller
     public function suratPesananPrekursor(Request $request, string $id)
     {
         $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
-        $this->abortIfOotPurchaseOrder($purchaseOrder);
         $precursorDetails = $this->suratPesananPrekursor->precursorDetails($purchaseOrder);
 
         abort_if(
@@ -419,7 +403,6 @@ class PembelianController extends Controller
     public function suratPesananReguler(Request $request, string $id)
     {
         $purchaseOrder = $this->PembelianService->DetailPembelian($id, BranchAccess::userBranchIds());
-        $this->abortIfOotPurchaseOrder($purchaseOrder);
         $regularDetails = $this->suratPesananReguler->regularDetails($purchaseOrder);
 
         abort_if(
@@ -453,15 +436,6 @@ class PembelianController extends Controller
             'copyCount' => SuratPesananOotService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
         ]);
-    }
-
-    private function abortIfOotPurchaseOrder(PembelianModel $purchaseOrder): void
-    {
-        abort_if(
-            $this->suratPesananOot->ootDetails($purchaseOrder)->isNotEmpty(),
-            422,
-            'Purchase order dengan obat berklasifikasi OOT hanya dapat menghasilkan Surat Pesanan OOT.'
-        );
     }
 
     /**

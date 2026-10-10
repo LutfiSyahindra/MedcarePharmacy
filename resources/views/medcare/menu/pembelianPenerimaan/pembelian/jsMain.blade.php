@@ -508,34 +508,67 @@
                 .prop('disabled', true)
                 .removeClass('btn-outline-info btn-outline-primary btn-outline-warning btn-outline-success btn-outline-dark')
                 .addClass('btn-outline-danger')
-                .attr('title', 'Surat pesanan mengikuti klasifikasi obat; OOT memiliki prioritas untuk seluruh PO')
+                .attr('title', 'Cetak surat pesanan sesuai jenis SP dalam PO')
                 .find('span').text('Cetak Surat Pesanan');
         });
+
+        function openPurchaseOrderDocument(document) {
+            const printWindow = window.open(document.url, '_blank');
+
+            if (!printWindow) {
+                return false;
+            }
+
+            printWindow.opener = null;
+            return true;
+        }
 
         $('#btnPrintPDF').on('click', function() {
             if (!detailPurchaseOrderId || $(this).prop('disabled') || detailPrintDocuments.length < 1) {
                 return;
             }
 
-            let blockedDocuments = 0;
+            if (detailPrintDocuments.length === 1) {
+                if (!openPurchaseOrderDocument(detailPrintDocuments[0])) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Surat pesanan diblokir browser',
+                        text: 'Izinkan pop-up untuk situs ini agar surat pesanan dapat dibuka.'
+                    });
+                }
+                return;
+            }
 
-            detailPrintDocuments.forEach(function(document) {
-                const printWindow = window.open(document.url, '_blank');
+            const documents = [...detailPrintDocuments];
 
-                if (printWindow) {
-                    printWindow.opener = null;
-                } else {
-                    blockedDocuments++;
+            Swal.fire({
+                target: '#pembelianModalDetail',
+                title: 'Pilih Surat Pesanan',
+                text: 'Pilih jenis SP yang ingin dicetak dari PO ini.',
+                input: 'select',
+                inputLabel: 'Jenis Surat Pesanan',
+                inputPlaceholder: 'Pilih jenis SP',
+                inputOptions: Object.fromEntries(documents.map((document, index) => [
+                    String(index), `${document.name} (${document.count} item)`
+                ])),
+                showCancelButton: true,
+                confirmButtonText: 'Cetak Surat',
+                cancelButtonText: 'Batal',
+                keydownListenerCapture: true,
+                preConfirm: function(selectedIndex) {
+                    const selectedDocument = selectedIndex === '' ? null : documents[selectedIndex];
+
+                    if (!selectedDocument) {
+                        Swal.showValidationMessage('Pilih jenis surat pesanan terlebih dahulu.');
+                        return false;
+                    }
+
+                    if (!openPurchaseOrderDocument(selectedDocument)) {
+                        Swal.showValidationMessage('Izinkan pop-up untuk situs ini agar surat pesanan dapat dibuka.');
+                        return false;
+                    }
                 }
             });
-
-            if (blockedDocuments > 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Sebagian dokumen diblokir browser',
-                    text: 'Izinkan pop-up untuk situs ini agar seluruh surat pesanan dapat dibuka dari satu tombol.'
-                });
-            }
         });
 
         // =================== Inisiasi Event Handler ===================
@@ -2134,41 +2167,38 @@
                     const psychotropicCount = Number(po.psychotropic_item_count ?? 0);
                     const precursorCount = Number(po.precursor_item_count ?? 0);
                     const ootCount = Number(po.oot_item_count ?? 0);
-                    const ootDocument = {
-                        name: 'OOT',
-                        count: ootCount,
-                        buttonClass: 'btn-outline-success',
-                        url: "{{ route("pembelian.suratPesananOot", ":id") }}".replace(':id', po.id)
-                    };
-
-                    detailPrintDocuments = ootCount > 0
-                        ? [ootDocument]
-                        : [
-                            {
-                                name: 'Reguler',
-                                count: regularCount,
-                                buttonClass: 'btn-outline-info',
-                                url: "{{ route("pembelian.suratPesananReguler", ":id") }}".replace(':id', po.id)
-                            },
-                            {
-                                name: 'Narkotika',
-                                count: narcoticCount,
-                                buttonClass: 'btn-outline-danger',
-                                url: "{{ route("pembelian.suratPesananNarkotika", ":id") }}".replace(':id', po.id)
-                            },
-                            {
-                                name: 'Psikotropika',
-                                count: psychotropicCount,
-                                buttonClass: 'btn-outline-primary',
-                                url: "{{ route("pembelian.suratPesananPsikotropika", ":id") }}".replace(':id', po.id)
-                            },
-                            {
-                                name: 'Prekursor',
-                                count: precursorCount,
-                                buttonClass: 'btn-outline-warning',
-                                url: "{{ route("pembelian.suratPesananPrekursor", ":id") }}".replace(':id', po.id)
-                            }
-                        ].filter(document => document.count > 0);
+                    detailPrintDocuments = [
+                        {
+                            name: 'Reguler',
+                            count: regularCount,
+                            buttonClass: 'btn-outline-info',
+                            url: "{{ route("pembelian.suratPesananReguler", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'Narkotika',
+                            count: narcoticCount,
+                            buttonClass: 'btn-outline-danger',
+                            url: "{{ route("pembelian.suratPesananNarkotika", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'Psikotropika',
+                            count: psychotropicCount,
+                            buttonClass: 'btn-outline-primary',
+                            url: "{{ route("pembelian.suratPesananPsikotropika", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'Prekursor',
+                            count: precursorCount,
+                            buttonClass: 'btn-outline-warning',
+                            url: "{{ route("pembelian.suratPesananPrekursor", ":id") }}".replace(':id', po.id)
+                        },
+                        {
+                            name: 'OOT',
+                            count: ootCount,
+                            buttonClass: 'btn-outline-success',
+                            url: "{{ route("pembelian.suratPesananOot", ":id") }}".replace(':id', po.id)
+                        }
+                    ].filter(document => document.count > 0);
 
                     const $printButton = $('#btnPrintPDF');
                     const totalOrderItems = detailPrintDocuments.reduce(
@@ -2195,8 +2225,8 @@
                         const documentNames = detailPrintDocuments.map(document => document.name).join(', ');
                         $printButton
                             .addClass('btn-outline-dark')
-                            .attr('title', `Buka surat otomatis untuk: ${documentNames}`)
-                            .find('span').text(`Cetak ${detailPrintDocuments.length} Jenis Surat (${totalOrderItems} item)`);
+                            .attr('title', `Pilih surat yang ingin dicetak: ${documentNames}`)
+                            .find('span').text(`Cetak Surat Pesanan (${detailPrintDocuments.length} jenis, ${totalOrderItems} item)`);
                     }
 
                     // Header
@@ -2217,19 +2247,19 @@
                         const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
 
                         const regularBadge = item.is_regular
-                            ? `<span class="badge bg-info bg-opacity-10 text-info-emphasis ms-2" title="Obat selain Narkotika, Psikotropika, dan Prekursor">Reguler</span>`
+                            ? `<span class="badge purchase-sp-badge is-regular ms-2" title="Obat selain Narkotika, Psikotropika, dan Prekursor">Reguler</span>`
                             : '';
                         const narcoticBadge = item.is_narcotic
-                            ? `<span class="badge bg-danger bg-opacity-10 text-danger ms-2" title="${escapeHtml(item.narcotic_classification ?? 'Narkotika')}">Narkotika</span>`
+                            ? `<span class="badge purchase-sp-badge is-narcotic ms-2" title="${escapeHtml(item.narcotic_classification ?? 'Narkotika')}">Narkotika</span>`
                             : '';
                         const psychotropicBadge = item.is_psychotropic
-                            ? `<span class="badge bg-primary bg-opacity-10 text-primary ms-2" title="${escapeHtml(item.psychotropic_classification ?? 'Psikotropika')}">Psikotropika</span>`
+                            ? `<span class="badge purchase-sp-badge is-psychotropic ms-2" title="${escapeHtml(item.psychotropic_classification ?? 'Psikotropika')}">Psikotropika</span>`
                             : '';
                         const precursorBadge = item.is_precursor
-                            ? `<span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
+                            ? `<span class="badge purchase-sp-badge is-precursor ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
                             : '';
                         const ootBadge = item.is_oot
-                            ? `<span class="badge bg-success bg-opacity-10 text-success ms-2" title="${escapeHtml(item.oot_classification ?? 'Klasifikasi OOT dari master obat')}">OOT</span>`
+                            ? `<span class="badge purchase-sp-badge is-oot ms-2" title="${escapeHtml(item.oot_classification ?? 'Klasifikasi OOT dari master obat')}">OOT</span>`
                             : '';
 
                         $('#detailObatTable tbody').append(`
