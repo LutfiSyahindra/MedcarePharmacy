@@ -59,27 +59,40 @@ class ApotekProfileController extends Controller
 
         $profile = ApotekProfile::firstOrNew(['branch_id' => $branch->id]);
         $oldLogoPath = $profile->logo_path;
+        $oldSignaturePath = $profile->pharmacist_signature_path;
         $newLogoPath = null;
+        $newSignaturePath = null;
 
-        if ($request->hasFile('logo')) {
-            $newLogoPath = $request->file('logo')->store('apotek-logos', 'public');
-        }
-
-        $data = Arr::except($request->validated(), ['logo', 'remove_logo']);
+        $data = Arr::except($request->validated(), [
+            'logo', 'remove_logo', 'pharmacist_signature', 'remove_pharmacist_signature',
+        ]);
         $data['branch_id'] = $branch->id;
         $data['operational_hours'] = $this->normalizeOperationalHours($request->input('operational_hours', []));
 
-        if ($newLogoPath) {
-            $data['logo_path'] = $newLogoPath;
-        } elseif ($request->boolean('remove_logo')) {
-            $data['logo_path'] = null;
-        }
-
         try {
+            if ($request->hasFile('logo')) {
+                $newLogoPath = $request->file('logo')->store('apotek-logos', 'public');
+                throw_unless($newLogoPath, \RuntimeException::class, 'Logo apotek gagal disimpan.');
+                $data['logo_path'] = $newLogoPath;
+            } elseif ($request->boolean('remove_logo')) {
+                $data['logo_path'] = null;
+            }
+
+            if ($request->hasFile('pharmacist_signature')) {
+                $newSignaturePath = $request->file('pharmacist_signature')->store('apotek-signatures', 'public');
+                throw_unless($newSignaturePath, \RuntimeException::class, 'Tanda tangan apoteker gagal disimpan.');
+                $data['pharmacist_signature_path'] = $newSignaturePath;
+            } elseif ($request->boolean('remove_pharmacist_signature')) {
+                $data['pharmacist_signature_path'] = null;
+            }
+
             $profile->fill($data)->save();
         } catch (\Throwable $exception) {
             if ($newLogoPath) {
                 Storage::disk('public')->delete($newLogoPath);
+            }
+            if ($newSignaturePath) {
+                Storage::disk('public')->delete($newSignaturePath);
             }
 
             throw $exception;
@@ -87,6 +100,9 @@ class ApotekProfileController extends Controller
 
         if ($oldLogoPath && ($newLogoPath || $request->boolean('remove_logo'))) {
             Storage::disk('public')->delete($oldLogoPath);
+        }
+        if ($oldSignaturePath && ($newSignaturePath || $request->boolean('remove_pharmacist_signature'))) {
+            Storage::disk('public')->delete($oldSignaturePath);
         }
 
         return redirect()

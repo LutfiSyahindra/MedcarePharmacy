@@ -171,6 +171,7 @@
         .signature-date { display: flex; align-items: end; gap: 1mm; }
         .signature-date .fill-line { min-width: 36mm; }
         .signature-space { height: {{ $type === "narkotika" ? "22mm" : "16mm" }}; }
+        @include("medcare.partials.pharmacist-signature-style")
         .signature-name { display: inline-block; min-width: 58mm; font-weight: 700; text-decoration: underline; }
         .signature-role { margin: .8mm 0; }
         .notes { margin-top: {{ $type === "narkotika" ? "8mm" : "5mm" }}; font-size: 10pt; }
@@ -192,6 +193,7 @@
 <body>
     @php
         $profile = $branch->apotekProfile;
+        $signatureUrl = $profile?->pharmacist_signature_url;
         $facilityName = $profile?->name ?: ($branch->name ?: "-");
         $facilityAddress = $profile?->address ?: ($branch->address ?: "-");
         $pharmacistName = $profile?->pharmacist_name ?: "................................";
@@ -352,7 +354,7 @@
                 <p class="signature-date">{{ $city }}, <span class="fill-line"></span></p>
                 <p>Pesanan</p>
                 <p>Tanda tangan dan stempel</p>
-                <div class="signature-space"></div>
+                @include("medcare.partials.pharmacist-signature", ["signatureUrl" => $signatureUrl])
                 <div><span class="signature-name">{{ $pharmacistName }}</span></div>
                 @if ($type === "prekursor")
                     <div class="signature-role">Apoteker/Tenaga Teknis Kefarmasian</div>

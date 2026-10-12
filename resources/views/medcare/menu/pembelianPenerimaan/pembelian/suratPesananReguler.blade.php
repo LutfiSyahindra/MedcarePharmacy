@@ -117,6 +117,7 @@
         .signature { width: 78mm; text-align: left; }
         .signature p { margin: 0 0 3mm; }
         .signature-space { height: 20mm; }
+        @include('medcare.partials.pharmacist-signature-style')
         .signature-name { display: inline-block; min-width: 62mm; font-weight: 700; text-decoration: underline; }
         .signature-role { margin: .7mm 0; }
         .notes { margin-top: 6mm; font-size: 10pt; }
@@ -140,6 +141,7 @@
 <body>
     @php
         $profile = $purchaseOrder->branch?->apotekProfile;
+        $signatureUrl = $profile?->pharmacist_signature_url;
         $facilityName = $profile?->name ?: ($purchaseOrder->branch?->name ?: '-');
         $facilityAddress = $profile?->address ?: ($purchaseOrder->branch?->address ?: '-');
         $pharmacistName = $profile?->pharmacist_name ?: '................................';
@@ -244,7 +246,7 @@
                     <p>{{ $city }}, {{ $formattedDate }}</p>
                     <p>Pesanan,</p>
                     <p>Tanda tangan dan stempel</p>
-                    <div class="signature-space"></div>
+                    @include('medcare.partials.pharmacist-signature', ['signatureUrl' => $signatureUrl])
                     <div><span class="signature-name">{{ $pharmacistName }}</span></div>
                     <div class="signature-role">Apoteker Penanggung Jawab</div>
                     <div>No. SIPA : {{ $pharmacistLicense }}</div>

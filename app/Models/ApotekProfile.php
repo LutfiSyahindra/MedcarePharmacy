@@ -30,6 +30,7 @@ class ApotekProfile extends Model
         'longitude',
         'pharmacist_name',
         'pharmacist_license_number',
+        'pharmacist_signature_path',
         'pharmacy_license_number',
         'license_expired_at',
         'tax_id',
@@ -56,6 +57,13 @@ class ApotekProfile extends Model
     {
         return $this->logo_path
             ? asset('storage/'.ltrim($this->logo_path, '/'))
+            : null;
+    }
+
+    public function getPharmacistSignatureUrlAttribute(): ?string
+    {
+        return $this->pharmacist_signature_path
+            ? asset('storage/'.ltrim($this->pharmacist_signature_path, '/'))
             : null;
     }
 }

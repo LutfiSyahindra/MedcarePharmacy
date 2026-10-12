@@ -67,6 +67,12 @@
     .apotek-upload-button svg,.apotek-remove-logo svg { width:15px; height:15px; }
     .apotek-file-help { margin:10px 0 0; color:#8a96aa; font-size:10px; line-height:1.45; }
     .apotek-remove-logo { display:inline-flex; align-items:center; gap:6px; margin-top:11px; padding:0; border:0; color:#c55262; background:transparent; font-size:11px; }
+    .apotek-signature-card { text-align:center; }
+    .apotek-signature-card .apotek-card-heading { text-align:left; }
+    .apotek-signature-preview { display:flex; align-items:center; justify-content:center; height:110px; margin-bottom:18px; padding:12px; border:1px dashed #ccd4e3; border-radius:12px; background:#fff; }
+    .apotek-signature-preview img { display:block; max-width:100%; max-height:100%; object-fit:contain; }
+    .apotek-signature-preview span { color:var(--apotek-muted); font-size:11px; }
+    .apotek-signature-card [hidden] { display:none !important; }
     .apotek-completeness-card { background:linear-gradient(180deg,#fff,#fbfcff); }
     .apotek-completion-score { display:flex; justify-content:space-between; align-items:end; margin-bottom:9px; }
     .apotek-completion-score strong { color:#2d3cb0; font-size:24px; line-height:1; }

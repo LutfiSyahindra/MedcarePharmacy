@@ -56,6 +56,8 @@ class SuratPesananNarkotikaTest extends TestCase
 
         $this->assertCount(1, $narcoticDetails);
         $this->assertSame(5, substr_count($html, 'class="narcotic-order-sheet"'));
+        $this->assertSame(5, substr_count($html, 'class="pharmacist-signature-image"'));
+        $this->assertSame(5, substr_count($html, asset('storage/apotek-signatures/branch-signature.png')));
         $this->assertStringContainsString('SURAT PESANAN NARKOTIKA', $html);
         $this->assertStringContainsString('class="medicine-table"', $html);
         $this->assertStringContainsString('class="name-column" scope="col">Nama obat', $html);
@@ -124,6 +126,7 @@ class SuratPesananNarkotikaTest extends TestCase
             'city' => 'Jakarta',
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
             'pharmacist_license_number' => 'SIPA-001',
+            'pharmacist_signature_path' => 'apotek-signatures/branch-signature.png',
         ]);
         $branch = (new BranchModel)->forceFill(['name' => 'Cabang Pusat']);
         $branch->setRelation('apotekProfile', $profile);

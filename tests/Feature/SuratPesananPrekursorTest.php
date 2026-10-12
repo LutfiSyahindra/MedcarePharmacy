@@ -60,6 +60,8 @@ class SuratPesananPrekursorTest extends TestCase
 
         $this->assertCount(2, $precursorDetails);
         $this->assertSame(4, substr_count($html, 'class="precursor-order-sheet"'));
+        $this->assertSame(4, substr_count($html, 'class="pharmacist-signature-image"'));
+        $this->assertSame(4, substr_count($html, asset('storage/apotek-signatures/branch-signature.png')));
         $this->assertSame(4, substr_count($html, 'PO-PRE-001/PRE'));
         $this->assertStringContainsString('Formulir 3', $html);
         $this->assertStringContainsString('SURAT PESANAN OBAT/BAHAN OBAT/PREKURSOR FARMASI*', $html);
@@ -124,6 +126,7 @@ class SuratPesananPrekursorTest extends TestCase
             'city' => 'Jakarta',
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
             'pharmacist_license_number' => 'SIPA-003',
+            'pharmacist_signature_path' => 'apotek-signatures/branch-signature.png',
         ]);
         $branch = (new BranchModel)->forceFill(['name' => 'Cabang Pusat']);
         $branch->setRelation('apotekProfile', $profile);

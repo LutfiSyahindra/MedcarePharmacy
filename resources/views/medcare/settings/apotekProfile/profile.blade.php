@@ -8,6 +8,8 @@
 @section("content")
     @php
         $logoUrl = $profile?->logo_url;
+        $signatureUrl = $profile?->pharmacist_signature_url;
+        $removeSignature = (bool) old("remove_pharmacist_signature", false);
         $profileValue = fn (string $key, mixed $fallback = null) => old($key, $profile?->{$key} ?? $fallback);
         $mapLatitude = old("latitude", $profile?->latitude);
         $mapLongitude = old("longitude", $profile?->longitude);
@@ -121,6 +123,34 @@
                                     <i data-feather="trash-2"></i> Hapus logo saat disimpan
                                 </button>
                             @endif
+                        </section>
+
+                        <section class="apotek-card apotek-signature-card">
+                            <div class="apotek-card-heading">
+                                <span class="apotek-section-icon violet"><i data-feather="edit-3"></i></span>
+                                <div><h2>Tanda tangan apoteker</h2><p>Otomatis ditempel pada SP cabang ini.</p></div>
+                            </div>
+
+                            <div class="apotek-signature-preview">
+                                <img src="{{ $signatureUrl ?: "" }}" alt="Pratinjau tanda tangan apoteker"
+                                    id="pharmacistSignatureImage" @if (! $signatureUrl || $removeSignature) hidden @endif>
+                                <span id="pharmacistSignaturePlaceholder" @if ($signatureUrl && ! $removeSignature) hidden @endif>Belum ada tanda tangan</span>
+                            </div>
+
+                            <label class="apotek-upload-button" for="pharmacistSignatureInput">
+                                <i data-feather="upload-cloud"></i><span>Pilih gambar tanda tangan</span>
+                            </label>
+                            <input type="file" name="pharmacist_signature" id="pharmacistSignatureInput"
+                                accept="image/png,image/jpeg,image/webp" hidden>
+                            <input type="hidden" name="remove_pharmacist_signature" id="removePharmacistSignatureInput" value="{{ $removeSignature ? "1" : "0" }}">
+                            <p class="apotek-file-help">PNG, JPG, atau WEBP, maksimal 2 MB. Gunakan gambar yang sudah dipotong rapi; PNG dengan latar transparan disarankan.</p>
+                            <div class="apotek-field-error" id="pharmacistSignatureError" role="alert" hidden></div>
+                            @error("pharmacist_signature")<div class="apotek-field-error">{{ $message }}</div>@enderror
+
+                            <button type="button" class="apotek-remove-logo" id="removePharmacistSignatureButton" @if (! $signatureUrl) hidden @endif>
+                                <i data-feather="{{ $removeSignature ? "rotate-ccw" : "trash-2" }}"></i>
+                                {{ $removeSignature ? "Batalkan hapus tanda tangan" : "Hapus tanda tangan saat disimpan" }}
+                            </button>
                         </section>
 
                         <section class="apotek-card apotek-completeness-card">

@@ -21,6 +21,7 @@ class DocumentOrderTemplateTest extends TestCase
             'city' => 'Jakarta',
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
             'pharmacist_license_number' => 'SIPA-001',
+            'pharmacist_signature_path' => 'apotek-signatures/template-signature.png',
         ]));
         $service = app(DocumentArchiveService::class);
 
@@ -56,6 +57,8 @@ class DocumentOrderTemplateTest extends TestCase
             $this->assertStringNotContainsString('Morphine 10 mg', $html);
             $this->assertStringNotContainsString('PT Distributor Sehat', $html);
             $this->assertSame($expectedCopyCounts[$type], substr_count($html, 'class="order-sheet"'));
+            $this->assertSame($expectedCopyCounts[$type], substr_count($html, 'class="pharmacist-signature-image"'));
+            $this->assertSame($expectedCopyCounts[$type], substr_count($html, asset('storage/apotek-signatures/template-signature.png')));
             $this->assertSame(2, substr_count($html, 'class="medicine-table commercial-template-table"'));
             $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Lembar Internal Apotek'));
             $this->assertSame(1, substr_count($html, 'class="copy-role-badge">Lembar Distributor'));
@@ -79,6 +82,11 @@ class DocumentOrderTemplateTest extends TestCase
         $psychotropic = $this->renderTemplate($service, $branch, 'psikotropika');
         $precursor = $this->renderTemplate($service, $branch, 'prekursor');
         $oot = $this->renderTemplate($service, $branch, 'oot');
+
+        foreach ([$regular, $narcotic, $psychotropic, $precursor, $oot] as $html) {
+            $this->assertStringNotContainsString('class="pharmacist-signature-image"', $html);
+            $this->assertStringContainsString('class="signature-space"', $html);
+        }
 
         $this->assertSame(10, substr_count($regular, 'class="empty-row"'));
         $this->assertStringContainsString('Surat Umum', $regular);

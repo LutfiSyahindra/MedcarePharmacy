@@ -46,6 +46,8 @@ class SuratPesananRegulerTest extends TestCase
         ])->render();
 
         $this->assertSame(2, substr_count($html, 'class="regular-order-sheet"'));
+        $this->assertSame(2, substr_count($html, 'class="pharmacist-signature-image"'));
+        $this->assertSame(2, substr_count($html, asset('storage/apotek-signatures/branch-signature.png')));
         $this->assertSame(2, substr_count($html, 'PO-REG-001/REG'));
         $this->assertStringContainsString('SURAT PESANAN OBAT REGULER', $html);
         $this->assertStringContainsString('Paracetamol 500 mg', $html);
@@ -70,6 +72,23 @@ class SuratPesananRegulerTest extends TestCase
         $this->assertStringNotContainsString('Dextromethorphan 15 mg', $html);
     }
 
+    public function test_regular_order_without_a_saved_signature_keeps_the_signature_space(): void
+    {
+        $purchaseOrder = $this->purchaseOrderForView();
+        $purchaseOrder->branch->apotekProfile->pharmacist_signature_path = null;
+
+        $html = view('medcare.menu.pembelianPenerimaan.pembelian.suratPesananReguler', [
+            'purchaseOrder' => $purchaseOrder,
+            'regularDetails' => app(SuratPesananRegulerService::class)->regularDetails($purchaseOrder),
+            'copyCount' => SuratPesananRegulerService::COPY_COUNT,
+            'autoPrint' => false,
+        ])->render();
+
+        $this->assertSame(2, substr_count($html, 'class="signature-space"'));
+        $this->assertStringNotContainsString('class="pharmacist-signature-image"', $html);
+        $this->assertStringContainsString('apt. Siti Sehat, S.Farm.', $html);
+    }
+
     private function purchaseOrderForView(): PembelianModel
     {
         $profile = (new ApotekProfile)->forceFill([
@@ -78,6 +97,7 @@ class SuratPesananRegulerTest extends TestCase
             'city' => 'Jakarta',
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
             'pharmacist_license_number' => 'SIPA-005',
+            'pharmacist_signature_path' => 'apotek-signatures/branch-signature.png',
         ]);
         $branch = (new BranchModel)->forceFill(['name' => 'Cabang Pusat']);
         $branch->setRelation('apotekProfile', $profile);

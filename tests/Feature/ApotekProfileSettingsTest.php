@@ -7,6 +7,7 @@ use App\Models\BranchModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -130,6 +131,175 @@ class ApotekProfileSettingsTest extends TestCase
         Storage::disk('public')->assertMissing('apotek-logos/logo-lama.png');
         Storage::disk('public')->assertExists($profile->logo_path);
         $this->assertNotSame('apotek-logos/logo-lama.png', $profile->logo_path);
+    }
+
+    public function test_signature_is_saved_and_previewed_for_the_selected_branch(): void
+    {
+        Storage::fake('public');
+
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('SIGN', 'Cabang Tanda Tangan');
+        $otherBranch = $this->branch('OTHER', 'Cabang Lain');
+
+        $this->actingAs($admin)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                'pharmacist_signature' => UploadedFile::fake()->image('tanda-tangan.png', 600, 200),
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('settings.apotek-profile.index', ['branch_id' => $branch->id]));
+
+        $profile = ApotekProfile::where('branch_id', $branch->id)->firstOrFail();
+        $this->assertStringStartsWith('apotek-signatures/', $profile->pharmacist_signature_path);
+        Storage::disk('public')->assertExists($profile->pharmacist_signature_path);
+
+        $this->get(route('settings.apotek-profile.index', ['branch_id' => $branch->id]))
+            ->assertOk()
+            ->assertSee('Tanda tangan apoteker')
+            ->assertSee($profile->pharmacist_signature_url);
+        $this->get(route('settings.apotek-profile.index', ['branch_id' => $otherBranch->id]))
+            ->assertOk()
+            ->assertDontSee($profile->pharmacist_signature_url);
+    }
+
+    public function test_signature_is_preserved_when_other_profile_fields_are_updated(): void
+    {
+        Storage::fake('public');
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('KEEP', 'Cabang Simpan Tanda Tangan');
+        $signaturePath = 'apotek-signatures/saved.png';
+        Storage::disk('public')->put($signaturePath, 'saved-signature');
+        $profile = ApotekProfile::create($this->profileAttributes($branch) + [
+            'pharmacist_signature_path' => $signaturePath,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, ['phone' => '0211234567']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($signaturePath, $profile->fresh()->pharmacist_signature_path);
+        Storage::disk('public')->assertExists($signaturePath);
+    }
+
+    public function test_new_signature_replaces_and_deletes_the_previous_file(): void
+    {
+        Storage::fake('public');
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('REPLACE', 'Cabang Ganti Tanda Tangan');
+        $oldPath = 'apotek-signatures/old.png';
+        Storage::disk('public')->put($oldPath, 'old-signature');
+        $profile = ApotekProfile::create($this->profileAttributes($branch) + [
+            'pharmacist_signature_path' => $oldPath,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                'pharmacist_signature' => UploadedFile::fake()->image('new.png', 600, 200),
+                'remove_pharmacist_signature' => '1',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $newPath = $profile->fresh()->pharmacist_signature_path;
+        $this->assertNotSame($oldPath, $newPath);
+        Storage::disk('public')->assertMissing($oldPath);
+        Storage::disk('public')->assertExists($newPath);
+    }
+
+    public function test_signature_can_be_removed_without_removing_the_logo(): void
+    {
+        Storage::fake('public');
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('REMOVE', 'Cabang Hapus Tanda Tangan');
+        $signaturePath = 'apotek-signatures/old.png';
+        $logoPath = 'apotek-logos/logo.png';
+        Storage::disk('public')->put($signaturePath, 'signature');
+        Storage::disk('public')->put($logoPath, 'logo');
+        $profile = ApotekProfile::create($this->profileAttributes($branch) + [
+            'pharmacist_signature_path' => $signaturePath,
+            'logo_path' => $logoPath,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                'remove_pharmacist_signature' => '1',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($profile->fresh()->pharmacist_signature_path);
+        Storage::disk('public')->assertMissing($signaturePath);
+        Storage::disk('public')->assertExists($logoPath);
+    }
+
+    public function test_invalid_or_oversized_signature_upload_is_rejected(): void
+    {
+        Storage::fake('public');
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('INVALID', 'Cabang Validasi Tanda Tangan');
+        $files = [
+            UploadedFile::fake()->create('signature.pdf', 100, 'application/pdf'),
+            UploadedFile::fake()->image('signature.gif'),
+            UploadedFile::fake()->image('signature.png')->size(2049),
+        ];
+
+        foreach ($files as $file) {
+            $this->actingAs($admin)
+                ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                    'pharmacist_signature' => $file,
+                ]))
+                ->assertSessionHasErrors('pharmacist_signature');
+        }
+
+        $this->assertDatabaseMissing('apotek_profiles', ['branch_id' => $branch->id]);
+        $this->assertSame([], Storage::disk('public')->allFiles('apotek-signatures'));
+    }
+
+    public function test_apoteker_cannot_upload_a_signature_to_an_unassigned_branch(): void
+    {
+        Storage::fake('public');
+        $apoteker = $this->userWithRole('Apoteker');
+        $branch = $this->branch('UNASSIGNED', 'Cabang Tanpa Akses');
+
+        $this->actingAs($apoteker)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                'pharmacist_signature' => UploadedFile::fake()->image('signature.png'),
+            ]))
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('apotek_profiles', ['branch_id' => $branch->id]);
+        $this->assertSame([], Storage::disk('public')->allFiles('apotek-signatures'));
+    }
+
+    public function test_failed_profile_save_cleans_new_uploads_and_preserves_the_saved_signature(): void
+    {
+        Storage::fake('public');
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('FAIL', 'Cabang Gagal Simpan');
+        $oldPath = 'apotek-signatures/old.png';
+        Storage::disk('public')->put($oldPath, 'old-signature');
+        $profile = ApotekProfile::create($this->profileAttributes($branch) + [
+            'pharmacist_signature_path' => $oldPath,
+        ]);
+        $event = 'eloquent.saving: '.ApotekProfile::class;
+        Event::listen($event, function () {
+            throw new \RuntimeException('Simulated save failure');
+        });
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($admin)
+                ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                    'logo' => UploadedFile::fake()->image('logo.png'),
+                    'pharmacist_signature' => UploadedFile::fake()->image('signature.png'),
+                ]));
+            $this->fail('The simulated save failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated save failure', $exception->getMessage());
+        } finally {
+            Event::forget($event);
+        }
+
+        $this->assertSame($oldPath, $profile->fresh()->pharmacist_signature_path);
+        $this->assertSame([$oldPath], Storage::disk('public')->allFiles());
     }
 
     public function test_profile_requires_an_address_and_map_coordinates(): void

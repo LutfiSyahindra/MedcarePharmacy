@@ -52,6 +52,61 @@
             window.feather?.replace();
         });
 
+        const signatureInput = document.getElementById('pharmacistSignatureInput');
+        const signatureImage = document.getElementById('pharmacistSignatureImage');
+        const signaturePlaceholder = document.getElementById('pharmacistSignaturePlaceholder');
+        const removeSignatureInput = document.getElementById('removePharmacistSignatureInput');
+        const removeSignatureButton = document.getElementById('removePharmacistSignatureButton');
+        const signatureError = document.getElementById('pharmacistSignatureError');
+        const savedSignatureUrl = signatureImage?.getAttribute('src') || '';
+        let signaturePreviewUrl = null;
+
+        function updateSignaturePreview() {
+            const markedForRemoval = removeSignatureInput.value === '1';
+            const previewUrl = markedForRemoval ? '' : (signaturePreviewUrl || savedSignatureUrl);
+            signatureImage.src = previewUrl;
+            signatureImage.hidden = !previewUrl;
+            signaturePlaceholder.hidden = !!previewUrl;
+            signaturePlaceholder.textContent = markedForRemoval ? 'Tanda tangan akan dihapus saat disimpan' : 'Belum ada tanda tangan';
+            removeSignatureButton.hidden = !savedSignatureUrl && !signaturePreviewUrl;
+            removeSignatureButton.innerHTML = markedForRemoval
+                ? '<i data-feather="rotate-ccw"></i> Batalkan hapus tanda tangan'
+                : '<i data-feather="trash-2"></i> Hapus tanda tangan saat disimpan';
+            window.feather?.replace();
+        }
+
+        signatureInput?.addEventListener('change', function () {
+            const file = this.files?.[0];
+            if (!file) return;
+
+            if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl);
+            signaturePreviewUrl = null;
+            signatureError.hidden = true;
+            formDirty = true;
+
+            if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+                this.value = '';
+                signatureError.textContent = 'Pilih gambar PNG, JPG, atau WEBP dengan ukuran maksimal 2 MB.';
+                signatureError.hidden = false;
+            } else {
+                signaturePreviewUrl = URL.createObjectURL(file);
+                removeSignatureInput.value = '0';
+            }
+            updateSignaturePreview();
+        });
+
+        removeSignatureButton?.addEventListener('click', function () {
+            removeSignatureInput.value = removeSignatureInput.value === '1' ? '0' : '1';
+            signatureInput.value = '';
+            if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl);
+            signaturePreviewUrl = null;
+            signatureError.hidden = true;
+            formDirty = true;
+            updateSignaturePreview();
+        });
+
+        updateSignaturePreview();
+
         document.querySelectorAll('.apotek-day-toggle input[type="checkbox"]').forEach(function (checkbox) {
             checkbox.addEventListener('change', function () {
                 const row = this.closest('.apotek-hours-row');

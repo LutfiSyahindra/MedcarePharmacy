@@ -60,6 +60,8 @@ class SuratPesananPsikotropikaTest extends TestCase
 
         $this->assertCount(2, $psychotropicDetails);
         $this->assertSame(5, substr_count($html, 'class="psychotropic-order-sheet"'));
+        $this->assertSame(5, substr_count($html, 'class="pharmacist-signature-image"'));
+        $this->assertSame(5, substr_count($html, asset('storage/apotek-signatures/branch-signature.png')));
         $this->assertSame(5, substr_count($html, 'PO-PSI-001/PSI'));
         $this->assertStringContainsString('Formulir 2', $html);
         $this->assertStringContainsString('SURAT PESANAN PSIKOTROPIKA', $html);
@@ -121,6 +123,7 @@ class SuratPesananPsikotropikaTest extends TestCase
             'city' => 'Jakarta',
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
             'pharmacist_license_number' => 'SIPA-002',
+            'pharmacist_signature_path' => 'apotek-signatures/branch-signature.png',
         ]);
         $branch = (new BranchModel)->forceFill(['name' => 'Cabang Pusat']);
         $branch->setRelation('apotekProfile', $profile);
