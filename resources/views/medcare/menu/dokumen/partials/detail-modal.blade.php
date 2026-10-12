@@ -71,7 +71,7 @@
                     <i class="mdi mdi-eye-outline"></i>
                     Pratinjau
                 </a>
-                <a href="#" class="btn btn-primary" target="_blank" rel="noopener" id="documentPrintButton">
+                <a href="#" class="btn btn-primary js-sp-print" target="_blank" rel="noopener" id="documentPrintButton">
                     <i class="mdi mdi-printer-outline"></i>
                     Cetak / Simpan PDF
                 </a>

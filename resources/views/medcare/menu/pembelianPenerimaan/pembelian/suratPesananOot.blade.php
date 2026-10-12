@@ -208,7 +208,7 @@
         @if ($profileIncomplete)
             <span class="profile-warning">Nama Apoteker atau SIPA belum lengkap di Profile Apotek.</span>
         @endif
-        <button type="button" onclick="window.print()">Cetak / Simpan PDF</button>
+        @include('medcare.partials.surat-pesanan-print-controls')
     </div>
 
     @for ($copy = 1; $copy <= $copyCount; $copy++)

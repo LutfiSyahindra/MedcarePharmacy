@@ -275,7 +275,7 @@
                                 title="Lihat detail"><i class="mdi mdi-eye-outline"></i>Detail</button>
                             <a class="document-action-button" href="${escapeHtml(row.preview_url)}" target="_blank" rel="noopener"
                                 title="Pratinjau dokumen" aria-label="Pratinjau dokumen"><i class="mdi mdi-file-eye-outline"></i></a>
-                            <a class="document-action-button is-print" href="${escapeHtml(row.print_url)}" target="_blank" rel="noopener"
+                            <a class="document-action-button is-print js-sp-print" href="${escapeHtml(row.print_url)}" target="_blank" rel="noopener"
                                 title="Cetak atau simpan PDF" aria-label="Cetak atau simpan PDF"><i class="mdi mdi-printer-outline"></i></a>
                         </div>`;
                     }
@@ -453,6 +453,17 @@
 
         $('#documentTable').on('click', '.js-document-detail', function() {
             openDocumentDetail(String($(this).data('type')), Number($(this).data('purchase-order')));
+        });
+
+        $(document).on('click', '.js-sp-print', function(event) {
+            event.preventDefault();
+            const printUrl = $(this).attr('href');
+            if (!printUrl || printUrl === '#') return;
+
+            showSuratPesananPrintOptions({
+                target: detailModalElement.classList.contains('show') ? '#documentDetailModal' : 'body',
+                documents: [{ url: printUrl, name: 'Pilih cetak dengan atau tanpa tanda tangan apoteker.' }]
+            });
         });
 
         function renderDocumentDetail(documentData) {

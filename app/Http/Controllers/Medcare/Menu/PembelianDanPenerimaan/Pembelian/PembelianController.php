@@ -360,6 +360,7 @@ class PembelianController extends Controller
             'narcoticDetails' => $narcoticDetails,
             'copyCount' => SuratPesananNarkotikaService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 
@@ -379,6 +380,7 @@ class PembelianController extends Controller
             'psychotropicDetails' => $psychotropicDetails,
             'copyCount' => SuratPesananPsikotropikaService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 
@@ -398,6 +400,7 @@ class PembelianController extends Controller
             'precursorDetails' => $precursorDetails,
             'copyCount' => SuratPesananPrekursorService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 
@@ -417,6 +420,7 @@ class PembelianController extends Controller
             'regularDetails' => $regularDetails,
             'copyCount' => SuratPesananRegulerService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 
@@ -436,6 +440,7 @@ class PembelianController extends Controller
             'ootDetails' => $ootDetails,
             'copyCount' => SuratPesananOotService::COPY_COUNT,
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 

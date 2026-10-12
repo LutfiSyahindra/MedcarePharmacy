@@ -46,6 +46,7 @@
 @push("style")
     @include("template.AddOn.dataTables")
     @include("template.AddOn.mdiicon")
+    @include("template.AddOn.sweetAlert")
     @include("medcare.menu.dokumen.partials.style")
 @endpush
 
@@ -318,7 +319,7 @@
                                     <a href="{{ $templateUrl }}" target="_blank" rel="noopener" class="document-template-view">
                                         <i class="mdi mdi-eye-outline"></i> Lihat
                                     </a>
-                                    <a href="{{ $templatePrintUrl }}" target="_blank" rel="noopener" class="document-template-print"
+                                    <a href="{{ $templatePrintUrl }}" target="_blank" rel="noopener" class="document-template-print js-sp-print"
                                         title="Cetak template" aria-label="Cetak template {{ $template["label"] }}">
                                         <i class="mdi mdi-printer-outline"></i>
                                     </a>
@@ -343,5 +344,6 @@
 @endsection
 
 @push("scripts")
+    @include("medcare.partials.surat-pesanan-print-options")
     @include("medcare.menu.dokumen.partials.script")
 @endpush

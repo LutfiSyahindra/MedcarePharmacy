@@ -1,4 +1,6 @@
 /* Keep the preview and the A4 print layout at the same dimensions. */
+.sp-signature-control { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.sp-signature-control select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; color: #111; background: #fff; font: inherit; }
 body { font-size: 10pt; line-height: 1.2; }
 .order-sheet,
 .regular-order-sheet,

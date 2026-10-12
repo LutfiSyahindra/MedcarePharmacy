@@ -527,62 +527,17 @@
                 .find('span').text('Cetak Surat Pesanan');
         });
 
-        function openPurchaseOrderDocument(document) {
-            const printWindow = window.open(document.url, '_blank');
-
-            if (!printWindow) {
-                return false;
-            }
-
-            printWindow.opener = null;
-            return true;
-        }
-
         $('#btnPrintPDF').on('click', function() {
             if (!detailPurchaseOrderId || $(this).prop('disabled') || detailPrintDocuments.length < 1) {
                 return;
             }
 
-            if (detailPrintDocuments.length === 1) {
-                if (!openPurchaseOrderDocument(detailPrintDocuments[0])) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Surat pesanan diblokir browser',
-                        text: 'Izinkan pop-up untuk situs ini agar surat pesanan dapat dibuka.'
-                    });
-                }
-                return;
-            }
-
-            const documents = [...detailPrintDocuments];
-
-            Swal.fire({
+            showSuratPesananPrintOptions({
                 target: '#pembelianModalDetail',
-                title: 'Pilih Surat Pesanan',
-                text: 'Pilih jenis SP yang ingin dicetak dari PO ini.',
-                input: 'select',
-                inputLabel: 'Jenis Surat Pesanan',
-                inputPlaceholder: 'Pilih jenis SP',
-                inputOptions: Object.fromEntries(documents.map((document, index) => [
-                    String(index), `${document.name} (${document.count} item)`
-                ])),
-                showCancelButton: true,
-                confirmButtonText: 'Cetak Surat',
-                cancelButtonText: 'Batal',
-                keydownListenerCapture: true,
-                preConfirm: function(selectedIndex) {
-                    const selectedDocument = selectedIndex === '' ? null : documents[selectedIndex];
-
-                    if (!selectedDocument) {
-                        Swal.showValidationMessage('Pilih jenis surat pesanan terlebih dahulu.');
-                        return false;
-                    }
-
-                    if (!openPurchaseOrderDocument(selectedDocument)) {
-                        Swal.showValidationMessage('Izinkan pop-up untuk situs ini agar surat pesanan dapat dibuka.');
-                        return false;
-                    }
-                }
+                documents: detailPrintDocuments.map(document => ({
+                    url: document.url,
+                    name: `${document.name} (${document.count} item)`
+                }))
             });
         });
 

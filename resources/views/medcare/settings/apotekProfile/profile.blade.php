@@ -128,7 +128,7 @@
                         <section class="apotek-card apotek-signature-card">
                             <div class="apotek-card-heading">
                                 <span class="apotek-section-icon violet"><i data-feather="edit-3"></i></span>
-                                <div><h2>Tanda tangan apoteker</h2><p>Otomatis ditempel pada SP cabang ini.</p></div>
+                                <div><h2>Tanda tangan apoteker</h2><p>Dapat disertakan saat mencetak SP cabang ini.</p></div>
                             </div>
 
                             <div class="apotek-signature-preview">

@@ -262,5 +262,6 @@
 @endsection
 
 @push("scripts")
+    @include("medcare.partials.surat-pesanan-print-options")
     @include("medcare.menu.pembelianPenerimaan.pembelian.jsMain")
 @endpush

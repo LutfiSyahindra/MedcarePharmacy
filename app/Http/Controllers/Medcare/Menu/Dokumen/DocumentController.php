@@ -62,6 +62,7 @@ class DocumentController extends Controller
             'type' => $type,
             'meta' => $this->documents->typeMetadata($type),
             'autoPrint' => $request->boolean('print'),
+            'withSignature' => $request->boolean('with_signature', true),
         ]);
     }
 
