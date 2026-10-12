@@ -136,6 +136,7 @@
             .regular-order-sheet { width: 190mm; min-height: 277mm; margin: 0; box-shadow: none; }
             .medicine-table tr { page-break-inside: avoid; break-inside: avoid; }
         }
+        @include('medcare.partials.surat-pesanan-print-style')
     </style>
 </head>
 <body>
@@ -241,21 +242,23 @@
                 </table>
             </section>
 
-            <div class="signature-wrap">
-                <div class="signature">
-                    <p>{{ $city }}, {{ $formattedDate }}</p>
-                    <p>Pesanan,</p>
-                    <p>Tanda tangan dan stempel</p>
-                    @include('medcare.partials.pharmacist-signature', ['signatureUrl' => $signatureUrl])
-                    <div><span class="signature-name">{{ $pharmacistName }}</span></div>
-                    <div class="signature-role">Apoteker Penanggung Jawab</div>
-                    <div>No. SIPA : {{ $pharmacistLicense }}</div>
+            <div class="order-closing">
+                <div class="signature-wrap">
+                    <div class="signature">
+                        <p>{{ $city }}, {{ $formattedDate }}</p>
+                        <p>Pesanan,</p>
+                        <p>Tanda tangan dan stempel</p>
+                        @include('medcare.partials.pharmacist-signature', ['signatureUrl' => $signatureUrl])
+                        <div><span class="signature-name">{{ $pharmacistName }}</span></div>
+                        <div class="signature-role">Apoteker Penanggung Jawab</div>
+                        <div>No. SIPA : {{ $pharmacistLicense }}</div>
+                    </div>
                 </div>
-            </div>
 
-            <section class="notes">
-                <p>Catatan: Surat pesanan ini hanya memuat obat selain Narkotika, Psikotropika, dan Prekursor.</p>
-            </section>
+                <section class="notes">
+                    <p>Catatan: Surat pesanan ini hanya memuat obat selain Narkotika, Psikotropika, dan Prekursor.</p>
+                </section>
+            </div>
 
             <span class="copy-mark">Lembar {{ $copyRole }} &middot; {{ $copy }} dari {{ $copyCount }}</span>
         </main>

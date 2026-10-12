@@ -188,6 +188,7 @@
         @media screen and (max-width: 800px) {
             .order-sheet { transform-origin: top left; }
         }
+        @include('medcare.partials.surat-pesanan-print-style')
     </style>
 </head>
 <body>
@@ -349,41 +350,43 @@
             </table>
         </section>
 
-        <div class="signature-wrap">
-            <div class="signature">
-                <p class="signature-date">{{ $city }}, <span class="fill-line"></span></p>
-                <p>Pesanan</p>
-                <p>Tanda tangan dan stempel</p>
-                @include("medcare.partials.pharmacist-signature", ["signatureUrl" => $signatureUrl])
-                <div><span class="signature-name">{{ $pharmacistName }}</span></div>
-                @if ($type === "prekursor")
-                    <div class="signature-role">Apoteker/Tenaga Teknis Kefarmasian</div>
-                    <div>No. SIPA/SIKTTK : {{ $pharmacistLicense }}</div>
-                @else
-                    <div>No. SIPA : {{ $pharmacistLicense }}</div>
-                @endif
+        <div class="order-closing">
+            <div class="signature-wrap">
+                <div class="signature">
+                    <p class="signature-date">{{ $city }}, <span class="fill-line"></span></p>
+                    <p>Pesanan</p>
+                    <p>Tanda tangan dan stempel</p>
+                    @include("medcare.partials.pharmacist-signature", ["signatureUrl" => $signatureUrl])
+                    <div><span class="signature-name">{{ $pharmacistName }}</span></div>
+                    @if ($type === "prekursor")
+                        <div class="signature-role">Apoteker/Tenaga Teknis Kefarmasian</div>
+                        <div>No. SIPA/SIKTTK : {{ $pharmacistLicense }}</div>
+                    @else
+                        <div>No. SIPA : {{ $pharmacistLicense }}</div>
+                    @endif
+                </div>
             </div>
-        </div>
 
-        <section class="notes">
-            @if ($type === "prekursor")
-                <p>*) &nbsp;coret yang tidak perlu</p>
-            @endif
-            <p>Catatan:</p>
-            @if ($type === "narkotika")
-                <ul>
-                    <li>Satu surat pesanan hanya berlaku untuk satu jenis Narkotika.</li>
-                    <li>Surat Pesanan dibuat 5 (lima) rangkap.</li>
-                </ul>
-            @elseif ($type === "psikotropika")
-                <p>Surat Pesanan dibuat 5 (lima) rangkap.</p>
-            @elseif ($type === "reguler")
-                <p>Surat pesanan ini hanya untuk obat selain Narkotika, Psikotropika, dan Prekursor.</p>
-                <p>Surat Pesanan dibuat 2 (dua) lembar untuk Internal Apotek dan Distributor.</p>
-            @else
-                <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
-            @endif
-        </section>
+            <section class="notes">
+                @if ($type === "prekursor")
+                    <p>*) &nbsp;coret yang tidak perlu</p>
+                @endif
+                <p>Catatan:</p>
+                @if ($type === "narkotika")
+                    <ul>
+                        <li>Satu surat pesanan hanya berlaku untuk satu jenis Narkotika.</li>
+                        <li>Surat Pesanan dibuat 5 (lima) rangkap.</li>
+                    </ul>
+                @elseif ($type === "psikotropika")
+                    <p>Surat Pesanan dibuat 5 (lima) rangkap.</p>
+                @elseif ($type === "reguler")
+                    <p>Surat pesanan ini hanya untuk obat selain Narkotika, Psikotropika, dan Prekursor.</p>
+                    <p>Surat Pesanan dibuat 2 (dua) lembar untuk Internal Apotek dan Distributor.</p>
+                @else
+                    <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
+                @endif
+            </section>
+        </div>
 
         <span class="copy-mark">
             Template kosong &middot;

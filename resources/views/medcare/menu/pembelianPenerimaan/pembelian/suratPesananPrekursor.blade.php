@@ -185,6 +185,7 @@
             }
             .medicine-table tr { page-break-inside: avoid; break-inside: avoid; }
         }
+        @include('medcare.partials.surat-pesanan-print-style')
     </style>
 </head>
 <body>
@@ -295,7 +296,7 @@
                                 @if ($showsCommercialDetails)
                                     <td class="name-column">
                                         <span class="medicine-name">{{ $medicine?->nama_obat ?: '-' }}</span>
-                                        <span class="medicine-meta"><strong>Bentuk:</strong> {{ $preparation }}<br><strong>Kekuatan:</strong> {{ $strength }}</span>
+                                        <span class="medicine-meta">{{ $preparation }} &middot; {{ $strength }}</span>
                                     </td>
                                     <td class="order-quantity-column"><span class="order-quantity-value">{{ $quantity }}</span></td>
                                     <td class="order-unit-column">{{ $unitName }}</td>
@@ -326,23 +327,25 @@
                 </table>
             </section>
 
-            <div class="signature-wrap">
-                <div class="signature">
-                    <p>{{ $city }}, {{ $formattedDate }}</p>
-                    <p>Pesanan</p>
-                    <p>Tanda tangan dan stempel</p>
-                    @include('medcare.partials.pharmacist-signature', ['signatureUrl' => $signatureUrl])
-                    <div><span class="signature-name">{{ $pharmacistName }}</span></div>
-                    <div class="signature-role">Apoteker/Tenaga Teknis Kefarmasian</div>
-                    <div>No. SIPA/SIKTTK : {{ $pharmacistLicense }}</div>
+            <div class="order-closing">
+                <div class="signature-wrap">
+                    <div class="signature">
+                        <p>{{ $city }}, {{ $formattedDate }}</p>
+                        <p>Pesanan</p>
+                        <p>Tanda tangan dan stempel</p>
+                        @include('medcare.partials.pharmacist-signature', ['signatureUrl' => $signatureUrl])
+                        <div><span class="signature-name">{{ $pharmacistName }}</span></div>
+                        <div class="signature-role">Apoteker/Tenaga Teknis Kefarmasian</div>
+                        <div>No. SIPA/SIKTTK : {{ $pharmacistLicense }}</div>
+                    </div>
                 </div>
-            </div>
 
-            <section class="notes">
-                <p>*) &nbsp;coret yang tidak perlu</p>
-                <p>Catatan:</p>
-                <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
-            </section>
+                <section class="notes">
+                    <p>*) &nbsp;coret yang tidak perlu</p>
+                    <p>Catatan:</p>
+                    <p>Surat Pesanan dibuat 4 (empat) rangkap.</p>
+                </section>
+            </div>
 
             <span class="copy-mark">Rangkap {{ $copy }} dari {{ $copyCount }}</span>
         </main>
