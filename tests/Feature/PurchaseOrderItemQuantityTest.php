@@ -66,7 +66,7 @@ class PurchaseOrderItemQuantityTest extends TestCase
                 return $this->orders;
             }
         };
-        $row = collect((new PembelianService($repository))->getPembelianTable([7]))
+        $row = collect(app(PembelianService::class, ['PembelianRepository' => $repository])->getPembelianTable([7]))
             ->firstWhere('id', 41);
 
         $this->assertNotNull($row);

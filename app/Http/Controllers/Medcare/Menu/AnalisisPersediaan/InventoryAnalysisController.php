@@ -194,7 +194,7 @@ class InventoryAnalysisController extends Controller
                 })->values();
                 $total = round($details->sum('subtotal'), 2);
                 $purchaseOrder = $this->purchases->createPembelian([
-                    'no_po' => $this->purchases->generatePo(),
+                    'no_po' => $this->purchases->reservePoNumber(),
                     'distributor_id' => (int) $distributorId,
                     'branch_id' => $branchId,
                     'tanggal_po' => today()->toDateString(),

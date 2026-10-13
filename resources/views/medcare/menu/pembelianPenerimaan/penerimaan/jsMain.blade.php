@@ -2147,6 +2147,9 @@
                 type: method,
                 data: serializePenerimaanForm(),
                 success: function(response) {
+                    if (response.data?.nomor_penerimaan) {
+                        $('#nomor_penerimaan').val(response.data.nomor_penerimaan);
+                    }
                     if (createNextInvoice) {
                         $('#penerimaanModal').one('hidden.bs.modal', function() {
                             openNextInvoice(poId);

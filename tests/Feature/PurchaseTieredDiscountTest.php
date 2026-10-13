@@ -56,7 +56,7 @@ class PurchaseTieredDiscountTest extends TestCase
             'is_default' => true,
         ]);
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('pembelian.store'), [
                 'no_po' => 'PO-DISC-001',
                 'distributor_id' => $distributor->id,
@@ -75,7 +75,7 @@ class PurchaseTieredDiscountTest extends TestCase
             ])
             ->assertOk();
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-DISC-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::findOrFail($saved->json('data.id'));
         $purchaseDetail = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)->firstOrFail();
 
         $this->assertSame('10.00', $purchaseDetail->diskon_1);
@@ -92,7 +92,7 @@ class PurchaseTieredDiscountTest extends TestCase
             ->assertOk()
             ->assertJsonPath('details.0.ppn', 11);
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('penerimaan.store'), [
                 'nomor_penerimaan' => 'PB-DISC-001',
                 'purchase_order_id' => $purchaseOrder->id,
@@ -111,7 +111,7 @@ class PurchaseTieredDiscountTest extends TestCase
             ])
             ->assertOk();
 
-        $receipt = PenerimaanBarangModel::where('nomor_penerimaan', 'PB-DISC-001')->firstOrFail();
+        $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
         $receiptDetail = PenerimaanBarangDetailModel::where('penerimaan_barang_id', $receipt->id)->firstOrFail();
 
         $this->assertSame('10.00', $receiptDetail->diskon_1);

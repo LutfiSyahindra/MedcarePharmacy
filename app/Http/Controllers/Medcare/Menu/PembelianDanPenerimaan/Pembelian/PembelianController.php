@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Medcare\Menu\PembelianDanPenerimaan\Pembelian;
 
 use App\Http\Controllers\Controller;
+use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
@@ -245,7 +246,7 @@ class PembelianController extends Controller
      */
     public function store(Request $request)
     {
-        $this->validatePurchaseRequest($request);
+        $usesManualNumber = $this->validatePurchaseRequest($request);
 
         $saveAsDraft = $request->boolean('save_as_draft');
         $detailRows = $this->purchaseDetailRows($request);
@@ -256,18 +257,21 @@ class PembelianController extends Controller
             2
         );
 
-        DB::beginTransaction();
-
-        try {
+        return DB::transaction(function () use ($request, $usesManualNumber, $saveAsDraft, $detailRows, $biayaAsuransi, $biayaPengiriman, $totalEstimasi) {
             /** @var \App\Models\User $user */
             $user = Auth::user();
             $branchId = BranchAccess::requireUserBranchId($user);
             $isApprover = $this->transactionNotifications->isApprovalRole($user);
             Log::info('User Role: '.($isApprover ? 'Approver' : 'Non-Approver'));
 
+            if ($usesManualNumber) {
+                $this->PembelianService->validateManualPoNumber($request->no_po);
+            }
+            $number = $usesManualNumber ? $request->no_po : $this->PembelianService->reservePoNumber();
+
             // Insert header
             $po = $this->PembelianService->createPembelian([
-                'no_po' => $request->no_po,
+                'no_po' => $number,
                 'distributor_id' => $request->distributor_id,
                 'branch_id' => $branchId,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
@@ -289,13 +293,11 @@ class PembelianController extends Controller
                 ]);
             }
 
-            DB::commit();
-
             // ======================
             // 🔔 KIRIM NOTIFIKASI
             // ======================
             if (! $saveAsDraft) {
-                $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+                DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user));
             }
 
             return response()->json([
@@ -306,15 +308,12 @@ class PembelianController extends Controller
                 'warning' => $this->missingConversionWarning($detailRows),
                 'data' => [
                     'id' => $po->id,
+                    'no_po' => $po->no_po,
                     'status' => $po->status,
                 ],
             ]);
 
-        } catch (\Throwable $e) {
-
-            DB::rollBack();
-            throw $e;
-        }
+        }, 5);
     }
 
     /**
@@ -614,7 +613,7 @@ class PembelianController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $this->validatePurchaseRequest($request, (int) $id);
+        $usesManualNumber = $this->validatePurchaseRequest($request, (int) $id);
 
         $saveAsDraft = $request->boolean('save_as_draft');
         $detailRows = $this->purchaseDetailRows($request);
@@ -625,9 +624,7 @@ class PembelianController extends Controller
             2
         );
 
-        DB::beginTransaction();
-
-        try {
+        return DB::transaction(function () use ($request, $id, $usesManualNumber, $saveAsDraft, $detailRows, $biayaAsuransi, $biayaPengiriman, $totalEstimasi) {
 
             /** @var \App\Models\User $user */
             $user = Auth::user();
@@ -635,8 +632,6 @@ class PembelianController extends Controller
             $existingPo = $this->PembelianService->findByIdPembelian($id, $branchIds);
 
             if (! $existingPo) {
-                DB::rollBack();
-
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Pembelian tidak ditemukan untuk branch user.',
@@ -644,17 +639,19 @@ class PembelianController extends Controller
             }
 
             if ($existingPo && $existingPo->status === 'approved') {
-                DB::rollBack();
-
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
                 ], 422);
             }
 
+            if ($usesManualNumber) {
+                $this->PembelianService->validateManualPoNumber($request->no_po, (int) $id);
+            }
+
             // =========================== UPDATE HEADER ============================
             $po = $this->PembelianService->updatePembelian($id, [
-                'no_po' => $request->no_po,
+                'no_po' => $usesManualNumber ? $request->no_po : $existingPo->no_po,
                 'distributor_id' => $request->distributor_id,
                 'branch_id' => $existingPo->branch_id,
                 'tanggal_po' => Carbon::createFromFormat('d-m-Y', $request->tanggal)->format('Y-m-d'),
@@ -678,10 +675,8 @@ class PembelianController extends Controller
                 ]);
             }
 
-            DB::commit();
-
             if (! $saveAsDraft) {
-                $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+                DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user));
             }
 
             return response()->json([
@@ -692,15 +687,12 @@ class PembelianController extends Controller
                 'warning' => $this->missingConversionWarning($detailRows),
                 'data' => [
                     'id' => $po->id,
+                    'no_po' => $po->no_po,
                     'status' => $po->status,
                 ],
             ]);
 
-        } catch (\Throwable $e) {
-
-            DB::rollBack();
-            throw $e;
-        }
+        }, 5);
     }
 
     /**
@@ -797,7 +789,7 @@ class PembelianController extends Controller
         return null;
     }
 
-    private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): void
+    private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): bool
     {
         $request->merge([
             'no_po' => trim((string) $request->input('no_po')),
@@ -809,8 +801,15 @@ class PembelianController extends Controller
             $purchaseOrderUniqueRule .= ','.$ignorePurchaseOrderId;
         }
 
+        $distributorId = $request->input('distributor_id');
+        $usesManualNumber = is_scalar($distributorId) && (bool) DistributorModel::query()
+            ->whereKey($distributorId)->value('uses_manual_po_number');
+        $numberRules = $usesManualNumber
+            ? ['required', 'string', 'max:50', $purchaseOrderUniqueRule]
+            : ['nullable', 'string', 'max:50'];
+
         $validator = Validator::make($request->all(), [
-            'no_po' => ['required', 'string', 'max:50', $purchaseOrderUniqueRule],
+            'no_po' => $numberRules,
             'save_as_draft' => ['sometimes', 'boolean'],
             'distributor_id' => ['required', 'integer', 'exists:distributors,id'],
             'tanggal' => ['required', 'date_format:d-m-Y'],
@@ -928,5 +927,7 @@ class PembelianController extends Controller
         });
 
         $validator->validate();
+
+        return $usesManualNumber;
     }
 }

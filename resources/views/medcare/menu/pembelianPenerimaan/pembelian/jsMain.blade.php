@@ -86,7 +86,8 @@
                 field.prop('readonly', true).attr('placeholder', 'Nomor dibuat otomatis');
                 $('#purchaseNumberModeTitle').text('Nomor Otomatis');
                 $('#purchaseNumberModeDescription').text('PO dibuat sesuai urutan bulan berjalan.');
-                $('#purchaseNumberHint').text('Terisi otomatis untuk distributor ini.');
+                $('#purchaseNumberHint').text(editMode ? 'Nomor PO sudah tersimpan.' :
+                    'Pratinjau nomor. Nomor akhir ditetapkan saat disimpan.');
 
                 if (!editMode && (currentPoNumberMode !== 'automatic' || !String(field.val() || '').trim())) {
                     generateAutomaticPurchaseOrderNumber().catch(function() {
@@ -1735,7 +1736,7 @@
 
         // =================== Inisiasi Action =========================
         function ensurePurchaseOrderNumber() {
-            if (String($('input[name="no_po"]').val() || '').trim() !== '') {
+            if (!selectedDistributorUsesManualPoNumber() || String($('input[name="no_po"]').val() || '').trim() !== '') {
                 return Promise.resolve();
             }
 
@@ -1750,7 +1751,6 @@
                 });
             }
 
-            return generateAutomaticPurchaseOrderNumber();
         }
 
         function waitForPendingUnitRequests() {
@@ -1875,6 +1875,9 @@
                     }
 
                     $('#pembelian_id').val(response.data?.id || $('#pembelian_id').val());
+                    if (response.data?.no_po) {
+                        $('input[name="no_po"]').val(response.data.no_po);
+                    }
                     $('#pembelianModal').modal('hide');
 
                     if (response.warning) {

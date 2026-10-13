@@ -164,8 +164,8 @@ class PenerimaanPurchaseOrderPickerTest extends TestCase
     {
         $po = $this->createOrder('SPLIT');
         $first = $this->invoicePayload($po, 'FIRST', 3);
-        $this->postJson(route('penerimaan.store'), $first)->assertOk();
-        $firstReceipt = PenerimaanBarangModel::where('nomor_penerimaan', $first['nomor_penerimaan'])->firstOrFail();
+        $saved = $this->postJson(route('penerimaan.store'), $first)->assertOk();
+        $firstReceipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
 
         $this->postJson(route('penerimaan.store'), $this->invoicePayload($po, 'SECOND', 4))->assertOk();
         $this->assertDatabaseCount('penerimaan_barang', 2);
@@ -275,9 +275,9 @@ class PenerimaanPurchaseOrderPickerTest extends TestCase
         $this->assertDatabaseCount('penerimaan_barang', 0);
 
         $payload['purchase_order_detail_id'] = [$selected->details->first()->id];
-        $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+        $saved = $this->postJson(route('penerimaan.store'), $payload)->assertOk();
         $this->assertDatabaseHas('penerimaan_barang', [
-            'nomor_penerimaan' => 'PB-PICKER-001', 'purchase_order_id' => $selected->id, 'status' => 'draft',
+            'nomor_penerimaan' => $saved->json('data.nomor_penerimaan'), 'purchase_order_id' => $selected->id, 'status' => 'draft',
         ]);
         $this->assertDatabaseHas('penerimaan_barang_detail', [
             'purchase_order_detail_id' => $selected->details->first()->id, 'qty_diterima' => 3,

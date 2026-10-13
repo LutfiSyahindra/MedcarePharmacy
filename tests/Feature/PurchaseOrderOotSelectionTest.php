@@ -77,7 +77,7 @@ class PurchaseOrderOotSelectionTest extends TestCase
             $classification,
         );
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('pembelian.store'), $this->payload(
                 'PO-OOT-AUTO-001',
                 $distributor,
@@ -86,7 +86,7 @@ class PurchaseOrderOotSelectionTest extends TestCase
             ))
             ->assertOk();
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-OOT-AUTO-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::findOrFail($saved->json('data.id'));
         $details = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)
             ->orderBy('id')
             ->get();
@@ -207,7 +207,7 @@ class PurchaseOrderOotSelectionTest extends TestCase
             $conversions[] = $conversion;
         }
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('pembelian.store'), $this->payload(
                 'PO-SP-MIX-001',
                 $distributor,
@@ -216,7 +216,7 @@ class PurchaseOrderOotSelectionTest extends TestCase
             ))
             ->assertOk();
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-SP-MIX-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::findOrFail($saved->json('data.id'));
         $response = $this->getJson(route('pembelian.show', $purchaseOrder->id))->assertOk();
 
         foreach ($types as $type => $key) {

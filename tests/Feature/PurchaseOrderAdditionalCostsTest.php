@@ -48,15 +48,15 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['satuan_id', 'satuan_id.13']);
 
-        $this->assertDatabaseMissing('purchase_orders', ['no_po' => 'PO-14-ITEM-001']);
+        $this->assertDatabaseCount('purchase_orders', 0);
 
         $payload = $this->payload('PO-14-ITEM-001', $distributor, $medicines, $conversions);
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('pembelian.store'), $payload)
             ->assertOk();
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-14-ITEM-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::findOrFail($saved->json('data.id'));
 
         $this->assertSame(14, PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)->count());
         $this->assertSame('1500.00', $purchaseOrder->biaya_asuransi);
@@ -91,7 +91,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('pembelian.store'), [
                 'no_po' => 'PO-BASE-UNIT-001',
                 'save_as_draft' => true,
@@ -112,7 +112,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'draft');
 
-        $purchaseOrder = PembelianModel::where('no_po', 'PO-BASE-UNIT-001')->firstOrFail();
+        $purchaseOrder = PembelianModel::findOrFail($saved->json('data.id'));
         $detail = PembelianDetailModel::where('purchase_order_id', $purchaseOrder->id)->firstOrFail();
 
         $this->assertNull($detail->satuan_konversi);
@@ -175,7 +175,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertJsonPath('total_biaya_tambahan', 400)
             ->assertJsonPath('total_qty_po', 4);
 
-        $this->actingAs($user)
+        $saved = $this->actingAs($user)
             ->postJson(route('penerimaan.store'), [
                 'nomor_penerimaan' => 'PB-RECEIPT-COST-001',
                 'purchase_order_id' => $purchaseOrder->id,
@@ -194,7 +194,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ])
             ->assertOk();
 
-        $receipt = PenerimaanBarangModel::where('nomor_penerimaan', 'PB-RECEIPT-COST-001')->firstOrFail();
+        $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
 
         $this->assertEquals(400, (float) $receipt->biaya_lain);
         $this->assertEquals(6400, (float) $receipt->total_faktur);
@@ -281,7 +281,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
         ] as $receiptData) {
             $purchaseOrder->forceFill(['status' => 'approved'])->save();
 
-            $this->actingAs($user)
+            $saved = $this->actingAs($user)
                 ->postJson(route('penerimaan.store'), [
                     'nomor_penerimaan' => 'PB-COST-LAYER-'.$receiptData['suffix'],
                     'purchase_order_id' => $purchaseOrder->id,
@@ -299,10 +299,7 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
                 ])
                 ->assertOk();
 
-            $receipt = PenerimaanBarangModel::where(
-                'nomor_penerimaan',
-                'PB-COST-LAYER-'.$receiptData['suffix']
-            )->firstOrFail();
+            $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
 
             // Avoid the legacy SQLite PO status constraint; this test targets stock layers.
             $purchaseOrder->forceFill(['status' => 'waiting_approval'])->save();

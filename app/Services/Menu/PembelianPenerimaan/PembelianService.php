@@ -3,7 +3,6 @@
 namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
-use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Repositories\Menu\PembelianPenerimaan\PembelianRepository;
 use Illuminate\Validation\ValidationException;
 
@@ -11,8 +10,10 @@ class PembelianService
 {
     protected $PembelianRepository;
 
-    public function __construct(PembelianRepository $PembelianRepository)
-    {
+    public function __construct(
+        PembelianRepository $PembelianRepository,
+        private readonly PurchaseReceiptNumberService $numbering,
+    ) {
         $this->PembelianRepository = $PembelianRepository;
     }
 
@@ -28,24 +29,17 @@ class PembelianService
 
     public function generatePo()
     {
-        $now = now();
-        $tahun = $now->format('Y');
-        $bulan = $now->format('m');
-        $prefix = 'PO-'.$tahun.'-'.$bulan.'-';
-        $lastNumber = PembelianModel::query()
-            ->where('no_po', 'like', $prefix.'%')
-            ->pluck('no_po')
-            ->map(static function (string $number) use ($prefix): int {
-                $sequence = substr($number, strlen($prefix));
+        return $this->numbering->previewPurchaseOrder();
+    }
 
-                return ctype_digit($sequence) ? (int) $sequence : 0;
-            })
-            ->max() ?? 0;
-        $nextNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+    public function reservePoNumber(): string
+    {
+        return $this->numbering->nextPurchaseOrder();
+    }
 
-        $noPo = $prefix.$nextNumber;
-
-        return $noPo;
+    public function validateManualPoNumber(string $number, ?int $ignoreId = null): void
+    {
+        $this->numbering->validateManualPurchaseOrder($number, $ignoreId);
     }
 
     public function getPembelianTable(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)

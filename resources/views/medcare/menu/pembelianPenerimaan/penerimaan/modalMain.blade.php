@@ -70,7 +70,7 @@
                                     <label class="form-label" for="nomor_penerimaan">Nomor Penerimaan</label>
                                     <input type="text" class="form-control" name="nomor_penerimaan"
                                         id="nomor_penerimaan" readonly>
-                                    <small class="purchase-field-hint">Dibuat otomatis per bulan.</small>
+                                    <small class="purchase-field-hint">Nomor otomatis ditetapkan saat pertama kali disimpan.</small>
                                 </div>
                                 <div class="col-lg-5 col-md-6 receive-field-wide">
                                     <label class="form-label" for="receive_selected_po">Pembelian Terpilih</label>

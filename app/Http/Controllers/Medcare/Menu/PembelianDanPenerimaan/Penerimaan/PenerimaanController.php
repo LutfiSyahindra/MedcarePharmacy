@@ -11,6 +11,7 @@ use App\Models\Menu\PembelianPenerimaan\PenerimaanBarangModel;
 use App\Models\Menu\PembelianPenerimaan\ReturPembelianModel;
 use App\Models\Menu\Stok\StokBatchModel;
 use App\Services\Menu\Keuangan\FinanceService;
+use App\Services\Menu\PembelianPenerimaan\PurchaseReceiptNumberService;
 use App\Services\Menu\Stok\StockService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Margins\MarginsService;
@@ -33,6 +34,7 @@ class PenerimaanController extends Controller
         private readonly TransactionNotificationService $transactionNotifications,
         private readonly MarginsService $marginsService,
         private readonly FinanceService $financeService,
+        private readonly PurchaseReceiptNumberService $numbering,
     ) {}
 
     public function penerimaan(Request $request)
@@ -204,17 +206,7 @@ class PenerimaanController extends Controller
 
     public function generateNoPenerimaan()
     {
-        $year = date('Y');
-        $month = date('m');
-        $prefix = 'PB-'.$year.'-'.$month.'-';
-
-        $last = PenerimaanBarangModel::where('nomor_penerimaan', 'like', $prefix.'%')
-            ->orderByDesc('id')
-            ->first();
-
-        $lastNumber = $last ? (int) substr($last->nomor_penerimaan, -4) : 0;
-
-        return response()->json($prefix.str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT));
+        return response()->json($this->numbering->previewReceipt());
     }
 
     public function approvedPurchaseOrders()
@@ -281,12 +273,14 @@ class PenerimaanController extends Controller
             $computed = $this->buildComputedDetails($request, $po);
             $compensationPlan = $this->buildSupplierCompensationPlan($request, $po, $computed);
 
-            $penerimaan = PenerimaanBarangModel::create($this->headerPayload(
+            $payload = $this->headerPayload(
                 $request,
                 $po,
                 $computed,
                 $compensationPlan['total']
-            ));
+            );
+            $payload['nomor_penerimaan'] = $this->numbering->nextReceipt();
+            $penerimaan = PenerimaanBarangModel::create($payload);
 
             foreach ($computed['details'] as $detail) {
                 $penerimaan->details()->create($detail);
@@ -302,8 +296,12 @@ class PenerimaanController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Draft penerimaan barang berhasil disimpan.',
+                'data' => [
+                    'id' => $penerimaan->id,
+                    'nomor_penerimaan' => $penerimaan->nomor_penerimaan,
+                ],
             ]);
-        });
+        }, 5);
     }
 
     public function show($id)
@@ -378,7 +376,7 @@ class PenerimaanController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate($this->rules($id));
+        $request->validate($this->rules());
 
         return DB::transaction(function () use ($request, $id) {
             $penerimaan = $this->penerimaanQueryForBranch([
@@ -419,6 +417,10 @@ class PenerimaanController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Draft penerimaan barang berhasil diperbarui.',
+                'data' => [
+                    'id' => $penerimaan->id,
+                    'nomor_penerimaan' => $penerimaan->nomor_penerimaan,
+                ],
             ]);
         });
     }
@@ -614,16 +616,10 @@ class PenerimaanController extends Controller
         ]);
     }
 
-    private function rules(?int $ignoreId = null): array
+    private function rules(): array
     {
-        $unique = 'unique:penerimaan_barang,nomor_penerimaan';
-
-        if ($ignoreId) {
-            $unique .= ','.$ignoreId;
-        }
-
         return [
-            'nomor_penerimaan' => ['required', 'string', 'max:60', $unique],
+            'nomor_penerimaan' => ['nullable', 'string', 'max:60'],
             'purchase_order_id' => ['required', 'integer', 'exists:purchase_orders,id'],
             'nomor_faktur' => ['required', 'string', 'max:100'],
             'nomor_surat_jalan' => ['nullable', 'string', 'max:100'],
@@ -980,7 +976,6 @@ class PenerimaanController extends Controller
         $sisaHutang = $this->moneyValue($tagihanSetelahGantiRugi - $jumlahDibayar);
 
         return [
-            'nomor_penerimaan' => $request->nomor_penerimaan,
             'purchase_order_id' => $po->id,
             'distributor_id' => $po->distributor_id,
             'nomor_faktur' => $request->nomor_faktur,
