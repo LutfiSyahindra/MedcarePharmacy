@@ -18,6 +18,54 @@ class PurchaseOrderDraftTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_large_json_draft_persists_every_item_with_aligned_quantities_and_prices(): void
+    {
+        Notification::fake();
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = $this->payload($distributor, $medicine, $conversion);
+        foreach (['obat_id', 'qty', 'harga_estimasi', 'diskon_1', 'diskon_2', 'diskon_3', 'ppn', 'subtotal', 'satuan_id'] as $field) {
+            $payload[$field] = [];
+        }
+        $expectedTotal = 0;
+        for ($index = 1; $index <= 300; $index++) {
+            $item = $index === 1 ? $medicine : MasterObatModel::create([
+                'kode_obat' => 'PO-BULK-'.$index,
+                'nama_obat' => 'Obat PO Bulk '.$index,
+                'satuan_id' => $medicine->satuan_id,
+                'is_active' => true,
+            ]);
+            $unit = $index === 1 ? $conversion : KonversiSatuanModel::create([
+                'obat_id' => $item->id,
+                'satuan_id' => $medicine->satuan_id,
+                'konversi' => 1,
+                'is_default' => true,
+            ]);
+            $payload['obat_id'][] = $item->id;
+            $payload['satuan_id'][] = $unit->id;
+            $payload['qty'][] = $index;
+            $payload['harga_estimasi'][] = 100 + $index;
+            $payload['subtotal'][] = $index * (100 + $index);
+            foreach (['diskon_1', 'diskon_2', 'diskon_3', 'ppn'] as $field) {
+                $payload[$field][] = 0;
+            }
+            $expectedTotal += $index * (100 + $index);
+        }
+
+        $response = $this->actingAs($user)->postJson(route('pembelian.store'), [
+            ...$payload,
+            'save_as_draft' => true,
+        ])->assertOk()->assertJsonPath('data.status', 'draft');
+
+        $order = PembelianModel::findOrFail($response->json('data.id'));
+        $details = PembelianDetailModel::where('purchase_order_id', $order->id)->orderBy('id')->get();
+        $this->assertCount(300, $details);
+        $this->assertEquals(45150, $details->sum('qty'));
+        $this->assertEquals(300, $details->last()->qty);
+        $this->assertEquals(400, $details->last()->harga_estimasi);
+        $this->assertEquals($expectedTotal, $order->total_estimasi);
+        Notification::assertNothingSent();
+    }
+
     public function test_purchase_order_can_be_saved_as_draft_then_submitted_for_approval(): void
     {
         Notification::fake();

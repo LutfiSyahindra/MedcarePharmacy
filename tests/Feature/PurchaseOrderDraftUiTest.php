@@ -8,17 +8,15 @@ class PurchaseOrderDraftUiTest extends TestCase
 {
     public function test_purchase_order_form_uses_conversion_for_subtotal_and_prioritizes_unit_width(): void
     {
-        $modal = file_get_contents(resource_path(
-            'views/medcare/menu/pembelianPenerimaan/pembelian/modalMain.blade.php'
-        ));
+        $modal = view('medcare.menu.pembelianPenerimaan.pembelian.modalMain')->render();
         $script = file_get_contents(resource_path(
             'views/medcare/menu/pembelianPenerimaan/pembelian/jsMain.blade.php'
         ));
 
         $this->assertIsString($modal);
         $this->assertIsString($script);
-        $this->assertStringContainsString('col-lg-3 col-md-6 purchase-unit-field', $modal);
-        $this->assertStringContainsString('col-lg-1 col-md-4 purchase-qty-field', $modal);
+        $this->assertStringContainsString('purchase-unit-column', $modal);
+        $this->assertStringContainsString('purchase-qty-column', $modal);
         $this->assertStringContainsString('name="harga_estimasi_satuan[]"', $modal);
         $this->assertStringContainsString('type="hidden" class="harga_estimasi" name="harga_estimasi[]"', $modal);
         $this->assertStringContainsString('class="form-control purchase-tax"', $modal);
@@ -27,7 +25,7 @@ class PurchaseOrderDraftUiTest extends TestCase
         $this->assertStringNotContainsString('convertedPurchaseUnitPrice', $script);
         $this->assertStringContainsString('let subtotal = qty * purchaseUnitPrice;', $script);
         $this->assertStringContainsString('subtotal = roundPurchaseMoney(subtotal * (1 + (ppn / 100)));', $script);
-        $this->assertStringContainsString('value="${options.ppn ?? 11}"', $script);
+        $this->assertStringContainsString('ppn: options.ppn ?? 11', $script);
         $this->assertStringContainsString("row.find('.harga_estimasi').val(purchaseUnitPrice.toFixed(2));", $script);
     }
 

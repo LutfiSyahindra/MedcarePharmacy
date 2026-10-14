@@ -25,14 +25,17 @@ class PurchaseOrderBulkMedicinePickerTest extends TestCase
         $script = file_get_contents(resource_path(
             'views/medcare/menu/pembelianPenerimaan/pembelian/jsMain.blade.php'
         ));
+        $workflow = file_get_contents(resource_path(
+            'views/medcare/menu/pembelianPenerimaan/pembelian/partials/entryWorkflow.blade.php'
+        ));
 
         $this->assertIsString($script);
         $this->assertStringContainsString('currentDetailMedicineIds()', $script);
         $this->assertStringContainsString("$('#addSelectedMedicines').on('click'", $script);
-        $this->assertStringContainsString('populateMedicineSelect(', $script);
-        $this->assertStringContainsString('append(detailItemTemplate())', $script);
+        $this->assertStringContainsString('populateMedicineSelect(', $workflow);
+        $this->assertStringContainsString('document.createDocumentFragment()', $workflow);
         $this->assertStringContainsString('initializeMedicineSelect($select)', $script);
-        $this->assertStringContainsString('preloadMedicineUnits(selectedItems.map', $script);
+        $this->assertStringContainsString('preloadMedicineUnits(entries.map', $workflow);
         $this->assertStringContainsString('updateCurrentStock(row, medicine);', $script);
         $this->assertStringContainsString('medicine.stok_saat_ini', $script);
         $this->assertStringNotContainsString('medicineCatalog.forEach(function(item)', $script);

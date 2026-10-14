@@ -8,6 +8,7 @@
     @include("template.AddOn.dropify")
     @include("template.AddOn.datePicker")
     @include("medcare.menu.pembelianPenerimaan.pembelian.partials.style")
+    @include("medcare.menu.pembelianPenerimaan.pembelian.partials.modalFormStyle")
 @endpush
 
 @section("content")
