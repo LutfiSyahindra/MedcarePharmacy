@@ -101,11 +101,56 @@ class ApotekProfileSettingsTest extends TestCase
         $profile = ApotekProfile::where('branch_id', $branch->id)->firstOrFail();
 
         $this->assertSame('Apotek Harmoni Sehat', $profile->name);
+        $this->assertSame('081234567890', $profile->pharmacist_phone);
         $this->assertSame('-6.2000000', $profile->latitude);
         $this->assertSame('106.8166667', $profile->longitude);
         $this->assertTrue($profile->operational_hours['monday']['enabled']);
         $this->assertFalse($profile->operational_hours['sunday']['enabled']);
         Storage::disk('public')->assertExists($profile->logo_path);
+    }
+
+    public function test_pharmacist_phone_is_displayed_updated_and_cleared_only_for_the_selected_branch(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('PHONE', 'Cabang Telepon');
+        $otherBranch = $this->branch('OTHER', 'Cabang Lain');
+        $profile = ApotekProfile::create($this->profileAttributes($branch));
+        $otherProfile = ApotekProfile::create($this->profileAttributes($otherBranch));
+
+        $this->actingAs($admin)
+            ->get(route('settings.apotek-profile.index', ['branch_id' => $branch->id]))
+            ->assertOk()
+            ->assertSee('Nomor telepon apoteker')
+            ->assertSee('name="pharmacist_phone"', false)
+            ->assertSee('value="081234567890"', false);
+
+        $this->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+            'pharmacist_phone' => '+62 812-3456-7891',
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertSame('+62 812-3456-7891', $profile->fresh()->pharmacist_phone);
+        $this->assertSame('081234567890', $otherProfile->fresh()->pharmacist_phone);
+
+        $this->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+            'pharmacist_phone' => '',
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertNull($profile->fresh()->pharmacist_phone);
+        $this->assertSame('081234567890', $otherProfile->fresh()->pharmacist_phone);
+    }
+
+    public function test_pharmacist_phone_longer_than_thirty_characters_is_rejected(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $branch = $this->branch('PHONE-LIMIT', 'Cabang Validasi Telepon');
+
+        $this->actingAs($admin)
+            ->put(route('settings.apotek-profile.update'), $this->validPayload($branch, [
+                'pharmacist_phone' => str_repeat('1', 31),
+            ]))
+            ->assertSessionHasErrors(['pharmacist_phone']);
+
+        $this->assertDatabaseMissing('apotek_profiles', ['branch_id' => $branch->id]);
     }
 
     public function test_new_logo_replaces_and_deletes_previous_file(): void
@@ -359,6 +404,7 @@ class ApotekProfileSettingsTest extends TestCase
             'latitude' => -6.2,
             'longitude' => 106.8166667,
             'pharmacist_name' => 'apt. Siti Sehat, S.Farm.',
+            'pharmacist_phone' => '081234567890',
             'pharmacist_license_number' => 'SIPA-001',
             'pharmacy_license_number' => 'SIA-001',
             'license_expired_at' => '2028-12-31',

@@ -45,10 +45,12 @@ class SuratPesananPrintSignatureTest extends TestCase
         ApotekProfile::create([
             'branch_id' => $this->branch->id,
             'name' => 'Apotek Cetak SP',
+            'phone' => '0215551234',
             'address' => 'Jl. Sehat No. 1',
             'latitude' => -6.2,
             'longitude' => 106.8,
             'pharmacist_name' => 'apt. Siti Sehat',
+            'pharmacist_phone' => '081234567890',
             'pharmacist_license_number' => 'SIPA-SIGN',
             'pharmacist_signature_path' => 'apotek-signatures/print-test.png',
         ]);
@@ -141,8 +143,41 @@ class SuratPesananPrintSignatureTest extends TestCase
             ->assertSee('SIPA-SIGN');
 
         $html = $response->getContent();
+        $this->assertPharmacistPhoneOutput($html, '081234567890', $copies);
         $this->assertSame($withSignature ? $copies : 0, substr_count($html, 'class="pharmacist-signature-image"'));
         $this->assertSame($withSignature ? $copies : 0, substr_count($html, asset('storage/apotek-signatures/print-test.png')));
         $this->assertSame($withSignature ? 0 : $copies, substr_count($html, 'class="signature-space"'));
+    }
+
+    public function test_orders_and_templates_without_a_pharmacist_phone_keep_a_blank_phone_field(): void
+    {
+        $this->branch->apotekProfile->update(['pharmacist_phone' => null]);
+
+        foreach (self::COPY_COUNTS as $type => $copies) {
+            $order = $this->get(route('pembelian.suratPesanan'.$type, [
+                'id' => $this->purchaseOrder->id,
+            ]))->assertOk();
+            $this->assertPharmacistPhoneOutput($order->getContent(), '-', $copies);
+
+            $template = $this->get(route('dokumen.template', [
+                'type' => strtolower($type),
+                'branch_id' => $this->branch->id,
+            ]))->assertOk();
+            $this->assertPharmacistPhoneOutput($template->getContent(), '................................', $copies);
+        }
+    }
+
+    private function assertPharmacistPhoneOutput(string $html, string $expectedPhone, int $copies): void
+    {
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $phoneRows = $xpath->query('//tr[td[1]="Jabatan" and td[3]="Apoteker Penanggung Jawab"]/following-sibling::tr[1]');
+
+        $this->assertCount($copies, $phoneRows);
+        foreach ($phoneRows as $row) {
+            $this->assertSame('No. Telepon', trim($row->childNodes->item(0)->textContent));
+            $this->assertSame($expectedPhone, trim($row->childNodes->item(2)->textContent));
+        }
     }
 }

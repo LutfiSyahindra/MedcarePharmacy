@@ -293,6 +293,12 @@
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6"><label class="form-label" for="pharmacist_name">Apoteker penanggung jawab</label><input type="text" name="pharmacist_name" id="pharmacist_name" value="{{ $profileValue("pharmacist_name") }}" class="form-control" placeholder="apt. Nama Lengkap, S.Farm."></div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="pharmacist_phone">Nomor telepon apoteker</label>
+                                    <input type="tel" name="pharmacist_phone" id="pharmacist_phone" value="{{ $profileValue("pharmacist_phone") }}" maxlength="30" class="form-control @error("pharmacist_phone") is-invalid @enderror" placeholder="0812 3456 7890" aria-describedby="pharmacist_phone_help">
+                                    @error("pharmacist_phone")<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    <div class="form-text" id="pharmacist_phone_help">Ditampilkan pada SP di bawah jabatan Apoteker Penanggung Jawab.</div>
+                                </div>
                                 <div class="col-md-6"><label class="form-label" for="pharmacist_license_number">Nomor SIPA</label><input type="text" name="pharmacist_license_number" id="pharmacist_license_number" value="{{ $profileValue("pharmacist_license_number") }}" class="form-control" placeholder="Nomor izin praktik apoteker"></div>
                                 <div class="col-md-6"><label class="form-label" for="pharmacy_license_number">Nomor SIA / izin apotek</label><input type="text" name="pharmacy_license_number" id="pharmacy_license_number" value="{{ $profileValue("pharmacy_license_number") }}" class="form-control" placeholder="Nomor izin resmi apotek"></div>
                                 <div class="col-md-3"><label class="form-label" for="license_expired_at">Berlaku sampai</label><input type="date" name="license_expired_at" id="license_expired_at" value="{{ old("license_expired_at", $profile?->license_expired_at?->format("Y-m-d")) }}" class="form-control"></div>

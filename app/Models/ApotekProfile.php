@@ -29,6 +29,7 @@ class ApotekProfile extends Model
         'latitude',
         'longitude',
         'pharmacist_name',
+        'pharmacist_phone',
         'pharmacist_license_number',
         'pharmacist_signature_path',
         'pharmacy_license_number',

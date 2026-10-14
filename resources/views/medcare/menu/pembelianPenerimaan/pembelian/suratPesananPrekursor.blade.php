@@ -229,6 +229,7 @@
                 <table class="field-table">
                     <tr><td class="field-label">Nama</td><td class="field-separator">:</td><td>{{ $pharmacistName }}</td></tr>
                     <tr><td class="field-label">Jabatan</td><td class="field-separator">:</td><td>Apoteker Penanggung Jawab</td></tr>
+                    <tr><td class="field-label">No. Telepon</td><td class="field-separator">:</td><td>{{ $profile?->pharmacist_phone ?: '-' }}</td></tr>
                 </table>
             </section>
 
