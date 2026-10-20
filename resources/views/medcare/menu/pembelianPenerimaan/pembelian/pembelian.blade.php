@@ -9,6 +9,7 @@
     @include("template.AddOn.datePicker")
     @include("medcare.menu.pembelianPenerimaan.pembelian.partials.style")
     @include("medcare.menu.pembelianPenerimaan.pembelian.partials.modalFormStyle")
+    @include("medcare.menu.pembelianPenerimaan.pembelian.partials.mobileFormStyle")
 @endpush
 
 @section("content")

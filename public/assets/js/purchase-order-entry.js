@@ -1,6 +1,55 @@
 (function (root) {
     'use strict';
 
+    const moneyFormatter = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+    const fractionalMoneyFormatter = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const roundMoney = value => Math.round((Math.max(0, Number(value) || 0) + Number.EPSILON) * 100) / 100;
+    const percentage = value => roundMoney(Math.min(100, Math.max(0, Number(value) || 0)));
+
+    function formatMoney(value) {
+        const amount = roundMoney(value);
+        return 'Rp ' + (Number.isInteger(amount) ? moneyFormatter : fractionalMoneyFormatter).format(amount);
+    }
+
+    function moneyInput(value, caret = String(value).length) {
+        const raw = String(value);
+        const clean = raw.replace(/^Rp\s*/i, '').replace(/\./g, '').replace(/\s/g, '');
+        if (clean === '') return { display: '', amount: '', caret: 0 };
+        // Keep invalid pasted prices visible so validation can explain the problem.
+        if (!/^\d*(?:,\d{0,2})?$/.test(clean) || clean === ',') {
+            return { display: raw, amount: '', caret };
+        }
+        const [integer, fraction] = clean.split(',');
+        const digits = (integer || '0').replace(/^0+(?=\d)/, '');
+        const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        const display = 'Rp ' + grouped + (fraction === undefined ? '' : ',' + fraction);
+        const amount = digits + (fraction ? '.' + fraction : '');
+        let remaining = (raw.slice(0, caret).match(/[\d,]/g) || []).length;
+        remaining -= Math.max(0, integer.length - digits.length);
+        let position = 3;
+        while (position < display.length && remaining > 0) {
+            if (/[\d,]/.test(display[position])) remaining--;
+            position++;
+        }
+        return { display, amount, caret: position };
+    }
+
+    function calculateAmounts({ qty, price, conversion = 1, discounts = [], tax = 11 }) {
+        const unitPrice = roundMoney(Number(price) * Number(conversion));
+        const rawGross = Math.max(0, Number(qty) || 0) * unitPrice;
+        const gross = roundMoney(rawGross);
+        const net = roundMoney(discounts.reduce((amount, discount) => amount * (1 - percentage(discount) / 100), rawGross));
+        const subtotal = roundMoney(net * (1 + percentage(tax) / 100));
+        return { unitPrice, gross, discount: roundMoney(gross - net), net, tax: roundMoney(subtotal - net), subtotal };
+    }
+
+    function summarizeAmounts(rows, additionalCost = 0) {
+        const sums = { gross: 0, discount: 0, tax: 0, subtotal: 0 };
+        rows.forEach(row => Object.keys(sums).forEach(key => { sums[key] += row[key]; }));
+        Object.keys(sums).forEach(key => { sums[key] = roundMoney(sums[key]); });
+        return { ...sums, additionalCost: roundMoney(additionalCost), total: roundMoney(sums.subtotal + roundMoney(additionalCost)) };
+    }
+
     function splitBatches(ids, size = 250) {
         const unique = Array.from(new Set(ids.map(String).filter(Boolean)));
         const batches = [];
@@ -66,5 +115,5 @@
         return payload;
     }
 
-    root.PurchaseOrderEntry = Object.freeze({ splitBatches, parsePaste, rowIssues, formPayload });
+    root.PurchaseOrderEntry = Object.freeze({ formatMoney, moneyInput, calculateAmounts, summarizeAmounts, splitBatches, parsePaste, rowIssues, formPayload });
 })(globalThis);

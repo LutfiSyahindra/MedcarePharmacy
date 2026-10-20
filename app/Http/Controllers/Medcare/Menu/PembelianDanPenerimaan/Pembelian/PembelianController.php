@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DistributorModel;
 use App\Models\KonversiSatuanModel;
 use App\Models\MasterObatModel;
+use App\Models\SatuansModel;
 use App\Services\Menu\PembelianPenerimaan\PembelianService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananNarkotikaService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananOotService;
@@ -14,6 +15,7 @@ use App\Services\Menu\PembelianPenerimaan\SuratPesananPsikotropikaService;
 use App\Services\Menu\PembelianPenerimaan\SuratPesananRegulerService;
 use App\Services\Notifikasi\TransactionNotificationService;
 use App\Services\Settings\Master\DistributorService;
+use App\Services\Settings\Master\KonversiSatuanObatService;
 use App\Support\BranchAccess;
 use App\Support\TieredDiscount;
 use Illuminate\Http\Request;
@@ -22,6 +24,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Yajra\DataTables\Facades\DataTables;
 
 class PembelianController extends Controller
@@ -199,6 +203,11 @@ class PembelianController extends Controller
 
     public function getKonversiSatuan(Request $request)
     {
+        $conversionQuery = KonversiSatuanModel::query()
+            ->select(['id', 'obat_id', 'satuan_id', 'konversi', 'is_default'])
+            ->selectRaw('EXISTS (SELECT 1 FROM purchase_order_details WHERE purchase_order_details.satuan_konversi = obat_satuan_conversions.id) AS is_used')
+            ->with('satuan:id,nama')
+            ->orderByDesc('is_default')->orderBy('konversi')->orderBy('id');
         if ($request->has('obat_ids')) {
             $validated = $request->validate([
                 'obat_ids' => ['required', 'array', 'max:250'],
@@ -208,13 +217,8 @@ class PembelianController extends Controller
                 ->map(fn ($medicineId) => (int) $medicineId)
                 ->unique()
                 ->values();
-            $conversions = KonversiSatuanModel::query()
-                ->select(['id', 'obat_id', 'satuan_id', 'konversi', 'is_default'])
-                ->with('satuan:id,nama')
+            $conversions = $conversionQuery
                 ->whereIn('obat_id', $medicineIds)
-                ->orderByDesc('is_default')
-                ->orderBy('konversi')
-                ->orderBy('id')
                 ->get()
                 ->groupBy(fn (KonversiSatuanModel $conversion) => (string) $conversion->obat_id);
 
@@ -228,9 +232,132 @@ class PembelianController extends Controller
         $validated = $request->validate([
             'obat_id' => ['required', 'integer', 'exists:master_obats,id'],
         ]);
-        $KonversiSatuan = $this->PembelianService->getKonversiSatuan($validated['obat_id']);
+        $KonversiSatuan = $conversionQuery->where('obat_id', $validated['obat_id'])->get();
 
         return response()->json($KonversiSatuan);
+    }
+
+    public function getSatuan()
+    {
+        return response()->json(SatuansModel::query()
+            ->select(['id', 'nama'])
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get());
+    }
+
+    public function storeKonversiSatuan(Request $request, KonversiSatuanObatService $conversionService)
+    {
+        $batch = $request->has('conversions');
+        $validated = $request->validate([
+            'obat_id' => ['required', 'integer', 'exists:master_obats,id'],
+            ...($batch ? [
+                'conversions' => ['required', 'array', 'list', 'min:1', 'max:20'],
+                'conversions.*.id' => ['nullable', 'integer', 'distinct'],
+                'conversions.*.satuan_id' => ['required', 'integer', 'distinct', 'exists:satuans,id'],
+                'conversions.*.konversi' => ['required', 'integer', 'min:1', 'max:2147483647'],
+                'selected_satuan_id' => ['nullable', 'integer'],
+            ] : [
+                'satuan_id' => ['required', 'integer', Rule::exists('satuans', 'id')->where('is_active', true)],
+                'konversi' => ['required', 'integer', 'min:1', 'max:2147483647'],
+            ]),
+        ]);
+        $rows = $batch ? collect($validated['conversions'])->sortKeys()->values()->all() : [$validated];
+        $selectedUnitId = (int) ($validated['selected_satuan_id'] ?? $rows[0]['satuan_id']);
+        if (! collect($rows)->contains(fn (array $row) => (int) $row['satuan_id'] === $selectedUnitId)) {
+            throw ValidationException::withMessages(['selected_satuan_id' => 'Pilih salah satu satuan konversi untuk dipakai di PO.']);
+        }
+
+        $result = DB::transaction(function () use ($validated, $rows, $selectedUnitId, $batch, $conversionService) {
+            $medicine = MasterObatModel::with('satuan')->lockForUpdate()->findOrFail($validated['obat_id']);
+
+            if (! $medicine->satuan) {
+                throw ValidationException::withMessages([
+                    'obat_id' => 'Obat belum memiliki satuan stok. Lengkapi satuan stok obat terlebih dahulu.',
+                ]);
+            }
+
+            $existing = KonversiSatuanModel::where('obat_id', $medicine->id)->get();
+            $requestedById = collect($rows)->filter(fn (array $row) => isset($row['id']))->keyBy('id');
+            $activeUnitIds = SatuansModel::where('is_active', true)->pluck('id');
+            $errors = [];
+            foreach ($rows as $index => $row) {
+                $prefix = $batch ? 'conversions.'.$index.'.' : '';
+                $conversion = isset($row['id']) ? $existing->firstWhere('id', (int) $row['id']) : null;
+                if (isset($row['id']) && ! $conversion) {
+                    $errors[$prefix.'id'] = 'Satuan konversi ini tidak tersedia untuk obat yang dipilih. Muat ulang pengaturan konversi.';
+                }
+                if (! $activeUnitIds->contains((int) $row['satuan_id']) && (int) ($conversion?->satuan_id ?? 0) !== (int) $row['satuan_id']) {
+                    $errors[$prefix.'satuan_id'] = 'Pilih satuan beli yang masih aktif.';
+                }
+                if ((int) $medicine->satuan_id === (int) $row['satuan_id'] && (int) $row['konversi'] !== 1) {
+                    $errors[$prefix.'konversi'] = 'Konversi untuk satuan yang sama dengan satuan stok harus bernilai 1.';
+                }
+                $sameUnit = $existing->firstWhere('satuan_id', (int) $row['satuan_id']);
+                $replacement = $sameUnit ? $requestedById->get($sameUnit->id) : null;
+                if ($replacement && (int) $replacement['satuan_id'] !== (int) $sameUnit->satuan_id) {
+                    $sameUnit = null;
+                }
+                if ($sameUnit && $conversion && $sameUnit->id !== $conversion->id) {
+                    $errors[$prefix.'satuan_id'] = 'Satuan beli ini sudah dipakai pada konversi lain. Pilih satuan yang berbeda.';
+                } elseif ($sameUnit && ! $conversion && (int) $sameUnit->konversi !== (int) $row['konversi']) {
+                    $errors[$prefix.'satuan_id'] = 'Satuan konversi ini sudah tersedia untuk obat tersebut. Pilih satuan yang sudah tersedia.';
+                }
+            }
+            if ($errors) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            $created = 0;
+            $updated = 0;
+            foreach ($rows as $index => $row) {
+                if (isset($row['id'])) {
+                    $conversion = $existing->firstWhere('id', (int) $row['id']);
+                    $changed = (int) $conversion->satuan_id !== (int) $row['satuan_id']
+                        || (int) $conversion->konversi !== (int) $row['konversi'];
+                    if ($changed) {
+                        try {
+                            $conversionService->updateKonversi($conversion->id, [
+                                'satuan_id' => $row['satuan_id'],
+                                'konversi' => $row['konversi'],
+                            ]);
+                        } catch (ValidationException $exception) {
+                            throw ValidationException::withMessages([
+                                'conversions.'.$index.'.konversi' => collect($exception->errors())->flatten()->all(),
+                            ]);
+                        }
+                        $updated++;
+                    }
+                }
+            }
+            $currentUnitIds = KonversiSatuanModel::where('obat_id', $medicine->id)->pluck('satuan_id');
+            foreach ($rows as $row) {
+                if (isset($row['id']) || $currentUnitIds->contains((int) $row['satuan_id'])) {
+                    continue;
+                }
+                $conversionService->createKonversi([
+                    'obat_id' => $medicine->id,
+                    'satuan_id' => $row['satuan_id'],
+                    'konversi' => $row['konversi'],
+                    'is_default' => $existing->isEmpty() && (int) $row['satuan_id'] === $selectedUnitId,
+                ]);
+                $currentUnitIds->push((int) $row['satuan_id']);
+                $created++;
+            }
+            $conversions = KonversiSatuanModel::with('satuan:id,nama')->where('obat_id', $medicine->id)
+                ->orderByDesc('is_default')->orderBy('konversi')->orderBy('id')->get();
+
+            return ['conversions' => $conversions, 'selected' => $conversions->firstWhere('satuan_id', $selectedUnitId), 'created' => $created, 'updated' => $updated];
+        }, 3);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $batch ? $result['conversions'] : $result['selected'],
+            'selected_id' => $result['selected']->id,
+            'created_count' => $result['created'],
+            'updated_count' => $result['updated'],
+            'message' => 'Satuan konversi berhasil disimpan dan dapat langsung digunakan pada PO.',
+        ], $result['created'] > 0 ? 201 : 200);
     }
 
     /**
@@ -783,7 +910,7 @@ class PembelianController extends Controller
     private function missingConversionWarning(array $detailRows): ?string
     {
         if (collect($detailRows)->contains(fn (array $row) => $row['satuan_konversi'] === null)) {
-            return 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di Master Data sebelum memproses PO.';
+            return 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi langsung di Form Purchase Order sebelum memproses PO.';
         }
 
         return null;

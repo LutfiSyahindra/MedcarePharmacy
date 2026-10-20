@@ -18,6 +18,21 @@
                 </div>
             </div>
 
+            <nav class="purchase-mobile-navigation" aria-label="Bagian form purchase order">
+                <button type="button" class="purchase-section-link is-current" data-purchase-section="purchaseInformationSection"
+                    aria-controls="purchaseInformationSection" aria-current="step">
+                    <span class="purchase-step-number" aria-hidden="true">1</span> Informasi
+                </button>
+                <button type="button" class="purchase-section-link" data-purchase-section="purchaseItemsSection"
+                    aria-controls="purchaseItemsSection">
+                    <span class="purchase-step-number" aria-hidden="true">2</span> Obat
+                </button>
+                <button type="button" class="purchase-section-link" data-purchase-section="purchaseSummarySection"
+                    aria-controls="purchaseSummarySection">
+                    <span class="purchase-step-number" aria-hidden="true">3</span> Ringkasan
+                </button>
+            </nav>
+
             <div class="modal-body">
                 <form id="pembelianForm" novalidate>
                     @csrf
@@ -26,7 +41,8 @@
 
                     <div class="purchase-form-layout">
                         <div class="purchase-form-main">
-                            <section class="purchase-form-section" aria-labelledby="purchaseInformationTitle">
+                            <section class="purchase-form-section purchase-information-section" id="purchaseInformationSection"
+                                aria-labelledby="purchaseInformationTitle" tabindex="-1">
                                 <div class="purchase-form-section-header">
                                     <div class="purchase-form-section-title">
                                         <i class="mdi mdi-file-document-outline"></i>
@@ -48,16 +64,18 @@
                                         </div>
 
                                         <div class="col-12 col-md-7 col-lg-4">
-                                            <label class="form-label" for="purchaseNumber">Nomor PO <span class="purchase-required" aria-hidden="true">*</span></label>
+                                            <div class="purchase-field-heading">
+                                                <label class="form-label" for="purchaseNumber">Nomor PO <span class="purchase-required" aria-hidden="true">*</span></label>
+                                                <div class="purchase-number-mode">
+                                                    <strong id="purchaseNumberModeTitle">Pilih Distributor</strong>
+                                                    <span id="purchaseNumberModeDescription" class="visually-hidden">Mode nomor PO ditentukan oleh distributor.</span>
+                                                </div>
+                                            </div>
                                             <div class="purchase-input-icon">
                                                 <i class="mdi mdi-file-document-edit-outline"></i>
                                                 <input type="text" class="form-control" name="no_po" id="purchaseNumber"
                                                     aria-describedby="purchaseNumberHint"
                                                     placeholder="Pilih distributor terlebih dahulu" maxlength="50" readonly required>
-                                            </div>
-                                            <div class="purchase-number-mode">
-                                                <strong id="purchaseNumberModeTitle">Pilih Distributor</strong>
-                                                <span id="purchaseNumberModeDescription" class="visually-hidden">Mode nomor PO ditentukan oleh distributor.</span>
                                             </div>
                                             <small class="purchase-field-hint" id="purchaseNumberHint">Nomor PO mengikuti pengaturan distributor.</small>
                                         </div>
@@ -77,7 +95,7 @@
 
                                         <div class="col-md-12">
                                             <details class="purchase-notes-details">
-                                                <summary>Catatan <span class="text-muted">(Opsional)</span></summary>
+                                                <summary><i class="mdi mdi-text-box-outline" aria-hidden="true"></i> Catatan <span class="text-muted">(Opsional)</span></summary>
                                                 <label class="form-label visually-hidden" for="purchaseNotes">Catatan pesanan</label>
                                                 <textarea class="form-control mt-2" name="catatan" id="purchaseNotes" rows="2"
                                                     placeholder="Contoh: kirim sebelum Jumat atau sertakan faktur."></textarea>
@@ -87,13 +105,14 @@
                                 </div>
                             </section>
 
-                            <section class="purchase-form-section" aria-labelledby="purchaseItemsTitle">
+                            <section class="purchase-form-section purchase-items-section" id="purchaseItemsSection"
+                                aria-labelledby="purchaseItemsTitle" tabindex="-1">
                                 <div class="purchase-form-section-header">
                                     <div class="purchase-form-section-title">
                                         <i class="mdi mdi-pill-multiple"></i>
                                         <div>
                                             <strong id="purchaseItemsTitle">2. Rincian Obat</strong>
-                                            <small>Tab: pindah kolom · Enter: baris berikutnya. Harga mengikuti satuan dasar.</small>
+                                            <small><span class="purchase-desktop-text">Tab: pindah kolom · Enter: baris berikutnya. Harga mengikuti satuan dasar.</span><span class="purchase-mobile-text">Pilih obat, isi jumlah dan harga, lalu periksa subtotal.</span></small>
                                         </div>
                                     </div>
                                     <div class="purchase-detail-actions">
@@ -103,11 +122,10 @@
                                             <i class="mdi mdi-checkbox-multiple-marked-outline"></i>
                                             Pilih Banyak Obat
                                         </button>
-                                        <button type="button" id="togglePurchasePaste" class="btn btn-outline-primary btn-sm" aria-expanded="false" aria-controls="purchasePastePanel"><i class="mdi mdi-content-paste"></i> Tempel dari Excel</button>
                                         <button type="button" id="addDetail"
                                             class="btn btn-outline-success btn-sm purchase-add-detail">
                                             <i class="mdi mdi-plus-circle-outline"></i>
-                                            Tambah Baris Manual
+                                            <span class="purchase-desktop-text">Tambah Baris Manual</span><span class="purchase-mobile-text">Tambah Obat</span>
                                         </button>
                                     </div>
                                 </div>
@@ -202,16 +220,22 @@
                                     <div id="purchaseConversionWarning" class="alert alert-warning d-none" role="alert">
                                         <i class="mdi mdi-alert-outline"></i>
                                         <strong>Satuan konversi belum lengkap.</strong>
-                                        PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di
-                                        <a href="{{ route('konversiSatuanObat.konversiSatuanObat') }}" target="_blank" rel="noopener">Master Data Konversi Satuan</a>,
-                                        lalu buka kembali draft untuk memproses PO.
+                                        Klik <strong>Set Satuan Konversi</strong> pada baris obat untuk melengkapinya langsung di form ini.
+                                        PO dapat disimpan sebagai draft selama konversi belum lengkap.
                                     </div>
                                     <div class="purchase-entry-table-wrap">
                                         <table class="table purchase-entry-table" aria-label="Rincian obat purchase order">
-                                            <thead><tr>
-                                                <th class="purchase-selection-column"><input type="checkbox" id="purchaseSelectVisible" class="form-check-input" aria-label="Pilih semua baris PO yang tampil"></th>
-                                                <th class="purchase-medicine-column">Obat / stok saat ini</th><th class="purchase-unit-column">Satuan beli</th><th class="purchase-qty-column">Qty</th><th class="purchase-price-column">Harga / satuan dasar (Rp)</th><th class="purchase-subtotal-column">Subtotal + PPN (Rp)</th><th class="purchase-actions-column">Diskon &amp; PPN / aksi</th>
-                                            </tr></thead>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col" class="purchase-selection-column"><input type="checkbox" id="purchaseSelectVisible" class="form-check-input" aria-label="Pilih semua baris PO yang tampil"></th>
+                                                    <th scope="col" class="purchase-medicine-column">Obat <small>Stok saat ini</small></th>
+                                                    <th scope="col" class="purchase-unit-column">Satuan beli <small>Konversi pembelian</small></th>
+                                                    <th scope="col" class="purchase-qty-column">Qty</th>
+                                                    <th scope="col" class="purchase-price-column">Harga dasar <small>Rp / satuan dasar</small></th>
+                                                    <th scope="col" class="purchase-subtotal-column">Subtotal <small>Termasuk PPN (Rp)</small></th>
+                                                    <th scope="col" class="purchase-actions-column">Diskon &amp; PPN <small>Pengaturan / hapus</small></th>
+                                                </tr>
+                                            </thead>
                                             <tbody id="detail-wrapper">@include('medcare.menu.pembelianPenerimaan.pembelian.partials.detailRow')</tbody>
                                         </table>
                                     </div>
@@ -223,7 +247,7 @@
                             </section>
                         </div>
 
-                        <aside class="purchase-form-aside" aria-label="Biaya dan ringkasan pesanan">
+                        <aside class="purchase-form-aside" id="purchaseSummarySection" aria-label="Biaya dan ringkasan pesanan" tabindex="-1">
                             <section class="purchase-form-section" aria-labelledby="purchaseCostsTitle">
                                 <div class="purchase-form-section-header">
                                     <div class="purchase-form-section-title">
@@ -236,38 +260,50 @@
                                 </div>
 
                                 <div class="purchase-form-section-body">
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <label class="form-label" for="purchaseInsurance">Biaya Asuransi</label>
-                                            <div class="input-group">
-                                                <span class="input-group-text">Rp</span>
-                                                <input type="number" class="form-control purchase-additional-cost"
-                                                    name="biaya_asuransi" min="0" max="9999999999999.99" step="0.01"
-                                                    value="0" id="purchaseInsurance" inputmode="decimal">
-                                            </div>
-                                        </div>
+                                    <details class="purchase-additional-costs" id="purchaseAdditionalCosts" open>
+                                        <summary>
+                                            <span><i class="mdi mdi-plus-circle-outline" aria-hidden="true"></i> Biaya tambahan</span>
+                                            <span id="purchaseAdditionalCostsValue">Opsional</span>
+                                            <i class="mdi mdi-chevron-down" aria-hidden="true"></i>
+                                        </summary>
+                                        <div class="purchase-additional-costs-fields">
+                                            <div class="row g-3">
+                                                <div class="col-12">
+                                                    <label class="form-label" for="purchaseInsurance">Biaya Asuransi</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">Rp</span>
+                                                        <input type="number" class="form-control purchase-additional-cost"
+                                                            name="biaya_asuransi" min="0" max="9999999999999.99" step="0.01"
+                                                            value="0" id="purchaseInsurance" inputmode="decimal">
+                                                    </div>
+                                                </div>
 
-                                        <div class="col-12">
-                                            <label class="form-label" for="purchaseShipping">Biaya Pengiriman</label>
-                                            <div class="input-group">
-                                                <span class="input-group-text">Rp</span>
-                                                <input type="number" class="form-control purchase-additional-cost"
-                                                    name="biaya_pengiriman" min="0" max="9999999999999.99" step="0.01"
-                                                    value="0" id="purchaseShipping" inputmode="decimal">
+                                                <div class="col-12">
+                                                    <label class="form-label" for="purchaseShipping">Biaya Pengiriman</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">Rp</span>
+                                                        <input type="number" class="form-control purchase-additional-cost"
+                                                            name="biaya_pengiriman" min="0" max="9999999999999.99" step="0.01"
+                                                            value="0" id="purchaseShipping" inputmode="decimal">
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </details>
                                 </div>
                             </section>
 
                             <div class="purchase-total-panel">
                                 <div class="purchase-total-copy">
                                     <span>Ringkasan Pesanan</span>
-                                    <small>Subtotal obat sudah termasuk diskon dan PPN.</small>
+                                    <small>Diskon dihitung berurutan; PPN dihitung setelah diskon.</small>
                                 </div>
                                 <div class="purchase-total-stats">
                                     <span>Baris obat <strong id="purchaseModalItemCount">1</strong></span>
-                                    <span>Subtotal obat <strong id="purchaseModalMedicineSubtotal">Rp 0</strong></span>
+                                    <span>Subtotal obat sebelum diskon <strong id="purchaseModalGrossSubtotal">Rp 0</strong></span>
+                                    <span>Subtotal diskon <strong id="purchaseModalDiscountSubtotal">Rp 0</strong></span>
+                                    <span>Subtotal PPN <strong id="purchaseModalTaxSubtotal">Rp 0</strong></span>
+                                    <span class="purchase-medicine-total">Subtotal akhir obat <strong id="purchaseModalMedicineSubtotal">Rp 0</strong></span>
                                     <span>Biaya tambahan <strong id="purchaseModalAdditionalCost">Rp 0</strong></span>
                                 </div>
                                 <div class="purchase-grand-total">
@@ -283,9 +319,14 @@
             </div>
 
             <div class="modal-footer purchase-form-footer">
-                <div class="purchase-mobile-total" role="status" aria-live="polite" aria-atomic="true">
-                    <span>Total Estimasi</span>
-                    <strong id="purchaseMobileTotal">Rp 0</strong>
+                <div class="purchase-mobile-total">
+                    <div class="purchase-footer-total-copy" role="status" aria-live="polite" aria-atomic="true">
+                        <span>Total Estimasi <span class="purchase-footer-item-count">· <span id="purchaseFooterItemCount">0</span> obat</span></span>
+                        <strong id="purchaseMobileTotal">Rp 0</strong>
+                    </div>
+                    <button type="button" id="purchaseReviewTotal" class="purchase-review-total" aria-controls="purchaseSummarySection">
+                        Rincian <i class="mdi mdi-chevron-up" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <div class="purchase-save-actions">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">
@@ -294,14 +335,15 @@
                     </button>
                     <button type="button" id="saveDraftForm" class="btn btn-outline-primary">
                         <i class="mdi mdi-content-save-move-outline"></i>
-                        Simpan sebagai Draft
+                        <span class="purchase-desktop-text">Simpan sebagai Draft</span><span class="purchase-mobile-text">Simpan Draft</span>
                     </button>
                     <button type="submit" id="submitForm" class="btn btn-primary" form="pembelianForm">
                         <i class="mdi mdi-content-save-outline"></i>
-                        Periksa &amp; Ajukan
+                        <span class="purchase-desktop-text">Periksa &amp; Ajukan</span><span class="purchase-mobile-text">Ajukan PO</span>
                     </button>
                 </div>
             </div>
+            @include('medcare.menu.pembelianPenerimaan.pembelian.partials.conversionModal')
         </div>
     </div>
 </div>

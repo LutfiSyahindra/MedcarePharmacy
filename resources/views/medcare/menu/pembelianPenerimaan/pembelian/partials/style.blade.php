@@ -1568,7 +1568,7 @@
         font-weight: 800;
     }
 
-    .purchase-modal .detail-item {
+    .purchase-modal .detail-item:not(.purchase-detail-row) {
         position: relative;
         margin: 0 0 .8rem !important;
         padding: 0 !important;
@@ -1578,7 +1578,7 @@
         overflow: hidden;
     }
 
-    .purchase-modal .detail-item:last-child {
+    .purchase-modal .detail-item:not(.purchase-detail-row):last-child {
         margin-bottom: 0 !important;
     }
 

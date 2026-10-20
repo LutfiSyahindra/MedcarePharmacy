@@ -309,6 +309,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/pembelian/{id}/surat-pesanan-reguler', [PembelianController::class, 'suratPesananReguler'])->name('pembelian.suratPesananReguler');
         Route::get('/pembelian/{id}/surat-pesanan-oot', [PembelianController::class, 'suratPesananOot'])->name('pembelian.suratPesananOot');
         Route::get('/pembelian/getKonversiSatuan', [PembelianController::class, 'getKonversiSatuan'])->name('pembelian.getKonversiSatuan');
+        Route::get('/pembelian/getSatuan', [PembelianController::class, 'getSatuan'])->name('pembelian.getSatuan');
+        Route::post('/pembelian/konversi-satuan', [PembelianController::class, 'storeKonversiSatuan'])->name('pembelian.storeKonversiSatuan');
 
         Route::get('/penerimaan', [PenerimaanController::class, 'penerimaan'])->name('penerimaan.penerimaan');
         Route::get('/penerimaan/table', [PenerimaanController::class, 'table'])->name('penerimaan.table');

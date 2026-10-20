@@ -1,19 +1,25 @@
-<div id="purchasePastePanel" class="purchase-paste-panel d-none">
-    <label class="form-label" for="purchasePasteInput">Tempel kolom Excel: Kode obat → Qty → Harga per satuan dasar (opsional)</label>
-    <textarea id="purchasePasteInput" class="form-control" rows="4" placeholder="OBT001&#9;10&#9;1500" aria-describedby="purchasePasteHint"></textarea>
-    <small id="purchasePasteHint">Tanpa baris judul. Pisahkan kolom dengan Tab. Qty mengikuti satuan beli default. Harga memakai angka tanpa pemisah ribuan; koma boleh untuk desimal.</small>
-    <div class="purchase-paste-actions">
-        <button type="button" id="previewPurchasePaste" class="btn btn-outline-primary btn-sm">Periksa Data</button>
-        <button type="button" id="applyPurchasePaste" class="btn btn-primary btn-sm" disabled>Masukkan ke Rincian</button>
-        <button type="button" id="closePurchasePaste" class="btn btn-light btn-sm">Tutup</button>
+<details id="purchaseEntryTools" class="purchase-entry-tools" open>
+    <summary>
+        <span><i class="mdi mdi-tune" aria-hidden="true"></i> Filter &amp; PPN</span>
+        <span id="purchaseFilterStatus" class="purchase-filter-status d-none">Filter aktif</span>
+        <i class="mdi mdi-chevron-down purchase-tools-chevron" aria-hidden="true"></i>
+    </summary>
+    <div class="purchase-entry-tools-body">
+        <div class="purchase-items-toolbar">
+            <input type="search" id="purchaseItemSearch" class="form-control" placeholder="Cari item dalam PO..." aria-label="Cari item dalam PO">
+            <label class="purchase-filter-check"><input type="checkbox" id="purchaseIssuesOnly" class="form-check-input"> Hanya yang bermasalah</label>
+            <button type="button" id="purchaseNextIssue" class="btn btn-outline-warning btn-sm"><span class="purchase-desktop-text">Ke masalah berikutnya</span><span class="purchase-mobile-text">Lihat Masalah</span></button>
+            <label class="purchase-select-all-mobile" for="purchaseSelectVisibleMobile"><input type="checkbox" id="purchaseSelectVisibleMobile" class="form-check-input"> Pilih semua item yang tampil</label>
+        </div>
+        <div class="purchase-tax-toolbar">
+            <label class="form-label" for="purchaseAllTax">PPN semua obat (%)</label>
+            <input type="number" id="purchaseAllTax" class="form-control" min="0" max="100" step="0.01" value="11" inputmode="decimal" aria-describedby="purchaseAllTaxHint" required>
+            <button type="button" id="applyPurchaseAllTax" class="btn btn-outline-primary btn-sm">Terapkan PPN ke Semua Obat</button>
+            <small id="purchaseAllTaxHint">Berlaku untuk seluruh baris dan obat yang ditambahkan berikutnya.</small>
+            <small id="purchaseAllTaxStatus" role="status" aria-live="polite"></small>
+        </div>
     </div>
-    <div id="purchasePastePreview" aria-live="polite"></div>
-</div>
-<div class="purchase-items-toolbar">
-    <input type="search" id="purchaseItemSearch" class="form-control" placeholder="Cari item dalam PO..." aria-label="Cari item dalam PO">
-    <label class="purchase-filter-check"><input type="checkbox" id="purchaseIssuesOnly" class="form-check-input"> Hanya yang bermasalah</label>
-    <button type="button" id="purchaseNextIssue" class="btn btn-outline-warning btn-sm">Ke masalah berikutnya</button>
-</div>
+</details>
 <div id="purchaseBulkToolbar" class="purchase-bulk-toolbar d-none">
     <strong><span id="purchaseBulkCount">0</span> item dipilih</strong>
     <label for="purchaseBulkField" class="visually-hidden">Kolom yang diubah massal</label>

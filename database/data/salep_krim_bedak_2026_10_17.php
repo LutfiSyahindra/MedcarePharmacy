@@ -1,0 +1,81 @@
+<?php
+
+// Pemetaan yang ditinjau untuk impor 17 Oktober 2026; tidak ada fallback klasifikasi.
+$regulation = 'https://peraturan.bpk.go.id/Download/301568/Permenkes%20Nomor%2028%20Tahun%202022.pdf';
+$topical = 'https://jdih.kemkes.go.id/common/dokumen/2021permenkes003.pdf';
+$consumerNote = 'BEBAS adalah pengelompokan internal untuk kosmetik, alat kesehatan, obat tradisional dan produk perawatan nonresep; bukan perubahan jenis izin edar menjadi obat bebas.';
+
+return [
+    'group' => 'SALEP, KRIM DAN BEDAK',
+    'main_names' => [
+        'SLPK' => 'SALEP, KRIM DAN BEDAK KERAS',
+        'SLPBT' => 'SALEP, KRIM DAN BEDAK BEBAS TERBATAS',
+        'SLPKB' => 'SALEP, KRIM DAN BEDAK BEBAS',
+    ],
+    'rules' => [
+        ['pattern' => '/^BENZOLAC[ -]?CL\b/', 'main' => 'SLPK', 'category' => 'KLT', 'sources' => ['https://www.alodokter.com/benzolac']],
+        ['pattern' => '/^BENZOLAC\b/', 'main' => 'SLPBT', 'category' => 'KLT', 'sources' => [$regulation, 'https://www.halodoc.com/obat-dan-vitamin/benzolac-2-5-gel-5-g']],
+        ['pattern' => '/^CARMED\s+(LOT|LOTION)\b/', 'main' => 'SLPKB', 'category' => 'KOS', 'sources' => ['https://www.halodoc.com/obat-dan-vitamin/carmed-moisturizing-lotion-100-ml'], 'note' => $consumerNote],
+        ['pattern' => '/^CARMED\b/', 'main' => 'SLPK', 'category' => 'KLT', 'sources' => ['https://www.klikdokter.com/obat/obat-kulit/carmed']],
+        ['pattern' => '/^(THROMBOGEL|THROMBOPHOB)\b/', 'main' => 'SLPBT', 'category' => 'KLT', 'sources' => ['https://www.klikdokter.com/obat/obat-kulit/thrombogel', 'https://lifepack.id/produk/thrombophob-oint-20-gr-untuk-mencegah-terjadinya-gumpalan-gumpalan-darah']],
+        ['pattern' => '/^CANESTEN\s+SD\b/', 'main' => 'SLPK', 'category' => 'AJM', 'sources' => ['https://www.k24klik.com/p/CANESTEN-VAG-SD-500MG-1S-3652']],
+        ['pattern' => '/^(CANESTEN|DAKTARIN|ERPHAZOL|FORMYCO|FUNGIDERM|INTERZOL|MYCORAL|ZORALIN|ULTRASILINE|MYCORINE|MYCOZOL|MICONAZOL|KETOKONAZOL|KETOMED|FUNTAS)\b/', 'main' => 'SLPBT', 'category' => 'AJM', 'sources' => [$regulation, 'https://registrasiobat.pom.go.id/files/assesment-reports/01762404039.pdf', 'https://www.alodokter.com/miconazole-krim']],
+        ['pattern' => '/^COUNTERPAIN\s+PXM\b/', 'main' => 'SLPBT', 'category' => 'ANL-TOP', 'sources' => [$topical]],
+        ['pattern' => '/^(FELDENE|FLAMAR|PIROFEL|BUFAFLAM|VOLTAREN|VOLTADEX|MEGATIC|ACLONAC|ERPHAFLAM)\b/', 'main' => 'SLPBT', 'category' => 'ANL-TOP', 'sources' => [$topical, 'https://www.halodoc.com/obat-dan-vitamin/erphaflam-emulgel-20-g', 'https://www.alodokter.com/voltadex-gel']],
+        ['pattern' => '/^(LAFALOS|MOLAKRIM|COUNTERPAIN|STOP-X)\b/', 'main' => 'SLPKB', 'category' => 'ANL-TOP', 'sources' => ['https://www.klikdokter.com/obat/gangguan-tulang-otot-dan-sendi/lafalos-plus']],
+        ['pattern' => '/^CALADINE\s+LOTION\b/', 'main' => 'SLPBT', 'category' => 'KLT', 'sources' => ['https://www.alodokter.com/caladine-lotion']],
+        ['pattern' => '/^CALADINE\b/', 'main' => 'SLPKB', 'category' => 'KLT', 'sources' => ['https://www.halodoc.com/kesehatan/caladine-lotion'], 'note' => $consumerNote],
+        ['pattern' => '/^PASQUAM\b/', 'main' => 'SLPBT', 'category' => 'KLT', 'sources' => [$regulation, 'https://www.klikdokter.com/obat/obat-kulit/pasquam']],
+        ['pattern' => '/^(NEW ASTAR|KALPANAX)\b/', 'main' => 'SLPBT', 'category' => 'AJM', 'sources' => ['https://www.klikdokter.com/obat/obat-kulit/new-astar', 'https://www.alodokter.com/miconazole-krim'], 'note' => 'KALPANAX tanpa varian dipetakan sebagai antijamur bebas terbatas; formula/varian perlu label.'],
+        ['pattern' => '/^SALEP HITAM ICHTYOL 12GR$/', 'main' => 'SLPKB', 'category' => 'KLT', 'sources' => ['https://www.mandjur.co.id/products/salep-hitam-ichtyol-12-gr'], 'note' => 'Varian Afiat 12 g terdaftar sebagai obat kuasi QD202786291; BEBAS adalah pengelompokan internal nonresep.'],
+        ['pattern' => '/^(INCHTIOL|SALEP HITAM ICHTYOL)\b/', 'main' => 'SLPBT', 'category' => 'KLT', 'sources' => ['https://exeltis.co.id/product-item/ichtyol-zalf/'], 'note' => 'Nama lama tidak menyertakan NIE; rujukan salep ichthammol obat bebas terbatas.'],
+        ['pattern' => '/^(BETADINE|SALEP 88|HEROCYN|SALICYL|CALLUSOL|KUTILOS)\b/', 'main' => 'SLPKB', 'category' => 'KLT', 'sources' => ['https://www.alodokter.com/callusol', 'https://www.mandjur.co.id/blogs/obat/kutilos']],
+        ['pattern' => '/^(MARCKS|BEDAK MARCKS|ACNES|ACNOL|PARASOL|GLIKODERM|HELIATECH|MELANOX ES|TOPICARE|TEKASOL|EZERRA|MOMILEN|NOROID|PURE BB|BEPANTHEN|DERMATIX|CUTIMED|HANSAPLAST|ALOCLAIR|MEBO)\b/', 'main' => 'SLPKB', 'category' => 'KOS', 'sources' => ['https://www.halodoc.com/obat-dan-vitamin/acnol-lotion-10-ml', 'https://www.halodoc.com/obat-dan-vitamin/tekasol-oint-1-10-g', 'https://www.halodoc.com/obat-dan-vitamin/bepanthen-baby-20-g-2-tube-hemat-borongan', 'https://www.klikdokter.com/obat/obat-herbal/mebo'], 'note' => $consumerNote],
+        ['pattern' => '/^(ACIFAR|ACICLOVIR|CLINOVIR)\b/', 'main' => 'SLPK', 'category' => 'AVS', 'sources' => ['https://www.alodokter.com/clinovir-krim']],
+        ['pattern' => '/^(SCABIMITE|SCABICID|SCACID|PERMETRIN|MEDSCAB)\b/', 'main' => 'SLPK', 'category' => 'APT', 'sources' => ['https://www.alodokter.com/scabimite']],
+        ['pattern' => '/^(GARABIOTIC|GARABIOTIK|GENALTEN|GENOINT|GENTAMISIN|NEBACETIN|NERACETIN|SAGESTAM|SALTICIN|PIBAKSIN|PIROTOP|MUPIROCIN|OXY TETRACIKLIN|FUSON|KALMICETINE|ERYMED|CINDALA|CLINIUM|MEDI[ -]?KLIN)\b/', 'main' => 'SLPK', 'category' => 'ABT', 'sources' => ['https://www.alodokter.com/mediklin', 'https://www.alodokter.com/mupirocin']],
+        ['pattern' => '/^(APOLAR|BENOSON|BETASON|ELOPRO|ESPERSON|FASOLON|FLUOCORT|MELANOX|MEDICORT|MESONE|MYCO-Z|BUFACOMB?|BIOPLACENTON|BEVALEX|BORRAGINOL|CENTABIO|CHLORAMFECORT|BURNAZIN|CINOLON|CLOBESAN|CLONADERM|ELOMOX|FARSEMIX|GENTASOLON|NERILON|NIACEF|NISAGON|MOFACORD|MOFACORT|OVISKIN|PIKANGSUANG|CLORAMFECORT|DENOMIX|DESOLEX|DERMASOLON|IKADERM|KALCINOL|KALTROFEN|KENALOG|KLODERMA|PRODERMIS|REFAQUIN|SAGALON|DERMOVEL|VITAQUIN|VITACID|BAYCUTEN|HYDROCORTISON|BETAMETASON|MOMETASON|DERMOVATE|VISANCORT|CLOBETASOL|DESOXIMETASONE|NEOCENTA|BENZOPALEN|DEPIGMEN|LITRAMED|PALENOX|REGROU|SORALEN)\b/', 'main' => 'SLPK', 'category' => 'KLT', 'sources' => ['https://www.alodokter.com/mofacort', 'https://www.alodokter.com/litramed', 'https://www.alodokter.com/soralen', 'https://www.klikdokter.com/obat/obat-kulit/regrou', 'https://www.alodokter.com/niacef-gel', 'https://www.alodokter.com/aloshop/products/borraginol-n-salep-15-gr/61b322840e51d9066d376956']],
+    ],
+    // Hanya padanan dengan ukuran yang sama, atau nama tanpa ukuran pada kedua sisi.
+    'aliases' => [
+        'BENOSON N CR 15GR' => 'BENOSON N 15 GR',
+        'BENOSON N CR 5GR' => 'BENOSON N 5 GR',
+        'MEDICORT CR 10GR' => 'MEDICORT 10 GR',
+        'MEDICORT CR 5GR' => 'MEDICORT 5 GR',
+        'MELANOX FORTE CR 15GR' => 'MELANOX FORTE 15 GR',
+        'BAYCUTEN N CREAM' => 'BAYCUTEN N',
+        'REFAQUIN CREAM' => 'REFAQUIN',
+        'DERMATIX ULTRA GEL 5GR' => 'DERMATIX ULTRA 5 GR',
+        'SCABIMITE 5% CR 10GR' => 'SCABIMITE 10 GR',
+        'SCABIMITE 5% CR 30GR' => 'SCABIMITE CR 30 GR',
+        'GARABIOTIC 0.1% CR 15GR' => 'GARABIOTIC 15 GR',
+        'GARABIOTIK KRIM 5GR' => 'GARABIOTIC 5 GR',
+    ],
+    'manufacturer_aliases' => [
+        'BERNOFARM, PT - ETICAL' => 'PT Bernofarm Pharmaceutical Company',
+        'TUNGGAL IDAMAN ABDI, PT' => 'PT Tunggal Idaman Abdi',
+        'SURYA DERMATO MEDICA - ETICAL' => 'PT Surya Dermato Medica Laboratories',
+        'SURYA DERMATO MEDICA - SKINCARE' => 'PT Surya Dermato Medica Laboratories',
+        'BAYER INDONESIA, PT - OTC' => 'PT Bayer Indonesia',
+        'KIMIA FARMA - KOSMETIK' => 'PT Kimia Farma Tbk',
+        'DARYA VARIA, PT - ETICAL' => 'PT Darya-Varia Laboratoria Tbk',
+        'TRANSFARMA MEDICA INDAH, PT - OTC' => 'PT Transfarma Medica Indah',
+        'GLAXO WELLCOME INDONESI, PT - ETH' => 'PT Glaxo Wellcome Indonesia',
+        'GALENIUM PHARMASIA LAB, PT - OTC' => 'PT Galenium Pharmasia Laboratories',
+        'GUARDIAN' => 'PT Guardian Pharmatama',
+        'NOVELL PHARMACEUTICAL LAB - GENERIK' => 'PT Novell Pharmaceutical Laboratories',
+        'IKAPHARMINDO - ETIKAL' => 'PT Ikapharmindo Putramas Tbk',
+        'SOHO -OTC' => 'PT Soho Industri Pharmasi',
+    ],
+    'distributor_aliases' => [
+        'PARIT PADANG GLOBAL, PT' => 'PT Parit Padang Global',
+        'MENSA BINA SUKSES, PT' => 'PT Mensa Binasukses',
+        'SAPTA SARITAMA, PT' => 'PT Sapta Sari Tama',
+        'ANUGERAH PHARMINDO LESTARI, PT' => 'PT Anugerah Pharmindo Lestari',
+        'KIMIA FARMA TRADING AND DISTRIBUTIO' => 'PT Kimia Farma Trading & Distribution',
+        'PERMATA TIMUR MEDIKA, PT' => 'PT Permata Timur Medika',
+        'MILLENNIUM PHARMACON' => 'PT Millennium Pharmacon International Tbk',
+        'ANTAR MITRA SEMBADA, PT' => 'PT Antar Mitra Sembada',
+        'DISTRIVERSA BUANA MAS, PT' => 'PT Distriversa Buana Mas',
+    ],
+];

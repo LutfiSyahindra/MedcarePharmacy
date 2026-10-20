@@ -5,12 +5,75 @@
         let purchaseAddingItems = false;
         let purchaseEntrySession = 0;
         let purchaseSubmittedSignature = '';
-        let purchasePasteEntries = [];
-        let purchasePasteSequence = 0;
         let purchaseGeneralErrors = [];
         let purchaseIssueCursor = -1;
+        const purchaseMobileLayout = window.matchMedia('(max-width: 767.98px), (max-width: 991.98px) and (pointer: coarse)');
+
+        function resetPurchaseToolsLayout() {
+            $('#purchaseEntryTools').prop('open', !purchaseMobileLayout.matches);
+            $('#purchaseAdditionalCosts').prop('open', !purchaseMobileLayout.matches);
+        }
+
+        resetPurchaseToolsLayout();
+        purchaseMobileLayout.addEventListener('change', resetPurchaseToolsLayout);
+
+        function closePurchaseAdjustments(activeRow = null) {
+            if (!purchaseMobileLayout.matches) return;
+            $('#detail-wrapper .detail-item').not(activeRow).find('.purchase-item-adjustments[open]').prop('open', false);
+        }
+
+        $('#detail-wrapper').on('focusin click select2:opening', '.detail-item', function() {
+            closePurchaseAdjustments(this);
+        });
+
+        const purchaseScrollBody = document.querySelector('#pembelianModal > .modal-dialog > .modal-content > .modal-body');
+        const purchaseSections = ['purchaseInformationSection', 'purchaseItemsSection', 'purchaseSummarySection'];
+        const purchaseReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let purchaseNavigationFrame = null;
+
+        function updatePurchaseNavigation() {
+            if (!purchaseMobileLayout.matches || !$('#pembelianModal').hasClass('show')) return;
+            const top = purchaseScrollBody.getBoundingClientRect().top + 48;
+            let current = purchaseSections[0];
+            purchaseSections.forEach(id => {
+                if (document.getElementById(id).getBoundingClientRect().top <= top) current = id;
+            });
+            if (purchaseScrollBody.scrollTop > 0 && purchaseScrollBody.scrollTop + purchaseScrollBody.clientHeight >= purchaseScrollBody.scrollHeight - 4) {
+                current = purchaseSections[2];
+            }
+            $('.purchase-section-link').each(function() {
+                const active = this.dataset.purchaseSection === current;
+                $(this).toggleClass('is-current', active).attr('aria-current', active ? 'step' : null);
+            });
+        }
+
+        function navigatePurchaseSection(id) {
+            if (purchaseSaveInProgress) return;
+            const section = document.getElementById(id);
+            if (!section || !purchaseSections.includes(id)) return;
+            section.focus({ preventScroll: true });
+            purchaseScrollBody.scrollTo({
+                top: section.getBoundingClientRect().top - purchaseScrollBody.getBoundingClientRect().top + purchaseScrollBody.scrollTop - 12,
+                behavior: purchaseReducedMotion.matches ? 'auto' : 'smooth'
+            });
+        }
+
+        $('.purchase-section-link').on('click', function() { navigatePurchaseSection(this.dataset.purchaseSection); });
+        $('#purchaseReviewTotal').on('click', function() { navigatePurchaseSection('purchaseSummarySection'); });
+        purchaseScrollBody.addEventListener('scroll', function() {
+            if (purchaseNavigationFrame !== null) return;
+            purchaseNavigationFrame = requestAnimationFrame(function() {
+                purchaseNavigationFrame = null;
+                updatePurchaseNavigation();
+            });
+        }, { passive: true });
+        $('#pembelianModal').on('shown.bs.modal', updatePurchaseNavigation);
+        purchaseMobileLayout.addEventListener('change', updatePurchaseNavigation);
 
         function resetPurchaseEntry() {
+            purchaseDefaultTax = 11;
+            $('#purchaseAllTax').val(11);
+            $('#purchaseAllTaxStatus').text('');
             purchaseEntrySession++;
             purchaseDirty = false;
             purchaseAllowClose = false;
@@ -19,17 +82,14 @@
             purchaseAddingItems = false;
             purchaseIssueCursor = -1;
             purchaseGeneralErrors = [];
-            purchasePasteEntries = [];
-            purchasePasteSequence++;
             $('#pembelianForm').prop('inert', false);
             $('.purchase-notes-details').prop('open', false);
+            resetPurchaseToolsLayout();
+            $('#purchaseFilterStatus').addClass('d-none');
             $('#purchaseDraftStatus').text('Belum disimpan');
-            $('#purchaseItemSearch, #purchasePasteInput').val('');
-            $('#purchaseIssuesOnly, #purchaseSelectVisible').prop('checked', false);
-            $('#purchasePastePanel, #purchaseBulkToolbar, #purchaseValidationSummary').addClass('d-none');
-            $('#purchasePastePreview').empty();
-            $('#applyPurchasePaste').prop('disabled', true);
-            $('#togglePurchasePaste').attr('aria-expanded', 'false');
+            $('#purchaseItemSearch').val('');
+            $('#purchaseIssuesOnly, #purchaseSelectVisible, #purchaseSelectVisibleMobile').prop('checked', false);
+            $('#purchaseBulkToolbar, #purchaseValidationSummary').addClass('d-none');
         }
 
         function markPurchaseDirty() {
@@ -74,6 +134,7 @@
                 if (this.name === 'no_po' && !selectedDistributorUsesManualPoNumber()) return;
                 const invalid = !this.validity.valid || (this.required && !String(this.value).trim());
                 $(this).toggleClass('is-invalid', purchaseReviewShown && invalid);
+                if (purchaseReviewShown && invalid) $(this).closest('details').prop('open', true);
                 if (invalid) issues.push(($('label[for="' + this.id + '"]').text().replace('*', '').trim() || this.name) + ' belum valid.');
             });
             return issues;
@@ -82,6 +143,7 @@
         function refreshPurchaseEntryState() {
             const query = String($('#purchaseItemSearch').val() || '').trim().toLocaleLowerCase('id-ID');
             const issuesOnly = $('#purchaseIssuesOnly').prop('checked');
+            $('#purchaseFilterStatus').toggleClass('d-none', !query && !issuesOnly);
             const counts = new Map();
             const rows = $('#detail-wrapper .detail-item');
             rows.each(function() {
@@ -125,7 +187,7 @@
             $('#purchaseBulkToolbar').toggleClass('d-none', selected === 0);
             $('#purchaseBulkCount').text(selected);
             $('#applyPurchaseBulk').text('Terapkan ke ' + selected + ' item');
-            $('#purchaseSelectVisible').prop('checked', visibleChecks.length > 0 && selectedVisible === visibleChecks.length)
+            $('#purchaseSelectVisible, #purchaseSelectVisibleMobile').prop('checked', visibleChecks.length > 0 && selectedVisible === visibleChecks.length)
                 .prop('indeterminate', selectedVisible > 0 && selectedVisible < visibleChecks.length)
                 .prop('disabled', visibleChecks.length === 0);
         }
@@ -138,6 +200,7 @@
             if (!rows.length) return;
             purchaseIssueCursor = (purchaseIssueCursor + 1) % rows.length;
             const row = rows.eq(purchaseIssueCursor).removeClass('d-none');
+            closePurchaseAdjustments(row[0]);
             row[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
             row.find('details').prop('open', true);
             const field = row.find('input:not([type="hidden"]):not([type="checkbox"]), select').filter(function() { return !this.disabled && !this.validity.valid; }).first();
@@ -158,7 +221,15 @@
                     purchaseIssueCursor = -1;
                     focusPurchaseIssue();
                 } else {
-                    $('#purchaseValidationSummary')[0].scrollIntoView({ block: 'center' });
+                    const field = $('#pembelianForm .is-invalid').first();
+                    if (field.length) {
+                        field.closest('details').prop('open', true);
+                        field[0].scrollIntoView({ block: 'center' });
+                        if (field.hasClass('select2-hidden-accessible')) field.select2('open');
+                        else field.trigger('focus');
+                    } else {
+                        $('#purchaseValidationSummary')[0].scrollIntoView({ block: 'center' });
+                    }
                 }
                 return false;
             }
@@ -227,6 +298,7 @@
                 if (session !== purchaseEntrySession) return;
                 hitungTotal(true);
                 $('#pembelianForm').prop('inert', false);
+                closePurchaseAdjustments(targets[0][0]);
                 targets[0][0].scrollIntoView({ block: 'center' });
                 targets[0].find('.qty').trigger('focus').trigger('select');
             } finally {
@@ -238,61 +310,6 @@
             }
         }
 
-        function setPurchasePasteOpen(open) {
-            $('#purchasePastePanel').toggleClass('d-none', !open);
-            $('#togglePurchasePaste').attr('aria-expanded', String(open));
-            if (open) { setMedicinePickerOpen(false); $('#purchasePasteInput').trigger('focus'); }
-        }
-
-        $('#togglePurchasePaste').on('click', () => setPurchasePasteOpen($('#purchasePastePanel').hasClass('d-none')));
-        $('#closePurchasePaste').on('click', () => setPurchasePasteOpen(false));
-        $('#purchasePasteInput').on('input', function() {
-            purchasePasteSequence++;
-            purchasePasteEntries = [];
-            $('#applyPurchasePaste').prop('disabled', true);
-            $('#purchasePastePreview').empty();
-        });
-        $('#previewPurchasePaste').on('click', async function() {
-            const sequence = ++purchasePasteSequence;
-            const session = purchaseEntrySession;
-            purchasePasteEntries = [];
-            $('#applyPurchasePaste').prop('disabled', true);
-            $('#purchasePastePreview').text('Memeriksa kode dan satuan obat...');
-            try {
-                const catalog = await getMedicineCatalog();
-                const rows = PurchaseOrderEntry.parsePaste($('#purchasePasteInput').val(), catalog, Array.from(currentDetailMedicineIds()));
-                await preloadMedicineUnits(rows.filter(row => !row.errors.length).map(row => row.medicine.id));
-                if (sequence !== purchasePasteSequence || session !== purchaseEntrySession) return;
-                if (!rows.length) { $('#purchasePastePreview').text('Tempel sedikitnya satu baris data.'); return; }
-                const valid = rows.every(row => !row.errors.length);
-                const previewRows = rows.map(row => {
-                    const unit = (medicineUnitCache.get(String(row.medicine?.id)) || [])[0];
-                    row.unitId = unit?.id;
-                    return '<tr><td>' + row.lineNumber + '</td><td>' + escapeHtml(row.code) + '</td><td>' + escapeHtml(row.medicine?.nama_obat || '—') + '</td><td>' + (Number.isFinite(row.qty) ? formatStockQuantity(row.qty) : '—') + '</td><td>' + escapeHtml(unit?.satuan?.nama || 'Konversi belum tersedia') + '</td><td>' + (Number.isFinite(row.price) ? formatRupiah(row.price) : '—') + '</td><td>' + escapeHtml(row.errors.join(' ') || (unit ? 'Siap dimasukkan' : 'Hanya draft sampai konversi lengkap')) + '</td></tr>';
-                }).join('');
-                $('#purchasePastePreview').html('<p>' + rows.length + ' baris · ' + rows.filter(row => row.errors.length).length + ' bermasalah</p><div class="purchase-paste-preview-wrap"><table class="table table-sm"><thead><tr><th>Baris</th><th>Kode</th><th>Obat</th><th>Qty</th><th>Satuan beli</th><th>Harga dasar</th><th>Hasil pemeriksaan</th></tr></thead><tbody>' + previewRows + '</tbody></table></div>');
-                if (valid) purchasePasteEntries = rows;
-                $('#applyPurchasePaste').prop('disabled', !valid).text('Masukkan ' + rows.length + ' item ke Rincian');
-            } catch {
-                if (sequence === purchasePasteSequence && session === purchaseEntrySession) $('#purchasePastePreview').text('Data obat atau satuan gagal dimuat. Klik Periksa Data untuk mencoba lagi.');
-            }
-        });
-        $('#applyPurchasePaste').on('click', async function() {
-            if (purchaseAddingItems || purchaseSaveInProgress) return;
-            const entries = purchasePasteEntries;
-            const existing = currentDetailMedicineIds();
-            if (!entries.length || entries.some(entry => existing.has(String(entry.medicine.id)))) {
-                $('#purchasePastePreview').text('Rincian PO berubah. Klik Periksa Data lagi agar tidak ada obat berulang.');
-                $(this).prop('disabled', true);
-                return;
-            }
-            $(this).prop('disabled', true);
-            await appendPurchaseEntries(entries);
-            setPurchasePasteOpen(false);
-            $('#purchasePasteInput').val('');
-            purchasePasteEntries = [];
-        });
-
         $('#medicinePickerPrevious, #medicinePickerNext').on('click', function() {
             medicinePickerPage += this.id === 'medicinePickerNext' ? 1 : -1;
             medicinePickerPage = Math.max(0, medicinePickerPage);
@@ -303,7 +320,7 @@
         $('#purchaseIssuesOnly').on('change', function() { purchaseReviewShown = true; refreshPurchaseEntryState(); });
         $('#purchaseNextIssue').on('click', focusPurchaseIssue);
         $('#detail-wrapper').on('change', '.purchase-row-check', updatePurchaseSelection);
-        $('#purchaseSelectVisible').on('change', function() {
+        $('#purchaseSelectVisible, #purchaseSelectVisibleMobile').on('change', function() {
             $('#detail-wrapper .detail-item').not('.d-none').find('.purchase-row-check').prop('checked', this.checked);
             updatePurchaseSelection();
         });
@@ -324,13 +341,28 @@
             markPurchaseDirty();
             hitungTotal();
         });
-        $('#detail-wrapper').on('keydown', '.qty, .harga_estimasi_satuan, .purchase-discount, .purchase-tax', function(event) {
+        $('#applyPurchaseAllTax').on('click', function() {
+            const field = document.getElementById('purchaseAllTax');
+            if (field.value === '' || !field.validity.valid) { field.reportValidity(); return; }
+            purchaseDefaultTax = normalizedDiscount(field.value);
+            const rows = $('#detail-wrapper .detail-item');
+            rows.each(function() {
+                const row = $(this);
+                row.find('.purchase-tax').val(purchaseDefaultTax);
+                row.removeData('server-errors');
+                recalculatePurchaseRow(row);
+            });
+            markPurchaseDirty();
+            hitungTotal(true);
+            $('#purchaseAllTaxStatus').text('PPN ' + formatStockQuantity(purchaseDefaultTax) + '% diterapkan ke ' + rows.length + ' baris obat.');
+        });
+        $('#detail-wrapper').on('keydown', '.qty, .purchase-price-input, .purchase-discount, .purchase-tax', function(event) {
             if (event.key !== 'Enter' || event.isComposing) return;
             event.preventDefault();
             const rows = $('#detail-wrapper .detail-item').not('.d-none');
             const index = rows.index($(this).closest('.detail-item')) + (event.shiftKey ? -1 : 1);
             if (index < 0 || index >= rows.length) return;
-            const target = rows.eq(index).find('[name="' + this.name + '"]');
+            const target = $(this).hasClass('purchase-price-input') ? rows.eq(index).find('.purchase-price-input') : rows.eq(index).find('[name="' + this.name + '"]');
             target.closest('details').prop('open', true);
             target.trigger('focus').trigger('select');
         });
@@ -343,7 +375,7 @@
         });
         $('#pembelianModal').on('hide.bs.modal', function(event) {
             if (purchaseAllowClose) return;
-            if (purchaseSaveInProgress || purchaseAddingItems) { event.preventDefault(); return; }
+            if (purchaseSaveInProgress || purchaseAddingItems || purchaseConversionSaves.size > 0 || purchaseConversionContext) { event.preventDefault(); return; }
             if (!purchaseDirty) return;
             event.preventDefault();
             if (purchaseReviewPending) return;
@@ -356,7 +388,7 @@
                 if (result.isConfirmed) { purchaseAllowClose = true; $('#pembelianModal').modal('hide'); }
             });
         });
-        $('#pembelianModal').on('hidden.bs.modal', function() { purchaseEntrySession++; purchasePasteSequence++; });
+        $('#pembelianModal').on('hidden.bs.modal', function() { purchaseEntrySession++; });
         window.addEventListener('beforeunload', function(event) {
             if (purchaseDirty && $('#pembelianModal').hasClass('show')) { event.preventDefault(); event.returnValue = ''; }
         });

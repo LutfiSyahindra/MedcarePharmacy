@@ -83,7 +83,7 @@ class PurchaseOrderConversionRequiredTest extends TestCase
             'save_as_draft' => true,
         ])->assertOk()
             ->assertJsonPath('data.status', 'draft')
-            ->assertJsonPath('warning', 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di Master Data sebelum memproses PO.');
+            ->assertJsonPath('warning', 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi langsung di Form Purchase Order sebelum memproses PO.');
 
         $purchaseOrder = PembelianModel::findOrFail($response->json('data.id'));
         $originalDetailIds = $purchaseOrder->details()->pluck('id')->all();
@@ -106,7 +106,7 @@ class PurchaseOrderConversionRequiredTest extends TestCase
             'save_as_draft' => true,
         ])->assertOk()
             ->assertJsonPath('data.status', 'draft')
-            ->assertJsonPath('warning', 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi di Master Data sebelum memproses PO.');
+            ->assertJsonPath('warning', 'PO hanya dapat disimpan sebagai draft. Lengkapi satuan konversi langsung di Form Purchase Order sebelum memproses PO.');
         $this->assertSame('2.00', $purchaseOrder->details()->where('obat_id', $medicine->id)->firstOrFail()->qty);
         Notification::assertNothingSent();
 
