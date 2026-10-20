@@ -152,6 +152,9 @@ class PurchaseOrderMedicineSearchTest extends TestCase
         $this->addItem($current, $this->medicine, 2);
         $approved = $this->createOrder($this->branch, '2026-10-03', 'approved');
         $this->addItem($approved, $this->medicine, 3);
+        $old->update(['total_estimasi' => 1000]);
+        $current->update(['total_estimasi' => 2000]);
+        $approved->update(['total_estimasi' => 3000]);
 
         $this->search('Obat B', [
             'date_start' => '2026-10-01', 'date_end' => '2026-10-31',
@@ -162,10 +165,12 @@ class PurchaseOrderMedicineSearchTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('recordsFiltered', 1)
             ->assertJsonPath('data.0.id', $current->id)
-            ->assertJsonPath('summary.total', 2);
+            ->assertJsonPath('summary.total', 2)
+            ->assertJsonPath('summary.total_estimasi', 2000);
 
         $this->search('Obat B', ['start' => 1, 'length' => 1])->assertOk()
             ->assertJsonPath('recordsFiltered', 3)
+            ->assertJsonPath('summary.total_estimasi', 6000)
             ->assertJsonCount(1, 'data');
     }
 

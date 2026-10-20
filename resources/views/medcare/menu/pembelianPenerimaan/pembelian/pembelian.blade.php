@@ -48,12 +48,20 @@
                 </div>
             </div>
 
-            <aside class="purchase-estimate-panel" aria-label="Total nilai estimasi purchase order">
-                <span class="purchase-estimate-icon"><i class="mdi mdi-cash-multiple"></i></span>
+            <aside class="purchase-estimate-panel" aria-labelledby="purchaseEstimateLabel">
+                <div class="purchase-estimate-heading">
+                    <span id="purchaseEstimateLabel">Total Nilai Estimasi PO</span>
+                    <span class="purchase-estimate-icon"><i class="mdi mdi-cash-multiple" aria-hidden="true"></i></span>
+                </div>
                 <div class="purchase-estimate-copy">
-                    <span>Total Nilai Estimasi PO</span>
                     <strong id="purchaseTotalValue">Rp 0</strong>
-                    <small>Akumulasi nilai seluruh PO yang tersimpan.</small>
+                </div>
+                <div class="purchase-estimate-footer">
+                    <div class="purchase-estimate-period">
+                        <i class="mdi mdi-calendar-range-outline" aria-hidden="true"></i>
+                        <span id="purchaseEstimatePeriod">Memuat periode...</span>
+                    </div>
+                    <small>Akumulasi nilai PO sesuai status, periode, dan obat terpilih.</small>
                 </div>
             </aside>
         </section>
@@ -64,7 +72,7 @@
                 <div class="purchase-stat-copy">
                     <strong id="purchaseTotalCount">0</strong>
                     <span>Total Purchase Order</span>
-                    <small>Seluruh PO yang tersimpan.</small>
+                    <small>Sesuai periode dan obat terpilih.</small>
                     <div class="purchase-stat-metrics" aria-label="Ringkasan item dan kuantitas">
                         <span><b id="purchaseTotalItem">0</b> item</span>
                         <span><b id="purchaseTotalQty">0</b> qty</span>
@@ -103,61 +111,72 @@
                     <span class="purchase-table-title-icon"><i class="mdi mdi-clipboard-text-outline"></i></span>
                     <div>
                         <h5>Daftar Purchase Order</h5>
-                        <p>Cari, filter, lalu buka detail transaksi yang dibutuhkan.</p>
+                        <p>Pantau pesanan dan kelola pembelian obat Anda.</p>
                     </div>
                 </div>
 
                 <div class="purchase-table-tools">
-                    <div class="purchase-search">
-                        <i class="mdi mdi-magnify"></i>
-                        <input type="search" id="searchPembelian"
-                            placeholder="Cari nomor PO, distributor, branch, atau user..." autocomplete="off"
-                            aria-label="Cari purchase order">
-                        <button type="button" class="purchase-search-clear" id="clearPurchaseSearch"
-                            aria-label="Hapus pencarian" title="Hapus pencarian">
-                            <i class="mdi mdi-close"></i>
-                        </button>
-                    </div>
                     <button type="button" class="btn btn-outline-secondary purchase-icon-btn" id="refreshPurchaseTable"
                         title="Muat ulang data" aria-label="Muat ulang data">
                         <i class="mdi mdi-refresh"></i>
                     </button>
                     <button type="button"
                         class="btn btn-outline-secondary purchase-icon-btn purchase-mobile-filter-toggle"
-                        id="purchaseMobileFilterToggle" aria-controls="purchaseFilterBar" aria-expanded="false"
-                        title="Buka filter" aria-label="Buka filter">
+                        id="purchaseMobileFilterToggle" aria-controls="purchasePeriodControls" aria-expanded="false"
+                        title="Buka filter periode" aria-label="Buka filter periode">
                         <i class="mdi mdi-tune-variant"></i>
                     </button>
                     <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1"
                         data-bs-toggle="modal" data-bs-target="#pembelianModal">
-                        <i class="mdi mdi-plus-circle-outline"></i>
-                        <span>Tambah PO</span>
+                        <i class="mdi mdi-plus"></i>
+                        <span>Buat PO Baru</span>
                     </button>
                 </div>
             </div>
 
-            <form class="purchase-medicine-search" id="purchaseMedicineSearchForm">
-                <label for="searchPurchaseMedicine">
-                    <i class="mdi mdi-pill"></i>
-                    Cari obat di PO
-                </label>
-                <div class="purchase-medicine-search-controls">
-                    <div class="purchase-medicine-search-select">
-                        <select id="searchPurchaseMedicine" class="form-select"
-                            aria-describedby="purchaseMedicineSearchHint">
-                            <option value=""></option>
-                        </select>
+            <div class="purchase-search-workspace">
+                <div class="purchase-search-field">
+                    <label for="searchPembelian">Cari purchase order</label>
+                    <div class="purchase-search">
+                        <i class="mdi mdi-magnify" aria-hidden="true"></i>
+                        <input type="search" id="searchPembelian"
+                            placeholder="Nomor PO, distributor, cabang, atau pembuat..." autocomplete="off"
+                            aria-describedby="purchaseSearchHint">
+                        <button type="button" class="purchase-search-clear" id="clearPurchaseSearch"
+                            aria-label="Hapus pencarian" title="Hapus pencarian" tabindex="-1">
+                            <i class="mdi mdi-close" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <button type="submit" class="btn btn-outline-primary">Cari di Semua PO</button>
+                    <small id="purchaseSearchHint">Cari transaksi sesuai status dan periode yang dipilih.</small>
                 </div>
-                <small id="purchaseMedicineSearchHint">
-                    Ketik nama atau kode, lalu pilih obat. Pencarian dimulai dari semua tanggal dan status.
-                </small>
-                <small id="purchaseMedicineSearchResult" class="d-none" role="status" aria-live="polite"></small>
-            </form>
+
+                <form class="purchase-medicine-search" id="purchaseMedicineSearchForm">
+                    <label for="searchPurchaseMedicine">
+                        <i class="mdi mdi-pill" aria-hidden="true"></i>
+                        Telusuri berdasarkan obat
+                    </label>
+                    <div class="purchase-medicine-search-controls">
+                        <div class="purchase-medicine-search-select">
+                            <select id="searchPurchaseMedicine" class="form-select"
+                                aria-describedby="purchaseMedicineSearchHint">
+                                <option value=""></option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary" title="Cari obat di semua PO"
+                            aria-label="Cari obat di semua PO">
+                            <i class="mdi mdi-magnify" aria-hidden="true"></i>
+                            <span>Cari obat</span>
+                        </button>
+                    </div>
+                    <small id="purchaseMedicineSearchHint">
+                        Pilih obat untuk mencari di semua tanggal dan status.
+                    </small>
+                    <small id="purchaseMedicineSearchResult" class="d-none" role="status" aria-live="polite"></small>
+                </form>
+            </div>
 
             <div class="purchase-filter-bar" id="purchaseFilterBar">
-                <div class="purchase-filter-group" aria-label="Filter status purchase order">
+                <div class="purchase-filter-group" role="group" aria-label="Filter status purchase order">
                     <span class="purchase-filter-label">
                         <i class="mdi mdi-filter-variant"></i>
                         Status
@@ -194,7 +213,7 @@
                     </button>
                 </div>
 
-                <div class="purchase-filter-controls">
+                <div class="purchase-filter-controls" id="purchasePeriodControls">
                     <div class="purchase-date-filter">
                         <label for="purchaseDateRange">
                             <i class="mdi mdi-calendar-range-outline"></i>
@@ -221,7 +240,7 @@
                     </div>
 
                     <div class="purchase-page-size">
-                        <label for="purchasePageLength">Tampilkan data</label>
+                        <label for="purchasePageLength">Baris per halaman</label>
                         <select id="purchasePageLength" class="form-select form-select-sm"
                             aria-label="Jumlah baris per halaman">
                             <option value="10">10</option>
@@ -233,21 +252,32 @@
                 </div>
             </div>
 
+            <div class="purchase-results-bar">
+                <div class="purchase-results-context" role="status" aria-live="polite" aria-atomic="true">
+                    <span class="purchase-results-dot" aria-hidden="true"></span>
+                    <span id="purchaseListContext">Memuat daftar purchase order...</span>
+                </div>
+                <button type="button" class="purchase-reset-filters" id="resetPurchaseFilters">
+                    <i class="mdi mdi-filter-remove-outline" aria-hidden="true"></i>
+                    Reset filter
+                </button>
+            </div>
+
             <div class="table-responsive purchase-table-wrap">
                 <table id="tablePembelian" class="table purchase-table align-middle">
                     <thead>
                         <tr>
                             <th>No</th>
                             <th>Approval</th>
-                            <th>Nomor PO</th>
+                            <th>Purchase Order</th>
                             <th>Tanggal PO</th>
-                            <th>Branch</th>
+                            <th>Cabang</th>
                             <th>Distributor</th>
                             <th>Item / Qty</th>
                             <th>Total Estimasi</th>
                             <th>Status</th>
                             <th>Catatan</th>
-                            <th>User</th>
+                            <th>Dibuat oleh</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -257,7 +287,7 @@
 
             <div class="purchase-table-hint">
                 <i class="mdi mdi-information-outline"></i>
-                Gunakan filter status untuk mempersempit daftar, lalu klik ikon mata untuk melihat rincian obat.
+                Klik nomor PO atau ikon mata untuk melihat rincian pesanan. Status penerimaan dapat dibuka jika sudah tersedia.
             </div>
         </section>
     </div>

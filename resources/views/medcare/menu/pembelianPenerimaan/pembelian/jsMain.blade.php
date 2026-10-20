@@ -1116,7 +1116,8 @@
             $('#purchaseReceivingFilterCount').text(receiving.toLocaleString('id-ID'));
             $('#purchaseCompletedCount, #purchaseCompletedFilterCount').text(completed.toLocaleString('id-ID'));
             $('#purchaseRejectedFilterCount').text(rejected.toLocaleString('id-ID'));
-            $('#purchaseTotalValue').text(formatRupiah(summary.total_estimasi));
+            const totalValue = formatRupiah(summary.total_estimasi);
+            $('#purchaseTotalValue').text(totalValue).css('--purchase-value-length', totalValue.length);
             $('#purchaseTotalItem').text((Number(summary.total_item) || 0).toLocaleString('id-ID'));
             $('#purchaseTotalQty').text(formatStockQuantity(summary.total_qty));
         }
@@ -1144,7 +1145,7 @@
         let PembelianTable = $('#tablePembelian').DataTable({
             processing: true,
             serverSide: true,
-            responsive: window.matchMedia('(min-width: 768px)').matches,
+            responsive: false,
             autoWidth: false,
             pageLength: 10,
             order: [
@@ -1216,12 +1217,17 @@
                 {
                     data: 'no_po',
                     name: 'no_po',
-                    render: function(data) {
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
+                        const date = moment(row.tanggal_po);
                         return `
-                            <span class="purchase-po-number">
-                                <i class="mdi mdi-file-document-outline"></i>
+                            <button type="button" class="purchase-po-number purchase-open-detail" data-id="${escapeHtml(row.id)}"
+                                aria-label="Lihat detail PO ${escapeHtml(data)}">
                                 ${escapeHtml(data)}
-                            </span>
+                                <i class="mdi mdi-arrow-top-right" aria-hidden="true"></i>
+                            </button>
+                            <span class="purchase-cell-meta purchase-desktop-meta">${date.isValid() ? date.format('DD MMM YYYY') : '-'}</span>
+                            ${row.catatan ? `<span class="purchase-note purchase-desktop-meta" title="${escapeHtml(row.catatan)}"><i class="mdi mdi-note-text-outline" aria-hidden="true"></i> ${escapeHtml(row.catatan)}</span>` : ''}
                         `;
                     }
                 },
@@ -1255,13 +1261,15 @@
                 {
                     data: 'distributor_id',
                     name: 'distributor_id',
-                    render: function(data) {
+                    render: function(data, type, row) {
+                        if (type !== 'display') return data;
                         let distributor = escapeHtml(data);
                         return `
                             <span class="purchase-badge is-distributor" title="${distributor}">
                                 <i class="mdi mdi-truck-delivery-outline"></i>
                                 ${distributor}
                             </span>
+                            <span class="purchase-cell-meta purchase-desktop-meta"><i class="mdi mdi-hospital-building" aria-hidden="true"></i> ${escapeHtml(row.branch_id)}</span>
                         `;
                     }
                 },
@@ -1339,6 +1347,13 @@
                             <i class="mdi ${statusIcon}"></i>
                             ${escapeHtml(statusLabel)}
                         `;
+                        const approval = row.approved_by
+                            ? `Disetujui oleh ${escapeHtml(row.approved_by)}`
+                            : status === 'rejected' ? 'Pengajuan ditolak'
+                            : status === 'draft' ? 'Belum diajukan'
+                            : status === 'waiting_approval' ? 'Menunggu persetujuan' : '';
+                        const approvalContent = approval
+                            ? `<span class="purchase-cell-meta purchase-desktop-meta purchase-approval-caption">${approval}</span>` : '';
 
                         if (!row.has_receipt) {
                             return `
@@ -1346,6 +1361,7 @@
                                     title="Belum ada data penerimaan untuk PO ${escapeHtml(row.no_po)}">
                                     ${statusContent}
                                 </span>
+                                ${approvalContent}
                             `;
                         }
 
@@ -1358,6 +1374,7 @@
                                 aria-label="Lihat penerimaan PO ${escapeHtml(row.no_po)}: ${escapeHtml(statusLabel)}">
                                 ${statusContent}
                             </a>
+                            ${approvalContent}
                         `;
                     }
                 },
@@ -1387,16 +1404,26 @@
                     name: 'actions',
                     orderable: false,
                     searchable: false,
-                    render: function(data, type, row) {
-                        return `<div class="purchase-action-group">${data || ''}<button type="button" class="btn btn-sm btn-outline-primary purchase-copy-order" data-id="${escapeHtml(row.id)}" title="Salin sebagai PO baru" aria-label="Salin sebagai PO baru"><i class="mdi mdi-content-copy"></i></button></div>`;
+                    render: function(data) {
+                        return `<div class="purchase-action-group">${data || ''}</div>`;
                     }
                 }
             ],
             columnDefs: [{
-                targets: [0, 11],
+                targets: [11],
                 className: 'text-center'
+            }, {
+                targets: [0],
+                className: 'purchase-secondary-column text-center'
+            }, {
+                targets: [1, 3, 4, 9],
+                className: 'purchase-secondary-column'
+            }, {
+                targets: [7],
+                className: 'text-end'
             }],
             drawCallback: function() {
+                updatePurchaseListContext(this.api());
                 let table = $('#tablePembelian');
                 table.toggleClass('is-medicine-search', Boolean(purchaseMedicineSearch));
                 const mobileLabels = [
@@ -1404,13 +1431,13 @@
                     'Approval',
                     'Nomor PO',
                     'Tanggal PO',
-                    'Branch',
+                    'Cabang',
                     'Distributor',
                     'Item / Qty',
                     'Total Estimasi',
                     'Status',
                     'Catatan',
-                    'User',
+                    'Dibuat oleh',
                     'Aksi'
                 ];
 
@@ -1467,8 +1494,8 @@
             },
             language: {
                 processing: '<span class="d-inline-flex align-items-center gap-2"><i class="mdi mdi-loading mdi-spin"></i> Memuat purchase order...</span>',
-                emptyTable: 'Belum ada purchase order.',
-                zeroRecords: 'Purchase order yang dicari tidak ditemukan.',
+                emptyTable: '<div class="purchase-empty-state"><i class="mdi mdi-clipboard-text-outline" aria-hidden="true"></i><strong>Belum ada purchase order di periode ini</strong><span>Ubah periode atau buat PO baru untuk mulai mencatat pembelian.</span></div>',
+                zeroRecords: '<div class="purchase-empty-state"><i class="mdi mdi-magnify" aria-hidden="true"></i><strong>Purchase order tidak ditemukan</strong><span>Coba kata kunci lain atau reset filter untuk melihat semua pesanan.</span></div>',
                 info: 'Menampilkan _START_-_END_ dari _TOTAL_ data',
                 infoEmpty: 'Menampilkan 0 data',
                 paginate: {
@@ -1480,9 +1507,25 @@
 
         let purchaseSearchTimer;
 
+        function updatePurchaseListContext(table) {
+            const status = String(table.column(8).search() || '');
+            const labels = {
+                draft: 'Draft', waiting_approval: 'Menunggu persetujuan', approved: 'Disetujui',
+                dalam_penerimaan: 'Dalam penerimaan', selesai: 'Selesai', rejected: 'Ditolak'
+            };
+            const period = purchaseDateStart && purchaseDateEnd
+                ? `${moment(purchaseDateStart).format('DD MMM YYYY')} – ${moment(purchaseDateEnd).format('DD MMM YYYY')}`
+                : 'Semua tanggal';
+            const count = Number(table.page.info().recordsDisplay || 0).toLocaleString('id-ID');
+            $('#purchaseEstimatePeriod').text(period);
+            $('#purchaseListContext').text(`${count} PO · ${labels[status] || 'Semua status'} · ${period}`);
+            $('#resetPurchaseFilters').prop('disabled', !(status || purchaseDateStart || purchaseDateEnd || purchaseMedicineId || table.search()));
+        }
+
         $('#searchPembelian').on('input', function() {
             let searchValue = this.value;
             $(this).closest('.purchase-search').toggleClass('has-value', Boolean(searchValue));
+            $('#clearPurchaseSearch').attr('tabindex', searchValue ? '0' : '-1');
             clearTimeout(purchaseSearchTimer);
             purchaseSearchTimer = setTimeout(function() {
                 PembelianTable.search(searchValue).draw();
@@ -1491,6 +1534,23 @@
 
         $('#clearPurchaseSearch').on('click', function() {
             $('#searchPembelian').val('').trigger('input').focus();
+        });
+
+        $('#resetPurchaseFilters').on('click', function() {
+            clearTimeout(purchaseSearchTimer);
+            purchaseMedicineId = '';
+            purchaseMedicineSearch = '';
+            $('#searchPurchaseMedicine').val(null).trigger('change.select2');
+            $('#searchPembelian').val('').closest('.purchase-search').removeClass('has-value');
+            $('#clearPurchaseSearch').attr('tabindex', '-1');
+            $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
+            $('.purchase-filter-chip[data-status=""]').addClass('is-active').attr('aria-pressed', 'true');
+            clearPurchaseDateFilter();
+            PembelianTable.search('').column(8).search('').draw();
+        });
+
+        $('#tablePembelian').on('click', '.purchase-open-detail', function() {
+            window.lihatPembelian($(this).attr('data-id'));
         });
 
         $('.purchase-filter-chip').on('click', function() {
@@ -1600,6 +1660,7 @@
             purchaseMedicineSearch = medicine ? medicineOptionText(medicine) : '';
             clearTimeout(purchaseSearchTimer);
             $('#searchPembelian').val('').closest('.purchase-search').removeClass('has-value');
+            $('#clearPurchaseSearch').attr('tabindex', '-1');
             $('.purchase-filter-chip').removeClass('is-active').attr('aria-pressed', 'false');
             $('.purchase-filter-chip[data-status=""]').addClass('is-active').attr('aria-pressed', 'true');
             clearPurchaseDateFilter();
@@ -1667,8 +1728,8 @@
             button
                 .toggleClass('is-active', isOpen)
                 .attr('aria-expanded', isOpen ? 'true' : 'false')
-                .attr('title', isOpen ? 'Tutup filter' : 'Buka filter')
-                .attr('aria-label', isOpen ? 'Tutup filter' : 'Buka filter')
+                .attr('title', isOpen ? 'Tutup filter periode' : 'Buka filter periode')
+                .attr('aria-label', isOpen ? 'Tutup filter periode' : 'Buka filter periode')
                 .find('i')
                 .toggleClass('mdi-tune-variant', !isOpen)
                 .toggleClass('mdi-chevron-up', isOpen);
@@ -1996,16 +2057,12 @@
             });
         };
 
-        $('#tablePembelian').on('click', '.purchase-copy-order', function() {
-            window.editPembelian($(this).attr('data-id'), true);
-        });
+        window.editPembelian = function(id) {
 
-        window.editPembelian = function(id, asCopy = false) {
-
-            editMode = !asCopy;
+            editMode = true;
 
             $.ajax({
-                url: (asCopy ? "{{ route('pembelian.show', ':id') }}" : "{{ route('pembelian.edit', ':id') }}").replace(':id', id),
+                url: "{{ route('pembelian.edit', ':id') }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
 
@@ -2013,27 +2070,22 @@
                     let detail = response.details ?? [];
 
                     $('#pembelianModal').modal('show');
-                    $('#pembelianModalLabel').text(asCopy ? 'Salin Purchase Order' : 'Edit Purchase Order');
+                    $('#pembelianModalLabel').text('Edit Purchase Order');
                     $('#submitForm').html(
                         '<i class="mdi mdi-check-all" aria-hidden="true"></i><span class="purchase-desktop-text">Periksa &amp; Ajukan</span><span class="purchase-mobile-text">Ajukan PO</span>'
                     );
 
-                    $('#pembelian_id').val(asCopy ? '' : header.id);
-                    if (!asCopy) $('input[name="no_po"]').val(header.no_po);
+                    $('#pembelian_id').val(header.id);
+                    $('input[name="no_po"]').val(header.no_po);
                     $('#distributor_id').val(header.distributor_id).trigger('change');
 
                     $('input[name="tanggal"]').val(
-                        (asCopy ? moment() : moment(header.tanggal_po)).format('DD-MM-YYYY')
+                        moment(header.tanggal_po).format('DD-MM-YYYY')
                     );
 
                     $('textarea[name="catatan"]').val(header.catatan ?? '');
                     $('.purchase-notes-details').prop('open', Boolean(header.catatan));
-                    if (asCopy) {
-                        markPurchaseDirty();
-                        $('#purchaseDraftStatus').text('Salinan ' + header.no_po + ' · periksa harga dan jumlah');
-                    } else {
-                        $('#purchaseDraftStatus').text('PO tersimpan');
-                    }
+                    $('#purchaseDraftStatus').text('PO tersimpan');
                     $('input[name="biaya_asuransi"]').val(header.biaya_asuransi ?? 0);
                     $('input[name="biaya_pengiriman"]').val(header.biaya_pengiriman ?? 0);
 
@@ -2096,6 +2148,8 @@
         };
 
         // --- Detail
+        @include('medcare.menu.pembelianPenerimaan.pembelian.partials.detailScript')
+
         window.lihatPembelian = function(id) {
             $.ajax({
                 url: "{{ route("pembelian.show", ":id") }}".replace(':id', id),
@@ -2182,60 +2236,7 @@
                             .find('span').text(`Cetak Surat Pesanan (${detailPrintDocuments.length} jenis, ${totalOrderItems} item)`);
                     }
 
-                    // Header
-                    $('#detail_no_po').val(po.no_po);
-                    $('#detail_distributor').val(po.distributor_name ?? 'Tidak diketahui');
-                    $('#detail_tanggal_po').val(po.tanggal_po ? moment(po.tanggal_po).format('DD-MM-YYYY') : '-');
-                    $('#detail_catatan').val(po.catatan ?? '-');
-
-                    // Kosongkan tabel
-                    $('#detailObatTable tbody').empty();
-                    // Tampilkan jumlah item
-                    $('#detail_total_item').text(detail.length);
-
-
-                    // Detail obat
-                    let medicineSubtotal = 0;
-                    detail.forEach(item => {
-                        const unitName = item.satuan_konversi?.satuan?.nama ?? '-';
-
-                        const regularBadge = item.is_regular
-                            ? `<span class="badge purchase-sp-badge is-regular ms-2" title="Obat selain Narkotika, Psikotropika, dan Prekursor">Reguler</span>`
-                            : '';
-                        const narcoticBadge = item.is_narcotic
-                            ? `<span class="badge purchase-sp-badge is-narcotic ms-2" title="${escapeHtml(item.narcotic_classification ?? 'Narkotika')}">Narkotika</span>`
-                            : '';
-                        const psychotropicBadge = item.is_psychotropic
-                            ? `<span class="badge purchase-sp-badge is-psychotropic ms-2" title="${escapeHtml(item.psychotropic_classification ?? 'Psikotropika')}">Psikotropika</span>`
-                            : '';
-                        const precursorBadge = item.is_precursor
-                            ? `<span class="badge purchase-sp-badge is-precursor ms-2" title="${escapeHtml(item.precursor_classification ?? 'Prekursor')}">Prekursor</span>`
-                            : '';
-                        const ootBadge = item.is_oot
-                            ? `<span class="badge purchase-sp-badge is-oot ms-2" title="${escapeHtml(item.oot_classification ?? 'Klasifikasi OOT dari master obat')}">OOT</span>`
-                            : '';
-
-                        $('#detailObatTable tbody').append(`
-                    <tr>
-                        <td data-label="Nama Obat">${escapeHtml(item.nama_obat ?? '-')}${regularBadge}${narcoticBadge}${psychotropicBadge}${precursorBadge}${ootBadge}</td>
-                        <td data-label="Satuan">${escapeHtml(unitName)}</td>
-                        <td data-label="Qty">${Number(item.qty ?? 0).toLocaleString('id-ID')}</td>
-                        <td data-label="Harga Estimasi">Rp ${Number(item.harga_estimasi ?? 0).toLocaleString('id-ID')}</td>
-                        <td data-label="Diskon 1">${Number(item.diskon_1 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td data-label="Diskon 2">${Number(item.diskon_2 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td data-label="Diskon 3">${Number(item.diskon_3 ?? 0).toLocaleString('id-ID')}%</td>
-                        <td data-label="PPN">${Number(item.ppn ?? 0).toLocaleString('id-ID')}%</td>
-                        <td data-label="Subtotal + PPN">Rp ${Number(item.subtotal ?? 0).toLocaleString('id-ID')}</td>
-                    </tr>
-                `);
-                        medicineSubtotal += Number(item.subtotal ?? 0);
-                    });
-
-                    // Total Estimasi
-                    $('#detail_subtotal_obat').text(formatRupiah(medicineSubtotal));
-                    $('#detail_biaya_asuransi').text(formatRupiah(po.biaya_asuransi));
-                    $('#detail_biaya_pengiriman').text(formatRupiah(po.biaya_pengiriman));
-                    $('#detail_total_estimasi').text(formatRupiah(po.total_estimasi));
+                    renderPurchaseOrderDetail(po);
 
                     // Tampilkan modal
                     $('#pembelianModalDetail').modal('show');

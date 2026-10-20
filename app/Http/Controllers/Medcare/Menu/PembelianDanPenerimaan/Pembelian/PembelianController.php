@@ -92,6 +92,9 @@ class PembelianController extends Controller
         }
 
         $summary = collect($Pembelian);
+        $statusColumn = collect($request->input('columns', []))->firstWhere('data', 'status');
+        $statusFilter = data_get($statusColumn, 'search.value', '');
+        $estimateSummary = filled($statusFilter) ? $summary->where('status', $statusFilter) : $summary;
         $draftCount = $summary->where('status', 'draft')->count();
         $waitingApprovalCount = $summary->where('status', 'waiting_approval')->count();
         $summaryData = [
@@ -103,7 +106,7 @@ class PembelianController extends Controller
             'dalam_penerimaan' => $summary->where('status', 'dalam_penerimaan')->count(),
             'selesai' => $summary->where('status', 'selesai')->count(),
             'rejected' => $summary->where('status', 'rejected')->count(),
-            'total_estimasi' => $summary->sum(function ($row) {
+            'total_estimasi' => $estimateSummary->sum(function ($row) {
                 return (float) ($row['total_estimasi'] ?? 0);
             }),
             'total_item' => $summary->sum(function ($row) {
