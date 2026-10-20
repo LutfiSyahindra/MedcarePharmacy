@@ -58,6 +58,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/session/csrf-token', function (\Illuminate\Http\Request $request) {
+        return response()->json([
+            'token' => csrf_token(),
+            'user_id' => $request->user()->id,
+        ])->header('Cache-Control', 'no-store, private');
+    })->name('session.csrf-token');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -295,9 +302,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/pembelian/getDistributor', [PembelianController::class, 'getDistributor'])->name('pembelian.getDistributor');
         Route::get('/pembelian/generateNoPO', [PembelianController::class, 'generateNoPO'])->name('pembelian.generateNoPO');
         Route::get('/pembelian/getObat', [PembelianController::class, 'getObat'])->name('pembelian.getObat');
-        Route::post('/pembelian/store', [PembelianController::class, 'store'])->name('pembelian.store');
+        Route::post('/pembelian/store', [PembelianController::class, 'store'])
+            ->middleware(\App\Http\Middleware\EnsurePurchaseOrderSaveIsIdempotent::class)->name('pembelian.store');
         Route::get('/pembelian/{id}/edit', [PembelianController::class, 'edit'])->name('pembelian.edit');
-        Route::put('/pembelian/{id}/update', [PembelianController::class, 'update'])->name('pembelian.update');
+        Route::put('/pembelian/{id}/update', [PembelianController::class, 'update'])
+            ->middleware(\App\Http\Middleware\EnsurePurchaseOrderSaveIsIdempotent::class)->name('pembelian.update');
         Route::put('/pembelian/{id}/approve', [PembelianController::class, 'approve'])->name('pembelian.approve');
         Route::put('/pembelian/{id}/reject', [PembelianController::class, 'reject'])->name('pembelian.reject');
         Route::put('/pembelian/{id}/reopen-approval', [PembelianController::class, 'reopenApproval'])->name('pembelian.reopenApproval');

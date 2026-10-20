@@ -10,13 +10,129 @@ use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Models\SatuansModel;
 use App\Models\User;
+use App\Services\Notifikasi\TransactionNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PurchaseOrderDraftTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_session_refresh_requires_login_and_does_not_cache_the_token(): void
+    {
+        $this->getJson(route('session.csrf-token'))->assertUnauthorized();
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->withSession(['_token' => 'current-session-token'])
+            ->getJson(route('session.csrf-token'))->assertOk()
+            ->assertJsonPath('token', 'current-session-token')->assertJsonPath('user_id', $user->id);
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+    }
+
+    public function test_repeating_a_create_after_a_lost_response_returns_the_same_po(): void
+    {
+        Notification::fake();
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = [...$this->payload($distributor, $medicine, $conversion), 'save_as_draft' => true];
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id];
+        $first = $this->actingAs($user)->postJson(route('pembelian.store'), $payload, $headers)->assertOk();
+        $second = $this->postJson(route('pembelian.store'), $payload, $headers)->assertOk();
+        $this->assertSame($first->json(), $second->json());
+        $this->assertDatabaseCount('purchase_orders', 1);
+        $this->assertDatabaseCount('purchase_order_details', 1);
+        $this->assertDatabaseCount('purchase_order_save_requests', 1);
+
+        $this->postJson(route('pembelian.store'), [...$payload, 'qty' => [2]], $headers)->assertConflict();
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
+
+    public function test_repeating_an_update_does_not_replace_details_or_send_notifications_again(): void
+    {
+        Notification::fake();
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = $this->payload($distributor, $medicine, $conversion);
+        $id = $this->actingAs($user)->postJson(route('pembelian.store'), [...$payload, 'save_as_draft' => true])
+            ->assertOk()->json('data.id');
+        $this->partialMock(TransactionNotificationService::class, function ($mock) {
+            $mock->shouldReceive('notifyApprovalRequest')->once();
+        });
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id];
+        $this->putJson(route('pembelian.update', $id), $payload, $headers)->assertOk();
+        $detailId = PembelianDetailModel::firstOrFail()->id;
+        $this->putJson(route('pembelian.update', $id), $payload, $headers)->assertOk();
+        $this->assertSame($detailId, PembelianDetailModel::firstOrFail()->id);
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
+
+    public function test_failed_validation_can_be_corrected_and_retried(): void
+    {
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = [...$this->payload($distributor, $medicine, $conversion), 'save_as_draft' => true];
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id];
+        $this->actingAs($user)->postJson(route('pembelian.store'), [...$payload, 'qty' => [0]], $headers)->assertUnprocessable();
+        $this->assertDatabaseCount('purchase_order_save_requests', 0);
+        $this->postJson(route('pembelian.store'), $payload, $headers)->assertOk();
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
+
+    public function test_saving_from_a_page_opened_by_another_account_is_rejected(): void
+    {
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $this->actingAs($user)->postJson(route('pembelian.store'), $this->payload($distributor, $medicine, $conversion), [
+            'Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id + 1,
+        ])->assertForbidden();
+        $this->assertDatabaseCount('purchase_orders', 0);
+    }
+
+    public function test_notification_failure_does_not_turn_a_committed_po_into_a_failed_save(): void
+    {
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $this->partialMock(TransactionNotificationService::class, function ($mock) {
+            $mock->shouldReceive('isApprovalRole')->andReturn(false);
+            $mock->shouldReceive('notifyApprovalRequest')->once()->andThrow(new \RuntimeException('Notification unavailable'));
+        });
+        $this->actingAs($user)->postJson(route('pembelian.store'), $this->payload($distributor, $medicine, $conversion), [
+            'Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id,
+        ])->assertOk()->assertJsonPath('status', 'success');
+        $this->assertDatabaseCount('purchase_orders', 1);
+        $this->assertDatabaseCount('purchase_order_details', 1);
+        $this->assertDatabaseCount('purchase_order_save_requests', 1);
+    }
+
+    public function test_real_csrf_rejection_can_refresh_the_token_and_save_without_reloading(): void
+    {
+        $this->app->bind(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, function ($app) {
+            return new class($app, $app['encrypter']) extends \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken
+            {
+                protected function runningUnitTests()
+                {
+                    return false;
+                }
+            };
+        });
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = [...$this->payload($distributor, $medicine, $conversion), 'save_as_draft' => true];
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id, 'X-CSRF-TOKEN' => 'stale-token'];
+        $this->actingAs($user)->withSession(['_token' => 'fresh-token'])
+            ->postJson(route('pembelian.store'), $payload, $headers)->assertStatus(419);
+        $this->assertDatabaseCount('purchase_orders', 0);
+        $token = $this->getJson(route('session.csrf-token'))->assertOk()->json('token');
+        $this->postJson(route('pembelian.store'), $payload, [...$headers, 'X-CSRF-TOKEN' => $token])->assertOk();
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
+
+    public function test_a_previous_response_cannot_be_replayed_after_branch_access_is_revoked(): void
+    {
+        [$user, $distributor, $medicine, $conversion] = $this->purchaseContext();
+        $payload = [...$this->payload($distributor, $medicine, $conversion), 'save_as_draft' => true];
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'X-PO-User' => $user->id];
+        $this->actingAs($user)->postJson(route('pembelian.store'), $payload, $headers)->assertOk();
+        $user->branches()->detach();
+        $user->unsetRelation('branches');
+        $this->postJson(route('pembelian.store'), $payload, $headers)->assertConflict();
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
 
     public function test_large_json_draft_persists_every_item_with_aligned_quantities_and_prices(): void
     {

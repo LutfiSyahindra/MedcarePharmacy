@@ -14,6 +14,11 @@
 
 @section("content")
     <div class="purchase-page">
+        <div id="purchaseRecoveryNotice" class="alert alert-warning d-none" role="status">
+            <p class="mb-2">Ada isian PO yang belum selesai disimpan di tab ini. Pulihkan untuk melanjutkan.</p>
+            <button type="button" class="btn btn-sm btn-primary" id="restorePurchaseRecovery">Pulihkan isian PO</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="discardPurchaseRecovery">Hapus cadangan</button>
+        </div>
         @include("medcare.menu.pembelianPenerimaan.pembelian.modalMain")
         @include("medcare.menu.pembelianPenerimaan.pembelian.modalDetail")
 

@@ -1,5 +1,5 @@
 <script src="{{ asset('assets/vendors/moment/moment.min.js') }}"></script>
-<script src="{{ asset('assets/js/purchase-order-entry.js') }}"></script>
+<script src="{{ asset('assets/js/purchase-order-entry.js') }}?v={{ filemtime(public_path('assets/js/purchase-order-entry.js')) }}"></script>
 <script>
     $(document).ready(function() {
 
@@ -34,6 +34,7 @@
 
         @include('medcare.menu.pembelianPenerimaan.pembelian.partials.entryWorkflow')
         @include('medcare.menu.pembelianPenerimaan.pembelian.partials.unitConversion')
+        @include('medcare.menu.pembelianPenerimaan.pembelian.partials.entryRecovery')
 
 
         // --- Variabel select2
@@ -464,7 +465,16 @@
 
         // =================== Inisiasi Modal ===================
         // --- Reset modal ketika dibuka
-        $('#pembelianModal').on('show.bs.modal', function() {
+        $('#pembelianModal').on('show.bs.modal', function(event) {
+            if (purchaseRecovering && !purchaseRecoveryOpening) {
+                event.preventDefault();
+                return;
+            }
+            if (!purchaseRecovering && !editMode && purchaseRecoveryStore.read()) {
+                event.preventDefault();
+                restorePurchaseRecovery();
+                return;
+            }
             let form = $('#pembelianForm');
             purchaseSaveInProgress = false;
             resetPurchaseEntry();
@@ -761,7 +771,7 @@
 
         // --- Get data distributor
         DistributorSelect.prop('disabled', true).append('<option>Memuat data...</option>');
-        $.ajax({
+        const purchaseDistributorsRequest = $.ajax({
             url: "{{ route("pembelian.getDistributor") }}",
             type: 'GET',
             dataType: 'json',
@@ -1794,9 +1804,23 @@
                 showPurchaseValidationErrors(xhr.responseJSON?.errors || {}, xhr.responseJSON?.message || 'Periksa kembali data purchase order.');
                 return;
             }
+            const status = xhr?.status;
+            let message = 'Isian PO tetap tersedia. Silakan coba simpan kembali.';
+            if (status === 401 || status === 419) {
+                message = 'Sesi login telah berakhir atau berubah. Masuk kembali melalui tab baru, lalu coba simpan lagi di form ini.';
+            } else if (status === 0 || status >= 500 || xhr?.statusText === 'parsererror') {
+                message = 'Hasil penyimpanan belum dapat dipastikan. Periksa koneksi lalu klik simpan kembali untuk memeriksa percobaan yang sama tanpa membuat PO ganda.';
+            } else if (status === 403 || status === 409) {
+                message = xhr.responseJSON?.message || 'Akses atau status PO telah berubah. Periksa akun dan daftar PO, lalu lanjutkan dari isian ini.';
+            }
             Swal.fire({
                 icon: 'error', title: 'Purchase order gagal disimpan',
-                text: xhr?.responseJSON?.message || 'Terjadi kesalahan saat menyimpan purchase order.'
+                text: message + (purchaseBackupAvailable ? ' Cadangan isian tersedia di tab browser ini.' : ' Jangan tutup atau muat ulang tab ini karena cadangan browser tidak tersedia.'),
+                showCancelButton: status === 401 || status === 419,
+                confirmButtonText: status === 401 || status === 419 ? 'Buka login di tab baru' : 'Mengerti',
+                cancelButtonText: 'Tetap di form'
+            }).then(function(result) {
+                if (result.isConfirmed && (status === 401 || status === 419)) window.open(@json(route('login')), '_blank', 'noopener');
             });
         }
 
@@ -1805,8 +1829,8 @@
                 return;
             }
 
-            if (!validatePurchaseEntry(saveAsDraft)) return;
-            if (!saveAsDraft && !confirmed) {
+            if (!purchasePendingSave && !validatePurchaseEntry(saveAsDraft)) return;
+            if (!purchasePendingSave && !saveAsDraft && !confirmed) {
                 confirmPurchaseSubmission();
                 return;
             }
@@ -1814,12 +1838,14 @@
             $('#pembelianForm').prop('inert', true);
             $('#purchaseDraftStatus').text('Menyimpan...');
             updateUnitLoadingState();
+            persistPurchaseRecovery();
 
-            Promise.all([
+            (purchasePendingSave ? Promise.resolve() : Promise.all([
                     ensurePurchaseOrderNumber(),
                     waitForPendingUnitRequests()
-                ])
+                ]))
                 .then(function() {
+                    if (purchasePendingSave) return sendPendingPurchaseSave();
                     if (!saveAsDraft && $('#detail-wrapper .detail-item').toArray().some(function(element) {
                         const row = $(element);
 
@@ -1853,24 +1879,29 @@
                     });
 
                     const payload = PurchaseOrderEntry.formPayload(formData, saveAsDraft);
+                    delete payload._token;
                     purchaseSubmittedSignature = purchaseEntrySignature();
-                    return new Promise(function(resolve, reject) {
-                        $.ajax({
-                            url: url, method: method,
-                            contentType: 'application/json', data: JSON.stringify(payload), processData: false,
-                            success: resolve,
-                            error: reject
-                        });
-                    });
+                    purchasePendingSave = {
+                        key: PurchaseOrderEntry.newRequestKey(), url, method, payload, saveAsDraft,
+                        signature: purchaseSubmittedSignature
+                    };
+                    persistPurchaseRecovery();
+                    return sendPendingPurchaseSave();
                 })
                 .then(function(response) {
-                    if (response.status !== 'success') {
+                    if (response?.status !== 'success' || !response.data?.id) {
                         throw {
-                            status: 422,
+                            status: response?.errors ? 422 : 0,
                             responseJSON: response
                         };
                     }
 
+                    const savedAttempt = purchasePendingSave;
+                    purchaseSubmittedSignature = savedAttempt.signature;
+                    saveAsDraft = savedAttempt.saveAsDraft;
+                    // Compare before the server's final automatic number changes the form.
+                    const changedSinceAttempt = purchaseEntrySignature() !== savedAttempt.signature;
+                    purchasePendingSave = null;
                     $('#pembelian_id').val(response.data?.id || $('#pembelian_id').val());
                     if (response.data?.no_po) {
                         $('input[name="no_po"]').val(response.data.no_po);
@@ -1879,12 +1910,15 @@
                     updatePurchaseOrderNumberMode();
                     if (saveAsDraft) $('#pembelianModalLabel').text('Edit Purchase Order');
                     markPurchaseSaved();
-                    if (!saveAsDraft) {
+                    if (!saveAsDraft && !changedSinceAttempt) {
                         purchaseAllowClose = true;
                         $('#pembelianModal').modal('hide');
                     }
 
-                    if (response.warning) {
+                    if (changedSinceAttempt) {
+                        Swal.fire({ icon: 'info', title: 'Percobaan simpan sebelumnya berhasil',
+                            text: 'PO sebelumnya sudah tersimpan. Perubahan setelah percobaan tersebut masih ada di form dan belum disimpan. Periksa kembali sebelum melanjutkan.' });
+                    } else if (response.warning) {
                         Swal.fire({
                             icon: 'warning',
                             title: response.message,
@@ -1906,6 +1940,8 @@
                     PembelianTable.ajax.reload(null, false);
                 })
                 .catch(function(xhr) {
+                    if (xhr?.status === 422) purchasePendingSave = null;
+                    persistPurchaseRecovery();
                     $('#purchaseDraftStatus').text('Gagal disimpan · periksa data dan coba lagi');
                     showPurchaseSaveError(xhr);
                 })
@@ -2058,6 +2094,10 @@
         };
 
         window.editPembelian = function(id) {
+            if (purchaseRecoveryStore.read()) {
+                restorePurchaseRecovery();
+                return;
+            }
 
             editMode = true;
 
@@ -2303,6 +2343,7 @@
             });
         }
         // ==================== End Inisiasi Action ====================
+        showPurchaseRecoveryNotice();
 
     });
 </script>

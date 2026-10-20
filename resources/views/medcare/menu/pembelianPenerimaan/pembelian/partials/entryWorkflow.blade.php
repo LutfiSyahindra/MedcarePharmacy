@@ -71,6 +71,7 @@
         purchaseMobileLayout.addEventListener('change', updatePurchaseNavigation);
 
         function resetPurchaseEntry() {
+            purchasePendingSave = null;
             purchaseDefaultTax = 11;
             $('#purchaseAllTax').val(11);
             $('#purchaseAllTaxStatus').text('');
@@ -95,6 +96,7 @@
         function markPurchaseDirty() {
             purchaseDirty = true;
             $('#purchaseDraftStatus').text('Perubahan belum disimpan');
+            schedulePurchaseRecovery();
         }
 
         function purchaseEntrySignature() {
@@ -106,6 +108,8 @@
 
         function markPurchaseSaved() {
             purchaseDirty = purchaseEntrySignature() !== purchaseSubmittedSignature;
+            if (purchaseDirty) persistPurchaseRecovery();
+            else clearPurchaseRecovery();
             $('#purchaseDraftStatus').text(purchaseDirty ? 'Ada perubahan setelah penyimpanan' :
                 'Tersimpan ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
         }
@@ -376,7 +380,7 @@
         $('#pembelianModal').on('hide.bs.modal', function(event) {
             if (purchaseAllowClose) return;
             if (purchaseSaveInProgress || purchaseAddingItems || purchaseConversionSaves.size > 0 || purchaseConversionContext) { event.preventDefault(); return; }
-            if (!purchaseDirty) return;
+            if (!purchaseDirty && !purchasePendingSave) return;
             event.preventDefault();
             if (purchaseReviewPending) return;
             purchaseReviewPending = true;
@@ -385,10 +389,11 @@
                 showCancelButton: true, confirmButtonText: 'Tutup tanpa menyimpan', cancelButtonText: 'Tetap mengisi'
             }).then(result => {
                 purchaseReviewPending = false;
-                if (result.isConfirmed) { purchaseAllowClose = true; $('#pembelianModal').modal('hide'); }
+                if (result.isConfirmed) { clearPurchaseRecovery(); purchaseAllowClose = true; $('#pembelianModal').modal('hide'); }
             });
         });
         $('#pembelianModal').on('hidden.bs.modal', function() { purchaseEntrySession++; });
         window.addEventListener('beforeunload', function(event) {
-            if (purchaseDirty && $('#pembelianModal').hasClass('show')) { event.preventDefault(); event.returnValue = ''; }
+            if (purchaseDirty || purchasePendingSave) persistPurchaseRecovery();
+            if ((purchaseDirty || purchasePendingSave) && $('#pembelianModal').hasClass('show')) { event.preventDefault(); event.returnValue = ''; }
         });

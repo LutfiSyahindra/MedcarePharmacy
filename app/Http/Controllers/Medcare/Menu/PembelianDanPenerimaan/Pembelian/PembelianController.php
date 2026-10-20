@@ -427,7 +427,7 @@ class PembelianController extends Controller
             // 🔔 KIRIM NOTIFIKASI
             // ======================
             if (! $saveAsDraft) {
-                DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user));
+                $this->notifyApprovalAfterCommit($po, $user);
             }
 
             return response()->json([
@@ -806,7 +806,7 @@ class PembelianController extends Controller
             }
 
             if (! $saveAsDraft) {
-                DB::afterCommit(fn () => $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user));
+                $this->notifyApprovalAfterCommit($po, $user);
             }
 
             return response()->json([
@@ -823,6 +823,18 @@ class PembelianController extends Controller
             ]);
 
         }, 5);
+    }
+
+    private function notifyApprovalAfterCommit($po, $user): void
+    {
+        DB::afterCommit(function () use ($po, $user) {
+            try {
+                $this->transactionNotifications->notifyApprovalRequest('pembelian', $po, $user);
+            } catch (\Throwable $exception) {
+                // The PO is already committed; a notification outage must not report a failed save.
+                report($exception);
+            }
+        });
     }
 
     /**

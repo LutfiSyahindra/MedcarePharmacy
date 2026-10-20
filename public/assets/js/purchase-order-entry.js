@@ -115,5 +115,48 @@
         return payload;
     }
 
-    root.PurchaseOrderEntry = Object.freeze({ formatMoney, moneyInput, calculateAmounts, summarizeAmounts, splitBatches, parsePaste, rowIssues, formPayload });
+    async function requestWithCsrfRecovery(send, refresh, onToken) {
+        try {
+            return await send();
+        } catch (error) {
+            if (error?.status !== 419) throw error;
+            const session = await refresh();
+            onToken(session);
+            // A 419 is rejected before saving. Retry once; network/5xx errors need an explicit retry.
+            return await send();
+        }
+    }
+
+    function recoveryStore(storage, key) {
+        return {
+            read() {
+                try {
+                    const entry = JSON.parse(storage().getItem(key));
+                    return entry?.version === 1 && entry.form && Array.isArray(entry.rows) ? entry : null;
+                } catch (_) { return null; }
+            },
+            write(entry) {
+                try {
+                    storage().setItem(key, JSON.stringify({ ...entry, version: 1 }));
+                    return true;
+                } catch (_) { return false; }
+            },
+            clear() {
+                try { storage().removeItem(key); } catch (_) { /* Storage may be disabled. */ }
+            }
+        };
+    }
+
+    function newRequestKey() {
+        // getRandomValues also works on the HTTP intranet origins used by some installations.
+        const bytes = new Uint8Array(16);
+        if (root.crypto?.getRandomValues) root.crypto.getRandomValues(bytes);
+        else bytes.forEach((_, index) => { bytes[index] = Math.floor(Math.random() * 256); });
+        bytes[6] = (bytes[6] & 15) | 64;
+        bytes[8] = (bytes[8] & 63) | 128;
+        const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+        return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
+    }
+
+    root.PurchaseOrderEntry = Object.freeze({ formatMoney, moneyInput, calculateAmounts, summarizeAmounts, splitBatches, parsePaste, rowIssues, formPayload, requestWithCsrfRecovery, recoveryStore, newRequestKey });
 })(globalThis);
