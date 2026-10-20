@@ -411,7 +411,7 @@
             if (status === 'cancelled') {
                 return {
                     className: 'is-rejected',
-                    label: 'Cancelled',
+                    label: 'Dibatalkan',
                     icon: 'mdi-cancel'
                 };
             }
@@ -1638,8 +1638,10 @@
             $('#receiveCancelledFilterCount').text(cancelled.toLocaleString('id-ID'));
             $('#receiveTotalValue').text(formatRupiah(summary.grand_total));
             $('#receiveTotalQty').text(Number(summary.total_qty || 0).toLocaleString('id-ID'));
-            $('#receiveDraftInsight').text(draft.toLocaleString('id-ID'));
             $('#receiveCancelledInsight').text(cancelled.toLocaleString('id-ID'));
+            $('#receivePeriodLabel').text(receiveDateStart && receiveDateEnd
+                ? `${formatDateDisplay(receiveDateStart)} – ${formatDateDisplay(receiveDateEnd)}`
+                : 'Semua tanggal');
         }
 
         function renderReceiveItems(row, type) {
@@ -2229,6 +2231,91 @@
             });
         };
 
+        $('#detailReceiveMedicineSearch').select2({
+            dropdownParent: $('#detailReceiveMedicineDropdown'),
+            width: '100%',
+            placeholder: 'Semua obat · cari nama atau kode obat...',
+            allowClear: true,
+            minimumResultsForSearch: 0,
+            language: {
+                noResults: () => 'Obat tidak ditemukan dalam penerimaan ini.',
+                searching: () => 'Mencari obat...'
+            }
+        }).on('change', filterReceiptDetailItems).on('select2:open', function() {
+            $('#detailReceiveMedicineDropdown .select2-search__field')
+                .attr('placeholder', 'Ketik nama atau kode obat')
+                .attr('aria-label', 'Cari nama atau kode obat dalam penerimaan')
+                .trigger('focus');
+        });
+        $('#detailReceiveMedicineDropdown .select2-selection')
+            .attr('aria-label', 'Cari obat dalam penerimaan')
+            .attr('aria-describedby', 'detailReceiveFilterCount');
+        document.getElementById('detailReceiveMedicineDropdown').addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && $('#detailReceiveMedicineSearch').data('select2')?.isOpen()) {
+                event.stopPropagation();
+                $('#detailReceiveMedicineSearch').select2('close');
+                $('#detailReceiveMedicineDropdown .select2-selection').trigger('focus');
+            }
+        }, true);
+
+        $('#detailReceiveResetSearch').on('click', function() {
+            $('#detailReceiveMedicineSearch').val('').trigger('change');
+            $('#detailReceiveMedicineDropdown .select2-selection').trigger('focus');
+        });
+        $('#penerimaanModalDetail').on('hide.bs.modal', function() {
+            $('#detailReceiveMedicineSearch').select2('close');
+        });
+
+        function filterReceiptDetailItems() {
+            const selectedId = String($('#detailReceiveMedicineSearch').val() || '');
+            const rows = $('#detailReceiveTable tbody tr');
+            let visible = 0;
+            rows.each(function() {
+                const row = $(this);
+                const matches = !selectedId || row.attr('data-medicine-id') === selectedId;
+                row.toggleClass('d-none', !matches);
+                if (matches) visible++;
+            });
+            $('#detailReceiveResetSearch').prop('disabled', !selectedId);
+            $('#detailReceiveFilterCount').text(`Menampilkan ${formatDecimal(visible)} dari ${formatDecimal(rows.length)} item${selectedId ? ' · sesuai obat terpilih' : ''}`);
+        }
+
+        function renderReceiptDetailItems(details) {
+            const medicines = new Map();
+            const rows = details.map(function(item, index) {
+                const medicineId = String(item.obat_id ?? item.obat?.id ?? `row-${index}`);
+                const name = item.obat?.nama_obat || '-';
+                const code = item.obat?.kode_obat || '-';
+                const medicine = medicines.get(medicineId) || { name, code, batches: 0 };
+                medicine.batches++;
+                medicines.set(medicineId, medicine);
+                const conversion = Number(item.konversi_satuan || item.purchase_order_detail?.satuan_konversi?.konversi || 1) || 1;
+                const purchaseUnit = item.satuan_beli || item.purchase_order_detail?.satuan_konversi?.satuan?.nama || '-';
+                const stockUnit = item.satuan_stok || item.obat?.satuan?.nama || 'satuan stok';
+                const qtyStock = Number(item.qty_diterima_stok ?? (Number(item.qty_diterima || 0) * conversion)) || 0;
+                const discounts = [item.diskon_1 ?? item.diskon ?? 0, item.diskon_2 ?? 0, item.diskon_3 ?? 0];
+                return `
+                    <tr data-medicine-id="${escapeHtml(medicineId)}">
+                        <td data-mobile-label="Obat"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(code)}</small></td>
+                        <td data-mobile-label="Qty Diterima"><strong>${formatDecimal(item.qty_diterima)} ${escapeHtml(purchaseUnit)}</strong><small>${formatDecimal(qtyStock)} ${escapeHtml(stockUnit)}</small></td>
+                        <td data-mobile-label="Batch / Kedaluwarsa"><strong>${escapeHtml(item.no_batch || '-')}</strong><small>ED ${escapeHtml(formatDateDisplay(item.expired_date))}</small></td>
+                        <td data-mobile-label="Harga Beli"><strong>${formatRupiah(item.harga_beli)}</strong><small>HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)}<br>Biaya lain tidak masuk HPP</small></td>
+                        <td data-mobile-label="Diskon 1 / 2 / 3"><div class="receipt-detail-discounts">${discounts.map((discount, i) => `<span title="Diskon ${i + 1}">${formatDecimal(discount)}%</span>`).join('')}</div><small>${formatRupiah(item.nilai_diskon)}</small></td>
+                        <td data-mobile-label="PPN"><strong>${formatDecimal(item.ppn)}%</strong><small>${formatRupiah(item.nilai_ppn)}</small></td>
+                        <td data-mobile-label="Total"><strong class="receipt-detail-line-total">${formatRupiah(item.total)}</strong></td>
+                    </tr>`;
+            });
+            $('#detailReceiveTable tbody').html(rows.join(''));
+            const options = [...medicines.entries()]
+                .sort((a, b) => a[1].name.localeCompare(b[1].name, 'id-ID'))
+                .map(([id, medicine]) => `<option value="${escapeHtml(id)}">${escapeHtml(medicine.name)} (${escapeHtml(medicine.code)}) · ${medicine.batches} item</option>`);
+            $('#detailReceiveMedicineSearch').html('<option value=""></option>' + options.join(''))
+                .val('').prop('disabled', !details.length).trigger('change');
+            $('#detailReceiveItemCount').text(formatDecimal(details.length));
+            $('#detailReceiveEmpty').prop('hidden', details.length > 0);
+            $('#detailReceiveTable').prop('hidden', !details.length);
+        }
+
         window.lihatPenerimaan = function(id) {
             $.get('{{ route("penerimaan.show", ":id") }}'.replace(':id', id), function(response) {
                 let header = response.header;
@@ -2238,71 +2325,42 @@
                     .removeClass('is-draft is-approved is-rejected')
                     .addClass(meta.className)
                     .html(`<i class="mdi ${meta.icon}"></i> ${meta.label}`);
-                $('#detailNomorPenerimaan').val(header.nomor_penerimaan);
-                $('#detailNoPo').val(header.purchase_order?.no_po || '-');
-                $('#detailSupplier').val(header.distributor?.nama || '-');
-                $('#detailTanggalTerima').val(formatDateDisplay(header.tanggal_penerimaan));
-                $('#detailNomorFaktur').val(header.nomor_faktur || '-');
-                $('#detailTanggalFaktur').val(formatDateDisplay(header.tanggal_faktur));
-                $('#detailTanggalJatuhTempo').val(formatDateDisplay(header.tanggal_jatuh_tempo));
-                $('#detailStatusPembayaran').val(paymentStatusLabel(header.status_pembayaran));
-                $('#detailInvoiceSubtotal').val(formatRupiah(header.subtotal));
-                $('#detailInvoiceDiskon').val(formatRupiah(header.diskon ?? header.total_diskon));
-                $('#detailInvoicePajak').val(formatRupiah(header.pajak ?? header.total_ppn));
-                $('#detailInvoiceBiayaLain').val(formatRupiah(header.biaya_lain));
-                $('#detailSupplierCompensationDiscount').val(formatRupiah(header.supplier_compensation_discount));
-                $('#detailTotalFaktur').val(formatRupiah(header.total_faktur ?? header.grand_total));
-                $('#detailPayableTotal').val(formatRupiah(Math.max(
+                $('#detailNomorPenerimaan').text(header.nomor_penerimaan);
+                $('#detailNoPo').text(header.purchase_order?.no_po || '-');
+                $('#detailSupplier').text(header.distributor?.nama || '-');
+                $('#detailTanggalTerima').text(formatDateDisplay(header.tanggal_penerimaan));
+                $('#detailNomorFaktur').text(header.nomor_faktur || '-');
+                $('#detailTanggalFaktur').text(formatDateDisplay(header.tanggal_faktur));
+                $('#detailTanggalJatuhTempo').text(formatDateDisplay(header.tanggal_jatuh_tempo));
+                $('#detailStatusPembayaran').text(paymentStatusLabel(header.status_pembayaran))
+                    .toggleClass('is-paid', header.status_pembayaran === 'lunas')
+                    .toggleClass('is-partial', header.status_pembayaran === 'sebagian');
+                $('#detailInvoiceSubtotal').text(formatRupiah(header.subtotal));
+                $('#detailInvoiceDiskon, #detailTotalDiscount').text(formatRupiah(header.diskon ?? header.total_diskon));
+                $('#detailInvoicePajak, #detailTotalPpn').text(formatRupiah(header.pajak ?? header.total_ppn));
+                $('#detailInvoiceBiayaLain').text(formatRupiah(header.biaya_lain));
+                $('#detailSupplierCompensationDiscount').text(formatRupiah(header.supplier_compensation_discount));
+                $('#detailTotalFaktur').text(formatRupiah(header.total_faktur ?? header.grand_total));
+                $('#detailPayableTotal').text(formatRupiah(Math.max(
                     0,
                     Number(header.total_faktur ?? header.grand_total ?? 0) - Number(header.supplier_compensation_discount || 0)
                 )));
-                $('#detailJumlahDibayar').val(formatRupiah(header.jumlah_dibayar));
-                $('#detailSisaHutang').val(formatRupiah(header.sisa_hutang));
-                $('#detailNomorSuratJalan').val(header.nomor_surat_jalan || '-');
-                $('#detailDiskonUntuk').val(
+                $('#detailJumlahDibayar').text(formatRupiah(header.jumlah_dibayar));
+                $('#detailSisaHutang').text(formatRupiah(header.sisa_hutang));
+                $('#detailNomorSuratJalan').text(header.nomor_surat_jalan || '-');
+                $('#detailDiskonUntuk').text(
                     header.diskon_untuk === 'pasien'
                         ? 'Diberikan ke Pasien'
                         : (header.diskon_untuk === 'apotek' ? 'Diambil Apotek' : '-')
                 );
-                $('#detailCatatan').val(header.catatan || '-');
-                $('#detailReceiveItemCount').text(Number(header.total_barang || 0).toLocaleString('id-ID'));
+                $('#detailCatatan').text(header.catatan || '-');
                 $('#detailGrandTotal').text(formatRupiah(header.total_faktur ?? header.grand_total));
                 $('#detailPrintPenerimaan').attr(
                     'href',
                     '{{ route("penerimaan.print", ":id") }}'.replace(':id', header.id)
                 );
 
-                $('#detailReceiveTable tbody').empty();
-                (header.details || []).forEach(function(item) {
-                    let conversion = Number(item.konversi_satuan || item.purchase_order_detail?.satuan_konversi?.konversi || 1) || 1;
-                    let purchaseUnit = item.satuan_beli || item.purchase_order_detail?.satuan_konversi?.satuan?.nama || '-';
-                    let stockUnit = item.satuan_stok || item.obat?.satuan?.nama || 'satuan stok';
-                    let qtyStock = Number(item.qty_diterima_stok || (Number(item.qty_diterima || 0) * conversion)) || 0;
-
-                    $('#detailReceiveTable tbody').append(`
-                        <tr>
-                            <td data-mobile-label="Barang">
-                                <strong>${escapeHtml(item.obat?.nama_obat || '-')}</strong>
-                                <small class="d-block text-muted">${escapeHtml(item.obat?.kode_obat || '-')}</small>
-                            </td>
-                            <td data-mobile-label="Qty">
-                                <strong>${Number(item.qty_diterima || 0).toLocaleString('id-ID')} ${escapeHtml(purchaseUnit)}</strong>
-                                <small class="d-block text-muted">${qtyStock.toLocaleString('id-ID')} ${escapeHtml(stockUnit)}</small>
-                            </td>
-                            <td data-mobile-label="Batch">${escapeHtml(item.no_batch || '-')}</td>
-                            <td data-mobile-label="Expired">${formatDateDisplay(item.expired_date)}</td>
-                            <td data-mobile-label="Harga Beli">
-                                ${formatRupiah(item.harga_beli)}
-                                <small class="d-block text-muted">HPP stok ${formatRupiah(item.harga_beli_stok)}/${escapeHtml(stockUnit)} (biaya lain tidak masuk HPP)</small>
-                            </td>
-                            <td data-mobile-label="Diskon 1">${formatDecimal(item.diskon_1, 0, 2)}%</td>
-                            <td data-mobile-label="Diskon 2">${formatDecimal(item.diskon_2, 0, 2)}%</td>
-                            <td data-mobile-label="Diskon 3">${formatDecimal(item.diskon_3, 0, 2)}%</td>
-                            <td data-mobile-label="PPN">${Number(item.ppn || 0).toLocaleString('id-ID')}%</td>
-                            <td data-mobile-label="Total">${formatRupiah(item.total)}</td>
-                        </tr>
-                    `);
-                });
+                renderReceiptDetailItems(header.details || []);
 
                 $('#penerimaanModalDetail').modal('show');
             }).fail(function(xhr) {
