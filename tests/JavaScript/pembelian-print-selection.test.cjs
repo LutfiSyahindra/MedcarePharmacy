@@ -6,9 +6,30 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname,
     '../../resources/views/medcare/menu/pembelianPenerimaan/pembelian/jsMain.blade.php'), 'utf8');
-const script = source.slice(source.indexOf('<script>') + 8, source.lastIndexOf('</script>'))
-    .replace(/\{\{\s*route\("([^"]+)"[^}]*\)\s*\}\}/g, (_, route) => `/${route}/:id`)
-    .replace(/\{\{[\s\S]*?\}\}/g, '0');
+function resolveBlade(text) {
+    text = text.replace(/@include\('([^']+)'\)/g, (_, view) => resolveBlade(fs.readFileSync(
+        path.join(__dirname, '../../resources/views', view.replaceAll('.', '/') + '.blade.php'), 'utf8')));
+    // JSON directives contain nested PHP calls; consume the complete expression.
+    let start;
+    while ((start = text.indexOf('@json(')) >= 0) {
+        let end = start + 6, depth = 1, quote = null;
+        for (; end < text.length && depth; end++) {
+            const char = text[end];
+            if (quote) { if (char === quote && text[end - 1] !== '\\') quote = null; }
+            else if (char === '"' || char === "'") quote = char;
+            else if (char === '(') depth++;
+            else if (char === ')') depth--;
+        }
+        assert.equal(depth, 0, 'JSON directive must be balanced');
+        text = text.slice(0, start) + '0' + text.slice(end);
+    }
+    return text.replace(/\{\{\s*route\("([^"]+)"[^}]*\)\s*\}\}/g, (_, route) => `/${route}/:id`)
+        .replace(/\{\{[\s\S]*?\}\}/g, '0');
+}
+const script = resolveBlade(source.slice(source.indexOf('<script>') + 8, source.lastIndexOf('</script>')));
+const printSource = fs.readFileSync(path.join(__dirname,
+    '../../resources/views/medcare/partials/surat-pesanan-print-options.blade.php'), 'utf8')
+    .replace(/^<script>\s*|\s*<\/script>\s*$/g, '');
 
 function printSelection({ blocked = false } = {}) {
     const button = {
@@ -30,10 +51,14 @@ function printSelection({ blocked = false } = {}) {
     const dialogs = [];
     const opened = [];
     const validation = [];
+    let selectedDocument = '';
     const context = vm.createContext({
+        URL,
+        document: { createElement() { return { textContent: '', get innerHTML() { return this.textContent; } }; } },
         detailPurchaseOrderId: null,
         detailPrintDocuments: [],
         window: {
+            location: { origin: 'https://medcare.test' },
             open(url, target) {
                 const popup = blocked ? null : { opener: 'parent' };
                 opened.push({ url, target, popup });
@@ -43,6 +68,7 @@ function printSelection({ blocked = false } = {}) {
         Swal: {
             fire(options) { dialogs.push(options); },
             showValidationMessage(message) { validation.push(message); },
+            getHtmlContainer() { return { querySelector() { return { value: selectedDocument }; } }; },
         },
         $(selector) {
             if (selector === '#btnPrintPDF' || selector === button) return button;
@@ -50,11 +76,13 @@ function printSelection({ blocked = false } = {}) {
             throw new Error(`Unexpected selector: ${selector}`);
         },
     });
+    vm.runInContext(printSource, context);
+    context.showSuratPesananPrintOptions = context.window.showSuratPesananPrintOptions;
     const start = script.indexOf("        $('#pembelianModalDetail').on('hidden.bs.modal'");
     const end = script.indexOf('        // =================== Inisiasi Event Handler', start);
     vm.runInContext(script.slice(start, end), context);
     const documentsStart = script.indexOf('                    const regularCount =');
-    const documentsEnd = script.indexOf('                    // Header', documentsStart);
+    const documentsEnd = script.indexOf('                    renderPurchaseOrderDetail(po);', documentsStart);
     vm.runInContext(`function loadPrintDocuments(po) {
         detailPurchaseOrderId = po.id;
         ${script.slice(documentsStart, documentsEnd)}
@@ -63,6 +91,7 @@ function printSelection({ blocked = false } = {}) {
     return {
         button, dialogs, opened, validation,
         load(counts) { context.loadPrintDocuments({ id: 42, ...counts }); },
+        select(index) { selectedDocument = String(index); },
         click() { button.handlers.click.call(button); },
         close() { modal.handlers['hidden.bs.modal'](); },
     };
@@ -83,14 +112,14 @@ test('Prekursor and OOT are both offered and confirming opens only the selected 
         assert.equal(dialog.input, 'select');
         assert.equal(dialog.showCancelButton, true);
         assert.equal(dialog.target, '#pembelianModalDetail');
-        assert.deepEqual(Object.values(dialog.inputOptions), ['Prekursor (2 item)', 'OOT (1 item)']);
-        const selectedIndex = Object.keys(dialog.inputOptions)
-            .find(index => dialog.inputOptions[index].startsWith(selectedType));
-        dialog.preConfirm(selectedIndex);
+        assert.ok(dialog.html.includes('Prekursor (2 item)'));
+        assert.ok(dialog.html.includes('OOT (1 item)'));
+        ui.select(selectedType === 'Prekursor' ? 0 : 1);
+        dialog.preConfirm('1');
 
         assert.equal(ui.opened.length, 1);
         assert.equal(ui.opened[0].url,
-            `/pembelian.suratPesanan${selectedType === 'OOT' ? 'Oot' : selectedType}/42`);
+            `https://medcare.test/pembelian.suratPesanan${selectedType === 'OOT' ? 'Oot' : selectedType}/42?print=1&with_signature=1`);
         assert.equal(ui.opened[0].target, '_blank');
         assert.equal(ui.opened[0].popup.opener, null);
     }
@@ -102,20 +131,21 @@ test('all available SP types remain selectable when OOT is present', () => {
         precursor_item_count: 1, oot_item_count: 1 });
     ui.click();
     assert.equal(ui.button.disabled, false);
-    assert.deepEqual(Object.values(ui.dialogs[0].inputOptions), [
+    for (const label of [
         'Reguler (1 item)', 'Narkotika (1 item)', 'Psikotropika (1 item)',
         'Prekursor (1 item)', 'OOT (1 item)',
-    ]);
+    ]) assert.ok(ui.dialogs[0].html.includes(label));
     assert.equal(ui.opened.length, 0);
 });
 
-test('one SP type opens directly without a selection dialog', () => {
+test('one SP type still offers signature options before printing', () => {
     const ui = printSelection();
     ui.load({ oot_item_count: 3 });
     ui.click();
-    assert.equal(ui.dialogs.length, 0);
+    assert.equal(ui.dialogs.length, 1);
+    ui.dialogs[0].preConfirm('0');
     assert.equal(ui.opened.length, 1);
-    assert.equal(ui.opened[0].url, '/pembelian.suratPesananOot/42');
+    assert.equal(ui.opened[0].url, 'https://medcare.test/pembelian.suratPesananOot/42?print=1&with_signature=0');
 });
 
 test('an empty selection keeps the chooser open without printing', () => {
@@ -137,7 +167,8 @@ test('closing the detail modal resets the print state for the next PO', () => {
     assert.equal(ui.opened.length, 0);
     ui.load({ regular_item_count: 2 });
     ui.click();
-    assert.equal(ui.opened[0].url, '/pembelian.suratPesananReguler/42');
+    ui.dialogs[0].preConfirm('1');
+    assert.equal(ui.opened[0].url, 'https://medcare.test/pembelian.suratPesananReguler/42?print=1&with_signature=1');
 });
 
 test('a PO without printable items cannot open a letter or chooser', () => {
@@ -153,15 +184,16 @@ test('a blocked popup keeps the chooser open and explains how to retry', () => {
     const ui = printSelection({ blocked: true });
     ui.load({ precursor_item_count: 1, oot_item_count: 1 });
     ui.click();
+    ui.select(1);
     assert.equal(ui.dialogs[0].preConfirm('1'), false);
     assert.equal(ui.opened.length, 1);
     assert.ok(ui.validation[0].includes('Izinkan pop-up'));
 });
 
-test('a blocked popup for a single SP shows a warning', () => {
+test('a blocked popup for a single SP keeps the print options open', () => {
     const ui = printSelection({ blocked: true });
     ui.load({ oot_item_count: 1 });
     ui.click();
-    assert.equal(ui.dialogs[0].icon, 'warning');
-    assert.ok(ui.dialogs[0].text.includes('Izinkan pop-up'));
+    assert.equal(ui.dialogs[0].preConfirm('1'), false);
+    assert.ok(ui.validation[0].includes('Izinkan pop-up'));
 });

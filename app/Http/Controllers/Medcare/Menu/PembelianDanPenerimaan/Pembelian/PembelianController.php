@@ -61,35 +61,17 @@ class PembelianController extends Controller
         $validated = $request->validate([
             'medicine_search' => ['nullable', 'string', 'max:150'],
             'medicine_id' => ['nullable', 'integer', 'exists:master_obats,id'],
+            'date_start' => ['nullable', 'date_format:Y-m-d'],
+            'date_end' => ['nullable', 'date_format:Y-m-d', Rule::when($request->filled('date_start'), 'after_or_equal:date_start')],
         ]);
         $branchIds = BranchAccess::userBranchIds();
         $Pembelian = $this->PembelianService->getPembelianTable(
             $branchIds,
             $validated['medicine_search'] ?? null,
-            isset($validated['medicine_id']) ? (int) $validated['medicine_id'] : null
+            isset($validated['medicine_id']) ? (int) $validated['medicine_id'] : null,
+            $validated['date_start'] ?? null,
+            $validated['date_end'] ?? null
         );
-        $dateStart = $request->input('date_start');
-        $dateEnd = $request->input('date_end');
-
-        if ($dateStart || $dateEnd) {
-            $Pembelian = collect($Pembelian)->filter(function ($row) use ($dateStart, $dateEnd) {
-                if (empty($row['tanggal_po']) || $row['tanggal_po'] === '-') {
-                    return false;
-                }
-
-                $purchaseDate = Carbon::parse($row['tanggal_po'])->startOfDay();
-
-                if ($dateStart && $purchaseDate->lt(Carbon::parse($dateStart)->startOfDay())) {
-                    return false;
-                }
-
-                if ($dateEnd && $purchaseDate->gt(Carbon::parse($dateEnd)->endOfDay())) {
-                    return false;
-                }
-
-                return true;
-            })->values()->all();
-        }
 
         $summary = collect($Pembelian);
         $statusColumn = collect($request->input('columns', []))->firstWhere('data', 'status');
@@ -136,14 +118,19 @@ class PembelianController extends Controller
                     <i class="mdi mdi-close-circle"></i>
                 </button>'
                     : '';
-                $reopenButton = $canApprove && in_array($status, ['approved', 'rejected'], true)
+                $reopenButton = $canApprove && $dataPembelian['can_reopen_approval']
                     ? '<button class="btn btn-sm btn-secondary btn-reopen-pembelian" onclick="reopenPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-lock-open-variant"></i>
                 </button>'
                     : '';
-                $editButton = ! in_array($status, ['approved', 'diterima_sebagian', 'selesai'], true)
+                $editButton = $dataPembelian['can_edit']
                     ? '<button class="btn btn-sm btn-success btn-edit-pembelian" onclick="editPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-pencil"></i>
+                </button>'
+                    : '';
+                $deleteButton = $dataPembelian['can_delete']
+                    ? '<button class="btn btn-sm btn-danger" onclick="deletePembelian('.$dataPembelian['id'].')" title="Hapus PO" aria-label="Hapus PO">
+                    <i class="mdi mdi-delete"></i>
                 </button>'
                     : '';
 
@@ -155,9 +142,7 @@ class PembelianController extends Controller
                 <button class="btn btn-sm btn-info" onclick="lihatPembelian('.$dataPembelian['id'].')">
                     <i class="mdi mdi-eye"></i>
                 </button> 
-                <button class="btn btn-sm btn-danger"  data-mode="edit" onclick="deletePembelian('.$dataPembelian['id'].')">
-                    <i class="mdi mdi-delete"></i>
-                </button>
+                '.$deleteButton.'
             ';
             })
             ->rawColumns(['actions'])
@@ -213,9 +198,10 @@ class PembelianController extends Controller
             ->orderByDesc('is_default')->orderBy('konversi')->orderBy('id');
         if ($request->has('obat_ids')) {
             $validated = $request->validate([
-                'obat_ids' => ['required', 'array', 'max:250'],
-                'obat_ids.*' => ['required', 'integer', 'distinct', 'exists:master_obats,id'],
+                'obat_ids' => ['required', 'array', 'list', 'max:250'],
+                'obat_ids.*' => ['required', 'integer', 'distinct'],
             ]);
+            $request->validate(['obat_ids' => ['exists:master_obats,id']]);
             $medicineIds = collect($validated['obat_ids'])
                 ->map(fn ($medicineId) => (int) $medicineId)
                 ->unique()
@@ -382,10 +368,7 @@ class PembelianController extends Controller
         $detailRows = $this->purchaseDetailRows($request);
         $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
         $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
-        $totalEstimasi = round(
-            collect($detailRows)->sum('subtotal') + $biayaAsuransi + $biayaPengiriman,
-            2
-        );
+        $totalEstimasi = $this->purchaseEstimateTotal($detailRows, $biayaAsuransi, $biayaPengiriman);
 
         return DB::transaction(function () use ($request, $usesManualNumber, $saveAsDraft, $detailRows, $biayaAsuransi, $biayaPengiriman, $totalEstimasi) {
             /** @var \App\Models\User $user */
@@ -416,12 +399,7 @@ class PembelianController extends Controller
             ]);
 
             // Insert detail
-            foreach ($detailRows as $detailRow) {
-                $this->PembelianService->createPembelianDetail([
-                    'purchase_order_id' => $po->id,
-                    ...$detailRow,
-                ]);
-            }
+            $this->PembelianService->insertPembelianDetails($po->id, $detailRows);
 
             // ======================
             // 🔔 KIRIM NOTIFIKASI
@@ -587,10 +565,10 @@ class PembelianController extends Controller
             ], 404);
         }
 
-        if ($Pembelian && $Pembelian->status === 'approved') {
+        if (! $Pembelian->canEdit()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
+                'message' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat diedit. Buka approval terlebih dahulu jika belum ada penerimaan.',
             ], 422);
         }
 
@@ -641,7 +619,7 @@ class PembelianController extends Controller
         }
 
         $updatedPo = $this->PembelianService->updateStatus($id, 'approved', $user->id, $branchIds);
-        $this->transactionNotifications->notifyActionResult('pembelian', $updatedPo, 'approved', $user);
+        $this->notifyActionAfterCommit($updatedPo, 'approved', $user);
 
         return response()->json([
             'status' => 'success',
@@ -693,7 +671,7 @@ class PembelianController extends Controller
         }
 
         $updatedPo = $this->PembelianService->updateStatus($id, 'rejected', null, $branchIds);
-        $this->transactionNotifications->notifyActionResult('pembelian', $updatedPo, 'rejected', $user);
+        $this->notifyActionAfterCommit($updatedPo, 'rejected', $user);
 
         return response()->json([
             'status' => 'success',
@@ -749,17 +727,14 @@ class PembelianController extends Controller
         $detailRows = $this->purchaseDetailRows($request);
         $biayaAsuransi = round((float) $request->input('biaya_asuransi', 0), 2);
         $biayaPengiriman = round((float) $request->input('biaya_pengiriman', 0), 2);
-        $totalEstimasi = round(
-            collect($detailRows)->sum('subtotal') + $biayaAsuransi + $biayaPengiriman,
-            2
-        );
+        $totalEstimasi = $this->purchaseEstimateTotal($detailRows, $biayaAsuransi, $biayaPengiriman);
 
         return DB::transaction(function () use ($request, $id, $usesManualNumber, $saveAsDraft, $detailRows, $biayaAsuransi, $biayaPengiriman, $totalEstimasi) {
 
             /** @var \App\Models\User $user */
             $user = Auth::user();
             $branchIds = BranchAccess::userBranchIds($user);
-            $existingPo = $this->PembelianService->findByIdPembelian($id, $branchIds);
+            $existingPo = $this->PembelianService->findByIdPembelian($id, $branchIds, true);
 
             if (! $existingPo) {
                 return response()->json([
@@ -768,10 +743,10 @@ class PembelianController extends Controller
                 ], 404);
             }
 
-            if ($existingPo && $existingPo->status === 'approved') {
+            if (! $existingPo->canEdit()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Pembelian yang sudah disetujui tidak bisa diedit. Buka approval terlebih dahulu.',
+                    'message' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat diedit. Buka approval terlebih dahulu jika belum ada penerimaan.',
                 ], 422);
             }
 
@@ -798,12 +773,7 @@ class PembelianController extends Controller
             $this->PembelianService->deletePembelianDetail($id);
 
             // =========================== INSERT DETAIL BARU =======================
-            foreach ($detailRows as $detailRow) {
-                $this->PembelianService->createPembelianDetail([
-                    'purchase_order_id' => $id,
-                    ...$detailRow,
-                ]);
-            }
+            $this->PembelianService->insertPembelianDetails((int) $id, $detailRows);
 
             if (! $saveAsDraft) {
                 $this->notifyApprovalAfterCommit($po, $user);
@@ -837,6 +807,17 @@ class PembelianController extends Controller
         });
     }
 
+    private function notifyActionAfterCommit($po, string $action, $user): void
+    {
+        DB::afterCommit(function () use ($po, $action, $user) {
+            try {
+                $this->transactionNotifications->notifyActionResult('pembelian', $po, $action, $user);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        });
+    }
+
     /**
      * Remove the specified resource from storage.
      */
@@ -856,11 +837,15 @@ class PembelianController extends Controller
                 'success' => true,
                 'message' => 'PO berhasil dihapus.',
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
+            report($e);
+
             // Tangani jika terjadi kesalahan
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
+                'message' => 'PO belum dapat dihapus. Silakan muat ulang daftar dan coba kembali.',
             ], 500);
         }
     }
@@ -902,6 +887,12 @@ class PembelianController extends Controller
                 $discount2,
                 $discount3
             );
+            $subtotal = round($netAmount * (1 + ($ppn / 100)), 2);
+            if ($subtotal > 9999999999999.99) {
+                throw ValidationException::withMessages([
+                    'harga_estimasi.'.$index => 'Subtotal item melebihi batas nilai yang dapat disimpan. Periksa qty dan harga obat.',
+                ]);
+            }
 
             $rows[] = [
                 'obat_id' => (int) $obatId,
@@ -911,7 +902,7 @@ class PembelianController extends Controller
                 'diskon_2' => $discount2,
                 'diskon_3' => $discount3,
                 'ppn' => $ppn,
-                'subtotal' => round($netAmount * (1 + ($ppn / 100)), 2),
+                'subtotal' => $subtotal,
                 'satuan_konversi' => $conversionId > 0 ? $conversionId : null,
                 'is_oot' => $this->suratPesananOot->isOotDrug(
                     $medicines->get((int) $obatId)
@@ -920,6 +911,18 @@ class PembelianController extends Controller
         }
 
         return $rows;
+    }
+
+    private function purchaseEstimateTotal(array $details, float $insurance, float $shipping): float
+    {
+        $total = round(collect($details)->sum('subtotal') + $insurance + $shipping, 2);
+        if ($total > 9999999999999.99) {
+            throw ValidationException::withMessages([
+                'total_estimasi' => 'Total estimasi PO melebihi batas nilai yang dapat disimpan. Periksa rincian dan biaya tambahan.',
+            ]);
+        }
+
+        return $total;
     }
 
     private function missingConversionWarning(array $detailRows): ?string
@@ -933,8 +936,9 @@ class PembelianController extends Controller
 
     private function validatePurchaseRequest(Request $request, ?int $ignorePurchaseOrderId = null): bool
     {
+        $number = $request->input('no_po');
         $request->merge([
-            'no_po' => trim((string) $request->input('no_po')),
+            'no_po' => is_string($number) ? trim($number) : $number,
         ]);
 
         $purchaseOrderUniqueRule = 'unique:purchase_orders,no_po';
@@ -960,33 +964,45 @@ class PembelianController extends Controller
             'biaya_asuransi' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
             'biaya_pengiriman' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
 
-            'obat_id' => ['required', 'array', 'min:1'],
-            'obat_id.*' => ['required', 'integer', 'exists:master_obats,id'],
-            'qty' => ['required', 'array'],
-            'qty.*' => ['required', 'numeric', 'min:1'],
-            'harga_estimasi' => ['required', 'array'],
-            'harga_estimasi.*' => ['required', 'numeric', 'min:0'],
-            'diskon_1' => ['required', 'array'],
+            'obat_id' => ['required', 'array', 'list', 'min:1'],
+            'obat_id.*' => ['required', 'integer', 'distinct'],
+            'qty' => ['required', 'array', 'list'],
+            'qty.*' => ['required', 'numeric', 'decimal:0,2', 'min:1', 'max:9999999999999.99'],
+            'harga_estimasi' => ['required', 'array', 'list'],
+            'harga_estimasi.*' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999999.99'],
+            'diskon_1' => ['required', 'array', 'list'],
             'diskon_1.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'diskon_2' => ['required', 'array'],
+            'diskon_2' => ['required', 'array', 'list'],
             'diskon_2.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'diskon_3' => ['required', 'array'],
+            'diskon_3' => ['required', 'array', 'list'],
             'diskon_3.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'ppn' => ['sometimes', 'array'],
+            'ppn' => ['sometimes', 'array', 'list'],
             'ppn.*' => ['required', 'numeric', 'min:0', 'max:100'],
-            'subtotal' => ['required', 'array'],
+            'subtotal' => ['required', 'array', 'list'],
             'subtotal.*' => ['required', 'numeric', 'min:0'],
-            'satuan_id' => ['required', 'array'],
+            'satuan_id' => ['required', 'array', 'list'],
             'satuan_id.*' => ['nullable', 'integer', 'min:0'],
         ], [
             'satuan_id.required' => 'Satuan setiap item obat belum selesai dimuat. Silakan tunggu lalu simpan kembali.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
             $medicineIds = $request->input('obat_id', []);
 
             if (! is_array($medicineIds)) {
                 return;
+            }
+
+            $existingMedicineIds = MasterObatModel::whereKey($medicineIds)->pluck('id')->all();
+            $existingMedicines = array_fill_keys($existingMedicineIds, true);
+            foreach ($medicineIds as $index => $medicineId) {
+                if (! isset($existingMedicines[$medicineId])) {
+                    $validator->errors()->add('obat_id.'.$index, 'Obat pada item ke-'.($index + 1).' tidak ditemukan.');
+                }
             }
 
             $detailFields = [

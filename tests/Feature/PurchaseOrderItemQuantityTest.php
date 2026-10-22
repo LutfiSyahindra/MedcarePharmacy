@@ -25,6 +25,7 @@ class PurchaseOrderItemQuantityTest extends TestCase
             'status' => 'draft',
             'details_count' => 2,
             'details_sum_qty' => 5.5,
+            'has_receipt' => false,
         ]);
         $purchaseOrder->setRelation('details', new EloquentCollection([
             new PembelianDetailModel(['qty' => 2]),
@@ -61,7 +62,7 @@ class PurchaseOrderItemQuantityTest extends TestCase
         {
             public function __construct(private readonly EloquentCollection $orders) {}
 
-            public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
+            public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null, ?string $dateStart = null, ?string $dateEnd = null)
             {
                 return $this->orders;
             }

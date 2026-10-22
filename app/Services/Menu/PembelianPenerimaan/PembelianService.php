@@ -4,6 +4,7 @@ namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Repositories\Menu\PembelianPenerimaan\PembelianRepository;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PembelianService
@@ -42,9 +43,9 @@ class PembelianService
         $this->numbering->validateManualPurchaseOrder($number, $ignoreId);
     }
 
-    public function getPembelianTable(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
+    public function getPembelianTable(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null, ?string $dateStart = null, ?string $dateEnd = null)
     {
-        $Pembelian = $this->PembelianRepository->getPembelian($branchIds, $medicineSearch, $medicineId)->load([
+        $Pembelian = $this->PembelianRepository->getPembelian($branchIds, $medicineSearch, $medicineId, $dateStart, $dateEnd)->load([
             'distributor',
             'createdBy',
             'approvedBy',
@@ -80,6 +81,9 @@ class PembelianService
                 'status' => $r->has_draft_receipt ? 'dalam_penerimaan' : ($r->status ?? '-'),
                 'purchase_order_status' => $r->status,
                 'has_receipt' => (bool) $r->has_receipt,
+                'can_edit' => $r->canEdit(),
+                'can_delete' => $r->canEdit(),
+                'can_reopen_approval' => $r->canReopenApproval(),
                 'catatan' => $r->catatan ?? '-',
                 'created_by' => $r->createdBy->name ?? '-',
                 'approved_by' => $r->approvedBy->name ?? null,
@@ -103,9 +107,9 @@ class PembelianService
         return $dataPembelianDetail;
     }
 
-    public function findByIdPembelian($id, ?array $branchIds = null)
+    public function findByIdPembelian($id, ?array $branchIds = null, bool $lockForUpdate = false)
     {
-        $Pembelian = $this->PembelianRepository->findByIdPembelian($id, $branchIds);
+        $Pembelian = $this->PembelianRepository->findByIdPembelian($id, $branchIds, $lockForUpdate);
 
         return $Pembelian;
     }
@@ -125,36 +129,79 @@ class PembelianService
 
     public function updateStatus($id, $status, $approvedBy = null, ?array $branchIds = null)
     {
-        if ($status === 'approved') {
-            $purchaseOrder = $this->PembelianRepository->findByIdPembelian($id, $branchIds);
-            $errors = [];
+        return DB::transaction(function () use ($id, $status, $approvedBy, $branchIds) {
+            $purchaseOrder = $this->PembelianRepository->findByIdPembelian($id, $branchIds, true);
+            abort_if(! $purchaseOrder, 404, 'Purchase order tidak ditemukan.');
 
-            foreach ($purchaseOrder?->details ?? [] as $index => $detail) {
-                $conversion = $detail->satuanKonversi;
+            $allowed = $status === 'waiting_approval'
+                ? $purchaseOrder->canReopenApproval()
+                : in_array($status, ['approved', 'rejected'], true)
+                    && $purchaseOrder->status === 'waiting_approval'
+                    && ! $purchaseOrder->hasReceivingActivity();
 
-                if (! $conversion || (int) $conversion->obat_id !== (int) $detail->obat_id
-                    || (float) $conversion->konversi <= 0 || ! $conversion->satuan) {
-                    $errors['satuan_id.'.$index] = 'Lengkapi satuan konversi untuk item obat ke-'.($index + 1).'. PO belum dapat diproses.';
+            if (! $allowed) {
+                throw ValidationException::withMessages([
+                    'status' => 'Status PO sudah berubah atau memiliki riwayat penerimaan. Muat ulang daftar PO sebelum melanjutkan.',
+                ]);
+            }
+
+            if ($status === 'approved') {
+                $errors = [];
+
+                if ($purchaseOrder->details->isEmpty()) {
+                    $errors['obat_id'] = 'PO harus memiliki sedikitnya satu item obat sebelum disetujui.';
+                }
+
+                foreach ($purchaseOrder?->details ?? [] as $index => $detail) {
+                    $conversion = $detail->satuanKonversi;
+
+                    if (! $conversion || (int) $conversion->obat_id !== (int) $detail->obat_id
+                        || (float) $conversion->konversi <= 0 || ! $conversion->satuan) {
+                        $errors['satuan_id.'.$index] = 'Lengkapi satuan konversi untuk item obat ke-'.($index + 1).'. PO belum dapat diproses.';
+                    }
+                }
+
+                if ($errors !== []) {
+                    throw ValidationException::withMessages($errors);
                 }
             }
 
-            if ($errors !== []) {
-                throw ValidationException::withMessages($errors);
-            }
-        }
-
-        return $this->PembelianRepository->updateStatus($id, $status, $approvedBy, $branchIds);
+            return $this->PembelianRepository->updateStatus($id, $status, $approvedBy, $branchIds);
+        }, 3);
     }
 
     public function deletePembelian($id, ?array $branchIds = null)
     {
-        $Pembelian = $this->PembelianRepository->findByIdPembelian($id, $branchIds);
+        return DB::transaction(function () use ($id, $branchIds) {
+            $Pembelian = $this->PembelianRepository->findByIdPembelian($id, $branchIds, true);
 
-        if (! $Pembelian) {
-            return false;
+            if (! $Pembelian) {
+                return false;
+            }
+
+            if (! $Pembelian->canEdit()) {
+                throw ValidationException::withMessages([
+                    'status' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat dihapus. Buka approval terlebih dahulu jika belum ada penerimaan.',
+                ]);
+            }
+
+            return $Pembelian->delete();
+        }, 3);
+    }
+
+    public function insertPembelianDetails(int $purchaseOrderId, array $details): void
+    {
+        $timestamp = now();
+        $rows = array_map(fn (array $detail) => [
+            ...$detail,
+            'purchase_order_id' => $purchaseOrderId,
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ], $details);
+
+        foreach (array_chunk($rows, 100) as $chunk) {
+            PembelianDetailModel::insert($chunk);
         }
-
-        return $Pembelian->delete();
     }
 
     public function deletePembelianDetail($poId)

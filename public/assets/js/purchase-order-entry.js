@@ -81,8 +81,8 @@
                 const errors = [];
                 if (columns.length < 2 || columns.length > 3) errors.push('Gunakan 2 atau 3 kolom yang dipisahkan Tab.');
                 if (!medicine) errors.push(byCode.has(code.toLocaleLowerCase('id-ID')) ? 'Kode obat tidak unik di master.' : 'Kode obat tidak ditemukan.');
-                if (!Number.isFinite(qty) || qty < 1) errors.push('Qty harus berupa angka minimal 1.');
-                if (!Number.isFinite(price) || price < 0) errors.push('Harga harus berupa angka minimal 0.');
+                if (!Number.isFinite(qty) || qty < 1 || qty > 9999999999999.99 || !/^\d+(?:[.,]\d{1,2})?$/.test(qtyText)) errors.push('Qty minimal 1 dengan maksimal 2 angka desimal.');
+                if (!Number.isFinite(price) || price < 0 || price > 9999999999999.99 || (priceText !== '' && !/^\d+(?:[.,]\d{1,2})?$/.test(priceText))) errors.push('Harga minimal 0 dengan maksimal 2 angka desimal.');
                 if (medicine && existing.has(String(medicine.id))) errors.push('Obat sudah ada dalam PO.');
                 if (medicine && seen.has(String(medicine.id))) errors.push('Obat berulang dalam data tempel.');
                 if (medicine) seen.add(String(medicine.id));
@@ -96,7 +96,9 @@
         if (item.medicineId && item.unitLoading) issues.push('Satuan belum selesai dimuat.');
         if (item.medicineId && !item.unitLoading && !(Number(item.unitId) > 0) && (!draft || String(item.unitId) !== '0')) issues.push('Lengkapi satuan konversi.');
         if (item.qty === '' || !Number.isFinite(Number(item.qty)) || Number(item.qty) < 1) issues.push('Qty minimal 1.');
+        else if (Number(item.qty) > 9999999999999.99 || !/^\d+(?:\.\d{1,2})?$/.test(String(item.qty))) issues.push('Qty maksimal 2 angka desimal dan tidak boleh melebihi 9.999.999.999.999,99.');
         if (item.price === '' || !Number.isFinite(Number(item.price)) || Number(item.price) < 0) issues.push('Harga minimal 0.');
+        else if (Number(item.price) > 9999999999999.99) issues.push('Harga melebihi batas nilai yang dapat disimpan.');
         if (item.adjustments.some(value => value === '' || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 100)) issues.push('Diskon dan PPN harus antara 0–100%.');
         return issues;
     }

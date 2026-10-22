@@ -12,6 +12,7 @@ use App\Models\SatuansModel;
 use App\Models\User;
 use App\Services\Notifikasi\TransactionNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -167,10 +168,15 @@ class PurchaseOrderDraftTest extends TestCase
             $expectedTotal += $index * (100 + $index);
         }
 
+        DB::enableQueryLog();
         $response = $this->actingAs($user)->postJson(route('pembelian.store'), [
             ...$payload,
             'save_as_draft' => true,
         ])->assertOk()->assertJsonPath('data.status', 'draft');
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+        $this->assertCount(3, $queries->filter(fn ($query) => str_starts_with($query, 'insert into "purchase_order_details"')));
+        $this->assertLessThanOrEqual(5, $queries->filter(fn ($query) => str_contains($query, 'from "master_obats"'))->count());
 
         $order = PembelianModel::findOrFail($response->json('data.id'));
         $details = PembelianDetailModel::where('purchase_order_id', $order->id)->orderBy('id')->get();

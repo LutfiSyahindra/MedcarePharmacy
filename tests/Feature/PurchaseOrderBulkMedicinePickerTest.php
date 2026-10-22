@@ -49,7 +49,7 @@ class PurchaseOrderBulkMedicinePickerTest extends TestCase
 
         $this->assertIsString($controller);
         $this->assertStringContainsString("\$request->has('obat_ids')", $controller);
-        $this->assertStringContainsString("'obat_ids' => ['required', 'array', 'max:250']", $controller);
+        $this->assertStringContainsString("'obat_ids' => ['required', 'array', 'list', 'max:250']", $controller);
         $this->assertStringContainsString("->whereIn('obat_id', \$medicineIds)", $controller);
     }
 }

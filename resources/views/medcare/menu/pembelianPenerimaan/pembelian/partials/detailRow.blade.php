@@ -25,7 +25,7 @@
     </td>
     <td class="purchase-qty-field">
         <label class="form-label purchase-cell-label">Qty</label>
-        <input type="number" class="form-control qty" name="qty[]" min="1" step="any" value="1" inputmode="decimal" required>
+        <input type="number" class="form-control qty" name="qty[]" min="1" max="9999999999999.99" step="0.01" value="1" inputmode="decimal" required>
     </td>
     <td class="purchase-price-field">
         <label class="form-label purchase-cell-label">Harga / Satuan Dasar (Rp)</label>
@@ -40,7 +40,7 @@
         <input type="hidden" class="subtotal" name="subtotal[]" value="0">
     </td>
     <td class="purchase-row-actions">
-        <details class="purchase-item-adjustments">
+        <details class="purchase-item-adjustments" name="purchase-item-adjustments">
             <summary>
                 <span class="purchase-adjustments-title">Diskon &amp; PPN <i class="mdi mdi-chevron-down" aria-hidden="true"></i></span>
                 <span class="purchase-adjustments-value">Tanpa diskon · PPN 11%</span>

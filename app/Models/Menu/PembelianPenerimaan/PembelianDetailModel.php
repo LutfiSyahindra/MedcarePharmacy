@@ -28,7 +28,7 @@ class PembelianDetailModel extends Model
 
     public function pembelian()
     {
-        return $this->belongsTo(PembelianModel::class);
+        return $this->belongsTo(PembelianModel::class, 'purchase_order_id');
     }
 
     public function obat()

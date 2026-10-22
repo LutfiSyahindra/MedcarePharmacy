@@ -60,6 +60,7 @@
                 Object.entries(backup.form).forEach(([name, value]) => {
                     $('#pembelianForm [name]').filter(function() { return this.name === name; }).val(value);
                 });
+                purchaseFormDatePicker.setDate(backup.form.tanggal || '', false, 'd-m-Y');
                 DistributorSelect.trigger('change');
                 editMode = Boolean(backup.form.pembelian_id);
                 $('#pembelianModalLabel').text(editMode ? 'Edit Purchase Order' : 'Form Purchase Order');
@@ -80,7 +81,6 @@
                         row.find('[name]').filter(function() { return this.name === name + '[]'; }).val(value);
                     });
                     select.trigger('change.select2');
-                    row.find('.purchase-item-adjustments').prop('open', true);
                     updateCurrentStock(row, medicine);
                     recalculatePurchaseRow(row);
                     row.find('.purchase-price-input').val(saved.priceInput);

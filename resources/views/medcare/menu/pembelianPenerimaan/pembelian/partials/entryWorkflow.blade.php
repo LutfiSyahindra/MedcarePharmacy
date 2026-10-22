@@ -72,6 +72,7 @@
 
         function resetPurchaseEntry() {
             purchasePendingSave = null;
+            purchaseLoadingDetails = false;
             purchaseDefaultTax = 11;
             $('#purchaseAllTax').val(11);
             $('#purchaseAllTaxStatus').text('');

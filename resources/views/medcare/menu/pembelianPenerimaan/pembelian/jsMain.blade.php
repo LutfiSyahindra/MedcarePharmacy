@@ -24,6 +24,8 @@
         const medicineSelectPageSize = 50;
         let medicinePickerSearchTimer = null;
         let purchaseSaveInProgress = false;
+        let purchaseLoadingDetails = false;
+        let purchaseEditRequestSequence = 0;
         let currentPoNumberMode = null;
         let currentPoDistributorId = null;
         let poNumberRequestSequence = 0;
@@ -42,9 +44,10 @@
         let PembelianSelect2Parent = $('#pembelianModal');
 
         // --- Inisialisasi flatpickr   
-        flatpickr("#flatpickr-date", {
+        const purchaseFormDatePicker = flatpickr("#flatpickr-date", {
             wrap: true,
-            dateFormat: "d-m-Y"
+            dateFormat: "d-m-Y",
+            defaultDate: new Date()
         });
 
         // --- Inisialisasi Select2
@@ -136,7 +139,6 @@
             Object.entries(values).forEach(([name, value]) => row.find('[name="' + name + '[]"]').attr('value', value));
             row.find('.purchase-price-input').attr('value', PurchaseOrderEntry.formatMoney(values.harga_estimasi_satuan));
             row.find('.purchase-subtotal-display').attr('value', PurchaseOrderEntry.formatMoney(values.subtotal));
-            row.find('details').prop('open', [options.diskon1, options.diskon2, options.diskon3].some(value => Number(value) > 0) || Number(options.ppn ?? 11) !== 11);
             return row[0].outerHTML;
         }
 
@@ -213,7 +215,7 @@
         }
 
         function updateUnitLoadingState() {
-            const isLoading = pendingUnitRequests.size > 0 || purchaseConversionSaves.size > 0;
+            const isLoading = purchaseLoadingDetails || pendingUnitRequests.size > 0 || purchaseConversionSaves.size > 0;
             let hasMissingConversion = false;
             const hasOpenConversion = purchaseConversionContext !== null;
 
@@ -233,8 +235,8 @@
             $('#submitForm').prop('disabled', isLoading || purchaseSaveInProgress || purchaseAddingItems || hasMissingConversion || hasOpenConversion);
             $('#saveDraftForm').prop('disabled', isLoading || purchaseSaveInProgress || purchaseAddingItems || hasOpenConversion);
             $('#addDetail, #addAnotherDetail, #toggleMedicinePicker, #addSelectedMedicines, #applyPurchaseBulk')
-                .prop('disabled', purchaseSaveInProgress || purchaseAddingItems);
-            $('#addSelectedMedicines').prop('disabled', purchaseSaveInProgress || purchaseAddingItems || selectedMedicineIds.size === 0);
+                .prop('disabled', purchaseLoadingDetails || purchaseSaveInProgress || purchaseAddingItems);
+            $('#addSelectedMedicines').prop('disabled', purchaseLoadingDetails || purchaseSaveInProgress || purchaseAddingItems || selectedMedicineIds.size === 0);
             $('#purchaseUnitLoadingNotice').toggleClass('d-none', !isLoading);
             $('#purchaseConversionWarning').toggleClass('d-none', !hasMissingConversion);
         }
@@ -478,9 +480,11 @@
             let form = $('#pembelianForm');
             purchaseSaveInProgress = false;
             resetPurchaseEntry();
-            medicineUnitCache.clear();
+            if (!purchaseRecoveryOpening) medicineUnitCache.clear();
             $('#pembelianModalLabel').text('Form Purchase Order');
             form.trigger('reset');
+            purchaseFormDatePicker.setDate(new Date());
+            purchaseEditRequestSequence++;
 
             $('#submitForm').html('<i class="mdi mdi-check-all" aria-hidden="true"></i><span class="purchase-desktop-text">Periksa &amp; Ajukan</span><span class="purchase-mobile-text">Ajukan PO</span>');
             $('#saveDraftForm').html('<i class="mdi mdi-content-save-move-outline" aria-hidden="true"></i><span class="purchase-desktop-text">Simpan sebagai Draft</span><span class="purchase-mobile-text">Simpan Draft</span>');
@@ -518,6 +522,8 @@
             $('#pembelian_id').val('');
             resetMedicinePicker();
             purchaseSaveInProgress = false;
+            purchaseLoadingDetails = false;
+            $('#pembelianForm').prop('inert', false);
             updateUnitLoadingState();
         });
         // =================== End Inisiasi Modal ===============
@@ -1825,7 +1831,7 @@
         }
 
         function submitPurchaseOrder(saveAsDraft = false, confirmed = false) {
-            if (purchaseSaveInProgress || purchaseConversionSaves.size > 0 || purchaseConversionContext) {
+            if (purchaseLoadingDetails || purchaseSaveInProgress || purchaseAddingItems || purchaseConversionSaves.size > 0 || purchaseConversionContext) {
                 return;
             }
 
@@ -2099,17 +2105,22 @@
                 return;
             }
 
-            editMode = true;
+            const editRequest = ++purchaseEditRequestSequence;
 
             $.ajax({
                 url: "{{ route('pembelian.edit', ':id') }}".replace(':id', id),
                 type: "GET",
                 success: function(response) {
+                    if (editRequest !== purchaseEditRequestSequence || $('#pembelianModal').hasClass('show')) return;
+                    editMode = true;
 
                     let header = response;
                     let detail = response.details ?? [];
 
                     $('#pembelianModal').modal('show');
+                    const session = purchaseEntrySession;
+                    purchaseLoadingDetails = true;
+                    $('#pembelianForm').prop('inert', true);
                     $('#pembelianModalLabel').text('Edit Purchase Order');
                     $('#submitForm').html(
                         '<i class="mdi mdi-check-all" aria-hidden="true"></i><span class="purchase-desktop-text">Periksa &amp; Ajukan</span><span class="purchase-mobile-text">Ajukan PO</span>'
@@ -2119,9 +2130,7 @@
                     $('input[name="no_po"]').val(header.no_po);
                     $('#distributor_id').val(header.distributor_id).trigger('change');
 
-                    $('input[name="tanggal"]').val(
-                        moment(header.tanggal_po).format('DD-MM-YYYY')
-                    );
+                    purchaseFormDatePicker.setDate(moment(header.tanggal_po).toDate());
 
                     $('textarea[name="catatan"]').val(header.catatan ?? '');
                     $('.purchase-notes-details').prop('open', Boolean(header.catatan));
@@ -2155,14 +2164,17 @@
 
                     hitungTotal();
 
-                    getMedicineCatalog()
+                    Promise.all([getMedicineCatalog(), Promise.resolve(purchaseDistributorsRequest)])
                         .then(function() {
+                            if (session !== purchaseEntrySession) return;
+                            DistributorSelect.val(header.distributor_id).trigger('change');
                             return preloadMedicineUnits(detail.map(item => item.obat_id));
                         })
                         .catch(function() {
                             // Select tetap dirender; satuan yang gagal akan menampilkan status error per baris.
                         })
                         .then(function() {
+                            if (session !== purchaseEntrySession) return;
                             const rowLoads = [];
 
                             $('.obatSelect').each(function(i) {
@@ -2170,10 +2182,17 @@
                                     preservePurchaseValues: true
                                 }));
                             });
-                            return Promise.allSettled(rowLoads);
+                            return Promise.allSettled(rowLoads).then(waitForPendingUnitRequests);
+                        })
+                        .finally(function() {
+                            if (session !== purchaseEntrySession) return;
+                            purchaseLoadingDetails = false;
+                            $('#pembelianForm').prop('inert', false);
+                            hitungTotal(true);
                         });
                 },
                 error: function(xhr) {
+                    if (editRequest !== purchaseEditRequestSequence) return;
                     editMode = false;
                     let message = xhr.responseJSON?.message ||
                         'Terjadi kesalahan saat memuat data pembelian.';

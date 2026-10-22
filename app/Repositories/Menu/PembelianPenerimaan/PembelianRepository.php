@@ -8,11 +8,14 @@ use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 
 class PembelianRepository
 {
-    public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null)
+    public function getPembelian(?array $branchIds = null, ?string $medicineSearch = null, ?int $medicineId = null, ?string $dateStart = null, ?string $dateEnd = null)
     {
         $query = PembelianModel::query();
 
         $this->scopeBranch($query, $branchIds);
+
+        $query->when($dateStart, fn ($query) => $query->where('tanggal_po', '>=', $dateStart))
+            ->when($dateEnd, fn ($query) => $query->where('tanggal_po', '<=', $dateEnd));
 
         $medicineSearch = trim($medicineSearch ?? '');
 
@@ -51,13 +54,14 @@ class PembelianRepository
         return $dataPembelianDetail;
     }
 
-    public function findByIdPembelian($id, ?array $branchIds = null)
+    public function findByIdPembelian($id, ?array $branchIds = null, bool $lockForUpdate = false)
     {
-        $query = PembelianModel::with('details', 'details.satuanKonversi.satuan');
+        $query = PembelianModel::with('details', 'details.satuanKonversi.satuan')
+            ->withExists('penerimaanBarang as has_receipt');
 
         $this->scopeBranch($query, $branchIds);
 
-        $Pembelian = $query->find($id);
+        $Pembelian = $query->when($lockForUpdate, fn ($query) => $query->lockForUpdate())->find($id);
 
         return $Pembelian;
     }

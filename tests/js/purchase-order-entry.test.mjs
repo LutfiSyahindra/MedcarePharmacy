@@ -34,6 +34,12 @@ test('ambiguous codes in the master cannot resolve to an arbitrary medicine', ()
     assert.match(rows[0].errors.join(), /tidak unik/);
 });
 
+test('paste rejects precision that cannot be preserved by purchase and receipt quantities', () => {
+    for (const raw of ['OBT001\t2,555', 'OBT001\t2\t1000,555', 'OBT001\t10000000000000', 'OBT001\t2\t10000000000000']) {
+        assert.ok(parsePaste(raw, catalog)[0].errors.length > 0, raw);
+    }
+});
+
 test('a 601-medicine request is batched within the endpoint limit with every unique ID retained', () => {
     const ids = Array.from({ length: 601 }, (_, index) => index + 1);
     const batches = splitBatches([...ids, 1, 2]);

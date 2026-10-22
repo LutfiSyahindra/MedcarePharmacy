@@ -89,7 +89,8 @@ function submissionHarness(server) {
     const signatures = workflow.slice(workflow.indexOf('        function purchaseEntrySignature('), workflow.indexOf('        function clearPurchaseFilters('));
     let complete;
     const state = {
-        purchasePendingSave: null, purchaseSaveInProgress: false, purchaseConversionSaves: new Set(), purchaseConversionContext: null,
+        purchasePendingSave: null, purchaseSaveInProgress: false, purchaseLoadingDetails: false, purchaseAddingItems: false,
+        purchaseConversionSaves: new Set(), purchaseConversionContext: null,
         purchaseDirty: true, purchaseSubmittedSignature: '', purchaseAllowClose: false, editMode: false, closed: false, backup: null,
         fields: [{ name: '_token', value: 'stale' }, { name: 'no_po', value: 'PREVIEW' }, { name: 'qty[]', value: '2' }],
         id: '', number: 'PREVIEW', errors: [], PurchaseOrderEntry: globalThis.PurchaseOrderEntry,
@@ -117,8 +118,49 @@ function submissionHarness(server) {
         }
     };
     const run = new Function('environment', `with (environment) { ${signatures} ${submit}; return submitPurchaseOrder; }`)(state);
-    return { state, submit: () => new Promise(resolve => { complete = resolve; run(false, true); }) };
+    return { state, trySubmit: () => run(false, true), submit: () => new Promise(resolve => { complete = resolve; run(false, true); }) };
 }
+
+test('saving waits until editing details and bulk item additions have finished', () => {
+    let calls = 0;
+    const form = submissionHarness(async () => { calls++; });
+    for (const flag of ['purchaseLoadingDetails', 'purchaseAddingItems']) {
+        form.state[flag] = true;
+        form.trySubmit();
+        assert.equal(form.state.purchaseSaveInProgress, false);
+        assert.equal(form.state.purchasePendingSave, null);
+        assert.equal(calls, 0);
+        form.state[flag] = false;
+    }
+});
+
+test('opening recovered PO entries retains their preloaded conversions while a new form refreshes them', () => {
+    const source = fs.readFileSync(new URL('../../resources/views/medcare/menu/pembelianPenerimaan/pembelian/jsMain.blade.php', import.meta.url), 'utf8');
+    const handler = source.slice(source.indexOf("        $('#pembelianModal').on('show.bs.modal'"),
+        source.indexOf('        // --- Reset state modal setelah'));
+    for (const recovering of [true, false]) {
+        let open;
+        const element = {
+            on(event, callback) { open = callback; return this; },
+            one() { return this; }, trigger() { return this; }, text() { return this; },
+            html() { return this; }, val() { return this; }, find() { return this; },
+            prop() { return this; }, removeClass() { return this; },
+        };
+        const cache = new Map([['42', [{ id: 3, konversi: 10 }]]]);
+        const environment = {
+            purchaseRecovering: recovering, purchaseRecoveryOpening: recovering, editMode: recovering,
+            purchaseRecoveryStore: { read: () => null }, purchaseSaveInProgress: false,
+            medicineUnitCache: cache, purchaseEditRequestSequence: 0,
+            currentPoNumberMode: null, currentPoDistributorId: null,
+            purchaseFormDatePicker: { setDate() {} }, DistributorSelect: element,
+            $: () => element, resetPurchaseEntry() {}, updateUnitLoadingState() {},
+            resetMedicinePicker() {}, detailItemTemplate() { return ''; }, formatRupiah: String, hitungTotal() {}, loadObatInto() {},
+        };
+        new Function('environment', `with (environment) { ${handler} }`)(environment);
+        open.call(element, { preventDefault() { throw new Error('Opening should be allowed'); } });
+        assert.equal(cache.has('42'), recovering);
+    }
+});
 
 test('the form reuses a pending request after a lost response and clears its backup only after success', async () => {
     const requests = new Map();

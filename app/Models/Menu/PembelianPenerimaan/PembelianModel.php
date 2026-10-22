@@ -24,6 +24,23 @@ class PembelianModel extends Model
         'biaya_pengiriman' => 'decimal:2',
     ];
 
+    public function canEdit(): bool
+    {
+        return in_array($this->status, ['draft', 'waiting_approval', 'rejected'], true)
+            && ! $this->hasReceivingActivity();
+    }
+
+    public function canReopenApproval(): bool
+    {
+        return in_array($this->status, ['approved', 'rejected'], true)
+            && ! $this->hasReceivingActivity();
+    }
+
+    public function hasReceivingActivity(): bool
+    {
+        return (bool) ($this->has_receipt ?? $this->penerimaanBarang()->exists());
+    }
+
     /**
      * Relasi ke detail purchase order
      */
