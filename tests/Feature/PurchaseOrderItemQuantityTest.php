@@ -26,6 +26,7 @@ class PurchaseOrderItemQuantityTest extends TestCase
             'details_count' => 2,
             'details_sum_qty' => 5.5,
             'has_receipt' => false,
+            'has_non_draft_receipt' => false,
         ]);
         $purchaseOrder->setRelation('details', new EloquentCollection([
             new PembelianDetailModel(['qty' => 2]),

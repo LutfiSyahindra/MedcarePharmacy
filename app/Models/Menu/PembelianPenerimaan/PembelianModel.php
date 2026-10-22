@@ -22,18 +22,31 @@ class PembelianModel extends Model
         'total_estimasi' => 'decimal:2',
         'biaya_asuransi' => 'decimal:2',
         'biaya_pengiriman' => 'decimal:2',
+        'revision' => 'integer',
     ];
 
     public function canEdit(): bool
     {
         return in_array($this->status, ['draft', 'waiting_approval', 'rejected'], true)
-            && ! $this->hasReceivingActivity();
+            && ! $this->hasNonDraftReceivingActivity();
     }
 
     public function canReopenApproval(): bool
     {
         return in_array($this->status, ['approved', 'rejected'], true)
-            && ! $this->hasReceivingActivity();
+            && ! $this->hasNonDraftReceivingActivity();
+    }
+
+    public function canDelete(): bool
+    {
+        return $this->canEdit() && ! $this->hasReceivingActivity();
+    }
+
+    public function hasNonDraftReceivingActivity(): bool
+    {
+        return (bool) ($this->has_non_draft_receipt ?? $this->penerimaanBarang()
+            ->where(fn ($query) => $query->where('status', '!=', 'draft')->orWhereNotNull('posted_at'))
+            ->exists());
     }
 
     public function hasReceivingActivity(): bool

@@ -23,6 +23,11 @@
                 <form id="penerimaanForm">
                     @csrf
                     <input type="hidden" name="penerimaan_id" id="penerimaan_id">
+                    <input type="hidden" name="purchase_order_revision" id="purchase_order_revision" value="0">
+                    <div class="alert alert-warning d-none" id="receivePoRevisionNotice" role="status">
+                        PO telah direvisi. Periksa kembali obat, qty, satuan, harga, dan total faktur, lalu simpan ulang draft sebelum posting.
+                        Isian sebelumnya tetap ditampilkan untuk obat yang masih ada di PO; obat yang dihapus dari PO tidak disertakan lagi saat draft disimpan.
+                    </div>
 
                     <nav class="receive-form-progress" aria-label="Navigasi dan kelengkapan form">
                         <button type="button" class="receive-progress-step is-active" id="receiveStepPo"

@@ -22,6 +22,7 @@ class PenerimaanBarangModel extends Model
         'supplier_compensation_discount' => 'decimal:2',
         'posted_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'requires_po_review' => 'boolean',
     ];
 
     public function details()

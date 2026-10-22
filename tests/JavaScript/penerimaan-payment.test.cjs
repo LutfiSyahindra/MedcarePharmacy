@@ -309,6 +309,24 @@ test('multiple batches share one PO limit and do not inflate the outstanding qua
     assert.equal(context.collectReceiveStats().invalidRows, 2);
 });
 
+test('a revised purchase unit preserves draft values and identifies the previous unit for review', () => {
+    const { context } = receiptForm([]);
+    for (const name of ['escapeHtml', 'receiveBatchOptionsHtml', 'detailRowTemplate']) {
+        const start = source.indexOf(`        function ${name}(`);
+        const end = source.indexOf('\n        }', start) + '\n        }'.length;
+        vm.runInContext(source.slice(start, end), context);
+    }
+    context.receiptInvoiceMode = '';
+    context.conversionText = () => '1 BOX = 10 PCS';
+    const html = context.detailRowTemplate({
+        id: 1, obat_id: 2, nama_obat: 'Obat', satuan: 'BOX', satuan_stok: 'PCS', konversi: 10, outstanding_qty: 5,
+    }, { qty_diterima: 2, harga_beli: 1250, satuan_beli: 'PCS', konversi_satuan: 1 });
+    assert.match(html, /Satuan PO berubah/);
+    assert.match(html, /sebelumnya per PCS/);
+    assert.match(html, /name="qty_diterima\[\]"[^>]*value="2"/);
+    assert.match(html, /name="harga_beli\[\]"[^>]*value="Rp\s1\.250"/);
+});
+
 test('invalid manual expiry dates identify the row without rejecting existing batches without expiry', () => {
     const { context, detailRows } = receiptForm([{ qty: 1 }]);
     detailRows[0].inputs['input[name="expired_date[]"]'].val('31-02-2027');

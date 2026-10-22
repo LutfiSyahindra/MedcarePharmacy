@@ -143,7 +143,8 @@ class PenerimaanController extends Controller
                 $editButton = $row->status === 'draft'
                     ? '<button class="btn btn-sm btn-success" onclick="editPenerimaan('.$row->id.')"><i class="mdi mdi-pencil"></i></button>'
                     : '';
-                $postButton = $canApprove && $row->status === 'draft'
+                $postButton = $canApprove && $row->status === 'draft' && ! $row->requires_po_review
+                    && in_array($row->purchaseOrder?->status, self::RECEIVABLE_PO_STATUSES, true)
                     ? '<button class="btn btn-sm btn-primary" onclick="postPenerimaan('.$row->id.')"><i class="mdi mdi-send-check-outline"></i></button>'
                     : '';
                 $cancelButton = $canApprove && $row->status !== 'cancelled'
@@ -383,10 +384,11 @@ class PenerimaanController extends Controller
         $this->validateReceiptRequest($request);
 
         return DB::transaction(function () use ($request, $id) {
+            $po = $this->approvedPo($request->purchase_order_id);
             $penerimaan = $this->penerimaanQueryForBranch([
                 'details',
                 'supplierCompensationAllocations',
-            ])->findOrFail($id);
+            ])->lockForUpdate()->findOrFail($id);
 
             if ($penerimaan->status !== 'draft') {
                 throw ValidationException::withMessages([
@@ -394,7 +396,6 @@ class PenerimaanController extends Controller
                 ]);
             }
 
-            $po = $this->approvedPo($request->purchase_order_id);
             $computed = $this->buildComputedDetails($request, $po, $penerimaan->id);
             $compensationPlan = $this->buildSupplierCompensationPlan($request, $po, $computed);
 
@@ -450,7 +451,7 @@ class PenerimaanController extends Controller
         ]);
 
         return DB::transaction(function () use ($id, $validated) {
-            $penerimaan = $this->penerimaanQueryForBranch([
+            $penerimaan = $this->lockReceipt($id, [
                 'purchaseOrder',
                 'details.obat.satuan',
                 'details.obat.golongan',
@@ -458,13 +459,26 @@ class PenerimaanController extends Controller
                 'details.obat.subGolongan',
                 'details.purchaseOrderDetail.satuanKonversi.satuan',
                 'supplierCompensationAllocations.returPembelian.compensations',
-            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds());
+            $po = $penerimaan->purchaseOrder;
 
             if ($penerimaan->status !== 'draft') {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Hanya draft penerimaan yang bisa diposting.',
                 ], 422);
+            }
+
+            if (! in_array($po->status, ['approved', 'diterima_sebagian', 'selesai'], true)) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'PO sedang direvisi atau belum disetujui. Selesaikan revisi dan approval PO sebelum melanjutkan penerimaan.',
+                ]);
+            }
+
+            if ($penerimaan->requires_po_review) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'PO sudah direvisi. Buka, periksa, dan simpan ulang draft penerimaan sebelum diposting.',
+                ]);
             }
 
             $initialPaymentAmount = round(max(0, (float) $penerimaan->jumlah_dibayar), 2);
@@ -552,10 +566,10 @@ class PenerimaanController extends Controller
         }
 
         return DB::transaction(function () use ($id) {
-            $penerimaan = $this->penerimaanQueryForBranch([
+            $penerimaan = $this->lockReceipt($id, [
                 'details.obat',
                 'supplierCompensationAllocations.compensation',
-            ], BranchAccess::approvalBranchIds())->lockForUpdate()->findOrFail($id);
+            ], BranchAccess::approvalBranchIds());
 
             if ($penerimaan->status === 'cancelled') {
                 return response()->json([
@@ -603,21 +617,40 @@ class PenerimaanController extends Controller
 
     public function destroy($id)
     {
-        $penerimaan = $this->penerimaanQueryForBranch()->findOrFail($id);
+        return DB::transaction(function () use ($id) {
+            $penerimaan = $this->lockReceipt($id, [], BranchAccess::userBranchIds());
 
-        if ($penerimaan->status !== 'draft') {
+            if ($penerimaan->status !== 'draft' || $penerimaan->posted_at !== null) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Hanya draft penerimaan yang belum pernah diposting yang bisa dihapus.',
+                ], 422);
+            }
+
+            $penerimaan->delete();
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'Hanya draft penerimaan yang bisa dihapus.',
-            ], 422);
+                'status' => 'success',
+                'message' => 'Draft penerimaan berhasil dihapus.',
+            ]);
+        });
+    }
+
+    private function lockReceipt($id, array $with, array $branchIds): PenerimaanBarangModel
+    {
+        // All receipt mutations acquire the PO lock first, serializing them with revision.
+        $receipt = $this->penerimaanQueryForBranch([], $branchIds)->findOrFail($id);
+        $poQuery = PembelianModel::query();
+        $this->scopePurchaseOrderBranch($poQuery, $branchIds);
+        $po = $poQuery->lockForUpdate()->findOrFail($receipt->purchase_order_id);
+        $receipt = $this->penerimaanQueryForBranch($with, $branchIds)->lockForUpdate()->findOrFail($id);
+        if ((int) $receipt->purchase_order_id !== (int) $po->id) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO penerimaan sudah berubah. Muat ulang daftar penerimaan sebelum melanjutkan.',
+            ]);
         }
 
-        $penerimaan->delete();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Draft penerimaan berhasil dihapus.',
-        ]);
+        return $receipt->setRelation('purchaseOrder', $po);
     }
 
     private function validateReceiptRequest(Request $request): void
@@ -645,6 +678,7 @@ class PenerimaanController extends Controller
         return [
             'nomor_penerimaan' => ['nullable', 'string', 'max:60'],
             'purchase_order_id' => ['required', 'integer', 'exists:purchase_orders,id'],
+            'purchase_order_revision' => ['nullable', 'integer', 'min:0'],
             'nomor_faktur' => ['required', 'string', 'max:100'],
             'nomor_surat_jalan' => ['nullable', 'string', 'max:100'],
             'tanggal_penerimaan' => ['required', 'string'],
@@ -705,6 +739,12 @@ class PenerimaanController extends Controller
 
     private function buildComputedDetails(Request $request, PembelianModel $po, ?int $ignorePenerimaanId = null): array
     {
+        if ((int) $request->input('purchase_order_revision', 0) !== (int) $po->revision) {
+            throw ValidationException::withMessages([
+                'purchase_order_revision' => 'PO sudah direvisi. Tutup lalu buka kembali form penerimaan untuk memuat rincian PO terbaru.',
+            ]);
+        }
+
         $detailsById = $po->details->keyBy('id');
         $receivedQuantities = $this->receivedQuantitiesForPoDetails($po->details->modelKeys(), $ignorePenerimaanId);
         $branchId = (int) $po->branch_id;
@@ -1024,6 +1064,7 @@ class PenerimaanController extends Controller
             'sisa_hutang' => $sisaHutang,
             'catatan' => $request->catatan,
             'created_by' => Auth::id(),
+            'requires_po_review' => false,
         ];
     }
 
@@ -1146,6 +1187,7 @@ class PenerimaanController extends Controller
         return [
             'id' => $po->id,
             'no_po' => $po->no_po,
+            'revision' => (int) $po->revision,
             'status' => $po->status,
             'can_create_receipt' => in_array($po->status, self::RECEIVABLE_PO_STATUSES, true)
                 && $details->sum('outstanding_qty') > 0,

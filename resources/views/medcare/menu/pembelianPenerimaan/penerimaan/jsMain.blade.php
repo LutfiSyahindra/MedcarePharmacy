@@ -598,6 +598,8 @@
             receiptInvoiceMode = '';
             $('#receiveInvoiceModeNotice, #submitPenerimaanNextInvoice').addClass('d-none');
             $('#penerimaan_id').val('');
+            $('#purchase_order_revision').val(0);
+            $('#receivePoRevisionNotice').addClass('d-none');
             $('#purchase_order_id, #receive_selected_po').val('');
             $('#receive_supplier').val('');
             hideSupplierCompensationAlert();
@@ -714,6 +716,7 @@
         function applyPurchaseOrder(po) {
             currentReceiptPo = po;
             $('#purchase_order_id').val(po.id);
+            $('#purchase_order_revision').val(po.revision || 0);
             $('#receive_selected_po').val(po.no_po || '-');
             renderPoSummary(po);
             renderReceivedInvoices(po.received_invoices || []);
@@ -1248,9 +1251,14 @@
             let batchOptions = Array.isArray(item.batch_options) ? [...item.batch_options] : [];
             let conversion = Number(item.konversi || existing?.konversi_satuan || 1) || 1;
             let stockUnit = item.satuan_stok || existing?.satuan_stok || 'satuan stok';
+            let unitChanged = existing && (Number(existing.konversi_satuan || 1) !== conversion
+                || (existing.satuan_beli && existing.satuan_beli !== item.satuan));
             let conversionHint = conversion > 1
                 ? `<small class="d-block text-muted receive-conversion-hint">${conversionText(qtyValue, conversion, item.satuan, stockUnit)}</small>`
                 : '';
+            if (unitChanged) {
+                conversionHint += `<small class="d-block text-warning">Satuan PO berubah. Qty dan harga sebelumnya per ${escapeHtml(existing.satuan_beli || 'satuan lama')} (konversi ${formatDecimal(existing.konversi_satuan || 1)}). Periksa dan sesuaikan isian.</small>`;
+            }
 
             if (selectedBatchId && !batchOptions.some(batchItem => String(batchItem.id) === String(selectedBatchId))) {
                 batchOptions.push({
@@ -2494,6 +2502,7 @@
                     $('#supplierCompensationDiscount').prop('disabled', compensationDiscount <= 0);
                     setMoneyInput('supplier_compensation_discount', compensationDiscount);
                     renderPoDetails(po, header.details || []);
+                    $('#receivePoRevisionNotice').toggleClass('d-none', !header.requires_po_review);
                 });
 
                 $('#penerimaanModal').modal('show');

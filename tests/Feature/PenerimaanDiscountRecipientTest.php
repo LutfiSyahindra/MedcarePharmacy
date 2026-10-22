@@ -6,8 +6,8 @@ use App\Models\BranchModel;
 use App\Models\DistributorModel;
 use App\Models\GolonganModel;
 use App\Models\KonversiSatuanModel;
-use App\Models\MasterObatModel;
 use App\Models\MarginsModel;
+use App\Models\MasterObatModel;
 use App\Models\Menu\Keuangan\FinanceTransactionModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
 use App\Models\Menu\PembelianPenerimaan\PembelianModel;
@@ -19,6 +19,7 @@ use App\Models\SatuansModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -394,8 +395,10 @@ class PenerimaanDiscountRecipientTest extends TestCase
             'total' => 94905,
         ]);
 
-        // Hindari constraint enum SQLite lama saat controller menyinkronkan status PO.
-        $purchaseOrder->update(['status' => 'waiting_approval']);
+        // The receiving-status migration only extends the PO enum on MySQL.
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA ignore_check_constraints = ON');
+        }
 
         return [$user, $receipt, $detail];
     }

@@ -57,11 +57,25 @@ class PembelianRepository
     public function findByIdPembelian($id, ?array $branchIds = null, bool $lockForUpdate = false)
     {
         $query = PembelianModel::with('details', 'details.satuanKonversi.satuan')
-            ->withExists('penerimaanBarang as has_receipt');
+            ->withExists([
+                'penerimaanBarang as has_receipt',
+                'penerimaanBarang as has_non_draft_receipt' => fn ($query) => $query
+                    ->where(fn ($receipts) => $receipts->where('status', '!=', 'draft')->orWhereNotNull('posted_at')),
+            ]);
 
         $this->scopeBranch($query, $branchIds);
 
         $Pembelian = $query->when($lockForUpdate, fn ($query) => $query->lockForUpdate())->find($id);
+
+        if ($Pembelian && $lockForUpdate) {
+            // Re-read receipt states under a lock after acquiring the PO lock, so a
+            // posting that just committed cannot be missed by a transaction snapshot.
+            $receipts = $Pembelian->penerimaanBarang()->lockForUpdate()->get(['id', 'status', 'posted_at']);
+            $Pembelian->setAttribute('has_receipt', $receipts->isNotEmpty());
+            $Pembelian->setAttribute('has_non_draft_receipt', $receipts
+                ->contains(fn ($receipt) => $receipt->status !== 'draft' || $receipt->posted_at !== null));
+            $Pembelian->syncOriginalAttributes(['has_receipt', 'has_non_draft_receipt']);
+        }
 
         return $Pembelian;
     }

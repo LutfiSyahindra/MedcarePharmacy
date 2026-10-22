@@ -568,7 +568,7 @@ class PembelianController extends Controller
         if (! $Pembelian->canEdit()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat diedit. Buka approval terlebih dahulu jika belum ada penerimaan.',
+                'message' => 'Buka approval PO sebelum mengedit. Revisi hanya diizinkan jika semua penerimaan masih draft dan belum pernah diposting.',
             ], 422);
         }
 
@@ -746,7 +746,7 @@ class PembelianController extends Controller
             if (! $existingPo->canEdit()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat diedit. Buka approval terlebih dahulu jika belum ada penerimaan.',
+                    'message' => 'Buka approval PO sebelum mengedit. Revisi hanya diizinkan jika semua penerimaan masih draft dan belum pernah diposting.',
                 ], 422);
             }
 
@@ -766,14 +766,10 @@ class PembelianController extends Controller
                 'catatan' => $request->catatan,
                 'approved_by' => null,
                 'status' => $saveAsDraft ? 'draft' : 'waiting_approval',
+                'revision' => (int) $existingPo->revision + 1,
             ], $branchIds);
 
-            // =========================== RESET DETAIL ============================
-            // Hapus semua detail PO lama
-            $this->PembelianService->deletePembelianDetail($id);
-
-            // =========================== INSERT DETAIL BARU =======================
-            $this->PembelianService->insertPembelianDetails((int) $id, $detailRows);
+            $this->PembelianService->syncPembelianDetails($existingPo, $detailRows);
 
             if (! $saveAsDraft) {
                 $this->notifyApprovalAfterCommit($po, $user);

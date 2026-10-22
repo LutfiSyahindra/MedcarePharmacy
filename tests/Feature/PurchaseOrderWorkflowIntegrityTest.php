@@ -92,7 +92,7 @@ class PurchaseOrderWorkflowIntegrityTest extends TestCase
 
     public static function receivingHistory(): array
     {
-        return [['draft'], ['posted'], ['cancelled']];
+        return [['posted'], ['cancelled']];
     }
 
     #[DataProvider('receivedStatuses')]

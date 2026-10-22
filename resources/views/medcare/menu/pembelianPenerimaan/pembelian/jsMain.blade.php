@@ -1489,8 +1489,8 @@
                     });
                 table.find('.purchase-action-group .btn-reopen-pembelian')
                     .attr({
-                        title: 'Buka approval purchase order',
-                        'aria-label': 'Buka approval purchase order'
+                        title: 'Revisi PO (buka approval)',
+                        'aria-label': 'Revisi PO (buka approval)'
                     });
                 table.find('.purchase-action-group .btn-edit-pembelian')
                     .attr({
@@ -2058,8 +2058,8 @@
 
         window.reopenPembelian = function(id) {
             Swal.fire({
-                title: 'Buka approval purchase order?',
-                text: 'Status PO akan kembali menunggu approval sehingga bisa diedit ulang.',
+                title: 'Buka approval untuk revisi PO?',
+                text: 'Status PO akan kembali menunggu approval agar bisa direvisi. Draft penerimaan tetap tersimpan dan bisa dilanjutkan setelah PO disetujui kembali. PO yang sudah diposting tidak dapat direvisi.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonText: 'Ya, buka approval',

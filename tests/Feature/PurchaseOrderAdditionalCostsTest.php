@@ -13,6 +13,7 @@ use App\Models\Menu\Stok\StokBatchModel;
 use App\Models\SatuansModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -212,8 +213,10 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
             ->assertJsonPath('details.1.harga_beli_stok', 2000)
             ->assertJsonPath('details.1.harga_jual', 2100);
 
-        // SQLite keeps the original PO status CHECK constraint; skip the unrelated status sync in this pricing test.
-        $purchaseOrder->update(['status' => 'waiting_approval']);
+        // The receiving-status migration only extends the PO enum on MySQL.
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA ignore_check_constraints = ON');
+        }
 
         $this->actingAs($user)
             ->putJson(route('penerimaan.post', $receipt->id), [
@@ -301,8 +304,10 @@ class PurchaseOrderAdditionalCostsTest extends TestCase
 
             $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
 
-            // Avoid the legacy SQLite PO status constraint; this test targets stock layers.
-            $purchaseOrder->forceFill(['status' => 'waiting_approval'])->save();
+            // The receiving-status migration only extends the PO enum on MySQL.
+            if (DB::getDriverName() === 'sqlite') {
+                DB::statement('PRAGMA ignore_check_constraints = ON');
+            }
 
             $this->actingAs($user)
                 ->putJson(route('penerimaan.post', $receipt->id), [

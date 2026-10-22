@@ -3,6 +3,7 @@
 namespace App\Services\Menu\PembelianPenerimaan;
 
 use App\Models\Menu\PembelianPenerimaan\PembelianDetailModel;
+use App\Models\Menu\PembelianPenerimaan\PembelianModel;
 use App\Repositories\Menu\PembelianPenerimaan\PembelianRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -54,6 +55,8 @@ class PembelianService
         $Pembelian->loadCount('details')->loadSum('details', 'qty');
         $Pembelian->loadExists([
             'penerimaanBarang as has_receipt',
+            'penerimaanBarang as has_non_draft_receipt' => fn ($query) => $query
+                ->where(fn ($receipts) => $receipts->where('status', '!=', 'draft')->orWhereNotNull('posted_at')),
             'penerimaanBarang as has_draft_receipt' => fn ($query) => $query->where('status', 'draft'),
         ]);
 
@@ -78,11 +81,12 @@ class PembelianService
                     ])->values()->all()
                     : [],
                 'total_estimasi' => $r->total_estimasi ?? '-',
-                'status' => $r->has_draft_receipt ? 'dalam_penerimaan' : ($r->status ?? '-'),
+                'status' => $r->has_draft_receipt && in_array($r->status, ['approved', 'diterima_sebagian'], true)
+                    ? 'dalam_penerimaan' : ($r->status ?? '-'),
                 'purchase_order_status' => $r->status,
                 'has_receipt' => (bool) $r->has_receipt,
                 'can_edit' => $r->canEdit(),
-                'can_delete' => $r->canEdit(),
+                'can_delete' => $r->canDelete(),
                 'can_reopen_approval' => $r->canReopenApproval(),
                 'catatan' => $r->catatan ?? '-',
                 'created_by' => $r->createdBy->name ?? '-',
@@ -137,11 +141,11 @@ class PembelianService
                 ? $purchaseOrder->canReopenApproval()
                 : in_array($status, ['approved', 'rejected'], true)
                     && $purchaseOrder->status === 'waiting_approval'
-                    && ! $purchaseOrder->hasReceivingActivity();
+                    && ! $purchaseOrder->hasNonDraftReceivingActivity();
 
             if (! $allowed) {
                 throw ValidationException::withMessages([
-                    'status' => 'Status PO sudah berubah atau memiliki riwayat penerimaan. Muat ulang daftar PO sebelum melanjutkan.',
+                    'status' => 'Status PO sudah berubah atau penerimaannya tidak lagi draft. PO yang sudah diposting tidak dapat direvisi. Muat ulang daftar PO sebelum melanjutkan.',
                 ]);
             }
 
@@ -179,7 +183,7 @@ class PembelianService
                 return false;
             }
 
-            if (! $Pembelian->canEdit()) {
+            if (! $Pembelian->canDelete()) {
                 throw ValidationException::withMessages([
                     'status' => 'PO yang sudah disetujui atau memiliki riwayat penerimaan tidak dapat dihapus. Buka approval terlebih dahulu jika belum ada penerimaan.',
                 ]);
@@ -207,6 +211,28 @@ class PembelianService
     public function deletePembelianDetail($poId)
     {
         return PembelianDetailModel::where('purchase_order_id', $poId)->delete();
+    }
+
+    public function syncPembelianDetails(PembelianModel $purchaseOrder, array $details): void
+    {
+        // Keep the IDs used by saved receipt batches for medicines that remain in the PO.
+        $existing = $purchaseOrder->details->keyBy('obat_id');
+        $retainedIds = [];
+
+        foreach ($details as $attributes) {
+            $detail = $existing->get($attributes['obat_id']);
+            if ($detail) {
+                $detail->update($attributes);
+            } else {
+                $detail = $purchaseOrder->details()->create($attributes);
+            }
+            $retainedIds[] = $detail->id;
+        }
+
+        // Removed medicines remain in draft receipt snapshots until the draft is reviewed.
+        // The foreign key sets their purchase_order_detail_id to null.
+        $purchaseOrder->details()->whereNotIn('id', $retainedIds)->delete();
+        $purchaseOrder->penerimaanBarang()->where('status', 'draft')->update(['requires_po_review' => true]);
     }
 
     public function getKonversiSatuan($obatId)
