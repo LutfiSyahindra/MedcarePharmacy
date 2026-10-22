@@ -673,18 +673,22 @@
             }
             if (receiptDirty && !receiptAllowClose) {
                 event.preventDefault();
+                let discardChanges = false;
                 Swal.fire({
                     target: '#penerimaanModal',
                     icon: 'warning', title: 'Isian belum disimpan',
                     text: 'Simpan draft agar perubahan qty, batch, dan faktur tidak hilang.',
                     showCancelButton: true,
-                    confirmButtonText: 'Lanjut mengisi', cancelButtonText: 'Tutup tanpa menyimpan'
-                }).then(function(result) {
-                    if (result.dismiss === Swal.DismissReason.cancel) {
+                    confirmButtonText: 'Lanjut mengisi', cancelButtonText: 'Tutup tanpa menyimpan',
+                    didClose: function() {
+                        if (!discardChanges) return;
+                        // Let SweetAlert finish its animation and release the page scroll lock first.
                         receiptAllowClose = true;
                         receiptDirty = false;
                         $('#penerimaanModal').modal('hide');
                     }
+                }).then(function(result) {
+                    discardChanges = result.dismiss === Swal.DismissReason.cancel;
                 });
             }
         });

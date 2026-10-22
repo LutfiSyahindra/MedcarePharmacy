@@ -98,6 +98,9 @@ function receiptSave({ mode = 'single', id = '', serialized = 'nomor_faktur=INV-
             requests.at(-1).complete();
             hiddenCallbacks.splice(0).forEach(callback => callback());
         },
+        finishDialog() {
+            alerts.at(-1)[0].didClose?.();
+        },
         tryClose() {
             let prevented = false;
             hide?.({ preventDefault() { prevented = true; } });
@@ -212,17 +215,40 @@ test('a pending save cannot be submitted again or closed', () => {
     assert.equal(form.tryClose(), false);
 });
 
-test('closing an unsaved form keeps the entered data until the user chooses to discard it', async () => {
-    const form = receiptSave();
-    form.context.receiptDirty = true;
-    assert.equal(form.tryClose(), true);
-    await Promise.resolve();
-    assert.equal(form.closed(), 0);
-    assert.equal(form.context.receiptDirty, true);
-    assert.equal(form.fields.get('input[name="nomor_faktur"]'), 'INV-TEST');
-    form.dialogResult({ dismiss: 'cancel' });
-    assert.equal(form.tryClose(), true);
-    await Promise.resolve();
-    assert.equal(form.closed(), 1);
-    assert.equal(form.context.receiptDirty, false);
+for (const [label, id] of [['new receipt', ''], ['draft edit', '17']]) {
+    test(`${label} waits for the discard dialog to release scroll before hiding its parent modal`, async () => {
+        const form = receiptSave({ id });
+        form.context.receiptDirty = true;
+        assert.equal(form.tryClose(), true);
+        await Promise.resolve();
+        form.finishDialog();
+        assert.equal(form.closed(), 0);
+        assert.equal(form.context.receiptDirty, true);
+        assert.equal(form.fields.get('input[name="nomor_faktur"]'), 'INV-TEST');
+
+        form.dialogResult({ dismiss: 'cancel' });
+        assert.equal(form.tryClose(), true);
+        await Promise.resolve();
+        // SweetAlert resolves its result before its closing animation and scroll cleanup finish.
+        assert.equal(form.closed(), 0);
+        assert.equal(form.context.receiptDirty, true);
+        form.finishDialog();
+        assert.equal(form.closed(), 1);
+        assert.equal(form.context.receiptDirty, false);
+        assert.equal(form.requests.length, 0);
+    });
+}
+
+test('dismissing the unsaved dialog without choosing discard keeps the form open', async () => {
+    for (const dismiss of ['backdrop', 'esc', 'close', undefined]) {
+        const form = receiptSave({ id: '17' });
+        form.context.receiptDirty = true;
+        form.dialogResult({ dismiss });
+        assert.equal(form.tryClose(), true);
+        await Promise.resolve();
+        form.finishDialog();
+        assert.equal(form.closed(), 0);
+        assert.equal(form.context.receiptDirty, true);
+        assert.equal(form.fields.get('input[name="nomor_faktur"]'), 'INV-TEST');
+    }
 });
