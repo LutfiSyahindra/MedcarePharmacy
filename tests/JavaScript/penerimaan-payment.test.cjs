@@ -37,6 +37,8 @@ class Field {
     html() { return this; }
     removeClass() { return this; }
     addClass() { return this; }
+    toggleClass() { return this; }
+    attr() { return this; }
 }
 
 function collection(elements) {
@@ -51,9 +53,9 @@ function receiptForm(rows, { additionalCost = 0, orderedQty = 10, compensation =
     const compensationCheckbox = new Field();
     compensationCheckbox.checked = compensation > 0;
     fields.supplier_compensation_discount.val(compensation);
-    const detailRows = rows.map(({ qty = 2, price = 100000, discounts = [10, 5, 2], tax = 11 } = {}) => {
+    const detailRows = rows.map(({ qty = 2, price = 100000, discounts = [10, 5, 2], tax = 11, poDetailId = 1 } = {}) => {
         const row = new Field('', '', {
-            max: orderedQty, konversi: 1, satuan: 'PCS', 'satuan-stok': 'PCS',
+            max: orderedQty, konversi: 1, satuan: 'PCS', 'satuan-stok': 'PCS', 'po-detail-id': poDetailId,
         });
         const inputs = {
             '.receive-qty': new Field('qty_diterima[]', qty),
@@ -114,6 +116,7 @@ function receiptForm(rows, { additionalCost = 0, orderedQty = 10, compensation =
         'invoiceMoneyInput', 'setMoneyInput', 'getMoneyInput', 'setMoneyElement',
         'serializePenerimaanForm', 'paymentStatusFromAmounts', 'conversionText',
         'normalizedPercent', 'normalizedDiscount', 'tieredDiscountNet', 'effectiveTieredDiscount',
+        'escapeHtml', 'receiveGroupQuantities', 'remainingQtyForReceiveRow', 'validReceiveDate',
         'collectReceiveStats', 'syncInvoiceTotals',
     ]) {
         const start = source.indexOf(`        function ${name}(`);
@@ -288,8 +291,67 @@ test('reopening a receipt renders its saved discounts, including zero, instead o
     for (const [index, value] of [0, 7.5, 3].entries()) {
         assert.match(saved, new RegExp(`name="diskon_${index + 1}\\[\\]"[^>]*value="${value}"`));
     }
-    assert.ok(saved.includes('Efektif 10,28%'));
     for (const [index, value] of [10, 5, 2].entries()) {
         assert.match(initial, new RegExp(`name="diskon_${index + 1}\\[\\]"[^>]*value="${value}"`));
     }
+});
+
+test('multiple batches share one PO limit and do not inflate the outstanding quantity', () => {
+    const { context, detailRows } = receiptForm([{ qty: 3 }, { qty: 2 }]);
+    const stats = context.collectReceiveStats();
+    assert.equal(stats.totalOutstanding, 10);
+    assert.equal(stats.totalQty, 5);
+    assert.equal(stats.invalidRows, 0);
+    assert.equal(context.remainingQtyForReceiveRow(detailRows[0]), 8);
+    assert.equal(context.remainingQtyForReceiveRow(detailRows[1]), 7);
+
+    detailRows[0].inputs['.receive-qty'].val(9);
+    assert.equal(context.collectReceiveStats().invalidRows, 2);
+});
+
+test('invalid manual expiry dates identify the row without rejecting existing batches without expiry', () => {
+    const { context, detailRows } = receiptForm([{ qty: 1 }]);
+    detailRows[0].inputs['input[name="expired_date[]"]'].val('31-02-2027');
+    assert.equal(context.collectReceiveStats().invalidRows, 1);
+    assert.match(context.collectReceiveStats().firstIssue, /expired date/);
+    detailRows[0].inputs['.receive-batch-select'].val('12');
+    detailRows[0].inputs['input[name="expired_date[]"]'].val('');
+    assert.equal(context.collectReceiveStats().invalidRows, 0);
+    assert.equal(context.validReceiveDate('29-02-2028'), true);
+    assert.equal(context.validReceiveDate('29-02-2027'), false);
+});
+
+test('editing preserves every batch, including received PO lines with no remaining quantity', () => {
+    const { context } = receiptForm([]);
+    const start = source.indexOf('        function receiveDetailEntries(');
+    const end = source.indexOf('\n        }', start) + '\n        }'.length;
+    vm.runInContext(source.slice(start, end), context);
+    const saved = [
+        { purchase_order_detail_id: 1, no_batch: 'FIRST', qty_diterima: 3, diskon_1: 0 },
+        { purchase_order_detail_id: 1, no_batch: 'SECOND', qty_diterima: 2, diskon_1: 10 },
+        { purchase_order_detail_id: 2, no_batch: 'FULL', qty_diterima: 1 },
+    ];
+    const entries = context.receiveDetailEntries({ details: [
+        { id: 1, outstanding_qty: 5 }, { id: 2, outstanding_qty: 0 },
+        { id: 3, outstanding_qty: 4 }, { id: 4, outstanding_qty: 0 },
+    ] }, saved);
+    assert.equal(entries.length, 4);
+    assert.equal(entries[0].detail, saved[0]);
+    assert.equal(entries[1].detail, saved[1]);
+    assert.equal(entries[2].detail, saved[2]);
+    assert.equal(entries[3].item.id, 3);
+    assert.equal(entries[3].detail, null);
+});
+
+test('existing expiry dates keep the DD-MM-YYYY display with or without a lazy date picker', () => {
+    const context = vm.createContext({ formatDateInput: value => value === '2028-10-21' ? '21-10-2028' : value });
+    const start = source.indexOf('        function setReceiveExpiredValue(');
+    const end = source.indexOf('\n        }', start) + '\n        }'.length;
+    vm.runInContext(source.slice(start, end), context);
+    let displayed;
+    context.setReceiveExpiredValue({ val(value) { displayed = value; } }, '2028-10-21');
+    assert.equal(displayed, '21-10-2028');
+    let picked;
+    context.setReceiveExpiredValue({ 0: { _flatpickr: { setDate(...args) { picked = args; } } } }, '2028-10-21');
+    assert.deepEqual(picked, ['21-10-2028', false, 'd-m-Y']);
 });

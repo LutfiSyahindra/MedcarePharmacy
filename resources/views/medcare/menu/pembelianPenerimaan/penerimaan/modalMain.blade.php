@@ -1,6 +1,6 @@
 <div class="modal fade purchase-modal" id="penerimaanModal" tabindex="-1" aria-labelledby="penerimaanModalLabel"
     aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable receive-modal-dialog">
+    <div class="modal-dialog modal-fullscreen modal-dialog-scrollable receive-modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title-wrap">
@@ -272,6 +272,22 @@
                                     Cari nama atau kode barang pada PO terpilih. Hapus pilihan untuk melihat semua barang.
                                 </small>
                             </div>
+                            <div class="receive-entry-tools">
+                                <div>
+                                    <label for="receiveRowFilter" class="form-label">Tampilkan baris</label>
+                                    <select id="receiveRowFilter" class="form-select form-select-sm">
+                                        <option value="all">Semua barang</option>
+                                        <option value="filled">Qty sudah diisi</option>
+                                        <option value="warning">Perlu dilengkapi</option>
+                                        <option value="empty">Qty belum diisi</option>
+                                    </select>
+                                </div>
+                                <p id="receiveVisibleRows" role="status" aria-live="polite">0 baris</p>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="receiveFocusIssue">
+                                    <i class="mdi mdi-alert-circle-outline" aria-hidden="true"></i> Lengkapi berikutnya
+                                </button>
+                            </div>
+                            <p class="receive-entry-hint">Gunakan Tambah Batch untuk membagi qty barang ke beberapa batch. Jumlahnya mengikuti sisa PO. Tekan Enter untuk pindah ke baris berikutnya.</p>
                             <div class="receive-detail-live-summary d-none" id="receiveDetailLiveSummary">
                                 <div>
                                     <span>Siap disimpan</span>
@@ -313,6 +329,9 @@
                                     </thead>
                                     <tbody id="receiveDetailRows"></tbody>
                                 </table>
+                            </div>
+                            <div id="receiveFilteredEmpty" class="receive-filtered-empty d-none" role="status">
+                                Tidak ada baris sesuai filter. Ubah pilihan barang atau filter baris untuk melihat yang lain.
                             </div>
                         </div>
                     </section>
@@ -485,9 +504,12 @@
                 <div class="receive-form-total">
                     <span>Total Penerimaan</span>
                     <strong id="receiveGrandTotal">Rp 0</strong>
-                    <small><span id="receiveModalItemCount">0</span> item · Qty <span id="receiveModalQtyCount">0</span></small>
+                    <small><span id="receiveModalItemCount">0</span> baris batch · Qty <span id="receiveModalQtyCount">0</span></small>
                 </div>
                 <div class="receive-form-buttons">
+                    <div class="receive-save-status-slot">
+                        <span id="receiveSaveStatus" class="receive-save-status" role="status" aria-live="polite" aria-atomic="true">Belum ada perubahan</span>
+                    </div>
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">
                         Batal
                     </button>

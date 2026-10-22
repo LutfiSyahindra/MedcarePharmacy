@@ -353,6 +353,134 @@ class PenerimaanPurchaseOrderPickerTest extends TestCase
             ->assertJsonPath('received_invoices.0.details.0.qty_diterima', 10);
     }
 
+    public function test_json_receipt_preserves_all_99_po_lines_for_single_split_and_updated_invoices(): void
+    {
+        $po = $this->createOrder('LARGE');
+        for ($index = 1; $index < 99; $index++) {
+            $po->details()->create([
+                'obat_id' => $this->medicine->id, 'qty' => 10, 'harga_estimasi' => 10000,
+                'diskon_1' => 10, 'ppn' => 11,
+            ]);
+        }
+        $details = $po->details()->orderBy('id')->get();
+        foreach ([route('penerimaan.approvedPo'), route('penerimaan.purchaseOrderDetail', $po->id)] as $url) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            try {
+                $this->getJson($url)->assertOk();
+                $quantityQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains(strtolower($query['query']), 'sum(')
+                    && str_contains($query['query'], 'penerimaan_barang_detail')
+                );
+                $this->assertCount(1, $quantityQueries, 'Receiving quantities must be loaded in one query for all 99 PO lines.');
+            } finally {
+                DB::disableQueryLog();
+            }
+        }
+        $payload = $this->invoicePayload($po, 'LARGE', 1);
+        $payload['purchase_order_detail_id'] = $details->modelKeys();
+        foreach (['obat_id', 'qty_diterima', 'no_batch', 'expired_date', 'harga_beli', 'ppn'] as $field) {
+            $payload[$field] = array_fill(0, 99, $payload[$field][0]);
+        }
+        $payload['stok_batch_id'] = array_fill(0, 99, null);
+        $payload['diskon_1'] = array_fill(0, 99, 10);
+        $payload['diskon_2'] = array_fill(0, 99, 0);
+        $payload['diskon_3'] = array_fill(0, 99, 0);
+
+        $saved = $this->postJson(route('penerimaan.store'), $payload)
+            ->assertOk()->assertJsonPath('status', 'success');
+        $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
+        $this->assertSame('INV-SPLIT-LARGE', $receipt->nomor_faktur);
+        $this->assertSame('2026-10-04', $receipt->tanggal_faktur->format('Y-m-d'));
+        $this->assertEquals(99, $receipt->total_barang);
+        $this->assertEquals(99, $receipt->total_qty);
+        $this->assertEquals(989010, $receipt->total_faktur);
+        $this->assertSame(99, $receipt->details()->count());
+        $this->assertEqualsCanonicalizing($details->modelKeys(), $receipt->details()->pluck('purchase_order_detail_id')->all());
+
+        // Editing uses the same JSON contract and must preserve every line too.
+        $payload['nomor_faktur'] = 'INV-LARGE-UPDATED';
+        $this->putJson(route('penerimaan.update', $receipt->id), $payload)
+            ->assertOk()->assertJsonPath('data.id', $receipt->id);
+        $this->assertDatabaseCount('penerimaan_barang', 1);
+        $this->assertSame(99, $receipt->details()->count());
+        $this->assertSame('INV-LARGE-UPDATED', $receipt->fresh()->nomor_faktur);
+
+        // Split mode still submits all PO lines, including 98 lines with zero quantity.
+        $payload['nomor_faktur'] = 'INV-LARGE-SPLIT';
+        $payload['qty_diterima'] = array_fill(0, 99, 0);
+        $payload['no_batch'] = array_fill(0, 99, '');
+        $payload['expired_date'] = array_fill(0, 99, '');
+        $payload['qty_diterima'][98] = 2;
+        $payload['no_batch'][98] = 'BATCH-LAST-LINE';
+        $payload['expired_date'][98] = '04-10-2027';
+        $split = $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+        $splitReceipt = PenerimaanBarangModel::findOrFail($split->json('data.id'));
+        $this->assertSame(1, $splitReceipt->details()->count());
+        $this->assertEquals(2, $splitReceipt->total_qty);
+        $this->assertEquals($details->last()->id, $splitReceipt->details()->firstOrFail()->purchase_order_detail_id);
+        $this->getJson(route('penerimaan.purchaseOrderDetail', $po->id))
+            ->assertOk()->assertJsonPath('can_create_receipt', true)
+            ->assertJsonPath('details.98.outstanding_qty', 7)
+            ->assertJsonCount(2, 'received_invoices');
+    }
+
+    public function test_incomplete_or_misaligned_detail_arrays_cannot_save_or_overwrite_a_draft(): void
+    {
+        $po = $this->createOrder('INCOMPLETE');
+        $original = $this->invoicePayload($po, 'ORIGINAL', 3);
+        $saved = $this->postJson(route('penerimaan.store'), $original)->assertOk();
+        $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
+        $payload = $this->invoicePayload($po, 'INCOMPLETE', 2);
+        foreach (['purchase_order_detail_id', 'obat_id', 'qty_diterima', 'no_batch', 'expired_date', 'harga_beli', 'ppn'] as $field) {
+            $payload[$field][] = $payload[$field][0];
+        }
+        $payload['stok_batch_id'] = [null, null];
+        $payload['diskon_1'] = [10, 10];
+        $payload['diskon_2'] = [0, 0];
+        $payload['diskon_3'] = [0, 0];
+
+        foreach (['obat_id', 'qty_diterima', 'no_batch', 'expired_date', 'harga_beli', 'ppn', 'stok_batch_id', 'diskon_1', 'diskon_2', 'diskon_3'] as $field) {
+            $incomplete = $payload;
+            unset($incomplete[$field][1]);
+            $this->postJson(route('penerimaan.store'), $incomplete)
+                ->assertUnprocessable()->assertJsonValidationErrors($field);
+            $this->putJson(route('penerimaan.update', $receipt->id), $incomplete)
+                ->assertUnprocessable()->assertJsonValidationErrors($field);
+        }
+        $payload['qty_diterima'] = [1 => 2, 2 => 2];
+        $this->postJson(route('penerimaan.store'), $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('qty_diterima');
+        $this->assertDatabaseCount('penerimaan_barang', 1);
+        $this->assertDatabaseCount('penerimaan_barang_detail', 1);
+        $this->assertSame('INV-SPLIT-ORIGINAL', $receipt->fresh()->nomor_faktur);
+        $this->assertEquals(3, $receipt->details()->firstOrFail()->qty_diterima);
+    }
+
+    public function test_invalid_calendar_dates_are_rejected_without_rolling_into_another_month(): void
+    {
+        $po = $this->createOrder('DATES');
+        $payload = $this->invoicePayload($po, 'DATES', 2);
+        $cases = [
+            ['tanggal_penerimaan', '31-02-2027', 'tanggal_penerimaan'],
+            ['tanggal_faktur', '2027-02-29', 'tanggal_faktur'],
+            ['tanggal_jatuh_tempo', '31-04-2027', 'tanggal_jatuh_tempo'],
+            ['expired_date', ['29-02-2027'], 'expired_date.0'],
+        ];
+        foreach ($cases as [$field, $value, $error]) {
+            $this->postJson(route('penerimaan.store'), [$field => $value] + $payload)
+                ->assertUnprocessable()->assertJsonValidationErrors($error);
+        }
+        $this->assertDatabaseCount('penerimaan_barang', 0);
+        $payload['expired_date'] = ['29-02-2028'];
+        $saved = $this->postJson(route('penerimaan.store'), $payload)->assertOk();
+        $receipt = PenerimaanBarangModel::findOrFail($saved->json('data.id'));
+        foreach ($cases as [$field, $value, $error]) {
+            $this->putJson(route('penerimaan.update', $receipt->id), [$field => $value] + $payload)
+                ->assertUnprocessable()->assertJsonValidationErrors($error);
+        }
+        $this->assertSame('2028-02-29', $receipt->details()->firstOrFail()->expired_date->format('Y-m-d'));
+    }
+
     private function invoicePayload(PembelianModel $po, string $suffix, float $quantity): array
     {
         return [

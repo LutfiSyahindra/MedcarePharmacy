@@ -218,14 +218,18 @@ class PenerimaanController extends Controller
 
         $this->scopePurchaseOrderBranch($query);
 
-        $orders = $query->get()
-            ->map(function ($po) {
+        $orders = $query->get();
+        $receivedQuantities = $this->receivedQuantitiesForPoDetails(
+            $orders->flatMap(fn ($po) => $po->details->modelKeys())->all()
+        );
+        $orders = $orders
+            ->map(function ($po) use ($receivedQuantities) {
                 $totalOutstanding = 0;
                 $outstandingItems = 0;
                 $medicines = [];
 
                 foreach ($po->details as $detail) {
-                    $outstanding = max(0, round((float) $detail->qty - $this->receivedQtyForPoDetail($detail->id), 2));
+                    $outstanding = max(0, round((float) $detail->qty - (float) ($receivedQuantities[$detail->id] ?? 0), 2));
                     $totalOutstanding += $outstanding;
                     $outstandingItems += $outstanding > 0 ? 1 : 0;
                     $medicines[] = [
@@ -266,7 +270,7 @@ class PenerimaanController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate($this->rules());
+        $this->validateReceiptRequest($request);
 
         return DB::transaction(function () use ($request) {
             $po = $this->approvedPo($request->purchase_order_id);
@@ -376,7 +380,7 @@ class PenerimaanController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate($this->rules());
+        $this->validateReceiptRequest($request);
 
         return DB::transaction(function () use ($request, $id) {
             $penerimaan = $this->penerimaanQueryForBranch([
@@ -616,6 +620,26 @@ class PenerimaanController extends Controller
         ]);
     }
 
+    private function validateReceiptRequest(Request $request): void
+    {
+        $request->validate($this->rules());
+
+        // A truncated form must never silently drop quantities or default missing prices to zero.
+        $details = $request->input('purchase_order_detail_id');
+        foreach (['obat_id', 'qty_diterima', 'no_batch', 'expired_date', 'harga_beli', 'ppn',
+            'stok_batch_id', 'diskon_1', 'diskon_2', 'diskon_3'] as $field) {
+            $values = $request->input($field);
+            if ($values === null) {
+                continue;
+            }
+            if (array_diff_key($details, $values) || array_diff_key($values, $details)) {
+                throw ValidationException::withMessages([
+                    $field => 'Data detail penerimaan tidak lengkap atau terpotong. Periksa seluruh barang lalu simpan kembali.',
+                ]);
+            }
+        }
+    }
+
     private function rules(): array
     {
         return [
@@ -682,6 +706,7 @@ class PenerimaanController extends Controller
     private function buildComputedDetails(Request $request, PembelianModel $po, ?int $ignorePenerimaanId = null): array
     {
         $detailsById = $po->details->keyBy('id');
+        $receivedQuantities = $this->receivedQuantitiesForPoDetails($po->details->modelKeys(), $ignorePenerimaanId);
         $branchId = (int) $po->branch_id;
         $rows = [];
         $summary = [
@@ -732,7 +757,7 @@ class PenerimaanController extends Controller
                 throw ValidationException::withMessages(['expired_date.'.$index => 'Expired date wajib diisi.']);
             }
 
-            $outstanding = max(0, round((float) $poDetail->qty - $this->receivedQtyForPoDetail($poDetail->id, $ignorePenerimaanId), 2));
+            $outstanding = max(0, round((float) $poDetail->qty - (float) ($receivedQuantities[$poDetail->id] ?? 0), 2));
 
             $quantitiesByDetail[$poDetail->id] = ($quantitiesByDetail[$poDetail->id] ?? 0) + $qty;
 
@@ -770,7 +795,7 @@ class PenerimaanController extends Controller
                 'satuan_stok' => $this->stockUnitLabel($poDetail),
                 'stok_batch_id' => $this->stockBatchIdForDiscountAndTax($selectedBatch, $diskon, $ppn),
                 'no_batch' => $batch,
-                'expired_date' => $expired === '' ? null : $this->parseDate($expired),
+                'expired_date' => $expired === '' ? null : $this->parseDate($expired, 'expired_date.'.$index),
                 'harga_beli' => $harga,
                 'harga_beli_stok' => $hargaStock,
                 'diskon_1' => $diskon1,
@@ -1048,9 +1073,10 @@ class PenerimaanController extends Controller
         }
 
         $batchOptionsByObat = $this->stockBatchOptionsByObat($po->details->pluck('obat_id')->all(), (int) $po->branch_id);
+        $receivedQuantities = $this->receivedQuantitiesForPoDetails($po->details->modelKeys(), $ignorePenerimaanId);
 
-        $details = $po->details->map(function ($detail) use ($ignorePenerimaanId, $batchOptionsByObat) {
-            $received = $this->receivedQtyForPoDetail($detail->id, $ignorePenerimaanId);
+        $details = $po->details->map(function ($detail) use ($receivedQuantities, $batchOptionsByObat) {
+            $received = (float) ($receivedQuantities[$detail->id] ?? 0);
             $outstanding = max(0, round((float) $detail->qty - $received, 2));
 
             return [
@@ -1208,17 +1234,23 @@ class PenerimaanController extends Controller
             ->values();
     }
 
-    private function receivedQtyForPoDetail($poDetailId, ?int $ignorePenerimaanId = null): float
+    private function receivedQuantitiesForPoDetails(array $poDetailIds, ?int $ignorePenerimaanId = null, bool $postedOnly = false): array
     {
-        return (float) PenerimaanBarangDetailModel::where('purchase_order_detail_id', $poDetailId)
-            ->whereHas('penerimaanBarang', function ($query) use ($ignorePenerimaanId) {
-                $query->where('status', '!=', 'cancelled');
+        if ($poDetailIds === []) {
+            return [];
+        }
 
+        return PenerimaanBarangDetailModel::whereIn('purchase_order_detail_id', $poDetailIds)
+            ->whereHas('penerimaanBarang', function ($query) use ($ignorePenerimaanId, $postedOnly) {
+                $postedOnly ? $query->where('status', 'posted') : $query->where('status', '!=', 'cancelled');
                 if ($ignorePenerimaanId) {
                     $query->where('id', '!=', $ignorePenerimaanId);
                 }
             })
-            ->sum('qty_diterima');
+            ->select('purchase_order_detail_id')
+            ->selectRaw('SUM(qty_diterima) as qty_received')
+            ->groupBy('purchase_order_detail_id')
+            ->pluck('qty_received', 'purchase_order_detail_id')->all();
     }
 
     private function selectedStockBatch($batchId, int $obatId, int $index, int $branchId): ?StokBatchModel
@@ -1353,15 +1385,6 @@ class PenerimaanController extends Controller
         return abs($this->discountPercent($left) - $this->discountPercent($right)) < 0.00001;
     }
 
-    private function postedReceivedQtyForPoDetail($poDetailId): float
-    {
-        return (float) PenerimaanBarangDetailModel::where('purchase_order_detail_id', $poDetailId)
-            ->whereHas('penerimaanBarang', function ($query) {
-                $query->where('status', 'posted');
-            })
-            ->sum('qty_diterima');
-    }
-
     private function syncPurchaseOrderReceivingStatus($poId): void
     {
         $po = PembelianModel::with('details')->lockForUpdate()->find($poId);
@@ -1372,10 +1395,11 @@ class PenerimaanController extends Controller
 
         $totalPoQty = 0;
         $totalReceivedQty = 0;
+        $receivedQuantities = $this->receivedQuantitiesForPoDetails($po->details->modelKeys(), postedOnly: true);
 
         foreach ($po->details as $detail) {
             $totalPoQty += (float) $detail->qty;
-            $totalReceivedQty += $this->postedReceivedQtyForPoDetail($detail->id);
+            $totalReceivedQty += (float) ($receivedQuantities[$detail->id] ?? 0);
         }
 
         $nextStatus = 'approved';
@@ -1742,8 +1766,17 @@ class PenerimaanController extends Controller
         $date = trim((string) $date);
 
         try {
-            if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
+            if (preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $date, $parts)) {
+                if (! checkdate((int) $parts[2], (int) $parts[1], (int) $parts[3])) {
+                    throw new \InvalidArgumentException;
+                }
+
                 return Carbon::createFromFormat('d-m-Y', $date)->format('Y-m-d');
+            }
+
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/', $date, $parts)
+                && ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+                throw new \InvalidArgumentException;
             }
 
             return Carbon::parse($date)->format('Y-m-d');

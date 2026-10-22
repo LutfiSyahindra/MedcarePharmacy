@@ -262,4 +262,104 @@
         .receive-list-actions .btn { font-size: .68rem; padding-inline: .6rem; }
         .receive-list-actions .receive-filter-toggle span { display: none; }
     }
+    #penerimaanModal { padding: 0 !important; }
+    #penerimaanModal .receive-modal-dialog.modal-fullscreen { width: 100%; max-width: none !important; height: 100vh; height: 100dvh; margin: 0; }
+    #penerimaanModal .receive-modal-dialog.modal-fullscreen > .modal-content { width: 100%; height: 100%; max-height: none !important; border: 0; border-radius: 0; }
+    #penerimaanModal .receive-modal-dialog.modal-fullscreen .modal-body { min-height: 0; max-height: none !important; overflow-y: auto; }
+    #penerimaanModal .receive-entry-tools { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; margin-bottom: .5rem; padding: .85rem; border: 1px solid #dce7e6; border-radius: 10px; background: #f6faf9; }
+    #penerimaanModal .receive-entry-tools > div { flex: 0 1 210px; min-width: 0; }
+    #penerimaanModal .receive-entry-tools .form-label { margin-bottom: .3rem; font-size: .7rem; }
+    #penerimaanModal .receive-entry-tools p { flex: 1; margin: 0 0 .45rem; font-size: .72rem; color: #536b69; }
+    #penerimaanModal .receive-entry-tools .btn { min-height: 38px; }
+    #penerimaanModal .receive-entry-hint { margin: .5rem 0 1rem; font-size: .7rem; color: #617471; line-height: 1.65; }
+    #penerimaanModal .receive-filtered-empty { padding: 1rem; text-align: center; background: #f6faf9; color: #526d68; border-radius: 10px; font-size: .75rem; }
+    #penerimaanModal .receive-batch-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+    #penerimaanModal .receive-batch-actions .btn { padding: .25rem .4rem; font-size: .65rem; min-height: 30px; }
+    #penerimaanModal .receive-save-status-slot { display: flex; flex: 0 0 100%; grid-column: 1 / -1; min-width: 0; justify-content: flex-end; }
+    #penerimaanModal .receive-save-status {
+        --receive-status-color: #526b68;
+        --receive-status-dot: #819591;
+        --receive-status-border: #dfe8e5;
+        --receive-status-background: #f2f6f4;
+        display: inline-flex;
+        align-items: center;
+        gap: .6rem;
+        max-width: 100%;
+        padding: .4rem .75rem;
+        border: 1px solid var(--receive-status-border);
+        border-radius: 999px;
+        background: linear-gradient(135deg, #fff, var(--receive-status-background));
+        box-shadow: 0 2px 6px rgba(24, 55, 48, .04), inset 0 1px 0 #fff;
+        color: var(--receive-status-color);
+        font-size: .72rem;
+        font-weight: 600;
+        line-height: 1.5;
+        text-align: left;
+    }
+    #penerimaanModal .receive-save-status::before {
+        content: '';
+        flex: 0 0 auto;
+        width: 6px;
+        height: 6px;
+        margin-inline: 3px;
+        border-radius: 50%;
+        background: var(--receive-status-dot);
+        box-shadow: 0 0 0 3px var(--receive-status-background);
+    }
+    #penerimaanModal .receive-save-status.is-dirty {
+        --receive-status-color: #946111;
+        --receive-status-dot: #c58b24;
+        --receive-status-border: #efdfb9;
+        --receive-status-background: #fff8e9;
+    }
+    #penerimaanModal .receive-save-status.is-saving {
+        --receive-status-color: #0f766e;
+        --receive-status-dot: #0f766e;
+        --receive-status-border: #c9e4df;
+        --receive-status-background: #edf8f5;
+    }
+    #penerimaanModal .receive-save-status.is-saving::before {
+        width: 11px;
+        height: 11px;
+        margin-inline: 0;
+        border: 2px solid #c9e4df;
+        border-top-color: var(--receive-status-dot);
+        background: transparent;
+        box-shadow: none;
+        animation: receive-save-spin .8s linear infinite;
+    }
+    #penerimaanModal .receive-save-status.is-saved {
+        --receive-status-color: #23734c;
+        --receive-status-dot: #2e9364;
+        --receive-status-border: #cee6d7;
+        --receive-status-background: #edf8f0;
+    }
+    #penerimaanModal .receive-save-status.is-error {
+        --receive-status-color: #b42318;
+        --receive-status-dot: #d5574d;
+        --receive-status-border: #f2d4d0;
+        --receive-status-background: #fff2f0;
+    }
+    #penerimaanModal .receive-form-buttons { flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+    #penerimaanModal .receive-detail-row .is-invalid { border-color: #dc3545; background-color: #fff9f9; }
+    #penerimaanModal .receive-detail-row.is-warning .receive-row-check { white-space: normal; }
+    #penerimaanModal #receiveInvoiceSection.is-locked .row.g-3 { opacity: 1; }
+    #penerimaanModal #receiveInvoiceSection.is-locked input:not(:disabled),
+    #penerimaanModal #receiveInvoiceSection.is-locked .receive-mobile-section-toggle { cursor: auto; }
+    #penerimaanModal .receive-form-buttons.is-saving .mdi-content-save-outline,
+    #penerimaanModal .receive-form-buttons.is-saving .mdi-file-document-multiple-outline { display: none; }
+    #penerimaanModal .receive-form-buttons.is-saving button[type="submit"]::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: .4rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: receive-save-spin .8s linear infinite; }
+    @keyframes receive-save-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+        #penerimaanModal .receive-form-buttons.is-saving button[type="submit"]::before,
+        #penerimaanModal .receive-save-status.is-saving::before { animation: none; }
+    }
+    @media (max-width: 767.98px) {
+        #penerimaanModal .receive-entry-tools { gap: .65rem; padding: .75rem; }
+        #penerimaanModal .receive-entry-tools > div { flex-basis: 100%; }
+        #penerimaanModal .receive-entry-tools .form-select { font-size: 16px; min-height: 44px; }
+        #penerimaanModal .receive-entry-tools .btn { min-height: 44px; font-size: .7rem; }
+        #penerimaanModal .receive-batch-actions .btn { min-height: 38px; }
+        #penerimaanModal .receive-save-status-slot { justify-content: flex-start; }
+    }
 </style>

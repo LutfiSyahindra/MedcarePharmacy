@@ -1,4 +1,4 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="{{ asset('assets/vendors/moment/moment.min.js') }}"></script>
 <script>
     $(document).ready(function() {
         const selectedPurchaseOrderId = @json($selectedPurchaseOrder?->id);
@@ -16,6 +16,10 @@
         let pendingInvoiceMode = '';
         let receiptInvoiceMode = '';
         let receiptSaving = false;
+        let receiptDirty = false;
+        let receiptAllowClose = false;
+        let currentReceiptPo = null;
+        let receiveRowFilter = 'all';
         let pickerSelection = null;
         let pickerInvoiceMode = '';
         let pickerDetail = null;
@@ -34,34 +38,42 @@
             }
         });
 
-        flatpickr("#receive-date", {
+        const receiveDateControl = flatpickr("#receive-date", {
+            wrap: true,
             dateFormat: "d-m-Y",
             defaultDate: moment().format('DD-MM-YYYY')
         });
 
-        flatpickr("#invoice-date", {
+        const invoiceDateControl = flatpickr("#invoice-date", {
+            wrap: true,
             dateFormat: "d-m-Y",
             defaultDate: moment().format('DD-MM-YYYY')
         });
 
-        flatpickr("#invoice-due-date", {
+        const invoiceDueDateControl = flatpickr("#invoice-due-date", {
+            wrap: true,
             dateFormat: "d-m-Y"
         });
 
         function formatRupiah(value) {
-            return new Intl.NumberFormat('id-ID', {
+            formatRupiah.formatter ??= new Intl.NumberFormat('id-ID', {
                 style: 'currency',
                 currency: 'IDR',
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 2
-            }).format(Number(value) || 0);
+            });
+            return formatRupiah.formatter.format(Number(value) || 0);
         }
 
         function formatDecimal(value, minimumFractionDigits = 0, maximumFractionDigits = 2) {
-            return Number(value || 0).toLocaleString('id-ID', {
-                minimumFractionDigits,
-                maximumFractionDigits
-            });
+            formatDecimal.formatters ??= new Map();
+            let key = `${minimumFractionDigits}:${maximumFractionDigits}`;
+            if (!formatDecimal.formatters.has(key)) {
+                formatDecimal.formatters.set(key, new Intl.NumberFormat('id-ID', {
+                    minimumFractionDigits, maximumFractionDigits
+                }));
+            }
+            return formatDecimal.formatters.get(key).format(Number(value) || 0);
         }
 
         function escapeHtml(value) {
@@ -205,6 +217,35 @@
             return payload;
         }
 
+        function penerimaanJsonPayload(serialized) {
+            let payload = {};
+            new URLSearchParams(serialized).forEach(function(value, name) {
+                if (name.endsWith('[]')) {
+                    let field = name.slice(0, -2);
+                    (payload[field] ??= []).push(value);
+                } else {
+                    payload[name] = value;
+                }
+            });
+            return JSON.stringify(payload);
+        }
+
+        function showReceiptSaveError(xhr, textStatus) {
+            $('#receiveSaveStatus').removeClass('is-dirty is-saving is-saved is-error')
+                .addClass('is-error').text('Status simpan belum terkonfirmasi. Periksa pesannya.');
+            let response = xhr?.responseJSON;
+            let errors = response?.errors || {};
+            let firstError = Object.values(errors)[0]?.[0];
+            let message = firstError || response?.message || 'Penerimaan belum bisa disimpan. Periksa isian lalu coba lagi.';
+            if (xhr?.status === 401 || xhr?.status === 419) {
+                message = 'Sesi telah berakhir. Isian tetap ada di form. Simpan salinan isian sebelum memuat ulang halaman dan masuk kembali.';
+            } else if (textStatus === 'parsererror' || !xhr?.status || xhr.status >= 500) {
+                message = firstError || response?.message ||
+                    'Penyimpanan belum dapat dipastikan karena respons server tidak lengkap. Isian tetap ada di form. Periksa daftar penerimaan sebelum mencoba lagi.';
+            }
+            Swal.fire({ icon: 'error', title: 'Penyimpanan belum berhasil dikonfirmasi', text: message });
+        }
+
         function paymentStatusLabel(status) {
             const labels = {
                 belum_dibayar: 'Belum Dibayar',
@@ -316,18 +357,18 @@
 
         function setReceiveExpiredValue(input, value) {
             let picker = input[0]?._flatpickr;
+            let formatted = value ? formatDateInput(value) : '';
 
             if (picker) {
-                if (value) {
-                    let inputFormat = /^\d{2}-\d{2}-\d{4}$/.test(value) ? 'd-m-Y' : 'Y-m-d';
-                    picker.setDate(value, false, inputFormat);
+                if (formatted) {
+                    picker.setDate(formatted, false, 'd-m-Y');
                 } else {
-                    picker.clear();
+                    picker.clear(false);
                 }
                 return;
             }
 
-            input.val(value || '');
+            input.val(formatted);
         }
 
         function setReceiveBatchMode(select, preserveManualValue = false) {
@@ -379,19 +420,21 @@
             row.data('batch-mode', 'manual');
         }
 
-        function initializeReceiveBatchSelects() {
-            $('.receive-batch-select').each(function() {
+        function initializeReceiveBatchSelects(scope = $('#receiveDetailRows')) {
+            scope.find('.receive-batch-select').each(function() {
                 let select = $(this);
 
                 if (select.data('select2')) {
                     select.select2('destroy');
                 }
 
-                select.select2({
-                    dropdownParent: $('#penerimaanModal'),
-                    width: '100%',
-                    minimumResultsForSearch: 5
-                });
+                if (select.find('option').length > 1) {
+                    select.select2({
+                        dropdownParent: $('#penerimaanModal'),
+                        width: '100%',
+                        minimumResultsForSearch: 5
+                    });
+                }
 
                 setReceiveBatchMode(select, true);
             });
@@ -487,15 +530,15 @@
                 .text(message || 'Isi detail barang terlebih dahulu.');
 
             section
-                .find('input:not([readonly]), select, button')
+                .find('input[name="jumlah_dibayar"], .receive-payment-action')
                 .prop('disabled', locked);
         }
 
-        function updateFormProgress() {
+        function updateFormProgress(itemStats = null) {
             let hasPo = Boolean($('#purchase_order_id').val());
             let hasInvoice = Boolean($('input[name="nomor_faktur"]').val()?.trim()) &&
                 Boolean($('input[name="tanggal_faktur"]').val()?.trim());
-            let itemStats = collectReceiveStats();
+            itemStats ??= collectReceiveStats();
             let hasValidItem = itemStats.itemCount > 0 && itemStats.invalidRows === 0;
             let itemState = '';
             let invoiceState = '';
@@ -539,6 +582,16 @@
         function resetPenerimaanForm(generateNumber = true) {
             let form = $('#penerimaanForm');
             form.trigger('reset');
+            receiveDateControl.setDate(moment().format('DD-MM-YYYY'), false);
+            invoiceDateControl.setDate(moment().format('DD-MM-YYYY'), false);
+            invoiceDueDateControl.clear(false);
+            receiptDirty = false;
+            receiptAllowClose = false;
+            currentReceiptPo = null;
+            receiveRowFilter = 'all';
+            $('#receiveRowFilter').val('all');
+            $('#receiveSaveStatus').removeClass('is-dirty is-saving is-saved is-error')
+                .text('Belum ada perubahan');
             paymentPreset = 'none';
             currentPoAdditionalCost = 0;
             currentPoTotalQty = 0;
@@ -553,6 +606,8 @@
             $('#receiveInvoiceHistoryList').empty();
             $('#receiveInvoiceHistoryCount').text('0 faktur');
             $('#receiveInvoiceHistoryEmpty').removeClass('d-none');
+            $('#receiveDetailRows .receive-batch-select.select2-hidden-accessible').select2('destroy');
+            $('#receiveDetailRows .receive-expired-date').each(function() { this._flatpickr?.destroy(); });
             $('#receiveDetailRows').empty();
             updateReceiveItemSearch();
             $('#receiveDetailEditor').addClass('d-none');
@@ -609,6 +664,43 @@
             }
         });
 
+        $('#penerimaanModal').on('hide.bs.modal', function(event) {
+            if (receiptSaving) {
+                event.preventDefault();
+                return;
+            }
+            if (receiptDirty && !receiptAllowClose) {
+                event.preventDefault();
+                Swal.fire({
+                    target: '#penerimaanModal',
+                    icon: 'warning', title: 'Isian belum disimpan',
+                    text: 'Simpan draft agar perubahan qty, batch, dan faktur tidak hilang.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Lanjut mengisi', cancelButtonText: 'Tutup tanpa menyimpan'
+                }).then(function(result) {
+                    if (result.dismiss === Swal.DismissReason.cancel) {
+                        receiptAllowClose = true;
+                        receiptDirty = false;
+                        $('#penerimaanModal').modal('hide');
+                    }
+                });
+            }
+        });
+
+        function markReceiptDirty() {
+            if (!$('#purchase_order_id').val() || receiptSaving) return;
+            receiptDirty = true;
+            $('#receiveSaveStatus').removeClass('is-dirty is-saving is-saved is-error')
+                .addClass('is-dirty').text('Ada perubahan yang belum disimpan');
+        }
+
+        $('#penerimaanForm').on('input change', '[name], #applySupplierCompensation', markReceiptDirty);
+        window.addEventListener('beforeunload', function(event) {
+            if (!receiptDirty && !receiptSaving) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
+
         $('#penerimaanModal').on('hidden.bs.modal', function() {
             editMode = false;
             $('#receivePoSummary, #receiveInvoiceSection').removeClass('is-mobile-details-open');
@@ -620,6 +712,7 @@
         });
 
         function applyPurchaseOrder(po) {
+            currentReceiptPo = po;
             $('#purchase_order_id').val(po.id);
             $('#receive_selected_po').val(po.no_po || '-');
             renderPoSummary(po);
@@ -1215,6 +1308,14 @@
                                 value="${escapeHtml(batch)}" placeholder="Batch manual"
                                 aria-label="Nomor batch ${escapeHtml(item.nama_obat)}">
                             <small class="receive-batch-mode">Input manual jika batch belum tersedia.</small>
+                            <div class="receive-batch-actions">
+                                <button type="button" class="btn btn-outline-primary receive-add-batch" aria-label="Tambah batch ${escapeHtml(item.nama_obat)}">
+                                    <i class="mdi mdi-plus" aria-hidden="true"></i> Tambah Batch
+                                </button>
+                                <button type="button" class="btn btn-outline-danger receive-remove-batch" aria-label="Hapus baris batch ${escapeHtml(item.nama_obat)}" disabled>
+                                    <i class="mdi mdi-delete-outline" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </td>
                     <td data-mobile-label="Expired Date">
@@ -1242,14 +1343,11 @@
                                 </label>
                             `).join('')}
                         </div>
-                        <small class="receive-field-note">Bisa diubah sesuai faktur.</small>
-                        <small class="receive-field-note receive-discount-effective">Efektif ${formatDecimal(diskon, 0, 2)}%</small>
                     </td>
                     <td data-mobile-label="PPN %">
                         <input type="number" class="form-control form-control-sm receive-tax" name="ppn[]"
                             min="0" max="100" step="0.01" value="${ppn}" inputmode="decimal"
                             aria-label="PPN persen ${escapeHtml(item.nama_obat)}">
-                        <small class="receive-field-note">Dari PO · default 11%</small>
                     </td>
                     <td data-mobile-label="Subtotal">
                         <strong class="receive-row-total">${formatRupiah(0)}</strong>
@@ -1285,9 +1383,50 @@
 
         function filterReceiveItemRows() {
             let selectedId = String($('#receiveItemSearch').val() || '');
-            $('#receiveDetailRows .receive-detail-row').each(function() {
+            let visible = 0;
+            let rows = $('#receiveDetailRows .receive-detail-row');
+            rows.each(function() {
                 let row = $(this);
-                row.toggleClass('d-none', selectedId !== '' && row.attr('data-po-detail-id') !== selectedId);
+                let matchesItem = !selectedId || row.attr('data-po-detail-id') === selectedId;
+                let matchesState = receiveRowFilter === 'all'
+                    || (receiveRowFilter === 'filled' && Number(row.find('.receive-qty').val()) > 0)
+                    || (receiveRowFilter === 'warning' && row.hasClass('is-warning'))
+                    || (receiveRowFilter === 'empty' && row.hasClass('is-empty'));
+                row.toggleClass('d-none', !matchesItem || !matchesState);
+                if (matchesItem && matchesState) visible++;
+            });
+            $('#receiveVisibleRows').text(`${formatDecimal(visible)} dari ${formatDecimal(rows.length)} baris`);
+            $('#receiveFilteredEmpty').toggleClass('d-none', !rows.length || visible > 0);
+        }
+
+        $('#receiveRowFilter').on('change', function() {
+            receiveRowFilter = this.value;
+            filterReceiveItemRows();
+        });
+
+        function focusReceiveIssue() {
+            receiveRowFilter = 'warning';
+            $('#receiveRowFilter').val('warning');
+            $('#receiveItemSearch').val('').trigger('change');
+            let row = $('#receiveDetailRows .is-warning').first();
+            if (!row.length) return;
+            row[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+            row.find('.is-invalid').first().trigger('focus');
+        }
+
+        $('#receiveFocusIssue').on('click', focusReceiveIssue);
+
+        function receiveDetailEntries(po, existingDetails = []) {
+            let savedByDetail = new Map();
+            existingDetails.forEach(function(detail) {
+                let key = String(detail.purchase_order_detail_id);
+                if (!savedByDetail.has(key)) savedByDetail.set(key, []);
+                savedByDetail.get(key).push(detail);
+            });
+            return (po.details || []).flatMap(function(item) {
+                let saved = savedByDetail.get(String(item.id));
+                if (saved?.length) return saved.map(detail => ({ item, detail }));
+                return Number(item.outstanding_qty) > 0 ? [{ item, detail: null }] : [];
             });
         }
 
@@ -1302,14 +1441,11 @@
         }
 
         function renderPoDetails(po, existingDetails = []) {
-            let existingByDetail = {};
-            existingDetails.forEach(function(detail) {
-                existingByDetail[detail.purchase_order_detail_id] = detail;
-            });
-
+            let entries = receiveDetailEntries(po, existingDetails);
+            let items = [...new Map(entries.map(entry => [entry.item.id, entry.item])).values()];
+            $('#receiveDetailRows .receive-batch-select.select2-hidden-accessible').select2('destroy');
+            $('#receiveDetailRows .receive-expired-date').each(function() { this._flatpickr?.destroy(); });
             $('#receiveDetailRows').empty();
-
-            let items = (po.details || []).filter(item => Number(item.outstanding_qty) > 0 || existingByDetail[item.id]);
             updateReceiveItemSearch(items);
 
             if (!items.length) {
@@ -1321,22 +1457,66 @@
                 return;
             }
 
-            items.forEach(function(item) {
-                $('#receiveDetailRows').append(detailRowTemplate(item, existingByDetail[item.id]));
-            });
+            $('#receiveDetailRows').html(entries.map(entry => detailRowTemplate(entry.item, entry.detail)).join(''));
 
             $('#receiveLineCount').text(items.length.toLocaleString('id-ID'));
             $('#receiveDetailEditor').removeClass('d-none');
             $('#receiveDetailEmpty').addClass('d-none');
 
-            flatpickr(".receive-expired-date", {
-                dateFormat: "d-m-Y",
-                allowInput: true
-            });
-
             initializeReceiveBatchSelects();
+            updateReceiveBatchButtons();
             recalculateReceiveTotals();
-            updateFormProgress();
+        }
+
+        $(document).on('focusin', '.receive-expired-date', function() {
+            if (this.readOnly || this._flatpickr) return;
+            flatpickr(this, {
+                dateFormat: 'd-m-Y', allowInput: true,
+                parseDate: function(value) {
+                    if (!validReceiveDate(value)) return undefined;
+                    let [day, month, year] = value.split('-').map(Number);
+                    return new Date(year, month - 1, day);
+                },
+                onClose: recalculateReceiveTotals
+            }).open();
+        });
+
+        function receiveGroupQuantities() {
+            let quantities = new Map();
+            $('.receive-detail-row').each(function() {
+                let row = $(this);
+                let key = row.data('po-detail-id') ?? this;
+                quantities.set(key, (quantities.get(key) || 0) + (Number(row.find('.receive-qty').val()) || 0));
+            });
+            return quantities;
+        }
+
+        function remainingQtyForReceiveRow(row) {
+            let qty = Number(row.find('.receive-qty').val()) || 0;
+            let used = receiveGroupQuantities().get(row.data('po-detail-id') ?? row[0]) || 0;
+            return roundMoney(Math.max(0, (Number(row.data('max')) || 0) - used + qty));
+        }
+
+        function updateReceiveBatchButtons() {
+            let counts = new Map();
+            let rows = $('#receiveDetailRows .receive-detail-row');
+            rows.each(function() {
+                let key = $(this).data('po-detail-id');
+                counts.set(key, (counts.get(key) || 0) + 1);
+            });
+            rows.each(function() {
+                let row = $(this);
+                row.find('.receive-remove-batch').prop('disabled', counts.get(row.data('po-detail-id')) <= 1);
+            });
+            $('#receiveLineCount').text(formatDecimal(rows.length));
+        }
+
+        function validReceiveDate(value) {
+            let match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value || '');
+            if (!match) return false;
+            let date = new Date(Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])));
+            return date.getUTCFullYear() === Number(match[3]) && date.getUTCMonth() + 1 === Number(match[2])
+                && date.getUTCDate() === Number(match[1]);
         }
 
         function collectReceiveStats() {
@@ -1351,6 +1531,9 @@
             let rowCount = 0;
             let readyRows = 0;
             let emptyRows = 0;
+            let firstIssue = '';
+            let quantities = receiveGroupQuantities();
+            let countedDetails = new Set();
 
             $('.receive-detail-row').each(function() {
                 let row = $(this);
@@ -1362,6 +1545,10 @@
                 let discount3 = normalizedDiscount(row.find('[name="diskon_3[]"]').val());
                 let tax = normalizedPercent(row.find('.receive-tax').val());
                 let max = Number(row.data('max')) || 0;
+                let detailKey = row.data('po-detail-id') ?? this;
+                let available = roundMoney(Math.max(0, max - (quantities.get(detailKey) || 0) + qty));
+                row.find('.receive-qty').attr('max', available);
+                row.find('.receive-row-hint').text(`Maks ${formatDecimal(available)} ${row.data('satuan') || 'satuan'} pada baris ini`);
                 let conversion = Number(row.data('konversi')) || 1;
                 let purchaseUnit = row.data('satuan') || 'satuan';
                 let stockUnit = row.data('satuan-stok') || 'satuan stok';
@@ -1369,6 +1556,15 @@
                 let batch = row.find('input[name="no_batch[]"]').val()?.trim();
                 let expired = row.find('input[name="expired_date[]"]').val()?.trim();
                 let hasBatchInfo = selectedBatchId ? Boolean(batch) : Boolean(batch && expired);
+                let invalidQty = qty < 0 || (quantities.get(detailKey) || 0) - max > 0.00001;
+                let invalidDate = qty > 0 && !selectedBatchId && !validReceiveDate(expired);
+                let missingBatch = qty > 0 && !batch;
+                let issue = invalidQty ? 'Qty seluruh batch melebihi sisa PO atau kurang dari 0.'
+                    : missingBatch ? 'Lengkapi nomor batch.'
+                    : invalidDate ? 'Periksa expired date (DD-MM-YYYY).' : '';
+                row.find('.receive-qty').toggleClass('is-invalid', invalidQty).attr('aria-invalid', String(invalidQty));
+                row.find('input[name="no_batch[]"]').toggleClass('is-invalid', missingBatch).attr('aria-invalid', String(missingBatch));
+                row.find('input[name="expired_date[]"]').toggleClass('is-invalid', invalidDate).attr('aria-invalid', String(invalidDate));
                 // Match the server's rounding for each receipt line before summing the invoice.
                 let subtotal = roundMoney(qty * price);
                 let taxBase = tieredDiscountNet(subtotal, discount1, discount2, discount3);
@@ -1377,10 +1573,12 @@
                 let total = roundMoney(taxBase + taxValue);
                 let check = row.find('.receive-row-check');
 
-                totalOutstanding += max;
+                if (!countedDetails.has(detailKey)) {
+                    totalOutstanding += max;
+                    countedDetails.add(detailKey);
+                }
 
                 row.find('.receive-row-total').text(formatRupiah(total));
-                row.find('.receive-discount-effective').text(`Efektif ${formatDecimal(effectiveTieredDiscount(discount1, discount2, discount3), 0, 2)}%`);
                 row.find('.receive-conversion-hint').text(conversionText(qty, conversion, purchaseUnit, stockUnit));
                 row.removeClass('is-filled is-warning is-empty');
                 check.removeClass('is-ok is-warning is-empty');
@@ -1393,16 +1591,22 @@
                     totalTax += taxValue;
                     grandTotal += total;
 
-                    if (!hasBatchInfo) {
+                    if (!hasBatchInfo || issue) {
                         invalidRows++;
+                        firstIssue ||= issue || 'Lengkapi batch dan expired date.';
                         row.addClass('is-warning');
                         check.addClass('is-warning').html(
-                            '<i class="mdi mdi-alert-circle-outline"></i> Perlu batch/expired');
+                            `<i class="mdi mdi-alert-circle-outline"></i> ${escapeHtml(issue || 'Lengkapi batch/expired')}`);
                     } else {
                         readyRows++;
                         row.addClass('is-filled');
                         check.addClass('is-ok').html('<i class="mdi mdi-check-circle-outline"></i> Lengkap');
                     }
+                } else if (invalidQty) {
+                    invalidRows++;
+                    firstIssue ||= issue;
+                    row.addClass('is-warning');
+                    check.addClass('is-warning').text(issue);
                 } else {
                     emptyRows++;
                     row.addClass('is-empty');
@@ -1421,16 +1625,18 @@
                 totalOutstanding,
                 rowCount,
                 readyRows,
-                emptyRows
+                emptyRows,
+                firstIssue
             };
         }
 
         function updateReceiveDetailSummary(stats) {
             $('#receiveDetailLiveSummary').toggleClass('d-none', stats.rowCount <= 0);
-            $('#receiveReadyRows').text(`${Number(stats.readyRows || 0).toLocaleString('id-ID')} item`);
-            $('#receiveWarningRows').text(`${Number(stats.invalidRows || 0).toLocaleString('id-ID')} item`);
+            $('#receiveReadyRows').text(`${Number(stats.readyRows || 0).toLocaleString('id-ID')} baris`);
+            $('#receiveWarningRows').text(`${Number(stats.invalidRows || 0).toLocaleString('id-ID')} baris`);
             $('#receiveLiveQty').text(Number(stats.totalQty || 0).toLocaleString('id-ID'));
             $('#receiveLiveValue').text(formatRupiah(stats.grandTotal || 0));
+            $('#receiveFocusIssue').prop('disabled', stats.invalidRows <= 0);
         }
 
         function syncInvoiceTotals(stats) {
@@ -1526,19 +1732,20 @@
             $('#receiveGrandTotal').text(formatRupiah(invoice.total));
             $('#summaryReceivePercent').text(`${receivePercent.toFixed(0)}%`);
             $('#summaryReceiveMeter').css('width', `${receivePercent}%`);
-            updateFormProgress();
+            updateFormProgress(stats);
+            filterReceiveItemRows();
         }
 
         $(document).on('input change', '.receive-qty, .receive-price, .receive-discount, .receive-tax, input[name="no_batch[]"], input[name="expired_date[]"], input[name="nomor_faktur"], input[name="tanggal_penerimaan"], input[name="tanggal_faktur"], input[name="tanggal_jatuh_tempo"], input[name="biaya_lain"], input[name="supplier_compensation_discount"], input[name="jumlah_dibayar"]', function() {
             let input = $(this);
-            let max = Number(input.closest('.receive-detail-row').data('max')) || 0;
 
             if (input.attr('name') === 'jumlah_dibayar') {
                 paymentPreset = 'manual';
             }
 
-            if (input.hasClass('receive-qty') && Number(input.val()) > max) {
-                input.val(max);
+            if (input.hasClass('receive-qty')) {
+                let available = remainingQtyForReceiveRow(input.closest('.receive-detail-row'));
+                if (Number(input.val()) > available) input.val(available);
             }
 
             if (input.hasClass('receive-tax') || input.hasClass('receive-discount')) {
@@ -1609,21 +1816,71 @@
 
         $(document).on('click', '.receive-fill-max', function() {
             let row = $(this).closest('.receive-detail-row');
-            row.find('.receive-qty').val(Number(row.data('max')) || 0).trigger('input');
+            row.find('.receive-qty').val(remainingQtyForReceiveRow(row)).trigger('input');
+        });
+
+        $(document).on('click', '.receive-add-batch', function() {
+            let row = $(this).closest('.receive-detail-row');
+            let item = currentReceiptPo?.details.find(item => String(item.id) === String(row.data('po-detail-id')));
+            if (!item) return;
+            let detail = { qty_diterima: 0, harga_beli: parseCurrencyValue(row.find('.receive-price').val()),
+                diskon_1: row.find('[name="diskon_1[]"]').val(), diskon_2: row.find('[name="diskon_2[]"]').val(),
+                diskon_3: row.find('[name="diskon_3[]"]').val(), ppn: row.find('.receive-tax').val() };
+            let added = $(detailRowTemplate(item, detail));
+            row.after(added);
+            initializeReceiveBatchSelects(added);
+            updateReceiveBatchButtons();
+            receiveRowFilter = 'all';
+            $('#receiveRowFilter').val('all');
+            recalculateReceiveTotals();
+            markReceiptDirty();
+            added.find('.receive-qty').trigger('focus');
+        });
+
+        $(document).on('click', '.receive-remove-batch', function() {
+            let row = $(this).closest('.receive-detail-row');
+            if ($(this).prop('disabled')) return;
+            row.find('.select2-hidden-accessible').select2('destroy');
+            row.find('.receive-expired-date').each(function() { this._flatpickr?.destroy(); });
+            row.remove();
+            updateReceiveBatchButtons();
+            recalculateReceiveTotals();
+            markReceiptDirty();
+        });
+
+        $(document).on('keydown', '#receiveDetailRows input', function(event) {
+            if (event.key !== 'Enter' || event.isComposing || event.originalEvent?.isComposing) return;
+            event.preventDefault();
+            let name = $(this).attr('name');
+            let rows = $('#receiveDetailRows .receive-detail-row:not(.d-none)');
+            let index = rows.index($(this).closest('.receive-detail-row'));
+            let next = rows.eq(index + (event.shiftKey ? -1 : 1));
+            if (next.length && index + (event.shiftKey ? -1 : 1) >= 0) {
+                next.find('input').filter(function() { return this.name === name; }).first().trigger('focus');
+            }
         });
 
         $('#fillAllOutstanding').on('click', function() {
             $('#receiveItemSearch').val('').trigger('change');
+            let quantities = receiveGroupQuantities();
+            let filled = new Set();
             $('.receive-detail-row').each(function() {
-                $(this).find('.receive-qty').val(Number($(this).data('max')) || 0);
+                let row = $(this);
+                let key = row.data('po-detail-id');
+                if (filled.has(key)) return;
+                let current = Number(row.find('.receive-qty').val()) || 0;
+                row.find('.receive-qty').val(roundMoney(Math.max(0, (Number(row.data('max')) || 0) - (quantities.get(key) || 0) + current)));
+                filled.add(key);
             });
             recalculateReceiveTotals();
+            markReceiptDirty();
         });
 
         $('#clearAllQty').on('click', function() {
             $('#receiveItemSearch').val('').trigger('change');
             $('.receive-detail-row .receive-qty').val(0);
             recalculateReceiveTotals();
+            markReceiptDirty();
         });
 
         function updateReceiveSummary(summary, recordsTotal) {
@@ -2113,9 +2370,9 @@
                 Swal.fire({
                     icon: 'warning',
                     title: 'Detail barang belum lengkap',
-                    text: itemStats.itemCount > 0 ?
+                    text: itemStats.firstIssue || (itemStats.itemCount > 0 ?
                         'Lengkapi batch atau expired date pada item yang diterima.' :
-                        'Isi minimal satu qty barang yang diterima.'
+                        'Isi minimal satu qty barang yang diterima.')
                 });
                 return;
             }
@@ -2142,16 +2399,36 @@
                 && e.originalEvent?.submitter?.id === 'submitPenerimaanNextInvoice';
             let poId = $('#purchase_order_id').val();
             receiptSaving = true;
+            $('#penerimaanForm').prop('inert', true);
+            $('#penerimaanModal .receive-form-buttons').addClass('is-saving');
+            $('#receiveSaveStatus').removeClass('is-dirty is-saving is-saved is-error')
+                .addClass('is-saving').text('Sedang menyimpan draft...');
             $('#submitPenerimaanForm, #submitPenerimaanNextInvoice').prop('disabled', true);
 
             $.ajax({
                 url: url,
                 type: method,
-                data: serializePenerimaanForm(),
+                // Large POs exceed PHP's max_input_vars when sent as form data.
+                contentType: 'application/json; charset=UTF-8',
+                dataType: 'json',
+                headers: { Accept: 'application/json' },
+                data: penerimaanJsonPayload(serializePenerimaanForm()),
                 success: function(response) {
-                    if (response.data?.nomor_penerimaan) {
-                        $('#nomor_penerimaan').val(response.data.nomor_penerimaan);
+                    if (response?.status !== 'success' || !Number.isSafeInteger(Number(response.data?.id))
+                        || Number(response.data.id) <= 0 || typeof response.data.nomor_penerimaan !== 'string'
+                        || !response.data.nomor_penerimaan.trim()
+                        || (id && String(response.data.id) !== String(id))) {
+                        showReceiptSaveError({ responseJSON: response });
+                        return;
                     }
+                    $('#penerimaan_id').val(response.data.id);
+                    $('#nomor_penerimaan').val(response.data.nomor_penerimaan);
+                    receiptSaving = false;
+                    receiptDirty = false;
+                    receiptAllowClose = true;
+                    $('#penerimaanForm').prop('inert', false);
+                    $('#receiveSaveStatus').removeClass('is-dirty is-saving is-saved is-error')
+                        .addClass('is-saved').text('Draft sudah tersimpan');
                     if (createNextInvoice) {
                         $('#penerimaanModal').one('hidden.bs.modal', function() {
                             openNextInvoice(poId);
@@ -2161,6 +2438,7 @@
                     Swal.fire({
                         icon: 'success',
                         title: response.message,
+                        text: response.data.nomor_penerimaan,
                         toast: true,
                         position: 'top-end',
                         timer: 3000,
@@ -2169,18 +2447,11 @@
                     });
                     PenerimaanTable.ajax.reload(null, false);
                 },
-                error: function(xhr) {
-                    let message = xhr.responseJSON?.message || 'Penerimaan belum bisa disimpan.';
-                    let errors = xhr.responseJSON?.errors || {};
-                    let firstError = Object.values(errors)[0]?.[0];
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal menyimpan',
-                        text: firstError || message
-                    });
-                },
+                error: showReceiptSaveError,
                 complete: function() {
                     receiptSaving = false;
+                    $('#penerimaanForm').prop('inert', false);
+                    $('#penerimaanModal .receive-form-buttons').removeClass('is-saving');
                     $('#submitPenerimaanForm, #submitPenerimaanNextInvoice').prop('disabled', false);
                 }
             });
@@ -2201,9 +2472,9 @@
                     $('#nomor_penerimaan').val(header.nomor_penerimaan);
                     $('input[name="nomor_faktur"]').val(header.nomor_faktur);
                     $('input[name="nomor_surat_jalan"]').val(header.nomor_surat_jalan);
-                    $('input[name="tanggal_penerimaan"]').val(formatDateInput(header.tanggal_penerimaan));
-                    $('input[name="tanggal_faktur"]').val(formatDateInput(header.tanggal_faktur));
-                    $('input[name="tanggal_jatuh_tempo"]').val(formatDateInput(header.tanggal_jatuh_tempo));
+                    receiveDateControl.setDate(formatDateInput(header.tanggal_penerimaan), false);
+                    invoiceDateControl.setDate(formatDateInput(header.tanggal_faktur), false);
+                    invoiceDueDateControl.setDate(formatDateInput(header.tanggal_jatuh_tempo), false);
                     $('input[name="status_pembayaran"]').val(header.status_pembayaran || 'belum_dibayar');
                     setMoneyInput('subtotal', header.subtotal);
                     setMoneyInput('diskon', header.diskon ?? header.total_diskon);
