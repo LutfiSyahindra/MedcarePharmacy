@@ -1910,7 +1910,7 @@
                     updatePurchaseOrderNumberMode();
                     if (saveAsDraft) $('#pembelianModalLabel').text('Edit Purchase Order');
                     markPurchaseSaved();
-                    if (!saveAsDraft && !changedSinceAttempt) {
+                    if (!changedSinceAttempt) {
                         purchaseAllowClose = true;
                         $('#pembelianModal').modal('hide');
                     }
