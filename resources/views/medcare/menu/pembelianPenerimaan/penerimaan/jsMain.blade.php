@@ -1258,10 +1258,10 @@
             let unitChanged = existing && (Number(existing.konversi_satuan || 1) !== conversion
                 || (existing.satuan_beli && existing.satuan_beli !== item.satuan));
             let conversionHint = conversion > 1
-                ? `<small class="d-block text-muted receive-conversion-hint">${conversionText(qtyValue, conversion, item.satuan, stockUnit)}</small>`
+                ? `<small class="d-block text-muted receive-qty-note receive-conversion-hint">${conversionText(qtyValue, conversion, item.satuan, stockUnit)}</small>`
                 : '';
             if (unitChanged) {
-                conversionHint += `<small class="d-block text-warning">Satuan PO berubah. Qty dan harga sebelumnya per ${escapeHtml(existing.satuan_beli || 'satuan lama')} (konversi ${formatDecimal(existing.konversi_satuan || 1)}). Periksa dan sesuaikan isian.</small>`;
+                conversionHint += `<small class="d-block text-warning receive-qty-note">Satuan PO berubah. Qty dan harga sebelumnya per ${escapeHtml(existing.satuan_beli || 'satuan lama')} (konversi ${formatDecimal(existing.konversi_satuan || 1)}). Periksa dan sesuaikan isian.</small>`;
             }
 
             if (selectedBatchId && !batchOptions.some(batchItem => String(batchItem.id) === String(selectedBatchId))) {

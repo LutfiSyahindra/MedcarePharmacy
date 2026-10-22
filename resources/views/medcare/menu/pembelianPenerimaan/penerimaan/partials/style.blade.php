@@ -2338,6 +2338,13 @@
         font-weight: 900;
     }
 
+    .receive-qty-note {
+        max-width: 160px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.4;
+    }
+
     .receive-row-total {
         color: var(--purchase-primary-strong);
         white-space: nowrap;
