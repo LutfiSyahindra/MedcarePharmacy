@@ -1841,15 +1841,23 @@
                 return;
             }
             purchaseSaveInProgress = true;
-            $('#pembelianForm').prop('inert', true);
-            $('#purchaseDraftStatus').text('Menyimpan...');
-            updateUnitLoadingState();
-            persistPurchaseRecovery();
 
-            (purchasePendingSave ? Promise.resolve() : Promise.all([
-                    ensurePurchaseOrderNumber(),
-                    waitForPendingUnitRequests()
-                ]))
+            // Start recovery before touching the form or preparing requests. A synchronous
+            // browser error here must also reach catch/finally and unlock the modal.
+            return Promise.resolve()
+                .then(function() {
+                    $('#pembelianForm').prop('inert', true);
+                    $('#purchaseDraftStatus').text('Menyimpan...');
+                    updateUnitLoadingState();
+                    persistPurchaseRecovery();
+
+                    if (!purchasePendingSave) {
+                        return PurchaseOrderEntry.withTimeout(() => Promise.all([
+                            ensurePurchaseOrderNumber(),
+                            waitForPendingUnitRequests()
+                        ]), 25000);
+                    }
+                })
                 .then(function() {
                     if (purchasePendingSave) return sendPendingPurchaseSave();
                     if (!saveAsDraft && $('#detail-wrapper .detail-item').toArray().some(function(element) {

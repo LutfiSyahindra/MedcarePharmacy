@@ -129,6 +129,28 @@
         }
     }
 
+    function withTimeout(task, milliseconds, onTimeout) {
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (callback, value) => {
+                if (settled) return;
+                settled = true;
+                root.clearTimeout(timer);
+                callback(value);
+            };
+            const timer = root.setTimeout(() => {
+                if (settled) return;
+                // Settle before aborting: a transport may fail to deliver its error callback.
+                finish(reject, { status: 0, statusText: 'timeout' });
+                try { if (onTimeout) onTimeout(); } catch (_) { /* The form is already released. */ }
+            }, milliseconds);
+            Promise.resolve().then(task).then(
+                value => finish(resolve, value),
+                error => finish(reject, error)
+            );
+        });
+    }
+
     function recoveryStore(storage, key) {
         return {
             read() {
@@ -160,5 +182,5 @@
         return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
     }
 
-    root.PurchaseOrderEntry = Object.freeze({ formatMoney, moneyInput, calculateAmounts, summarizeAmounts, splitBatches, parsePaste, rowIssues, formPayload, requestWithCsrfRecovery, recoveryStore, newRequestKey });
+    root.PurchaseOrderEntry = Object.freeze({ formatMoney, moneyInput, calculateAmounts, summarizeAmounts, splitBatches, parsePaste, rowIssues, formPayload, requestWithCsrfRecovery, withTimeout, recoveryStore, newRequestKey });
 })(globalThis);

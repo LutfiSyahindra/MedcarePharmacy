@@ -25,20 +25,25 @@
         function persistPurchaseRecovery() {
             clearTimeout(purchaseRecoveryTimer);
             if (purchaseRecovering || !$('#pembelianModal').hasClass('show')) return;
-            const form = {};
-            $('#pembelianForm [name]').each(function() {
-                if (this.name !== '_token' && !this.name.endsWith('[]')) form[this.name] = $(this).val();
-            });
-            const rows = $('#detail-wrapper .detail-item').map(function() {
-                const row = $(this);
-                const fields = {};
-                // Include disabled selections and incomplete/invalid values as entered.
-                row.find('[name]').each(function() { fields[this.name.slice(0, -2)] = $(this).val(); });
-                return { fields, priceInput: row.find('.purchase-price-input').val(),
-                    medicineText: row.find('[name="obat_id[]"] option:selected').text() };
-            }).get();
-            purchaseBackupAvailable = purchaseRecoveryStore.write({ form, rows,
-                pending: purchasePendingSave, defaultTax: purchaseDefaultTax, updatedAt: Date.now() });
+            try {
+                const form = {};
+                $('#pembelianForm [name]').each(function() {
+                    if (this.name !== '_token' && !this.name.endsWith('[]')) form[this.name] = $(this).val();
+                });
+                const rows = $('#detail-wrapper .detail-item').map(function() {
+                    const row = $(this);
+                    const fields = {};
+                    // Include disabled selections and incomplete/invalid values as entered.
+                    row.find('[name]').each(function() { fields[this.name.slice(0, -2)] = $(this).val(); });
+                    return { fields, priceInput: row.find('.purchase-price-input').val(),
+                        medicineText: row.find('[name="obat_id[]"] option:selected').text() };
+                }).get();
+                purchaseBackupAvailable = purchaseRecoveryStore.write({ form, rows,
+                    pending: purchasePendingSave, defaultTax: purchaseDefaultTax, updatedAt: Date.now() });
+            } catch (_) {
+                // A browser backup is optional; failure to collect it must not block saving.
+                purchaseBackupAvailable = false;
+            }
         }
 
         function showPurchaseRecoveryNotice() {
@@ -105,7 +110,16 @@
         }
 
         function purchaseAjax(options) {
-            return new Promise((resolve, reject) => $.ajax({ ...options, success: resolve, error: reject }));
+            let request;
+            return PurchaseOrderEntry.withTimeout(() => new Promise((resolve, reject) => {
+                request = $.ajax(options);
+                // Deferred handlers also observe requests cancelled before $.ajax returns.
+                request.done(resolve).fail(function(xhr, statusText) {
+                    reject(statusText === 'parsererror'
+                        ? { status: xhr.status, statusText, responseJSON: xhr.responseJSON }
+                        : xhr);
+                });
+            }), options.timeout || 60000, () => request?.abort('timeout'));
         }
 
         function sendPendingPurchaseSave() {
